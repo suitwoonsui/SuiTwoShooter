@@ -69,6 +69,8 @@ function checkBossProjectileCollision() {
           if (typeof playForceFieldDestroyedSound === 'function') {
             playForceFieldDestroyedSound();
           }
+          // Give player invulnerability when force field is destroyed
+          game.invulnerabilityTime = 60; // 1 second of invulnerability
         } else {
           console.log('Force field damaged by boss projectile! New level:', game.forceField.level);
           // Play force field power down sound
