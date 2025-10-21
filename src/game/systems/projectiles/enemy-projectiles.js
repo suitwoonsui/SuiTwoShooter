@@ -44,12 +44,13 @@ function checkEnemyProjectileCollision() {
         b.y > bodyY && b.y < bodyY + bodyHeight) {
       
       // If force field is active, it blocks the projectile
-      if (game.forceField.active && game.forceField.level > 0) {
+      if (game.forceField.active && game.forceField.level > 0 && game.forceField.invulnerabilityTime <= 0) {
         console.log('Force field blocked projectile! Level:', game.forceField.level);
         game.enemyProjectiles.splice(i,1);
         
         // Force field takes damage and loses a level
         game.forceField.level--;
+        game.forceField.invulnerabilityTime = 60; // 1 second of invulnerability
         if (game.forceField.level <= 0) {
           game.forceField.active = false;
           game.forceField.level = 0;

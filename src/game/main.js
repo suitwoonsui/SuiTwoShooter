@@ -71,6 +71,7 @@ function restart() {
   resetCoinStreak();
   game.forceField.maxStreak = 0;
   game.forceField.active = false;
+  game.forceField.invulnerabilityTime = 0;
   player.lane = 1;
   player.y = game.height / 2 - player.height / 2;
   game.mouseY = game.height / 2;
@@ -159,7 +160,8 @@ const game = {
     level: 0, // 0 = none, 1 = level 1, 2 = level 2
     coinStreak: 0, // Consecutive coins collected without being hit
     maxStreak: 0, // Highest streak achieved this game
-    active: false // Whether force field is currently active
+    active: false, // Whether force field is currently active
+    invulnerabilityTime: 0 // Invulnerability timer after being hit (60 frames = 1 second)
   }
 };
 
@@ -471,6 +473,11 @@ function update() {
   // Invulnerability timer
   if (game.invulnerabilityTime > 0) {
     game.invulnerabilityTime--;
+  }
+
+  // Force field invulnerability timer
+  if (game.forceField.invulnerabilityTime > 0) {
+    game.forceField.invulnerabilityTime--;
   }
 
   // Boss spawning
