@@ -1,0 +1,804 @@
+﻿
+> function draw() {
+    const ctx = game.ctx;
+    
+    // Always clear canvas
+    ctx.clearRect(0, 0, game.width, game.height);
+    
+    // Show menu message if menu is visible
+    if (typeof gameState !== 'undefined' && gameState.isMenuVisible) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillRect(0, 0, game.width, game.height);
+      
+      ctx.fillStyle = '#4DA2FF';
+      ctx.font = 'bold 32px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Main Menu Active', game.width / 2, game.height / 2);
+      
+      ctx.fillStyle = '#ccc';
+      ctx.font = '18px Arial';
+      ctx.fillText('Use the menu above to start playing', game.width / 2, game.height / 2 + 40);
+      
+      return;
+    }
+    
+    // Update header stats and game UI
+    updateHeaderStats();
+    updateGameUI();
+  
+    // Enhanced Game Over screen
+    if (game.gameOver) {
+      // Animated dark background with pulsing effect
+      const pulseAlpha = 0.7 + 0.3 * Math.sin(Date.now() * 0.005);
+      ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha})`;
+      ctx.fillRect(0, 0, game.width, game.height);
+      
+      // End particles
+      game.particles.forEach(p => p.draw(ctx));
+      
+      // Enhanced GAME OVER title with glow effect - properly positioned
+      ctx.save();
+      ctx.shadowColor = '#FF0000';
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = '#FF0000';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 4;
+      ctx.font = 'bold 64px Arial'; // Reduced font size to fit better
+      ctx.textAlign = 'center';
+      const gameOverText = 'GAME OVER';
+      const centerX = game.width / 2;
+      const centerY = game.height / 2 - 60; // Moved up to ensure it fits
+      ctx.strokeText(gameOverText, centerX, centerY);
+      ctx.fillText(gameOverText, centerX, centerY);
+      ctx.restore();
+      
+      // Enhanced final score display
+      ctx.save();
+      ctx.shadowColor = '#39ff14';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = '#39ff14';
+      ctx.strokeStyle = '#4DA2FF';
+      ctx.lineWidth = 3;
+      ctx.font = 'bold 36px Arial'; // Reduced font size
+      ctx.strokeText(`Final Score: ${game.score.toLocaleString()}`, centerX, centerY + 40);
+      ctx.fillText(`Final Score: ${game.score.toLocaleString()}`, centerX, centerY + 40);
+      ctx.restore();
+      
+      // Enhanced stats display
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 22px Arial'; // Reduced font size
+      ctx.fillText(`Coins Collected: ${game.coins}`, centerX, centerY + 80);
+      
+      ctx.fillStyle = '#4DA2FF';
+      ctx.font = 'bold 20px Arial'; // Reduced font size
+      ctx.fillText(`Bosses Defeated: ${game.bossesDefeated}`, centerX, centerY + 105);
+      
+      // Enhanced restart instructions with animation
+      const blinkAlpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
+      ctx.fillStyle = `rgba(170, 170, 170, ${blinkAlpha})`;
+      ctx.font = 'bold 22px Arial'; // Reduced font size
+      ctx.fillText('Press SPACE to restart', centerX, centerY + 140);
+      
+      return;
+    }
+  
+    // Enhanced Pause overlay
+    if (game.paused) {
+      // Animated semi-transparent overlay
+      const pulseAlpha = 0.6 + 0.2 * Math.sin(Date.now() * 0.008);
+      ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha})`;
+      ctx.fillRect(0, 0, game.width, game.height);
+      
+      // Enhanced PAUSED text with glow
+      ctx.save();
+      ctx.shadowColor = '#4DA2FF';
+      ctx.shadowBlur = 25;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#4DA2FF';
+      ctx.lineWidth = 5;
+      ctx.font = 'bold 72px Arial';
+      ctx.textAlign = 'center';
+      const pausedText = 'PAUSED';
+      const centerX = game.width / 2;
+      const centerY = game.height / 2 - 60;
+      ctx.strokeText(pausedText, centerX, centerY);
+      ctx.fillText(pausedText, centerX, centerY);
+      ctx.restore();
+      
+      // Enhanced instructions with animation
+      const blinkAlpha = 0.6 + 0.4 * Math.sin(Date.now() * 0.012);
+      ctx.fillStyle = `rgba(204, 204, 204, ${blinkAlpha})`;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.font = 'bold 28px Arial';
+      ctx.strokeText('Press P to resume', centerX, centerY + 80);
+      ctx.fillText('Press P to resume', centerX, centerY + 80);
+      
+      // Additional controls info
+      ctx.fillStyle = '#AAAAAA';
+      ctx.font = 'bold 20px Arial';
+      ctx.fillText('SPACE: Restart Game', centerX, centerY + 120);
+      
+      return;
+    }
+  
+    // Horizontal background
+    if (!game.bossActive && !game.bossWarning) {
+      ctx.drawImage(backgroundImage, game.bgX - game.width, 0, game.width, game.height);
+      ctx.drawImage(backgroundImage, game.bgX, 0, game.width, game.height);
+    } else {
+      // Static background during boss phase
+      ctx.drawImage(backgroundImage, 0, 0, game.width, game.height);
+    }
+  
+    // Boss warning
+    if (game.bossWarning) {
+      // Pulsing effect
+      const alpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
+      ctx.save();
+      ctx.fillStyle = `rgba(255, 0, 0, ${alpha * 0.3})`;
+      ctx.fillRect(0, 0, game.width, game.height);
+      
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#FF0000';
+      ctx.lineWidth = 3;
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      const text = 'BOSS WARNING!';
+      const x = game.width / 2;
+      const y = game.height / 2;
+      ctx.strokeText(text, x, y);
+      ctx.fillText(text, x, y);
+      ctx.restore();
+      
+      // Still draw player
+      ctx.drawImage(characterImage, player.x, player.y, player.width, player.height);
+      return;
+    }
+  
+    if (game.bossActive) {
+      // Player
+      ctx.drawImage(characterImage, player.x, player.y, player.width, player.height);
+      
+      // Force field rendering during boss fight
+      if (game.forceField.active && game.forceField.level > 0) {
+        ctx.save();
+        
+        // Force field properties based on level
+        const fieldRadius = 50 + (game.forceField.level * 15); // Level 1: 65px, Level 2: 80px
+        const fieldColor = game.forceField.level === 1 ? '#4DA2FF' : '#39ff14'; // Sui blue for level 1, Highlighter green for level 2
+        const fieldAlpha = 0.3 + (game.forceField.level * 0.1); // Level 1: 0.4, Level 2: 0.5
+        
+        // Animated pulsing effect
+        const pulseScale = 1 + 0.1 * Math.sin(Date.now() * 0.01);
+        const pulseRadius = fieldRadius * pulseScale;
+        
+        const pcx = player.x + player.width/2;
+        const pcy = player.y + player.height/2;
+        
+        // Create gradient for force field
+        const fieldGrad = ctx.createRadialGradient(pcx, pcy, 0, pcx, pcy, pulseRadius);
+        fieldGrad.addColorStop(0, `rgba(255,255,255,${fieldAlpha * 0.5})`);
+        fieldGrad.addColorStop(0.7, fieldColor + Math.floor(fieldAlpha * 255).toString(16).padStart(2, '0'));
+        fieldGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        
+        // Draw force field circle
+        ctx.fillStyle = fieldGrad;
+        ctx.beginPath();
+        ctx.arc(pcx, pcy, pulseRadius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw force field outline
+        ctx.strokeStyle = fieldColor;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = fieldAlpha;
+        ctx.beginPath();
+        ctx.arc(pcx, pcy, pulseRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Add sparkle effects for level 2
+        if (game.forceField.level === 2) {
+          ctx.globalAlpha = 0.6;
+          for (let i = 0; i < 8; i++) {
+            const angle = (Date.now() * 0.002 + i * Math.PI / 4) % (Math.PI * 2);
+            const sparkleX = pcx + Math.cos(angle) * (pulseRadius * 0.8);
+            const sparkleY = pcy + Math.sin(angle) * (pulseRadius * 0.8);
+            
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        
+        ctx.restore();
+      }
+      
+      // Player bullets
+      game.bullets.forEach(b=>{
+        // Draw trail first (behind the projectile)
+        if (b.trail && b.trail.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = b.trailColor;
+          ctx.lineCap = 'butt'; // Flat ends instead of rounded
+          
+          // Draw trail segments with diminishing size and opacity (draw from newest to oldest)
+          for (let i = b.trail.length - 2; i >= 0; i--) {
+            const currentPoint = b.trail[i];
+            const nextPoint = b.trail[i + 1];
+            
+            // Calculate diminishing properties (progress from old to new)
+            const progress = (i + 1) / (b.trail.length - 1);
+            const alpha = progress * 0.4; // Fade from 40% to 0% (newest point is 40%, oldest is 0%)
+            const orbSize = b.level * 8 + 16; // Same size calculation as the projectile
+            const lineWidth = progress * Math.max(3, orbSize); // Diminish from full size to 0 (newest point is full, oldest is 0)
+            
+            // Draw multiple layers for flame-like effect
+            for (let layer = 0; layer < 3; layer++) {
+              const layerAlpha = alpha * (1 - layer * 0.3); // Each layer is more transparent
+              const layerWidth = lineWidth * (1 - layer * 0.2); // Each layer is slightly thinner
+              const layerOffset = (layer - 1) * 2; // Offset layers slightly
+              
+              ctx.globalAlpha = layerAlpha;
+              ctx.lineWidth = Math.max(1, layerWidth);
+              
+              ctx.beginPath();
+              ctx.moveTo(currentPoint.x + layerOffset, currentPoint.y);
+              ctx.lineTo(nextPoint.x + layerOffset, nextPoint.y);
+              ctx.stroke();
+            }
+          }
+          
+          ctx.restore();
+        }
+        
+        // Draw the projectile itself
+        const orbSize=b.level*8+16, bx=b.x, by=b.y-orbSize/2; // Smaller but proportional orbs
+        ctx.save();
+        ctx.globalAlpha=0.7+0.3*(b.level/3);
+        ctx.shadowColor='cyan'; ctx.shadowBlur=10+b.level*5;
+        // Draw Blue Orb Shot image instead of rectangle
+        ctx.drawImage(blueOrbShotImage, bx, by, orbSize, orbSize);
+        ctx.restore(); ctx.shadowBlur=0;
+      });
+      
+      // Boss - with enrage effect
+      const imageToUse = bossImage || bossImages[game.boss.type-1] || enemyImages[0];
+      
+      // Enrage effect - pulsing red outline
+      if (game.boss.enraged) {
+        ctx.save();
+        const pulseAlpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
+        ctx.strokeStyle = `rgba(255, 0, 0, ${pulseAlpha})`;
+        ctx.lineWidth = 8;
+        if (imageToUse.complete && imageToUse.naturalWidth > 0) {
+          const baseHeight = game.boss.height;
+          const aspectRatio = imageToUse.naturalWidth / imageToUse.naturalHeight;
+          const bossWidth = baseHeight * aspectRatio;
+          const centerOffset = (game.boss.width - bossWidth) / 2;
+          ctx.strokeRect(game.boss.x + centerOffset - 4, game.boss.y - 4, bossWidth + 8, baseHeight + 8);
+        } else {
+          ctx.strokeRect(game.boss.x - 4, game.boss.y - 4, game.boss.width + 8, game.boss.height + 8);
+        }
+        ctx.restore();
+      }
+      
+      // Draw boss with proper aspect ratio based on height
+      if (imageToUse.complete && imageToUse.naturalWidth > 0) {
+        const baseHeight = game.boss.height; // Use the current height as base
+        const aspectRatio = imageToUse.naturalWidth / imageToUse.naturalHeight;
+        const bossWidth = baseHeight * aspectRatio;
+        const bossHeight = baseHeight;
+        
+        // Center the boss horizontally if width changes
+        const centerOffset = (game.boss.width - bossWidth) / 2;
+        
+        // Add red glow effect for Tier 2 and Tier 4 bosses (Boss_Market_Maker and Boss_Shadow_Figure)
+        if (game.boss.tier === 2 || game.boss.tier === 4) {
+          ctx.save();
+          // Create red glow effect
+          ctx.shadowColor = '#FF0000';
+          ctx.shadowBlur = 20;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.drawImage(imageToUse, game.boss.x + centerOffset, game.boss.y, bossWidth, bossHeight);
+          ctx.restore();
+        } else {
+          ctx.drawImage(imageToUse, game.boss.x + centerOffset, game.boss.y, bossWidth, bossHeight);
+        }
+      } else {
+        // Fallback to original size if image not loaded
+        if (game.boss.tier === 2 || game.boss.tier === 4) {
+          ctx.save();
+          ctx.shadowColor = '#FF0000';
+          ctx.shadowBlur = 20;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.drawImage(imageToUse, game.boss.x, game.boss.y, game.boss.width, game.boss.height);
+          ctx.restore();
+        } else {
+          ctx.drawImage(imageToUse, game.boss.x, game.boss.y, game.boss.width, game.boss.height);
+        }
+      }
+      
+      // Boss hit effect - red outline instead of white highlight
+      if (game.boss.hitTime > 0) {
+        ctx.save();
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 4;
+        if (imageToUse.complete && imageToUse.naturalWidth > 0) {
+          const baseHeight = game.boss.height;
+          const aspectRatio = imageToUse.naturalWidth / imageToUse.naturalHeight;
+          const bossWidth = baseHeight * aspectRatio;
+          const centerOffset = (game.boss.width - bossWidth) / 2;
+          ctx.strokeRect(game.boss.x + centerOffset, game.boss.y, bossWidth, baseHeight);
+        } else {
+          ctx.strokeRect(game.boss.x, game.boss.y, game.boss.width, game.boss.height);
+        }
+        ctx.restore();
+      }
+      
+      // Vulnerability indicator - ONLY during invulnerability phase
+      if (!game.boss.vulnerable) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(100, 100, 255, 0.3)';
+        if (imageToUse.complete && imageToUse.naturalWidth > 0) {
+          const baseHeight = game.boss.height;
+          const aspectRatio = imageToUse.naturalWidth / imageToUse.naturalHeight;
+          const bossWidth = baseHeight * aspectRatio;
+          const centerOffset = (game.boss.width - bossWidth) / 2;
+          ctx.fillRect(game.boss.x + centerOffset, game.boss.y, bossWidth, baseHeight);
+          
+          // Blue outline to indicate invulnerability
+          ctx.strokeStyle = '#4444FF';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(game.boss.x + centerOffset, game.boss.y, bossWidth, baseHeight);
+        } else {
+          ctx.fillRect(game.boss.x, game.boss.y, game.boss.width, game.boss.height);
+          
+          // Blue outline to indicate invulnerability
+          ctx.strokeStyle = '#4444FF';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(game.boss.x, game.boss.y, game.boss.width, game.boss.height);
+        }
+        ctx.restore();
+      }
+      
+      // Boss health bar (visible only when vulnerable)
+      if (game.boss.vulnerable) {
+        const barW = game.width * 0.6, barX = (game.width - barW) / 2, barY = 10;
+        ctx.strokeStyle = '#FFF'; ctx.lineWidth = 3;
+        ctx.strokeRect(barX, barY, barW, 15);
+        
+        // Bar background
+        ctx.fillStyle = '#333';
+        ctx.fillRect(barX + 1, barY + 1, barW - 2, 13);
+        
+        // Health bar
+        const ratio = Math.max(game.boss.hp, 0) / game.boss.maxHp;
+        const healthColor = ratio > 0.5 ? '#0F0' : ratio > 0.25 ? '#FF0' : '#F00';
+        ctx.fillStyle = healthColor;
+        ctx.fillRect(barX + 1, barY + 1, (barW - 2) * ratio, 13);
+        
+        // HP text
+        ctx.fillStyle = '#FFF';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${game.boss.hp}/${game.boss.maxHp}`, game.width/2, barY + 12);
+        
+        // Current attack pattern display
+        const patterns = ['Linear Shot', 'Triple Spread', 'Homing Shot', 'Vertical Barrage', 'Spiral Attack'];
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Attack: ${patterns[game.boss.attackPattern]}`, game.width/2, barY + 35);
+        
+        // Enrage timer
+        if (!game.boss.enraged) {
+          const now = game.now();
+          const enrageElapsed = now - game.boss.enrageStart;
+          const remaining = Math.max(0, (game.boss.enrageTime - enrageElapsed) / 1000);
+          
+          // Enrage timer bar
+          const timerBarW = game.width * 0.4;
+          const timerBarX = (game.width - timerBarW) / 2;
+          const timerBarY = 55; // Just below health bar
+          
+          // Bar background
+          ctx.strokeStyle = '#FFF';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(timerBarX, timerBarY, timerBarW, 12);
+          
+          ctx.fillStyle = '#222';
+          ctx.fillRect(timerBarX + 1, timerBarY + 1, timerBarW - 2, 10);
+          
+          // Progress bar (red filling up)
+          const timerRatio = Math.min(enrageElapsed / game.boss.enrageTime, 1);
+          const timerColor = timerRatio > 0.8 ? '#FF0000' : timerRatio > 0.5 ? '#FF8800' : '#FFAA00';
+          ctx.fillStyle = timerColor;
+          ctx.fillRect(timerBarX + 1, timerBarY + 1, (timerBarW - 2) * timerRatio, 10);
+          
+          // Timer text
+          ctx.fillStyle = '#FFF';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(`ENRAGE in ${remaining.toFixed(1)}s`, game.width/2, timerBarY + 10);
+        } else {
+          // ENRAGED display
+          ctx.fillStyle = '#FF0000';
+          ctx.font = 'bold 16px Arial';
+          ctx.textAlign = 'center';
+          const enrageAlpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
+          ctx.save();
+          ctx.globalAlpha = enrageAlpha;
+          ctx.fillText('âš¡ ENRAGED âš¡', game.width/2, 65);
+          ctx.restore();
+        }
+      } else {
+        // Display time remaining before vulnerability
+        const now = game.now();
+        const elapsedTime = now - game.boss.entranceStart;
+        const remaining = Math.max(0, (game.boss.entranceTime - elapsedTime) / 1000);
+        
+        ctx.fillStyle = '#FFF';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Boss arrives in ${remaining.toFixed(1)}s`, game.width/2, 50);
+      }
+      
+      // Lives display during boss
+      const maxLives = 3;
+      const lifeSize = 30;
+      for (let i = 0; i < maxLives; i++) {
+        const x = game.width - 10 - i * (lifeSize + 5);
+        const y = 50; // Lower to avoid boss health bar
+        if (i < game.lives) {
+          // Full heart
+          ctx.drawImage(lifeFullImage, x - lifeSize, y, lifeSize, lifeSize);
+        } else {
+          // Empty heart
+          ctx.drawImage(lifeEmptyImage, x - lifeSize, y, lifeSize, lifeSize);
+        }
+      }
+      
+      // Score during boss moved to overlay - handled by HTML/CSS
+      
+      // Enemy bullets
+      ctx.fillStyle = '#FF4444'; ctx.strokeStyle = '#FF0000'; ctx.lineWidth = 2;
+      game.enemyBullets.forEach(b => {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        
+        // Check if this is a regular enemy bullet (has spin property) or boss bullet
+        if (b.spin !== undefined) {
+          // Regular enemy bullet - use spinning candle
+          ctx.rotate(b.spin);
+          
+          // Draw red candle image with proper aspect ratio
+          if (enemyCandleImage.complete && enemyCandleImage.naturalWidth > 0) {
+            const baseWidth = 6;
+            const aspectRatio = enemyCandleImage.naturalHeight / enemyCandleImage.naturalWidth;
+            const candleWidth = baseWidth;
+            const candleHeight = baseWidth * aspectRatio;
+            ctx.drawImage(enemyCandleImage, -candleWidth/2, -candleHeight/2, candleWidth, candleHeight);
+          } else {
+            // Fallback to circle if image not loaded
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI*2);
+            ctx.fill(); ctx.stroke();
+          }
+        } else {
+          // Boss bullet - use directional arrow
+          const angle = Math.atan2(b.vy, b.vx);
+          ctx.rotate(angle);
+          
+          // Draw boss arrow image with proper aspect ratio
+          if (bossArrowImage.complete && bossArrowImage.naturalWidth > 0) {
+            const baseWidth = 30;
+            const aspectRatio = bossArrowImage.naturalHeight / bossArrowImage.naturalWidth;
+            const arrowWidth = baseWidth;
+            const arrowHeight = baseWidth * aspectRatio;
+            ctx.drawImage(bossArrowImage, -arrowWidth/2, -arrowHeight/2, arrowWidth, arrowHeight);
+          } else {
+            // Fallback to circle if image not loaded
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI*2);
+            ctx.fill(); ctx.stroke();
+          }
+        }
+        
+        ctx.restore();
+      });
+      
+      // Particles
+      game.particles.forEach(p => p.draw(ctx));
+      
+      // Flash effect
+      if (game.flashTime > 0) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,0,0,0.5)';
+        ctx.fillRect(0, 0, game.width, game.height);
+        ctx.restore();
+      }
+      return;
+    }
+  
+    // Normal game - horizontal lanes
+    ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.setLineDash([10,10]);
+    ctx.lineDashOffset=-game.score*0.5;
+    for (let i=1;i<3;i++){
+      const y=i*game.laneHeight;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(game.width,y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  
+    // Draw tiles
+    tiles.forEach(tile=>{
+      if (tile.x>-100 && tile.x<game.width+100) {
+        tile.obstacles.forEach(obs=>{
+          const x=tile.x+20;
+          const y=obs.lane*game.laneHeight+(game.laneHeight-60)/2;
+          
+          // Draw enemy with proper aspect ratio
+          const enemyImage = enemyImages[obs.type-1];
+          if (enemyImage.complete && enemyImage.naturalWidth > 0) {
+            const baseHeight = 60;
+            const aspectRatio = enemyImage.naturalWidth / enemyImage.naturalHeight;
+            const enemyHeight = baseHeight;
+            const enemyWidth = baseHeight * aspectRatio;
+            
+            // Add red glow effect for Tier 2 and Tier 4 enemies (Market Maker and Shadow Hand)
+            if (obs.type === 2 || obs.type === 4) {
+              ctx.save();
+              // Create red glow effect
+              ctx.shadowColor = '#FF0000';
+              ctx.shadowBlur = 15;
+              ctx.shadowOffsetX = 0;
+              ctx.shadowOffsetY = 0;
+              ctx.drawImage(enemyImage, x, y, enemyWidth, enemyHeight);
+              ctx.restore();
+            } else {
+              ctx.drawImage(enemyImage, x, y, enemyWidth, enemyHeight);
+            }
+          } else {
+            // Fallback to fixed size if image not loaded
+            if (obs.type === 2 || obs.type === 4) {
+              ctx.save();
+              ctx.shadowColor = '#FF0000';
+              ctx.shadowBlur = 15;
+              ctx.shadowOffsetX = 0;
+              ctx.shadowOffsetY = 0;
+              ctx.drawImage(enemyImage, x, y, 60, 60);
+              ctx.restore();
+            } else {
+              ctx.drawImage(enemyImage, x, y, 60, 60);
+            }
+          }
+        });
+        if (tile.coinLane!==null) {
+          const cx=tile.x+30;
+          const cy=tile.coinLane*game.laneHeight+(game.laneHeight-40)/2;
+          
+          // Draw coin with proper aspect ratio
+          if (collectableImage.complete && collectableImage.naturalWidth > 0) {
+            const baseSize = 40;
+            const aspectRatio = collectableImage.naturalWidth / collectableImage.naturalHeight;
+            const coinWidth = baseSize;
+            const coinHeight = baseSize / aspectRatio;
+            const centerOffsetY = (40 - coinHeight) / 2;
+            ctx.drawImage(collectableImage, cx, cy + centerOffsetY, coinWidth, coinHeight);
+          } else {
+            // Fallback to fixed size if image not loaded
+            ctx.drawImage(collectableImage, cx, cy, 40, 40);
+          }
+        }
+        if (tile.powerup) {
+          const px=tile.x+30;
+          const py=tile.powerup.lane*game.laneHeight+(game.laneHeight-40)/2;
+          const img=tile.powerup.type===1?powerupBonusImage:powerupMalusImage;
+          ctx.drawImage(img,px,py,40,40);
+        }
+      }
+    });
+  
+    // Player glow & trail
+    let glowR=30;
+    if (game.chargeStart) {
+      const ratio=Math.min((performance.now()-game.chargeStart)/game.maxChargeTime,1);
+      glowR+=ratio*20;
+    }
+    const pcx=player.x+player.width/2, pcy=player.y+player.height/2;
+    const grad=ctx.createRadialGradient(pcx,pcy,0,pcx,pcy,glowR);
+    grad.addColorStop(0,'rgba(57,255,20,0.9)');
+    grad.addColorStop(1,'rgba(57,255,20,0)');
+    ctx.fillStyle=grad;
+    ctx.beginPath(); ctx.arc(pcx,pcy,glowR,0,Math.PI*2); ctx.fill();
+  
+    // Force field rendering
+    if (game.forceField.active && game.forceField.level > 0) {
+      ctx.save();
+      
+      // Force field properties based on level
+      const fieldRadius = 50 + (game.forceField.level * 15); // Level 1: 65px, Level 2: 80px
+      const fieldColor = game.forceField.level === 1 ? '#4DA2FF' : '#39ff14'; // Sui blue for level 1, Highlighter green for level 2
+      const fieldAlpha = 0.3 + (game.forceField.level * 0.1); // Level 1: 0.4, Level 2: 0.5
+      
+      // Animated pulsing effect
+      const pulseScale = 1 + 0.1 * Math.sin(Date.now() * 0.01);
+      const pulseRadius = fieldRadius * pulseScale;
+      
+      // Create gradient for force field
+      const fieldGrad = ctx.createRadialGradient(pcx, pcy, 0, pcx, pcy, pulseRadius);
+      fieldGrad.addColorStop(0, `rgba(255,255,255,${fieldAlpha * 0.5})`);
+      fieldGrad.addColorStop(0.7, fieldColor + Math.floor(fieldAlpha * 255).toString(16).padStart(2, '0'));
+      fieldGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      
+      // Draw force field circle
+      ctx.fillStyle = fieldGrad;
+      ctx.beginPath();
+      ctx.arc(pcx, pcy, pulseRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Draw force field outline
+      ctx.strokeStyle = fieldColor;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = fieldAlpha;
+      ctx.beginPath();
+      ctx.arc(pcx, pcy, pulseRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Add sparkle effects for level 2
+      if (game.forceField.level === 2) {
+        ctx.globalAlpha = 0.6;
+        for (let i = 0; i < 8; i++) {
+          const angle = (Date.now() * 0.002 + i * Math.PI / 4) % (Math.PI * 2);
+          const sparkleX = pcx + Math.cos(angle) * (pulseRadius * 0.8);
+          const sparkleY = pcy + Math.sin(angle) * (pulseRadius * 0.8);
+          
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      
+      ctx.restore();
+    }
+  
+    // Trailing glow effect
+    if (player.trail.length > 1) {
+      player.trail.forEach((pt, i) => {
+        const trailProgress = i / (player.trail.length - 1);
+        const trailGlowR = glowR * (0.3 + trailProgress * 0.7); // Size from 30% to 100% of main glow
+        const trailAlpha = (0.1 + trailProgress * 0.4); // Alpha from 10% to 50%
+        
+        const trailGrad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, trailGlowR);
+        trailGrad.addColorStop(0, `rgba(57,255,20,${trailAlpha})`);
+        trailGrad.addColorStop(1, `rgba(57,255,20,0)`);
+        
+        ctx.fillStyle = trailGrad;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, trailGlowR, 0, Math.PI*2);
+        ctx.fill();
+      });
+    }
+  
+  
+    // Player
+    ctx.drawImage(characterImage,player.x,player.y,player.width,player.height);
+  
+    // Player bullets (horizontal)
+    game.bullets.forEach(b=>{
+      // Draw trail first (behind the projectile)
+      if (b.trail && b.trail.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = b.trailColor;
+        ctx.lineCap = 'butt'; // Flat ends instead of rounded
+        
+        // Draw trail segments with diminishing size and opacity (draw from newest to oldest)
+        for (let i = b.trail.length - 2; i >= 0; i--) {
+          const currentPoint = b.trail[i];
+          const nextPoint = b.trail[i + 1];
+          
+          // Calculate diminishing properties (progress from old to new)
+          const progress = (i + 1) / (b.trail.length - 1);
+          const alpha = progress * 0.4; // Fade from 40% to 0% (newest point is 40%, oldest is 0%)
+          const orbSize = b.level * 8 + 16; // Same size calculation as the projectile
+          const lineWidth = progress * Math.max(3, orbSize); // Diminish from full size to 0 (newest point is full, oldest is 0)
+          
+          // Draw multiple layers for flame-like effect
+          for (let layer = 0; layer < 3; layer++) {
+            const layerAlpha = alpha * (1 - layer * 0.3); // Each layer is more transparent
+            const layerWidth = lineWidth * (1 - layer * 0.2); // Each layer is slightly thinner
+            const layerOffset = (layer - 1) * 2; // Offset layers slightly
+            
+            ctx.globalAlpha = layerAlpha;
+            ctx.lineWidth = Math.max(1, layerWidth);
+            
+            ctx.beginPath();
+            ctx.moveTo(currentPoint.x + layerOffset, currentPoint.y);
+            ctx.lineTo(nextPoint.x + layerOffset, nextPoint.y);
+            ctx.stroke();
+          }
+        }
+        
+        ctx.restore();
+      }
+      
+      // Draw the projectile itself
+      const orbSize=b.level*8+16, bx=b.x, by=b.y-orbSize/2; // Smaller but proportional orbs
+      ctx.save();
+      ctx.globalAlpha=0.7+0.3*(b.level/3);
+      ctx.shadowColor='cyan'; ctx.shadowBlur=10+b.level*5;
+      // Draw Blue Orb Shot image instead of rectangle
+      ctx.drawImage(blueOrbShotImage, bx, by, orbSize, orbSize);
+      ctx.restore(); ctx.shadowBlur=0;
+    });
+  
+    // Enemy bullets
+    ctx.fillStyle='#FF4444'; ctx.strokeStyle='#FF0000'; ctx.lineWidth=2;
+    game.enemyBullets.forEach(b=>{
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      
+      // Check if this is a regular enemy bullet (has spin property) or boss bullet
+      if (b.spin !== undefined) {
+        // Regular enemy bullet - use spinning candle
+        ctx.rotate(b.spin);
+        
+        // Draw red candle image with proper aspect ratio
+        if (enemyCandleImage.complete && enemyCandleImage.naturalWidth > 0) {
+          const baseWidth = 6;
+          const aspectRatio = enemyCandleImage.naturalHeight / enemyCandleImage.naturalWidth;
+          const candleWidth = baseWidth;
+          const candleHeight = baseWidth * aspectRatio;
+          ctx.drawImage(enemyCandleImage, -candleWidth/2, -candleHeight/2, candleWidth, candleHeight);
+        } else {
+          // Fallback to circle if image not loaded
+          ctx.beginPath();
+          ctx.arc(0, 0, 5, 0, Math.PI*2);
+          ctx.fill(); ctx.stroke();
+        }
+      } else {
+        // Boss bullet - use directional arrow
+        const angle = Math.atan2(b.vy, b.vx);
+        ctx.rotate(angle);
+        
+        // Draw boss arrow image with proper aspect ratio
+        if (bossArrowImage.complete && bossArrowImage.naturalWidth > 0) {
+          const baseWidth = 30;
+          const aspectRatio = bossArrowImage.naturalHeight / bossArrowImage.naturalWidth;
+          const arrowWidth = baseWidth;
+          const arrowHeight = baseWidth * aspectRatio;
+          ctx.drawImage(bossArrowImage, -arrowWidth/2, -arrowHeight/2, arrowWidth, arrowHeight);
+        } else {
+          // Fallback to circle if image not loaded
+          ctx.beginPath();
+          ctx.arc(0, 0, 6, 0, Math.PI*2);
+          ctx.fill(); ctx.stroke();
+        }
+      }
+      
+      ctx.restore();
+    });
+  
+    // Particles
+    game.particles.forEach(p=>p.draw(ctx));
+  
+    // In-game UI moved to overlay outside canvas - will be handled by HTML/CSS
+    
+    // Lives display with sprites
+    ctx.font='24px Arial'; ctx.textAlign='right';
+    const maxLives = 3;
+    const lifeSize = 30;
+    for (let i = 0; i < maxLives; i++) {
+      const x = game.width - 10 - i * (lifeSize + 5);
+      const y = 5;
+      if (i < game.lives) {
+        // Full heart
+        ctx.drawImage(lifeFullImage, x - lifeSize, y, lifeSize, lifeSize);
+      } else {
+        // Empty heart
+        ctx.drawImage(lifeEmptyImage, x - lifeSize, y, lifeSize, lifeSize);
+
+

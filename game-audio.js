@@ -1,0 +1,2076 @@
+// ==========================================
+// GAME AUDIO SYSTEM - COMPLETE VERSION
+// ==========================================
+
+class GameAudioManager {
+  constructor() {
+    this.audioContext = null;
+    this.sounds = {};
+    this.music = null;
+    this.masterVolume = 0.7; // Default volume (70%)
+    this.soundEffectsVolume = 0.8; // Default sound effects volume (80%)
+    this.backgroundMusicVolume = 0.6; // Default background music volume (60%)
+    this.soundEffectsEnabled = true;
+    this.backgroundMusicEnabled = true;
+    this.isInitialized = false;
+    
+    // Performance optimization: cache oscillators
+    this.oscillatorCache = [];
+    this.maxCacheSize = 10;
+    
+    // Performance optimization: limit concurrent sounds
+    this.maxConcurrentSounds = 8;
+    this.activeSounds = 0;
+    
+    // Track active oscillators for immediate stopping
+    this.activeOscillators = new Set();
+    
+    // Enhanced sound effect definitions with improved audio design
+    this.soundEffects = {
+      // Player actions - more magical and satisfying
+      shoot: { frequency: 450, duration: 0.1, type: 'sine', volume: 1.0 },
+      playerHit: { frequency: 180, duration: 0.4, type: 'square', volume: 1.3 },
+      
+      // Enemy interactions - more impactful and varied
+      enemyHit: { frequency: 300, duration: 0.08, type: 'triangle', volume: 0.6 },
+      enemyDestroyed: { frequency: 120, duration: 0.4, type: 'sawtooth', volume: 1.5 },
+      
+      // Collectibles - more rewarding and distinct
+      powerupCollect: { frequency: 700, duration: 0.15, type: 'sine', volume: 0.9 },
+      powerupNegative: { frequency: 250, duration: 0.3, type: 'square', volume: 1.2 },
+      coinCollect: { frequency: 900, duration: 0.4, type: 'sine', volume: 0.8 },
+      
+      // Boss encounters - more dramatic and intimidating
+      bossHit: { frequency: 200, duration: 0.25, type: 'triangle', volume: 1.0 },
+      bossDestroyed: { frequency: 80, duration: 1.2, type: 'sawtooth', volume: 1.6 },
+      
+      // Game state - more emotional impact
+      gameOver: { frequency: 150, duration: 1.5, type: 'square', volume: 1.4 },
+      levelUp: { frequency: 900, duration: 0.4, type: 'sine', volume: 0.8 },
+      
+      // Force field system - more sci-fi and methodical
+      forceFieldActivate: { frequency: 400, duration: 1.5, type: 'square', volume: 2.2 },
+      forceFieldPowerUp: { frequency: 600, duration: 1.2, type: 'sine', volume: 1.4 },
+      forceFieldPowerDown: { frequency: 400, duration: 1.0, type: 'triangle', volume: 1.4 },
+      forceFieldDestroyed: { frequency: 150, duration: 1.5, type: 'square', volume: 1.6 },
+      
+      // UI and feedback sounds
+      menuClick: { frequency: 600, duration: 0.05, type: 'sine', volume: 0.6 },
+      menuHover: { frequency: 700, duration: 0.03, type: 'sine', volume: 0.4 },
+      buttonPress: { frequency: 500, duration: 0.08, type: 'square', volume: 0.7 },
+      achievement: { frequency: 800, duration: 0.3, type: 'sine', volume: 0.8 },
+      warning: { frequency: 400, duration: 0.2, type: 'square', volume: 1.0 },
+      success: { frequency: 900, duration: 0.2, type: 'sine', volume: 0.8 }
+    };
+    
+    // Enhanced background music patterns with multiple layers
+    this.musicPatterns = {
+      // INTENSE SPACE SHOOTER THEME - Serious and Ominous
+      
+      // THEME 1: ATMOSPHERIC EXPLORATION - Mysterious & Spacious
+      
+      // Main melody - single line, mysterious intervals, lots of space
+      theme1Melody: [
+        { note: 'D3', duration: 2.0 },
+        { note: 'F3', duration: 1.5 },
+        { note: 'Bb3', duration: 2.5 },
+        { note: 'D4', duration: 1.8 },
+        { note: 'Bb3', duration: 1.0 },
+        { note: 'F3', duration: 2.2 },
+        { note: 'D3', duration: 1.5 },
+        { note: 'C3', duration: 2.8 },
+        { note: 'Bb2', duration: 1.8 },
+        { note: 'D3', duration: 1.2 },
+        { note: 'F3', duration: 2.0 },
+        { note: 'Bb3', duration: 1.5 },
+        { note: 'D4', duration: 2.2 },
+        { note: 'Bb3', duration: 1.0 },
+        { note: 'F3', duration: 2.5 },
+        { note: 'D3', duration: 1.8 }
+      ],
+      
+      // Bass line - deep, sparse foundation
+      theme1Bass: [
+        { note: 'D1', duration: 4.0 },
+        { note: 'Bb1', duration: 3.5 },
+        { note: 'F2', duration: 4.5 },
+        { note: 'D1', duration: 3.8 }
+      ],
+      
+      // Harmony layer - minimal, occasional chord tones
+      theme1Harmony: [
+        { note: 'F3', duration: 2.5 },
+        { note: 'Bb3', duration: 2.0 },
+        { note: 'D4', duration: 3.0 },
+        { note: 'Bb3', duration: 2.2 },
+        { note: 'F3', duration: 2.8 },
+        { note: 'D4', duration: 2.0 },
+        { note: 'F3', duration: 3.2 },
+        { note: 'Bb3', duration: 1.5 }
+      ],
+      
+      // Default patterns (used by Theme 1, but will be preserved)
+      melody: [
+        { note: 'D3', duration: 2.0 },
+        { note: 'F3', duration: 1.5 },
+        { note: 'Bb3', duration: 2.5 },
+        { note: 'D4', duration: 1.8 },
+        { note: 'Bb3', duration: 1.0 },
+        { note: 'F3', duration: 2.2 },
+        { note: 'D3', duration: 1.5 },
+        { note: 'C3', duration: 2.8 },
+        { note: 'Bb2', duration: 1.8 },
+        { note: 'D3', duration: 1.2 },
+        { note: 'F3', duration: 2.0 },
+        { note: 'Bb3', duration: 1.5 },
+        { note: 'D4', duration: 2.2 },
+        { note: 'Bb3', duration: 1.0 },
+        { note: 'F3', duration: 2.5 },
+        { note: 'D3', duration: 1.8 }
+      ],
+      
+      bass: [
+        { note: 'D1', duration: 4.0 },
+        { note: 'Bb1', duration: 3.5 },
+        { note: 'F2', duration: 4.5 },
+        { note: 'D1', duration: 3.8 }
+      ],
+      
+      harmony: [
+        { note: 'F3', duration: 2.5 },
+        { note: 'Bb3', duration: 2.0 },
+        { note: 'D4', duration: 3.0 },
+        { note: 'Bb3', duration: 2.2 },
+        { note: 'F3', duration: 2.8 },
+        { note: 'D4', duration: 2.0 },
+        { note: 'F3', duration: 3.2 },
+        { note: 'Bb3', duration: 1.5 }
+      ],
+      
+      // THEME 2: DRIVING ACTION - Rhythmic & Energetic
+      theme2Melody: [
+        { note: 'E4', duration: 0.2 },
+        { note: 'G4', duration: 0.2 },
+        { note: 'B4', duration: 0.4 },
+        { note: 'E5', duration: 0.2 },
+        { note: 'B4', duration: 0.2 },
+        { note: 'G4', duration: 0.2 },
+        { note: 'E4', duration: 0.2 },
+        { note: 'D4', duration: 0.3 },
+        { note: 'E4', duration: 0.2 },
+        { note: 'G4', duration: 0.2 },
+        { note: 'B4', duration: 0.4 },
+        { note: 'D5', duration: 0.2 },
+        { note: 'B4', duration: 0.2 },
+        { note: 'G4', duration: 0.2 },
+        { note: 'E4', duration: 0.2 },
+        { note: 'D4', duration: 0.3 }
+      ],
+      theme2Bass: [
+        { note: 'E2', duration: 0.4 },
+        { note: 'E2', duration: 0.4 },
+        { note: 'A2', duration: 0.4 },
+        { note: 'A2', duration: 0.4 },
+        { note: 'B2', duration: 0.4 },
+        { note: 'B2', duration: 0.4 },
+        { note: 'E2', duration: 0.4 },
+        { note: 'E2', duration: 0.4 }
+      ],
+      theme2Harmony: [
+        { note: 'G3', duration: 0.4 },
+        { note: 'B3', duration: 0.4 },
+        { note: 'E4', duration: 0.4 },
+        { note: 'G3', duration: 0.4 },
+        { note: 'A3', duration: 0.4 },
+        { note: 'C4', duration: 0.4 },
+        { note: 'E4', duration: 0.4 },
+        { note: 'A3', duration: 0.4 }
+      ],
+      
+      // THEME 3: MINIMALIST TENSION - Sparse & Unsettling
+      theme3Melody: [
+        { note: 'E3', duration: 2.0 },
+        { note: 'A3', duration: 3.0 },
+        { note: 'C4', duration: 1.5 },
+        { note: 'G3', duration: 2.5 },
+        { note: 'D3', duration: 3.5 },
+        { note: 'E3', duration: 1.0 },
+        { note: 'Bb3', duration: 2.8 },
+        { note: 'C3', duration: 2.2 }
+      ],
+      theme3Bass: [
+        { note: 'E1', duration: 4.0 },
+        { note: 'A1', duration: 6.0 },
+        { note: 'C2', duration: 5.0 },
+        { note: 'E1', duration: 4.5 }
+      ],
+      theme3Harmony: [
+        { note: 'G3', duration: 3.0 },
+        { note: 'Bb3', duration: 4.0 },
+        { note: 'D4', duration: 2.5 },
+        { note: 'F3', duration: 3.5 }
+      ],
+      
+    // THEME 4: RETRO SCI-FI - Classic Space Game Feel
+    theme4Melody: [
+      { note: 'C4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'G4', duration: 0.3 },
+      { note: 'C5', duration: 0.3 },
+      { note: 'G4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'C4', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'C4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'G4', duration: 0.3 },
+      { note: 'A4', duration: 0.3 },
+      { note: 'G4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'C4', duration: 0.3 },
+      { note: 'A3', duration: 0.3 }
+    ],
+    theme4Bass: [
+      { note: 'C2', duration: 0.6 },
+      { note: 'C2', duration: 0.6 },
+      { note: 'F2', duration: 0.6 },
+      { note: 'F2', duration: 0.6 },
+      { note: 'G2', duration: 0.6 },
+      { note: 'G2', duration: 0.6 },
+      { note: 'C2', duration: 0.6 },
+      { note: 'C2', duration: 0.6 }
+    ],
+    theme4Harmony: [
+      { note: 'E4', duration: 0.6 },
+      { note: 'G4', duration: 0.6 },
+      { note: 'C5', duration: 0.6 },
+      { note: 'E4', duration: 0.6 },
+      { note: 'F4', duration: 0.6 },
+      { note: 'A4', duration: 0.6 },
+      { note: 'C5', duration: 0.6 },
+      { note: 'F4', duration: 0.6 }
+    ],
+
+    // THEME 5: ACTION PACKED - Fast, Intense, Adrenaline
+    theme5Melody: [
+      { note: 'E4', duration: 0.2 },
+      { note: 'G4', duration: 0.2 },
+      { note: 'A4', duration: 0.2 },
+      { note: 'C5', duration: 0.2 },
+      { note: 'A4', duration: 0.2 },
+      { note: 'G4', duration: 0.2 },
+      { note: 'E4', duration: 0.2 },
+      { note: 'D4', duration: 0.2 },
+      { note: 'C4', duration: 0.2 },
+      { note: 'E4', duration: 0.2 },
+      { note: 'G4', duration: 0.2 },
+      { note: 'A4', duration: 0.2 },
+      { note: 'C5', duration: 0.2 },
+      { note: 'A4', duration: 0.2 },
+      { note: 'G4', duration: 0.2 },
+      { note: 'E4', duration: 0.2 },
+      { note: 'D4', duration: 0.2 }
+    ],
+    theme5Bass: [
+      { note: 'E1', duration: 0.4 },
+      { note: 'E1', duration: 0.4 },
+      { note: 'A1', duration: 0.4 },
+      { note: 'A1', duration: 0.4 },
+      { note: 'C2', duration: 0.4 },
+      { note: 'C2', duration: 0.4 },
+      { note: 'E1', duration: 0.4 },
+      { note: 'E1', duration: 0.4 },
+      { note: 'A1', duration: 0.4 },
+      { note: 'A1', duration: 0.4 },
+      { note: 'C2', duration: 0.4 },
+      { note: 'C2', duration: 0.4 },
+      { note: 'E1', duration: 0.4 },
+      { note: 'E1', duration: 0.4 },
+      { note: 'A1', duration: 0.4 },
+      { note: 'A1', duration: 0.4 }
+    ],
+    theme5Harmony: [
+      { note: 'G3', duration: 0.4 },
+      { note: 'B3', duration: 0.4 },
+      { note: 'E4', duration: 0.4 },
+      { note: 'G3', duration: 0.4 },
+      { note: 'A3', duration: 0.4 },
+      { note: 'C4', duration: 0.4 },
+      { note: 'E4', duration: 0.4 },
+      { note: 'A3', duration: 0.4 },
+      { note: 'G3', duration: 0.4 },
+      { note: 'B3', duration: 0.4 },
+      { note: 'E4', duration: 0.4 },
+      { note: 'G3', duration: 0.4 },
+      { note: 'A3', duration: 0.4 },
+      { note: 'C4', duration: 0.4 },
+      { note: 'E4', duration: 0.4 },
+      { note: 'A3', duration: 0.4 }
+    ],
+
+    // THEME 6: MILITARISTIC - Marching Rhythm, Commanding
+    theme6Melody: [
+      { note: 'C4', duration: 0.5 },
+      { note: 'C4', duration: 0.5 },
+      { note: 'E4', duration: 0.5 },
+      { note: 'G4', duration: 0.5 },
+      { note: 'C5', duration: 0.5 },
+      { note: 'G4', duration: 0.5 },
+      { note: 'E4', duration: 0.5 },
+      { note: 'C4', duration: 0.5 },
+      { note: 'A3', duration: 0.5 },
+      { note: 'A3', duration: 0.5 },
+      { note: 'C4', duration: 0.5 },
+      { note: 'E4', duration: 0.5 },
+      { note: 'G4', duration: 0.5 },
+      { note: 'E4', duration: 0.5 },
+      { note: 'C4', duration: 0.5 },
+      { note: 'A3', duration: 0.5 }
+    ],
+    theme6Bass: [
+      { note: 'C1', duration: 1.0 },
+      { note: 'C1', duration: 1.0 },
+      { note: 'F1', duration: 1.0 },
+      { note: 'F1', duration: 1.0 },
+      { note: 'G1', duration: 1.0 },
+      { note: 'G1', duration: 1.0 },
+      { note: 'C1', duration: 1.0 },
+      { note: 'C1', duration: 1.0 }
+    ],
+    theme6Harmony: [
+      { note: 'E3', duration: 1.0 },
+      { note: 'G3', duration: 1.0 },
+      { note: 'C4', duration: 1.0 },
+      { note: 'E3', duration: 1.0 },
+      { note: 'F3', duration: 1.0 },
+      { note: 'A3', duration: 1.0 },
+      { note: 'C4', duration: 1.0 },
+      { note: 'F3', duration: 1.0 }
+    ],
+
+    // THEME 7: HIGH ENERGY - Very Fast, Driving, Relentless
+    theme7Melody: [
+      { note: 'E4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'C5', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 },
+      { note: 'E4', duration: 0.15 },
+      { note: 'D4', duration: 0.15 },
+      { note: 'C4', duration: 0.15 },
+      { note: 'E4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'C5', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 },
+      { note: 'E4', duration: 0.15 },
+      { note: 'D4', duration: 0.15 },
+      { note: 'C4', duration: 0.15 },
+      { note: 'E4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'C5', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 },
+      { note: 'E4', duration: 0.15 },
+      { note: 'D4', duration: 0.15 },
+      { note: 'C4', duration: 0.15 },
+      { note: 'E4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'C5', duration: 0.15 },
+      { note: 'A4', duration: 0.15 },
+      { note: 'G4', duration: 0.15 }
+    ],
+    theme7Bass: [
+      { note: 'E1', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'A1', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'C2', duration: 0.3 },
+      { note: 'E1', duration: 0.3 },
+      { note: 'E1', duration: 0.3 }
+    ],
+    theme7Harmony: [
+      { note: 'G3', duration: 0.3 },
+      { note: 'B3', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'G3', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'C4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'G3', duration: 0.3 },
+      { note: 'B3', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'G3', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'C4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'G3', duration: 0.3 },
+      { note: 'B3', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'G3', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'C4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'G3', duration: 0.3 },
+      { note: 'B3', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'G3', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'C4', duration: 0.3 },
+      { note: 'E4', duration: 0.3 },
+      { note: 'A3', duration: 0.3 },
+      { note: 'G3', duration: 0.3 }
+    ],
+
+    // THEME 8: AGGRESSIVE - Heavy, Powerful, Dominating
+    theme8Melody: [
+      { note: 'E3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'C4', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 },
+      { note: 'E3', duration: 0.25 },
+      { note: 'D3', duration: 0.25 },
+      { note: 'C3', duration: 0.25 },
+      { note: 'E3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'C4', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 },
+      { note: 'E3', duration: 0.25 },
+      { note: 'D3', duration: 0.25 },
+      { note: 'C3', duration: 0.25 },
+      { note: 'E3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'C4', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 },
+      { note: 'E3', duration: 0.25 },
+      { note: 'D3', duration: 0.25 },
+      { note: 'C3', duration: 0.25 },
+      { note: 'E3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'C4', duration: 0.25 },
+      { note: 'A3', duration: 0.25 },
+      { note: 'G3', duration: 0.25 }
+    ],
+    theme8Bass: [
+      { note: 'E0', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'A0', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'C1', duration: 0.5 },
+      { note: 'E0', duration: 0.5 },
+      { note: 'E0', duration: 0.5 }
+    ],
+    theme8Harmony: [
+      { note: 'G2', duration: 0.5 },
+      { note: 'B2', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'G2', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'C3', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'G2', duration: 0.5 },
+      { note: 'B2', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'G2', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'C3', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'G2', duration: 0.5 },
+      { note: 'B2', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'G2', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'C3', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'G2', duration: 0.5 },
+      { note: 'B2', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'G2', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'C3', duration: 0.5 },
+      { note: 'E3', duration: 0.5 },
+      { note: 'A2', duration: 0.5 },
+      { note: 'G2', duration: 0.5 }
+    ],
+      
+      // MENU THEMES - Soothing and Gentle
+      
+      // THEME 9: GENTLE AMBIENT - Soft, flowing, peaceful
+      theme9Melody: [
+        { note: 'F4', duration: 1.2 },
+        { note: 'A4', duration: 1.0 },
+        { note: 'C5', duration: 1.5 },
+        { note: 'F5', duration: 1.0 },
+        { note: 'C5', duration: 0.8 },
+        { note: 'A4', duration: 1.2 },
+        { note: 'F4', duration: 1.0 },
+        { note: 'E4', duration: 1.5 },
+        { note: 'F4', duration: 1.0 },
+        { note: 'A4', duration: 1.2 },
+        { note: 'C5', duration: 1.0 },
+        { note: 'F5', duration: 1.5 },
+        { note: 'C5', duration: 1.0 },
+        { note: 'A4', duration: 0.8 },
+        { note: 'F4', duration: 1.2 },
+        { note: 'E4', duration: 1.0 }
+      ],
+      theme9Bass: [
+        { note: 'F2', duration: 2.0 },
+        { note: 'C3', duration: 2.0 },
+        { note: 'F2', duration: 2.0 },
+        { note: 'C3', duration: 2.0 }
+      ],
+      theme9Harmony: [
+        { note: 'A2', duration: 2.0 },
+        { note: 'C3', duration: 2.0 },
+        { note: 'F3', duration: 2.0 },
+        { note: 'A2', duration: 2.0 }
+      ],
+      
+      // THEME 10: PEACEFUL MELODY - Warm, comforting, gentle
+      theme10Melody: [
+        { note: 'G4', duration: 1.0 },
+        { note: 'B4', duration: 0.8 },
+        { note: 'D5', duration: 1.2 },
+        { note: 'G5', duration: 0.8 },
+        { note: 'D5', duration: 1.0 },
+        { note: 'B4', duration: 0.8 },
+        { note: 'G4', duration: 1.0 },
+        { note: 'F4', duration: 1.2 },
+        { note: 'G4', duration: 0.8 },
+        { note: 'B4', duration: 1.0 },
+        { note: 'D5', duration: 0.8 },
+        { note: 'G5', duration: 1.2 },
+        { note: 'D5', duration: 0.8 },
+        { note: 'B4', duration: 1.0 },
+        { note: 'G4', duration: 0.8 },
+        { note: 'F4', duration: 1.0 }
+      ],
+      theme10Bass: [
+        { note: 'G2', duration: 1.5 },
+        { note: 'D3', duration: 1.5 },
+        { note: 'G2', duration: 1.5 },
+        { note: 'D3', duration: 1.5 }
+      ],
+      theme10Harmony: [
+        { note: 'B2', duration: 1.5 },
+        { note: 'D3', duration: 1.5 },
+        { note: 'G3', duration: 1.5 },
+        { note: 'B2', duration: 1.5 }
+      ],
+      
+      // THEME 11: SOFT HARMONY - Delicate, ethereal, dreamy
+      theme11Melody: [
+        { note: 'E4', duration: 1.5 },
+        { note: 'G4', duration: 1.0 },
+        { note: 'B4', duration: 1.8 },
+        { note: 'E5', duration: 1.0 },
+        { note: 'B4', duration: 1.2 },
+        { note: 'G4', duration: 1.0 },
+        { note: 'E4', duration: 1.5 },
+        { note: 'D4', duration: 1.8 },
+        { note: 'E4', duration: 1.0 },
+        { note: 'G4', duration: 1.2 },
+        { note: 'B4', duration: 1.0 },
+        { note: 'E5', duration: 1.8 },
+        { note: 'B4', duration: 1.0 },
+        { note: 'G4', duration: 1.2 },
+        { note: 'E4', duration: 1.0 },
+        { note: 'D4', duration: 1.5 }
+      ],
+      theme11Bass: [
+        { note: 'E2', duration: 2.5 },
+        { note: 'B2', duration: 2.5 },
+        { note: 'E2', duration: 2.5 },
+        { note: 'B2', duration: 2.5 }
+      ],
+      theme11Harmony: [
+        { note: 'G2', duration: 2.5 },
+        { note: 'B2', duration: 2.5 },
+        { note: 'E3', duration: 2.5 },
+        { note: 'G2', duration: 2.5 }
+      ],
+      
+      // THEME 12: TRANQUIL SPACE - Mysterious, floating, serene
+      theme12Melody: [
+        { note: 'D4', duration: 1.8 },
+        { note: 'F4', duration: 1.2 },
+        { note: 'Bb4', duration: 2.0 },
+        { note: 'D5', duration: 1.2 },
+        { note: 'Bb4', duration: 1.5 },
+        { note: 'F4', duration: 1.2 },
+        { note: 'D4', duration: 1.8 },
+        { note: 'C4', duration: 2.0 },
+        { note: 'D4', duration: 1.2 },
+        { note: 'F4', duration: 1.5 },
+        { note: 'Bb4', duration: 1.2 },
+        { note: 'D5', duration: 2.0 },
+        { note: 'Bb4', duration: 1.2 },
+        { note: 'F4', duration: 1.5 },
+        { note: 'D4', duration: 1.2 },
+        { note: 'C4', duration: 1.8 }
+      ],
+      theme12Bass: [
+        { note: 'D2', duration: 3.0 },
+        { note: 'Bb2', duration: 3.0 },
+        { note: 'D2', duration: 3.0 },
+        { note: 'Bb2', duration: 3.0 }
+      ],
+      theme12Harmony: [
+        { note: 'F3', duration: 3.0 },
+        { note: 'Bb3', duration: 3.0 },
+        { note: 'D4', duration: 3.0 },
+        { note: 'F3', duration: 3.0 }
+      ],
+      bossMelody: [
+        { note: 'F3', duration: 0.15 },
+        { note: 'G3', duration: 0.15 },
+        { note: 'Bb3', duration: 0.15 },
+        { note: 'C4', duration: 0.15 },
+        { note: 'Bb3', duration: 0.15 },
+        { note: 'G3', duration: 0.15 },
+        { note: 'F3', duration: 0.15 },
+        { note: 'Eb3', duration: 0.15 },
+        { note: 'D3', duration: 0.15 },
+        { note: 'C3', duration: 0.15 },
+        { note: 'Bb2', duration: 0.15 },
+        { note: 'C3', duration: 0.15 },
+        { note: 'D3', duration: 0.15 },
+        { note: 'Eb3', duration: 0.15 },
+        { note: 'F3', duration: 0.15 },
+        { note: 'G3', duration: 0.15 }
+      ],
+      
+      // Boss bass - deep, ominous (Raised One Octave)
+      bossBass: [
+        { note: 'F1', duration: 0.3 },
+        { note: 'F1', duration: 0.3 },
+        { note: 'Bb1', duration: 0.3 },
+        { note: 'Bb1', duration: 0.3 },
+        { note: 'C2', duration: 0.3 },
+        { note: 'C2', duration: 0.3 },
+        { note: 'F1', duration: 0.3 },
+        { note: 'F1', duration: 0.3 }
+      ],
+      
+      // Boss harmony - dissonant, threatening (Raised One Octave)
+      bossHarmony: [
+        { note: 'Ab3', duration: 0.15 },
+        { note: 'C4', duration: 0.15 },
+        { note: 'Eb4', duration: 0.15 },
+        { note: 'Ab3', duration: 0.15 },
+        { note: 'Bb3', duration: 0.15 },
+        { note: 'D4', duration: 0.15 },
+        { note: 'F4', duration: 0.15 },
+        { note: 'Bb3', duration: 0.15 },
+        { note: 'C4', duration: 0.15 },
+        { note: 'Eb4', duration: 0.15 },
+        { note: 'G4', duration: 0.15 },
+        { note: 'C4', duration: 0.15 },
+        { note: 'Ab3', duration: 0.15 },
+        { note: 'C4', duration: 0.15 },
+        { note: 'Eb4', duration: 0.15 },
+        { note: 'Ab3', duration: 0.15 }
+      ],
+      
+      // OLD SOOTHING MUSIC (COMMENTED OUT)
+      /*
+      // Main melody - more engaging and varied
+      melody: [
+        { note: 'C4', duration: 0.4 },
+        { note: 'E4', duration: 0.4 },
+        { note: 'G4', duration: 0.4 },
+        { note: 'C5', duration: 0.6 },
+        { note: 'B4', duration: 0.3 },
+        { note: 'A4', duration: 0.3 },
+        { note: 'G4', duration: 0.4 },
+        { note: 'F4', duration: 0.4 },
+        { note: 'E4', duration: 0.4 },
+        { note: 'D4', duration: 0.4 },
+        { note: 'C4', duration: 0.8 }
+      ],
+      
+      // Bass line for depth
+      bass: [
+        { note: 'C3', duration: 0.8 },
+        { note: 'G3', duration: 0.8 },
+        { note: 'C3', duration: 0.8 },
+        { note: 'F3', duration: 0.8 },
+        { note: 'C3', duration: 0.8 },
+        { note: 'G3', duration: 0.8 },
+        { note: 'C3', duration: 1.6 }
+      ],
+      
+      // Harmony layer
+      harmony: [
+        { note: 'E4', duration: 1.6 },
+        { note: 'G4', duration: 1.6 },
+        { note: 'C5', duration: 1.6 },
+        { note: 'E4', duration: 1.6 },
+        { note: 'G4', duration: 1.6 },
+        { note: 'C5', duration: 1.6 },
+        { note: 'E4', duration: 3.2 }
+      ]
+      */
+    };
+    
+    // Current music state
+    this.musicState = {
+      currentPattern: 'melody',
+      patternIndex: 0,
+      layerIndex: 0,
+      isPlaying: false,
+      isBossMusic: false,
+      tempo: 120 // BPM
+    };
+    
+    this.init();
+  }
+  
+  // Initialize audio context
+  init() {
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.isInitialized = true;
+      console.log('✓ Audio system initialized');
+    } catch (error) {
+      console.warn('⚠ Audio not supported:', error);
+      this.isInitialized = false;
+    }
+  }
+  
+  // Initialize theme
+  initializeTheme() {
+    if (this.isInitialized) {
+      this.setTheme(5); // Default to Theme 5 (Action Packed)
+    }
+  }
+  
+  // Test specific instrument
+  testInstrument(instrumentType) {
+    if (!this.isInitialized) return;
+    
+    this.stopBackgroundMusic();
+    this.resumeContext();
+    
+    this.musicState.isPlaying = true;
+    this.musicState.patternIndex = 0;
+    this.musicState.layerIndex = 0;
+    this.musicState.isBossMusic = false;
+    
+    const playNote = (note, duration, startTime, layer = 'melody') => {
+      const frequency = this.noteToFrequency(note);
+      const { oscillator, gainNode } = this.createOscillator(frequency, instrumentType);
+      
+      if (!oscillator) return;
+      
+      // Different volumes for different layers and instruments
+      let volume = 0.1;
+      switch(layer) {
+        case 'melody': 
+          volume = waveType === 'sawtooth' ? 0.08 : 0.12; // Reduce sawtooth melody volume
+          break;
+        case 'bass': 
+          volume = waveType === 'sawtooth' ? 0.05 : 0.08; // Reduce sawtooth bass volume
+          break;
+        case 'harmony': 
+          volume = waveType === 'sawtooth' ? 0.04 : 0.06; // Reduce sawtooth harmony volume
+          break;
+      }
+      
+      const finalVolume = volume * this.masterVolume * this.backgroundMusicVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+    
+    const playLayer = (layerName) => {
+      // Use current theme's patterns
+      const patternKey = this.musicState.currentPatterns ? this.musicState.currentPatterns[layerName] : layerName;
+      const pattern = this.musicPatterns[patternKey];
+      const currentTime = this.audioContext.currentTime;
+      
+      if (!pattern || pattern.length === 0) return;
+      
+      let startTime = currentTime;
+      pattern.forEach(note => {
+        playNote(note.note, note.duration, startTime, layerName);
+        startTime += note.duration;
+      });
+      
+      return startTime;
+    };
+    
+    // Play all layers with the specified instrument
+    const melodyEndTime = playLayer('melody');
+    const bassEndTime = playLayer('bass');
+    const harmonyEndTime = playLayer('harmony');
+    
+    const maxEndTime = Math.max(melodyEndTime, bassEndTime, harmonyEndTime);
+    
+    // Schedule next loop
+    this.musicTimeout = setTimeout(() => {
+      if (this.musicState.isPlaying) {
+        this.testInstrument(instrumentType);
+      }
+    }, (maxEndTime - currentTime) * 1000);
+    
+    console.log(`Testing instrument: ${instrumentType}`);
+  }
+  
+  // Resume audio context (required for user interaction)
+  resumeContext() {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+  }
+  
+  // Create oscillator for sound generation
+  createOscillator(frequency, type = 'sine') {
+    if (!this.isInitialized) return null;
+    
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+    
+    // Connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Track active oscillators for immediate stopping
+    this.activeOscillators.add(oscillator);
+    
+    // Clean up when oscillator stops
+    oscillator.addEventListener('ended', () => {
+      this.activeOscillators.delete(oscillator);
+    });
+    
+    return { oscillator, gainNode };
+  }
+  
+  // Play a sound effect with performance optimizations
+  playSound(soundName, volume = 1.0) {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    // Performance check: limit concurrent sounds
+    if (this.activeSounds >= this.maxConcurrentSounds) {
+      console.warn('Max concurrent sounds reached, skipping:', soundName);
+      return;
+    }
+    
+    const soundDef = this.soundEffects[soundName];
+    if (!soundDef) {
+      console.warn(`Sound effect '${soundName}' not found`);
+      return;
+    }
+    
+    this.resumeContext();
+    this.activeSounds++;
+    
+    const { oscillator, gainNode } = this.createOscillator(soundDef.frequency, soundDef.type);
+    if (!oscillator) {
+      this.activeSounds--;
+      return;
+    }
+    
+    // Set volume with master volume control and sound-specific compensation
+    const soundVolume = soundDef.volume || 1.0;
+    const finalVolume = volume * soundVolume * this.masterVolume * this.soundEffectsVolume;
+    gainNode.gain.setValueAtTime(finalVolume, this.audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + soundDef.duration);
+    
+    // Play the sound
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + soundDef.duration);
+    
+    // Clean up after sound finishes
+    setTimeout(() => {
+      this.activeSounds = Math.max(0, this.activeSounds - 1);
+    }, soundDef.duration * 1000);
+  }
+  
+  // Play multiple sounds in sequence (for complex effects)
+  playSoundSequence(sounds) {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    let currentTime = this.audioContext.currentTime;
+    
+    sounds.forEach(sound => {
+      const { oscillator, gainNode } = this.createOscillator(sound.frequency, sound.type);
+      if (!oscillator) return;
+      
+      const finalVolume = (sound.volume || 1.0) * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + sound.duration);
+      
+      oscillator.start(currentTime);
+      oscillator.stop(currentTime + sound.duration);
+      
+      currentTime += sound.duration;
+    });
+  }
+  
+  // Menu music - plays in menus, settings, etc.
+  playMenuMusic() {
+    if (!this.isInitialized || !this.backgroundMusicEnabled) return;
+    
+    this.stopBackgroundMusic();
+    this.resumeContext();
+    
+    this.musicState.isPlaying = true;
+    this.musicState.patternIndex = 0;
+    this.musicState.layerIndex = 0;
+    this.musicState.isBossMusic = false;
+    
+    // Use Theme 12 (Tranquil Space) for menu music
+    this.setTheme(12);
+    
+    const playNote = (note, duration, startTime, layer = 'melody', instrument = 'auto') => {
+      const frequency = this.noteToFrequency(note);
+      
+      // Select instrument based on layer or override - MENU MUSIC USES ONLY GENTLE WAVES
+      let waveType = 'sine';
+      if (instrument === 'auto') {
+        switch(layer) {
+          case 'melody': waveType = 'triangle'; break;  // Soft, melodic
+          case 'bass': waveType = 'triangle'; break;   // Gentle bass (no sawtooth)
+          case 'harmony': waveType = 'triangle'; break; // Soft harmony (softer than sine)
+        }
+      } else {
+        waveType = instrument;
+      }
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, waveType);
+      
+      if (!oscillator) return;
+      
+      // Different volumes for different layers - MENU MUSIC VOLUMES
+      let volume = 0.1;
+      switch(layer) {
+        case 'melody': 
+          volume = 0.12; // Gentle melody volume
+          break;
+        case 'bass': 
+          volume = 0.08; // Restored bass volume
+          break;
+        case 'harmony': 
+          volume = 0.03; // Very subtle harmony volume (reduced from 0.06)
+          break;
+      }
+      
+      const finalVolume = volume * this.masterVolume * this.backgroundMusicVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+    
+    const playLayer = (layerName) => {
+      // Use current theme's patterns
+      const patternKey = this.musicState.currentPatterns ? this.musicState.currentPatterns[layerName] : layerName;
+      const pattern = this.musicPatterns[patternKey];
+      const currentTime = this.audioContext.currentTime;
+      let noteTime = currentTime;
+      
+      pattern.forEach(note => {
+        playNote(note.note, note.duration, noteTime, layerName);
+        noteTime += note.duration;
+      });
+      
+      return noteTime;
+    };
+    
+    const playComposition = () => {
+      if (!this.musicState.isPlaying) return;
+      
+      const currentTime = this.audioContext.currentTime;
+      
+      // Play melody only (ultra-minimal menu music)
+      const melodyEndTime = playLayer('melody');
+      // const bassEndTime = playLayer('bass'); // Disabled for ultra-minimal menu music
+      // const harmonyEndTime = playLayer('harmony'); // Disabled for cleaner menu music
+      
+      // Schedule next composition
+      const maxEndTime = melodyEndTime;
+      this.musicTimeout = setTimeout(() => {
+        if (this.musicState.isPlaying) {
+          playComposition();
+        }
+      }, (maxEndTime - currentTime) * 1000);
+    };
+    
+    playComposition();
+  }
+
+  // Gameplay music - plays during actual gameplay
+  playGameplayMusic() {
+    console.log('🎵 playGameplayMusic() called');
+    if (!this.isInitialized || !this.backgroundMusicEnabled) {
+      console.log('❌ Gameplay music blocked:', {
+        isInitialized: this.isInitialized,
+        backgroundMusicEnabled: this.backgroundMusicEnabled
+      });
+      return;
+    }
+    
+    // Always ensure Theme 5 is set for regular gameplay
+    this.setTheme(5); // Default to Theme 5 (Action Packed)
+    
+    this.stopBackgroundMusic();
+    this.resumeContext();
+    
+    this.musicState.isPlaying = true;
+    this.musicState.patternIndex = 0;
+    this.musicState.layerIndex = 0;
+    this.musicState.isBossMusic = false;
+    
+    const playNote = (note, duration, startTime, layer = 'melody', instrument = 'auto') => {
+      const frequency = this.noteToFrequency(note);
+      
+      // Select instrument based on layer or override
+      let waveType = 'sine';
+      if (instrument === 'auto') {
+        switch(layer) {
+          case 'melody': waveType = 'triangle'; break;  // Soft, melodic
+          case 'bass': waveType = 'sawtooth'; break;   // Deep, rich bass
+          case 'harmony': waveType = 'square'; break;   // Hollow, supporting
+        }
+      } else {
+        waveType = instrument;
+      }
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, waveType);
+      
+      if (!oscillator) return;
+      
+      // Different volumes for different layers and instruments
+      let volume = 0.1;
+      switch(layer) {
+        case 'melody': 
+          volume = waveType === 'sawtooth' ? 0.08 : 0.12; // Reduce sawtooth melody volume
+          break;
+        case 'bass': 
+          volume = waveType === 'sawtooth' ? 0.05 : 0.08; // Reduce sawtooth bass volume
+          break;
+        case 'harmony': 
+          volume = waveType === 'sawtooth' ? 0.04 : 0.06; // Reduce sawtooth harmony volume
+          break;
+      }
+      
+      const finalVolume = volume * this.masterVolume * this.backgroundMusicVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+    
+    const playLayer = (layerName) => {
+      // Choose pattern based on boss music state or current theme
+      let patternKey;
+      if (this.musicState.isBossMusic) {
+        patternKey = `boss${layerName.charAt(0).toUpperCase() + layerName.slice(1)}`;
+      } else {
+        // Use current theme's patterns
+        patternKey = this.musicState.currentPatterns ? this.musicState.currentPatterns[layerName] : layerName;
+      }
+      const pattern = this.musicPatterns[patternKey];
+      const currentTime = this.audioContext.currentTime;
+      let noteTime = currentTime;
+      
+      pattern.forEach(note => {
+        playNote(note.note, note.duration, noteTime, layerName);
+        noteTime += note.duration;
+      });
+      
+      return noteTime;
+    };
+    
+    const playComposition = () => {
+      if (!this.musicState.isPlaying) return;
+      
+      const currentTime = this.audioContext.currentTime;
+      
+      // Play all layers simultaneously
+      const melodyEndTime = playLayer('melody');
+      const bassEndTime = playLayer('bass');
+      const harmonyEndTime = playLayer('harmony');
+      
+      // Schedule next composition
+      const maxEndTime = Math.max(melodyEndTime, bassEndTime, harmonyEndTime);
+      this.musicTimeout = setTimeout(() => {
+        if (this.musicState.isPlaying) {
+          playComposition();
+        }
+      }, (maxEndTime - currentTime) * 1000);
+    };
+    
+    playComposition();
+  }
+
+  // Stop background music immediately
+  stopBackgroundMusic() {
+    // Stop the music by setting the playing flag
+    this.musicState.isPlaying = false;
+    // Don't disable backgroundMusicEnabled - that should only be controlled by user settings
+    
+    // Clear any pending timeouts that might restart the music
+    if (this.musicTimeout) {
+      clearTimeout(this.musicTimeout);
+      this.musicTimeout = null;
+    }
+    
+    // Stop all active oscillators immediately
+    this.activeOscillators.forEach(oscillator => {
+      try {
+        oscillator.stop();
+        oscillator.disconnect();
+      } catch (e) {
+        // Oscillator might already be stopped
+      }
+    });
+    this.activeOscillators.clear();
+  }
+  
+  // Play boss music
+  playBossMusic() {
+    console.log('🎵 playBossMusic() called');
+    console.log('🔍 Debug info:', {
+      isInitialized: this.isInitialized,
+      backgroundMusicEnabled: this.backgroundMusicEnabled,
+      audioContextState: this.audioContext?.state,
+      gameSettings: typeof gameSettings !== 'undefined' ? {
+        backgroundMusic: gameSettings.backgroundMusic,
+        masterVolume: gameSettings.masterVolume
+      } : 'gameSettings not available'
+    });
+    
+    if (!this.isInitialized) {
+      console.log('❌ Boss music blocked - audio not initialized');
+      return;
+    }
+    
+    // Force enable background music for boss music (boss music should always play)
+    if (!this.backgroundMusicEnabled) {
+      console.log('⚠️ Background music disabled, but enabling for boss music');
+      this.backgroundMusicEnabled = true;
+    }
+    
+    // Always ensure Theme 5 is set for regular gameplay
+    this.setTheme(5); // Default to Theme 5 (Action Packed)
+    
+    this.stopBackgroundMusic();
+    this.resumeContext();
+    
+    this.musicState.isPlaying = true;
+    this.musicState.patternIndex = 0;
+    this.musicState.layerIndex = 0;
+    this.musicState.isBossMusic = true;
+    
+    console.log('🎵 Boss music state set, scheduling composition...');
+    
+    // Add a dramatic pause before boss music starts
+    setTimeout(() => {
+      if (this.musicState.isPlaying && this.musicState.isBossMusic) {
+        console.log('🎵 Starting boss composition...');
+        this.playBossComposition();
+      } else {
+        console.log('❌ Boss composition blocked - state changed');
+      }
+    }, 800); // 0.8 second pause
+  }
+  
+  
+  // Theme switching methods
+  setTheme(themeNumber) {
+    if (!this.isInitialized) return;
+    
+    const themeMap = {
+      1: { melody: 'theme1Melody', bass: 'theme1Bass', harmony: 'theme1Harmony' }, // Theme 1 uses dedicated patterns
+      2: { melody: 'theme2Melody', bass: 'theme2Bass', harmony: 'theme2Harmony' },
+      3: { melody: 'theme3Melody', bass: 'theme3Bass', harmony: 'theme3Harmony' },
+      4: { melody: 'theme4Melody', bass: 'theme4Bass', harmony: 'theme4Harmony' },
+      5: { melody: 'theme5Melody', bass: 'theme5Bass', harmony: 'theme5Harmony' },
+      6: { melody: 'theme6Melody', bass: 'theme6Bass', harmony: 'theme6Harmony' },
+      7: { melody: 'theme7Melody', bass: 'theme7Bass', harmony: 'theme7Harmony' },
+      8: { melody: 'theme8Melody', bass: 'theme8Bass', harmony: 'theme8Harmony' },
+      9: { melody: 'theme9Melody', bass: 'theme9Bass', harmony: 'theme9Harmony' }, // Menu themes
+      10: { melody: 'theme10Melody', bass: 'theme10Bass', harmony: 'theme10Harmony' },
+      11: { melody: 'theme11Melody', bass: 'theme11Bass', harmony: 'theme11Harmony' },
+      12: { melody: 'theme12Melody', bass: 'theme12Bass', harmony: 'theme12Harmony' }
+    };
+    
+    const theme = themeMap[themeNumber];
+    if (theme) {
+      // Store the current theme's patterns in the musicState for reference
+      this.musicState.currentTheme = themeNumber;
+      this.musicState.currentPatterns = theme;
+      console.log(`Switched to Theme ${themeNumber}`);
+    }
+  }
+  
+  // Test specific theme
+  testTheme(themeNumber) {
+    if (!this.isInitialized) return;
+    
+    this.stopBackgroundMusic();
+    this.setTheme(themeNumber);
+    this.resumeContext();
+    
+    this.musicState.isPlaying = true;
+    this.musicState.patternIndex = 0;
+    this.musicState.layerIndex = 0;
+    this.musicState.isBossMusic = false;
+    
+    // Use minimal sound for menu themes (9-12), full sound for gameplay themes (1-8)
+    if (themeNumber >= 9 && themeNumber <= 12) {
+      this.playMenuThemeTest(themeNumber);
+    } else {
+      this.playRegularComposition();
+    }
+  }
+  
+  // Test menu themes with minimal sound (melody only)
+  playMenuThemeTest(themeNumber) {
+    if (!this.musicState.isPlaying) return;
+    
+    const playNote = (note, duration, startTime, layer = 'melody', instrument = 'auto') => {
+      const frequency = this.noteToFrequency(note);
+      
+      // Use only gentle triangle waves for menu themes
+      const waveType = 'triangle';
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, waveType);
+      
+      if (!oscillator) return;
+      
+      // Gentle volume for menu themes
+      const volume = 0.12;
+      const finalVolume = volume * this.masterVolume * this.backgroundMusicVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+    
+    const playLayer = (layerName) => {
+      // Use current theme's patterns
+      const patternKey = this.musicState.currentPatterns ? this.musicState.currentPatterns[layerName] : layerName;
+      const pattern = this.musicPatterns[patternKey];
+      const currentTime = this.audioContext.currentTime;
+      let noteTime = currentTime;
+      
+      pattern.forEach(note => {
+        playNote(note.note, note.duration, noteTime, layerName);
+        noteTime += note.duration;
+      });
+      
+      return noteTime;
+    };
+    
+    const playComposition = () => {
+      if (!this.musicState.isPlaying) return;
+      
+      const currentTime = this.audioContext.currentTime;
+      
+      // Play melody and harmony (gentle menu theme test)
+      const melodyEndTime = playLayer('melody');
+      // const bassEndTime = playLayer('bass'); // Disabled for ultra-minimal menu music
+      const harmonyEndTime = playLayer('harmony'); // Added back with gentle triangle waves
+      
+      // Schedule next composition
+      const maxEndTime = Math.max(melodyEndTime, harmonyEndTime);
+      this.musicTimeout = setTimeout(() => {
+        if (this.musicState.isPlaying) {
+          playComposition();
+        }
+      }, (maxEndTime - currentTime) * 1000);
+    };
+    
+    playComposition();
+  }
+  
+  // Boss music composition
+  playBossComposition() {
+    if (!this.musicState.isPlaying) return;
+    
+    const playNote = (note, duration, startTime, layer = 'melody', instrument = 'auto') => {
+      const frequency = this.noteToFrequency(note);
+      
+      // Select instrument based on layer or override
+      let waveType = 'sine';
+      if (instrument === 'auto') {
+        switch(layer) {
+          case 'melody': waveType = 'sawtooth'; break;  // Aggressive, harsh
+          case 'bass': waveType = 'square'; break;    // Deep, commanding
+          case 'harmony': waveType = 'triangle'; break; // Dark, supporting
+        }
+      } else {
+        waveType = instrument;
+      }
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, waveType);
+      
+      if (!oscillator) return;
+      
+      // Different volumes for different layers and instruments
+      let volume = 0.1;
+      switch(layer) {
+        case 'melody': 
+          volume = waveType === 'sawtooth' ? 0.08 : 0.12; // Reduce sawtooth melody volume
+          break;
+        case 'bass': 
+          volume = waveType === 'sawtooth' ? 0.05 : 0.08; // Reduce sawtooth bass volume
+          break;
+        case 'harmony': 
+          volume = waveType === 'sawtooth' ? 0.04 : 0.06; // Reduce sawtooth harmony volume
+          break;
+      }
+      
+      const finalVolume = volume * this.masterVolume * this.backgroundMusicVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+    
+    const playLayer = (layerName) => {
+      // Use boss patterns
+      const patternKey = `boss${layerName.charAt(0).toUpperCase() + layerName.slice(1)}`;
+      const pattern = this.musicPatterns[patternKey];
+      const currentTime = this.audioContext.currentTime;
+      let noteTime = currentTime;
+      
+      console.log(`Boss music - playing layer: ${layerName}, patternKey: ${patternKey}, pattern exists:`, !!pattern);
+      
+      if (!pattern || pattern.length === 0) {
+        console.warn(`Boss pattern not found: ${patternKey}`);
+        return currentTime;
+      }
+      
+      pattern.forEach(note => {
+        playNote(note.note, note.duration, noteTime, layerName);
+        noteTime += note.duration;
+      });
+      
+      return noteTime;
+    };
+    
+    const currentTime = this.audioContext.currentTime;
+    
+    // Play all boss layers simultaneously
+    const melodyEndTime = playLayer('melody');
+    const bassEndTime = playLayer('bass');
+    const harmonyEndTime = playLayer('harmony');
+    
+    // Schedule next composition
+    const maxEndTime = Math.max(melodyEndTime, bassEndTime, harmonyEndTime);
+    this.musicTimeout = setTimeout(() => {
+      if (this.musicState.isPlaying && this.musicState.isBossMusic) {
+        this.playBossComposition();
+      }
+    }, (maxEndTime - currentTime) * 1000);
+  }
+  
+  // Regular music composition
+  playRegularComposition() {
+    if (!this.musicState.isPlaying) return;
+    
+    const playNote = (note, duration, startTime, layer = 'melody', instrument = 'auto') => {
+      const frequency = this.noteToFrequency(note);
+      
+      // Select instrument based on layer or override
+      let waveType = 'sine';
+      if (instrument === 'auto') {
+        switch(layer) {
+          case 'melody': waveType = 'triangle'; break;  // Soft, melodic
+          case 'bass': waveType = 'sawtooth'; break;   // Deep, rich bass
+          case 'harmony': waveType = 'square'; break;   // Hollow, supporting
+        }
+      } else {
+        waveType = instrument;
+      }
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, waveType);
+      
+      if (!oscillator) return;
+      
+      // Different volumes for different layers and instruments
+      let volume = 0.1;
+      switch(layer) {
+        case 'melody': 
+          volume = waveType === 'sawtooth' ? 0.08 : 0.12; // Reduce sawtooth melody volume
+          break;
+        case 'bass': 
+          volume = waveType === 'sawtooth' ? 0.05 : 0.08; // Reduce sawtooth bass volume
+          break;
+        case 'harmony': 
+          volume = waveType === 'sawtooth' ? 0.04 : 0.06; // Reduce sawtooth harmony volume
+          break;
+      }
+      
+      const finalVolume = volume * this.masterVolume * this.backgroundMusicVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+    
+    const playLayer = (layerName) => {
+      // Use current theme's patterns
+      const patternKey = this.musicState.currentPatterns ? this.musicState.currentPatterns[layerName] : layerName;
+      const pattern = this.musicPatterns[patternKey];
+      const currentTime = this.audioContext.currentTime;
+      let noteTime = currentTime;
+      
+      pattern.forEach(note => {
+        playNote(note.note, note.duration, noteTime, layerName);
+        noteTime += note.duration;
+      });
+      
+      return noteTime;
+    };
+    
+    const currentTime = this.audioContext.currentTime;
+    
+    // Play all regular layers simultaneously
+    const melodyEndTime = playLayer('melody');
+    const bassEndTime = playLayer('bass');
+    const harmonyEndTime = playLayer('harmony');
+    
+    // Schedule next composition
+    const maxEndTime = Math.max(melodyEndTime, bassEndTime, harmonyEndTime);
+    this.musicTimeout = setTimeout(() => {
+      if (this.musicState.isPlaying && !this.musicState.isBossMusic) {
+        this.playRegularComposition();
+      }
+    }, (maxEndTime - currentTime) * 1000);
+  }
+  
+  // Convert note name to frequency
+  noteToFrequency(note) {
+    const notes = {
+      // Low octaves (boss music)
+      'F0': 21.83, 'Bb0': 29.14, 'C1': 32.70, 'D1': 36.71, 'Eb1': 38.89, 'F1': 43.65, 'G1': 49.00, 'Bb1': 58.27, 'C2': 65.41, 'D2': 73.42, 'Eb2': 77.78, 'F2': 87.31, 'G2': 98.00, 'Ab2': 103.83, 'Bb2': 116.54,
+      // Mid octaves
+      'C3': 130.81, 'D3': 146.83, 'Eb3': 155.56, 'F3': 174.61, 'G3': 196.00, 'Ab3': 207.65, 'Bb3': 233.08,
+      // Standard octaves
+      'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23,
+      'G4': 392.00, 'A4': 440.00, 'B4': 493.88, 'C5': 523.25,
+      'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99
+    };
+    return notes[note] || 440;
+  }
+  
+  // Set master volume
+  setMasterVolume(volume) {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+  }
+  
+  // Set sound effects volume
+  setSoundEffectsVolume(volume) {
+    this.soundEffectsVolume = Math.max(0, Math.min(1, volume));
+  }
+  
+  // Set background music volume
+  setBackgroundMusicVolume(volume) {
+    this.backgroundMusicVolume = Math.max(0, Math.min(1, volume));
+  }
+  
+  // Enable/disable sound effects
+  setSoundEffectsEnabled(enabled) {
+    this.soundEffectsEnabled = enabled;
+  }
+  
+  // Enable/disable background music
+  setBackgroundMusicEnabled(enabled) {
+    this.backgroundMusicEnabled = enabled;
+    if (!enabled) {
+      this.stopBackgroundMusic();
+    }
+    // Note: Music will only start when explicitly called (e.g., during gameplay)
+  }
+  
+  // Play explosion effect (multiple frequencies)
+  playExplosion() {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    const explosionSounds = [
+      { frequency: 200, duration: 0.3, type: 'sawtooth', volume: 0.8 },
+      { frequency: 150, duration: 0.4, type: 'square', volume: 0.6 },
+      { frequency: 100, duration: 0.5, type: 'triangle', volume: 0.4 }
+    ];
+    
+    this.playSoundSequence(explosionSounds);
+  }
+  
+  // Play power-up collection effect
+  playPowerUpCollect(isPositive = true) {
+    if (isPositive) {
+      this.playSound('powerupCollect');
+    } else {
+      this.playSound('powerupNegative');
+    }
+  }
+  
+  // Play boss-related sounds
+  playBossSpawn() {
+    this.playSound('bossSpawn');
+  }
+  
+  playBossDestroyed() {
+    this.playExplosion();
+    setTimeout(() => this.playSound('bossDestroyed'), 300);
+  }
+  
+  // Play game state sounds
+  playGameOver() {
+    this.stopBackgroundMusic();
+    this.playSound('gameOver');
+  }
+  
+  playLevelUp() {
+    this.playSound('levelUp');
+  }
+  
+  // Play force field activation (gentle sci-fi startup sequence)
+  playForceFieldActivate() {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    this.resumeContext();
+    const steps = 4;
+    const duration = 1.5;
+    const stepDuration = duration / steps;
+    const startFreq = 250;
+    const endFreq = 450;
+    const freqStep = (endFreq - startFreq) / (steps - 1);
+    
+    for (let i = 0; i < steps; i++) {
+      const frequency = startFreq + (freqStep * i);
+      const startTime = this.audioContext.currentTime + (stepDuration * i);
+      
+      // Use only sine waves for gentle, smooth sound
+      const { oscillator, gainNode } = this.createOscillator(frequency, 'sine');
+      if (!oscillator) continue;
+      
+      // Much more prominent volume increase - similar to power down
+      const volumeMultiplier = 0.4 + (i * 0.2); // 0.4, 0.6, 0.8, 1.0 - much louder
+      const noteDuration = stepDuration * 0.8; // Shorter notes so they don't overlap
+      
+      const finalVolume = volumeMultiplier * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + noteDuration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + noteDuration);
+    }
+  }
+  
+  // Play force field power up (enhanced upgrade sequence)
+  playForceFieldPowerUp() {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    this.resumeContext();
+    const steps = 6;
+    const duration = 1.2;
+    const stepDuration = duration / steps;
+    const startFreq = 200;
+    const endFreq = 600;
+    const freqStep = (endFreq - startFreq) / (steps - 1);
+    
+    for (let i = 0; i < steps; i++) {
+      const frequency = startFreq + (freqStep * i);
+      const startTime = this.audioContext.currentTime + (stepDuration * i);
+      
+      // Use sine wave for smoother, less harsh sound
+      const { oscillator, gainNode } = this.createOscillator(frequency, 'sine');
+      if (!oscillator) continue;
+      
+      // Much more prominent volume - peaks higher like power down
+      const volumeMultiplier = 0.5 + Math.sin((i / steps) * Math.PI) * 0.5; // 0.5 to 1.0 peak - much louder
+      const noteDuration = stepDuration + (i * 0.03);
+      
+      const finalVolume = volumeMultiplier * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + noteDuration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + noteDuration);
+    }
+  }
+  
+  // Play force field power down (enhanced damage sequence)
+  playForceFieldPowerDown() {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    this.resumeContext();
+    const steps = 6;
+    const duration = 1.0;
+    const stepDuration = duration / steps;
+    const startFreq = 600;
+    const endFreq = 200;
+    const freqStep = (endFreq - startFreq) / (steps - 1);
+    
+    for (let i = 0; i < steps; i++) {
+      const frequency = startFreq + (freqStep * i);
+      const startTime = this.audioContext.currentTime + (stepDuration * i);
+      
+      // Use triangle wave for smoother, more ominous descent
+      const { oscillator, gainNode } = this.createOscillator(frequency, 'triangle');
+      if (!oscillator) continue;
+      
+      // Increased volume for better audibility - starts higher and decreases less dramatically
+      const volumeMultiplier = 0.35 - (i * 0.04); // 0.35, 0.31, 0.27, 0.23, 0.19, 0.15
+      const noteDuration = stepDuration + (i * 0.05);
+      
+      const finalVolume = volumeMultiplier * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + noteDuration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + noteDuration);
+    }
+  }
+  
+  // Play force field destroyed (enhanced catastrophic failure sequence)
+  playForceFieldDestroyed() {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    this.resumeContext();
+    const steps = 4;
+    const duration = 1.5;
+    const stepDuration = duration / steps;
+    const startFreq = 400;
+    const endFreq = 80;
+    const freqStep = (endFreq - startFreq) / (steps - 1);
+    
+    for (let i = 0; i < steps; i++) {
+      const frequency = startFreq + (freqStep * i);
+      const startTime = this.audioContext.currentTime + (stepDuration * i);
+      
+      // Use square wave for harsh, mechanical failure sound
+      const { oscillator, gainNode } = this.createOscillator(frequency, 'square');
+      if (!oscillator) continue;
+      
+      // Volume increases dramatically for catastrophic effect
+      const volumeMultiplier = 0.2 + (i * 0.2); // 0.2, 0.4, 0.6, 0.8
+      const noteDuration = stepDuration + (i * 0.05);
+      
+      const finalVolume = volumeMultiplier * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + noteDuration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + noteDuration);
+    }
+    
+    // Add a final low-frequency rumble for impact
+    setTimeout(() => {
+      const { oscillator, gainNode } = this.createOscillator(60, 'square');
+      if (oscillator) {
+        const finalVolume = 0.3 * this.masterVolume * this.soundEffectsVolume;
+        gainNode.gain.setValueAtTime(finalVolume, this.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+        
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + 0.3);
+      }
+    }, duration * 1000);
+  }
+  
+  // Play ascending sequence (low to high) for power up
+  playAscendingSequence(startFreq = 200, endFreq = 800, duration = 1.2, steps = 5) {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    this.resumeContext();
+    const stepDuration = duration / steps;
+    const freqStep = (endFreq - startFreq) / (steps - 1);
+    
+    for (let i = 0; i < steps; i++) {
+      const frequency = startFreq + (freqStep * i);
+      const startTime = this.audioContext.currentTime + (stepDuration * i);
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, 'sawtooth');
+      if (!oscillator) continue;
+      
+      const finalVolume = 0.2 * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + stepDuration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + stepDuration);
+    }
+  }
+  
+  // Play descending sequence (high to low) for power down
+  playDescendingSequence(startFreq = 600, endFreq = 150, duration = 0.8, steps = 4) {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    this.resumeContext();
+    const stepDuration = duration / steps;
+    const freqStep = (endFreq - startFreq) / (steps - 1);
+    
+    for (let i = 0; i < steps; i++) {
+      const frequency = startFreq + (freqStep * i);
+      const startTime = this.audioContext.currentTime + (stepDuration * i);
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, 'triangle');
+      if (!oscillator) continue;
+      
+      const finalVolume = 0.2 * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + stepDuration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + stepDuration);
+    }
+  }
+  
+  // Play dramatic destruction sequence (descending with longer notes)
+  playDestructionSequence(startFreq = 300, endFreq = 80, duration = 1.5, steps = 3) {
+    if (!this.soundEffectsEnabled || !this.isInitialized) return;
+    
+    this.resumeContext();
+    const stepDuration = duration / steps;
+    const freqStep = (endFreq - startFreq) / (steps - 1);
+    
+    for (let i = 0; i < steps; i++) {
+      const frequency = startFreq + (freqStep * i);
+      const startTime = this.audioContext.currentTime + (stepDuration * i);
+      
+      const { oscillator, gainNode } = this.createOscillator(frequency, 'square');
+      if (!oscillator) continue;
+      
+      const finalVolume = 0.25 * this.masterVolume * this.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(finalVolume, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + stepDuration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + stepDuration);
+    }
+  }
+  
+  // Get audio system statistics for debugging
+  getAudioStats() {
+    return {
+      isInitialized: this.isInitialized,
+      masterVolume: this.masterVolume,
+      soundEffectsEnabled: this.soundEffectsEnabled,
+      backgroundMusicEnabled: this.backgroundMusicEnabled,
+      activeSounds: this.activeSounds,
+      maxConcurrentSounds: this.maxConcurrentSounds,
+      oscillatorCacheSize: this.oscillatorCache.length,
+      maxCacheSize: this.maxCacheSize,
+      audioContextState: this.audioContext ? this.audioContext.state : 'not initialized'
+    };
+  }
+  
+  // Clean up resources
+  cleanup() {
+    this.stopBackgroundMusic();
+    this.activeSounds = 0;
+    this.oscillatorCache = [];
+    
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+    }
+  }
+}
+
+// Global audio manager instance
+let gameAudio = null;
+
+// Initialize audio system
+function initGameAudio() {
+  gameAudio = new GameAudioManager();
+  
+  // Initialize the audio context
+  gameAudio.init();
+  
+  // Load settings from the main game
+  if (typeof gameSettings !== 'undefined') {
+    console.log('🔧 Loading game settings:', {
+      masterVolume: gameSettings.masterVolume,
+      soundEffectsVolume: gameSettings.soundEffectsVolume,
+      backgroundMusicVolume: gameSettings.backgroundMusicVolume,
+      soundEffects: gameSettings.soundEffects,
+      backgroundMusic: gameSettings.backgroundMusic
+    });
+    
+    gameAudio.setMasterVolume(gameSettings.masterVolume / 100);
+    gameAudio.setSoundEffectsVolume(gameSettings.soundEffectsVolume / 100);
+    gameAudio.setBackgroundMusicVolume(gameSettings.backgroundMusicVolume / 100);
+    gameAudio.setSoundEffectsEnabled(gameSettings.soundEffects);
+    gameAudio.setBackgroundMusicEnabled(gameSettings.backgroundMusic);
+  } else {
+    console.log('⚠️ gameSettings not available during audio initialization');
+  }
+  
+  console.log('✓ Game audio system ready');
+  
+  // Menu music will start after user interaction (front page button click)
+}
+
+// Audio integration functions for the main game
+function playShootSound() {
+  if (gameAudio) {
+    // Create magical orb launch sound - simpler approach
+    if (gameAudio.soundEffectsEnabled && gameAudio.isInitialized) {
+      gameAudio.resumeContext();
+      
+      // Create a magical "pew" sound with frequency sweep
+      const startFreq = 600;
+      const endFreq = 400;
+      const duration = 0.12;
+      
+      const { oscillator, gainNode } = gameAudio.createOscillator(startFreq, 'sine');
+      if (!oscillator) return;
+      
+      // Frequency sweep from high to low (like energy dissipating)
+      oscillator.frequency.setValueAtTime(startFreq, gameAudio.audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(endFreq, gameAudio.audioContext.currentTime + duration);
+      
+      // Volume envelope - quick attack, quick decay
+      const finalVolume = 0.4 * gameAudio.masterVolume * gameAudio.soundEffectsVolume;
+      gainNode.gain.setValueAtTime(0, gameAudio.audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(finalVolume, gameAudio.audioContext.currentTime + 0.01); // Quick attack
+      gainNode.gain.exponentialRampToValueAtTime(0.01, gameAudio.audioContext.currentTime + duration);
+      
+      oscillator.start(gameAudio.audioContext.currentTime);
+      oscillator.stop(gameAudio.audioContext.currentTime + duration);
+    }
+  }
+}
+
+function playEnemyHitSound() {
+  if (gameAudio) gameAudio.playSound('enemyHit');
+}
+
+function playEnemyDestroyedSound() {
+  if (gameAudio) gameAudio.playSound('enemyDestroyed');
+}
+
+function playCoinCollectSound() {
+  if (gameAudio) gameAudio.playSound('coinCollect');
+}
+
+function playPowerUpSound(isPositive) {
+  if (gameAudio) gameAudio.playPowerUpCollect(isPositive);
+}
+
+
+function playBossHitSound() {
+  if (gameAudio) gameAudio.playSound('bossHit');
+}
+
+function playBossDestroyedSound() {
+  if (gameAudio) gameAudio.playBossDestroyed();
+}
+
+function playGameOverSound() {
+  if (gameAudio) gameAudio.playGameOver();
+}
+
+function playLevelUpSound() {
+  if (gameAudio) gameAudio.playLevelUp();
+}
+
+function playForceFieldSound() {
+  if (gameAudio) gameAudio.playForceFieldActivate();
+}
+
+function playForceFieldPowerUpSound() {
+  if (gameAudio) gameAudio.playForceFieldPowerUp();
+}
+
+function playForceFieldPowerDownSound() {
+  if (gameAudio) gameAudio.playForceFieldPowerDown();
+}
+
+function playForceFieldDestroyedSound() {
+  if (gameAudio) gameAudio.playForceFieldDestroyed();
+}
+
+// UI and feedback audio functions
+function playMenuClickSound() {
+  if (gameAudio) gameAudio.playSound('menuClick');
+}
+
+function playMenuHoverSound() {
+  if (gameAudio) gameAudio.playSound('menuHover');
+}
+
+function playButtonPressSound() {
+  if (gameAudio) gameAudio.playSound('buttonPress');
+}
+
+function playAchievementSound() {
+  if (gameAudio) gameAudio.playSound('achievement');
+}
+
+function playWarningSound() {
+  if (gameAudio) gameAudio.playSound('warning');
+}
+
+function playSuccessSound() {
+  if (gameAudio) gameAudio.playSound('success');
+}
+
+// Enhanced boss hit sound
+function playBossHitSound() {
+  if (gameAudio) gameAudio.playSound('bossHit');
+}
+
+// Enhanced player hit sound
+function playPlayerHitSound() {
+  if (gameAudio) gameAudio.playSound('playerHit');
+}
+
+// Wrapper functions for easy access
+function startMenuMusic() {
+  if (gameAudio) gameAudio.playMenuMusic();
+}
+
+function startGameplayMusic() {
+  if (gameAudio) gameAudio.playGameplayMusic();
+}
+
+function stopBackgroundMusic() {
+  if (gameAudio) gameAudio.stopBackgroundMusic();
+}
+
+function startBossMusic() {
+  if (gameAudio) gameAudio.playBossMusic();
+}
+
+// Resume gameplay music after boss defeat (with pause)
+function resumeGameplayMusic() {
+  console.log('🎵 resumeGameplayMusic() called');
+  if (gameAudio) {
+    console.log('🔍 Resume debug info:', {
+      backgroundMusicEnabled: gameAudio.backgroundMusicEnabled,
+      isInitialized: gameAudio.isInitialized,
+      musicState: gameAudio.musicState
+    });
+    
+    gameAudio.stopBackgroundMusic();
+    gameAudio.resumeContext();
+    
+    // Ensure background music is enabled for gameplay
+    if (!gameAudio.backgroundMusicEnabled) {
+      console.log('⚠️ Enabling background music for gameplay');
+      gameAudio.backgroundMusicEnabled = true;
+    }
+    
+    gameAudio.musicState.isPlaying = true;
+    gameAudio.musicState.patternIndex = 0;
+    gameAudio.musicState.layerIndex = 0;
+    gameAudio.musicState.isBossMusic = false;
+    
+    console.log('🎵 Scheduling gameplay music restart...');
+    
+    // Add a brief pause before gameplay music resumes
+    setTimeout(() => {
+      if (gameAudio.musicState.isPlaying && !gameAudio.musicState.isBossMusic) {
+        console.log('🎵 Starting gameplay music after victory pause');
+        gameAudio.playGameplayMusic();
+      } else {
+        console.log('❌ Gameplay music blocked - state changed');
+      }
+    }, 600); // 0.6 second pause
+  } else {
+    console.log('❌ resumeGameplayMusic called but gameAudio not available');
+  }
+}
+
+// Settings integration
+function updateAudioSettings() {
+  if (gameAudio && typeof gameSettings !== 'undefined') {
+    gameAudio.setMasterVolume(gameSettings.masterVolume / 100);
+    gameAudio.setSoundEffectsVolume(gameSettings.soundEffectsVolume / 100);
+    gameAudio.setBackgroundMusicVolume(gameSettings.backgroundMusicVolume / 100);
+    gameAudio.setSoundEffectsEnabled(gameSettings.soundEffects);
+    gameAudio.setBackgroundMusicEnabled(gameSettings.backgroundMusic);
+  }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Small delay to ensure other systems are loaded
+  setTimeout(initGameAudio, 100);
+});

@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SuiTwo</title>
+  <link rel="stylesheet" href="game-styles.css">
+</head>
+<body>
+  <!-- Front Page Overlay -->
+  <div id="frontPage" class="front-page-overlay">
+    <div class="front-page-content">
+      <h1 class="game-title"><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+      <p class="game-subtitle">Space Shooter Alpha v0.1</p>
+      <div class="game-description">
+        <p>Navigate through the cosmos, defeat enemies, and survive as long as possible!</p>
+        <p>Use MOUSE to move and P to pause. Auto-fire is enabled!</p>
+      </div>
+      <button id="enterGameBtn" class="enter-game-btn">
+        🎮 Enter Game
+      </button>
+      <div class="audio-note">
+        <small>🔊 Audio will start after clicking Enter</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enhanced Top information bar -->
+  <header class="suitch-header">
+    <div class="title">
+      <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="header-logo"> SuiTwo
+      <span class="alpha-badge">Alpha v0.1</span>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-icon">📏</span>
+        Distance: <span id="distance">0</span> m
+      </div>
+      <div class="stat">
+        <span class="stat-icon">🪙</span>
+        Coins: <span id="coins">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-icon">⚡</span>
+        Status: <span id="status">Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main container with canvas -->
+  <div class="game-container">
+    <!-- Game canvas -->
+    <main class="game-wrapper">
+      <canvas id="gameCanvas" width="800" height="480"></canvas>
+      
+      <!-- In-game UI Overlay -->
+      <div class="game-ui-overlay">
+        <div class="game-stats-panel">
+          <div class="stat-item">
+            <span class="stat-label">Score:</span>
+            <span class="stat-value" id="gameScore">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Magic Orb Level:</span>
+            <span class="stat-value" id="orbLevel">1</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Tier:</span>
+            <span class="stat-value" id="gameTier">1</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Bosses Defeated:</span>
+            <span class="stat-value" id="bossesDefeated">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Force Field:</span>
+            <span class="stat-value" id="forceFieldLevel">None</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Coin Streak:</span>
+            <span class="stat-value" id="coinStreak">0</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Enhanced Bottom controls bar -->
+  <footer class="suitch-footer">
+    <div class="controls">
+      <span class="control-item">
+        <span class="control-icon">🖱️</span>
+        Mouse: Move Player
+      </span>
+      <span class="control-item">
+        <span class="control-icon">⏸️</span>
+        P: Pause/Resume
+      </span>
+      <span class="control-item">
+        <span class="control-icon">🔫</span>
+        Auto-Fire: Enabled
+      </span>
+    </div>
+    <div class="version-info">
+      Alpha Release • Build 2024.01 • Anti-Cheat Enabled • Secure Scoring
+    </div>
+  </footer>
+
+  <!-- Main Menu Overlay -->
+  <div class="main-menu-overlay" id="mainMenuOverlay">
+    <div class="main-menu-content">
+      <div class="game-title">
+        <h1><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+        <div class="version-badge">Alpha v0.1</div>
+      </div>
+      
+      <div class="menu-buttons">
+        <button class="menu-btn primary" onclick="playButtonPressSound(); startGame()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">▶️</span>
+          Start Game
+        </button>
+        <button class="menu-btn" onclick="playButtonPressSound(); showSettings()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">⚙️</span>
+          Settings
+        </button>
+        <button class="menu-btn" onclick="playButtonPressSound(); showInstructions()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">📖</span>
+          How to Play
+        </button>
+        <button class="menu-btn" onclick="playButtonPressSound(); showLeaderboard()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">🏆</span>
+          Leaderboard
+        </button>
+        <button class="menu-btn" onclick="playButtonPressSound(); showSoundTest()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">🔊</span>
+          Sound Test
+        </button>
+      </div>
+      
+      <div class="menu-footer">
+        <div class="game-stats">
+          <div class="stat-item">
+            <span class="stat-label">Best Score:</span>
+            <span class="stat-value" id="bestScoreDisplay">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Games Played:</span>
+            <span class="stat-value" id="gamesPlayedDisplay">0</span>
+          </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sound Test Panel -->
+  <div class="sound-test-panel" id="soundTestPanel">
+    <div class="sound-test-content">
+      <div class="sound-test-header">
+        <h2>🔊 Sound Test</h2>
+        <button class="close-btn" onclick="hideSoundTest()">✕</button>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎵 Game Sounds</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testSound('shoot')">🔫 Shoot</button>
+          <button class="sound-btn" onclick="testSound('enemyHit')">💥 Enemy Hit</button>
+          <button class="sound-btn" onclick="testSound('enemyDestroyed')">💀 Enemy Destroyed</button>
+          <button class="sound-btn" onclick="testSound('coinCollect')">🪙 Coin Collect</button>
+          <button class="sound-btn" onclick="testSound('powerupCollect')">⚡ Power Up</button>
+          <button class="sound-btn" onclick="testSound('powerupNegative')">⚠️ Power Down</button>
+          <button class="sound-btn" onclick="testSound('bossHit')">🎯 Boss Hit</button>
+          <button class="sound-btn" onclick="testSound('bossDestroyed')">💀 Boss Destroyed</button>
+          <button class="sound-btn" onclick="testSound('gameOver')">💀 Game Over</button>
+          <button class="sound-btn" onclick="testSound('levelUp')">📈 Level Up</button>
+          <button class="sound-btn" onclick="testSound('playerHit')">💢 Player Hit</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🛡️ Force Field Sounds</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testForceFieldSound('activate')">🟢 Force Field Activate</button>
+          <button class="sound-btn" onclick="testForceFieldSound('powerUp')">🔵 Force Field Power Up</button>
+          <button class="sound-btn" onclick="testForceFieldSound('powerDown')">🟡 Force Field Power Down</button>
+          <button class="sound-btn" onclick="testForceFieldSound('destroyed')">🔴 Force Field Destroyed</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎼 Musical Sequences</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testSequence('ascending')">📈 Ascending Sequence</button>
+          <button class="sound-btn" onclick="testSequence('descending')">📉 Descending Sequence</button>
+          <button class="sound-btn" onclick="testSequence('destruction')">💥 Destruction Sequence</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎵 Gameplay Music</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testGameplayMusic()">🎶 Play Gameplay Music</button>
+          <button class="sound-btn" onclick="testBossMusic()">👹 Play Boss Music</button>
+          <button class="sound-btn" onclick="stopBackgroundMusic()">⏹️ Stop Music</button>
+        </div>
+        
+        <h4>🎵 Theme Testing</h4>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(1)">🌌 Theme 1: Atmospheric</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(2)">⚡ Theme 2: Driving Action</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(3)">🔇 Theme 3: Minimalist</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(4)">🕹️ Theme 4: Retro Sci-Fi</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(5)">🚀 Theme 5: Action Packed</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(6)">🎖️ Theme 6: Militaristic</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(7)">⚡ Theme 7: High Energy</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(8)">💥 Theme 8: Aggressive</button>
+        </div>
+        
+        <h4>🌙 Menu Themes (Soothing)</h4>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(9)">🌸 Theme 9: Gentle Ambient</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(10)">🕊️ Theme 10: Peaceful Melody</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(11)">✨ Theme 11: Soft Harmony</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(12)">🌌 Theme 12: Tranquil Space</button>
+        </div>
+        
+        <h4>🎼 Instrument Testing</h4>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('sine')">🔔 Sine Wave (Pure)</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('square')">📦 Square Wave (Digital)</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('sawtooth')">🔺 Sawtooth Wave (Buzzy)</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('triangle')">🔺 Triangle Wave (Soft)</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎮 UI & Feedback Sounds</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testSound('menuClick')">🖱️ Menu Click</button>
+          <button class="sound-btn" onclick="testSound('menuHover')">👆 Menu Hover</button>
+          <button class="sound-btn" onclick="testSound('buttonPress')">🔘 Button Press</button>
+          <button class="sound-btn" onclick="testSound('achievement')">🏆 Achievement</button>
+          <button class="sound-btn" onclick="testSound('warning')">⚠️ Warning</button>
+          <button class="sound-btn" onclick="testSound('success')">✅ Success</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🔧 Audio Debug</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="showAudioStats()">📊 Audio Stats</button>
+          <button class="sound-btn" onclick="testAllSounds()">🎵 Test All Sounds</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-content">
+      <div class="settings-header">
+        <h2>⚙️ Game Settings</h2>
+        <button class="close-btn" onclick="hideSettings()">✕</button>
+      </div>
+      
+      <div class="settings-section">
+        <h3>🎮 Controls</h3>
+        <div class="setting-item">
+          <label for="mouseSensitivity">Mouse Sensitivity:</label>
+          <input type="range" id="mouseSensitivity" min="0.1" max="0.5" step="0.05" value="0.2">
+          <span id="mouseSensitivityValue">0.2</span>
+        </div>
+      </div>
+      
+      <div class="settings-section">
+        <h3>🎨 Graphics</h3>
+        <div class="setting-item">
+          <label for="particleEffects">Particle Effects:</label>
+          <input type="checkbox" id="particleEffects" checked>
+        </div>
+        <div class="setting-item">
+          <label for="screenShake">Screen Shake:</label>
+          <input type="checkbox" id="screenShake" checked>
+        </div>
+        <div class="setting-item">
+          <label for="trailEffects">Player Trail:</label>
+          <input type="checkbox" id="trailEffects" checked>
+        </div>
+      </div>
+      
+      <div class="settings-section">
+        <h3>🔊 Audio</h3>
+        <div class="setting-item">
+          <label for="masterVolume">Master Volume:</label>
+          <input type="range" id="masterVolume" min="0" max="100" step="10" value="70">
+          <span id="masterVolumeValue">70%</span>
+        </div>
+        <div class="setting-item">
+          <label for="soundEffectsVolume">Sound Effects Volume:</label>
+          <input type="range" id="soundEffectsVolume" min="0" max="100" step="10" value="80">
+          <span id="soundEffectsVolumeValue">80%</span>
+        </div>
+        <div class="setting-item">
+          <label for="backgroundMusicVolume">Background Music Volume:</label>
+          <input type="range" id="backgroundMusicVolume" min="0" max="100" step="10" value="60">
+          <span id="backgroundMusicVolumeValue">60%</span>
+        </div>
+        <div class="setting-item">
+          <label for="soundEffects">Sound Effects:</label>
+          <input type="checkbox" id="soundEffects" checked>
+        </div>
+        <div class="setting-item">
+          <label for="backgroundMusic">Background Music:</label>
+          <input type="checkbox" id="backgroundMusic" checked>
+        </div>
+      </div>
+      
+      <div class="settings-buttons">
+        <button class="menu-btn" onclick="playButtonPressSound(); resetSettings()">Reset to Default</button>
+        <button class="menu-btn primary" onclick="playButtonPressSound(); saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions Panel -->
+  <div class="instructions-panel" id="instructionsPanel">
+    <div class="instructions-content">
+      <div class="instructions-header">
+        <h2>📖 How to Play</h2>
+        <button class="close-btn" onclick="hideInstructions()">✕</button>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🎯 Objective</h3>
+        <p>Survive as long as possible, defeat bosses, and achieve the highest score!</p>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🎮 Controls</h3>
+        <div class="control-item">
+          <span class="control-icon">🖱️</span>
+          <span class="control-text">Mouse: Move your character vertically</span>
+        </div>
+        <div class="control-item">
+          <span class="control-icon">⏸️</span>
+          <span class="control-text">P: Pause/Resume game</span>
+        </div>
+        <div class="control-item">
+          <span class="control-icon">🔫</span>
+          <span class="control-text">Auto-Fire: Your character shoots automatically</span>
+        </div>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🎯 Gameplay</h3>
+        <ul>
+          <li>Move your character to avoid enemies and collect power-ups</li>
+          <li>Collect coins to increase your score</li>
+          <li>Pick up green power-ups to increase firepower</li>
+          <li>Avoid red power-ups that decrease firepower</li>
+          <li>Defeat bosses to progress to higher tiers</li>
+          <li>Higher tiers feature stronger enemies and bosses</li>
+        </ul>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🏆 Scoring</h3>
+        <ul>
+          <li>Destroy enemies: 15 points × enemy tier</li>
+          <li>Collect coins: 10 points each</li>
+          <li>Defeat bosses: 5000 points × tier</li>
+          <li>Survival bonus: Continuous points based on speed</li>
+        </ul>
+      </div>
+      
+      <div class="instructions-buttons">
+        <button class="menu-btn primary" onclick="playButtonPressSound(); hideInstructions()">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Name input modal -->
+  <div class="name-input-modal" id="nameInputModal">
+    <div class="name-input-content">
+      <h2>🎉 New High Score!</h2>
+      <div class="score-display">
+        Final Score: <span id="finalScoreDisplay">0</span>
+      </div>
+      <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
+      <br>
+      <button onclick="playButtonPressSound(); saveScore()">Save Score</button>
+      <button onclick="playButtonPressSound(); skipSave()">Skip</button>
+    </div>
+  </div>
+
+  <!-- Load security FIRST -->
+  <script src="game-security.js"></script>
+
+  <!-- Load audio system -->
+  <script src="game-audio.js"></script>
+
+  <!-- Game script -->
+    <!-- Modular game scripts -->
+    <script src="src/game/rendering/background-images.js"></script>
+    <script src="src/game/rendering/player/player-images.js"></script>
+    <script src="src/game/rendering/ui/life-images.js"></script>
+    <script src="src/game/rendering/collectibles/collectible-images.js"></script>
+    <script src="src/game/rendering/enemies/enemy-images.js"></script>
+    <script src="src/game/rendering/bosses/boss-images.js"></script>
+    <script src="src/game/rendering/projectiles/projectile-images.js"></script>
+    <script src="src/game/rendering/effects/particle.js"></script>
+    <script src="src/utils/helpers.js"></script>
+    <script src="src/game/shared/sprite-metrics.js"></script>
+    <script src="src/game/main.js"></script>
+    
+    <!-- Game Systems -->
+    <script src="src/game/systems/player/player.js"></script>
+    <script src="src/game/systems/bosses/bosses.js"></script>
+      <script src="src/game/systems/projectiles/player-projectiles.js"></script>
+      <script src="src/game/systems/projectiles/enemy-projectiles.js"></script>
+      <script src="src/game/systems/projectiles/boss-projectiles.js"></script>
+    <script src="src/game/systems/collision/collision.js"></script>
+    <script src="src/game/systems/tiles/tiles.js"></script>
+    <script src="src/game/systems/core/scoring.js"></script>
+    <script src="src/game/systems/collectibles/collectibles.js"></script>
+    <script src="src/game/systems/enemies/enemy-stats.js"></script>
+    <script src="src/game/systems/enemies/enemy-behavior.js"></script>
+    <script src="src/game/systems/effects/effects.js"></script>
+    
+    <!-- Rendering modules -->
+    <script src="src/game/rendering/ui/ui-rendering.js"></script>
+    <script src="src/game/rendering/ui/game-state-rendering.js"></script>
+    <script src="src/game/rendering/ui/lives-rendering.js"></script>
+    <script src="src/game/rendering/background-rendering.js"></script>
+    <script src="src/game/rendering/player/player-rendering.js"></script>
+      <script src="src/game/rendering/projectiles/player-projectile-rendering.js"></script>
+      <script src="src/game/rendering/projectiles/enemy-projectile-rendering.js"></script>
+      <script src="src/game/rendering/projectiles/boss-projectile-rendering.js"></script>
+    <script src="src/game/rendering/enemies/enemy-rendering.js"></script>
+    <script src="src/game/rendering/collectibles/collectibles-rendering.js"></script>
+    <script src="src/game/rendering/bosses/boss-rendering.js"></script>
+    <script src="src/game/rendering/effects/effects-rendering.js"></script>
+    <script src="src/game/rendering/main-rendering.js"></script>
+  
+  <script>
+    // ==========================================
+    // MAIN MENU AND GAME STATE MANAGEMENT
+    // ==========================================
+    
+    // Game state management
+    let gameState = {
+      isMenuVisible: true,
+      isGameRunning: false,
+      isPaused: false,
+      isGameOver: false
+    };
+    
+    // Game settings
+    let gameSettings = {
+      mouseSensitivity: 0.2,
+      particleEffects: true,
+      screenShake: true,
+      trailEffects: true,
+      masterVolume: 70,
+      soundEffectsVolume: 80,
+      backgroundMusicVolume: 60,
+      soundEffects: true,
+      backgroundMusic: true
+    };
+    
+    // Game statistics
+    let gameStats = {
+      bestScore: 0,
+      gamesPlayed: 0,
+      totalCoins: 0,
+      bossesDefeated: 0
+    };
+    
+    // Load settings and stats from localStorage
+    function loadGameData() {
+      const savedSettings = localStorage.getItem('gameSettings');
+      if (savedSettings) {
+        gameSettings = { ...gameSettings, ...JSON.parse(savedSettings) };
+      }
+      
+      const savedStats = localStorage.getItem('gameStats');
+      if (savedStats) {
+        gameStats = { ...gameStats, ...JSON.parse(savedStats) };
+      }
+      
+      updateMenuStats();
+      applySettings();
+    }
+    
+    // Save settings and stats to localStorage
+    function saveGameData() {
+      localStorage.setItem('gameSettings', JSON.stringify(gameSettings));
+      localStorage.setItem('gameStats', JSON.stringify(gameStats));
+    }
+    
+    // Update menu statistics display
+    function updateMenuStats() {
+      const bestScoreElement = document.getElementById('bestScoreDisplay');
+      const gamesPlayedElement = document.getElementById('gamesPlayedDisplay');
+      
+      if (bestScoreElement) {
+        bestScoreElement.textContent = gameStats.bestScore.toLocaleString();
+      }
+      if (gamesPlayedElement) {
+        gamesPlayedElement.textContent = gameStats.gamesPlayed;
+      }
+    }
+    
+    // Apply settings to the game
+    function applySettings() {
+      if (typeof game !== 'undefined') {
+        if (player) {
+          player.moveSpeed = gameSettings.mouseSensitivity;
+        }
+      }
+      
+      // Apply audio settings
+      if (typeof updateAudioSettings === 'function') {
+        updateAudioSettings();
+      }
+    }
+    
+    // Main menu functions
+    function startGame() {
+      gameState.isMenuVisible = false;
+      gameState.isGameRunning = true;
+      gameState.isPaused = false;
+      gameState.isGameOver = false;
+      
+      // Hide main menu
+      const mainMenu = document.getElementById('mainMenuOverlay');
+      if (mainMenu) {
+        mainMenu.style.display = 'none';
+      }
+      
+      // Start the game
+      if (typeof restart === 'function') {
+        restart();
+      }
+      
+      // Stop menu music and start gameplay music (only if enabled)
+      if (typeof stopBackgroundMusic === 'function') {
+        stopBackgroundMusic(); // Stop menu music
+      }
+      if (typeof startGameplayMusic === 'function' && gameSettings.backgroundMusic) {
+        startGameplayMusic(); // Start gameplay music
+      }
+      
+      // Update games played counter
+      gameStats.gamesPlayed++;
+      saveGameData();
+    }
+    
+    function showSettings() {
+      const settingsPanel = document.getElementById('settingsPanel');
+      if (settingsPanel) {
+        settingsPanel.style.display = 'flex';
+        loadSettingsToUI();
+      }
+    }
+    
+    function hideSettings() {
+      const settingsPanel = document.getElementById('settingsPanel');
+      if (settingsPanel) {
+        settingsPanel.style.display = 'none';
+      }
+    }
+    
+    function showInstructions() {
+      const instructionsPanel = document.getElementById('instructionsPanel');
+      if (instructionsPanel) {
+        instructionsPanel.style.display = 'flex';
+      }
+    }
+    
+    function hideInstructions() {
+      const instructionsPanel = document.getElementById('instructionsPanel');
+      if (instructionsPanel) {
+        instructionsPanel.style.display = 'none';
+      }
+    }
+    
+    // Sound Test Functions
+    function showSoundTest() {
+      const soundTestPanel = document.getElementById('soundTestPanel');
+      if (soundTestPanel) {
+        soundTestPanel.style.display = 'flex';
+        // Initialize audio system if not already done
+        if (typeof initGameAudio === 'function' && !gameAudio) {
+          initGameAudio();
+        }
+        // Stop any playing background music when entering sound test
+        if (typeof stopBackgroundMusic === 'function') {
+          stopBackgroundMusic();
+        }
+      }
+    }
+    
+    function hideSoundTest() {
+      const soundTestPanel = document.getElementById('soundTestPanel');
+      if (soundTestPanel) {
+        soundTestPanel.style.display = 'none';
+      }
+    }
+    
+    function testSound(soundName) {
+      if (gameAudio) {
+        // Special case for shoot sound - use the new magical sound
+        if (soundName === 'shoot') {
+          playShootSound(); // Use the new magical orb launch sound
+        } else {
+          gameAudio.playSound(soundName);
+        }
+      } else {
+        console.log(`Testing sound: ${soundName}`);
+      }
+    }
+    
+    function testForceFieldSound(type) {
+      if (gameAudio) {
+        switch(type) {
+          case 'activate':
+            gameAudio.playForceFieldActivate();
+            break;
+          case 'powerUp':
+            gameAudio.playForceFieldPowerUp();
+            break;
+          case 'powerDown':
+            gameAudio.playForceFieldPowerDown();
+            break;
+          case 'destroyed':
+            gameAudio.playForceFieldDestroyed();
+            break;
+        }
+      } else {
+        console.log(`Testing force field sound: ${type}`);
+      }
+    }
+    
+    function testSequence(type) {
+      if (gameAudio) {
+        switch(type) {
+          case 'ascending':
+            gameAudio.playAscendingSequence();
+            break;
+          case 'descending':
+            gameAudio.playDescendingSequence();
+            break;
+          case 'destruction':
+            gameAudio.playDestructionSequence();
+            break;
+        }
+      } else {
+        console.log(`Testing sequence: ${type}`);
+      }
+    }
+    
+    function testGameplayMusic() {
+      if (gameAudio) {
+        gameAudio.playGameplayMusic();
+      } else {
+        console.log('Testing gameplay music');
+      }
+    }
+    
+    function testBossMusic() {
+      if (gameAudio) {
+        gameAudio.playBossMusic();
+      } else {
+        console.log('Testing boss music');
+      }
+    }
+    
+    function showAudioStats() {
+      if (gameAudio) {
+        const stats = gameAudio.getAudioStats();
+        console.log('Audio System Stats:', stats);
+        alert(`Audio System Stats:\n\n` +
+              `Initialized: ${stats.isInitialized}\n` +
+              `Master Volume: ${Math.round(stats.masterVolume * 100)}%\n` +
+              `Sound Effects: ${stats.soundEffectsEnabled ? 'ON' : 'OFF'}\n` +
+              `Background Music: ${stats.backgroundMusicEnabled ? 'ON' : 'OFF'}\n` +
+              `Active Sounds: ${stats.activeSounds}/${stats.maxConcurrentSounds}\n` +
+              `Audio Context: ${stats.audioContextState}`);
+      } else {
+        alert('Audio system not initialized');
+      }
+    }
+    
+    function testAllSounds() {
+      if (gameAudio) {
+        const soundNames = Object.keys(gameAudio.soundEffects);
+        let delay = 0;
+        
+        soundNames.forEach(soundName => {
+          setTimeout(() => {
+            gameAudio.playSound(soundName);
+          }, delay);
+          delay += 200; // 200ms between each sound
+        });
+        
+        console.log(`Testing ${soundNames.length} sounds with ${delay}ms total duration`);
+      } else {
+        console.log('Audio system not initialized');
+      }
+    }
+    
+    function stopBackgroundMusic() {
+      if (gameAudio) {
+        gameAudio.stopBackgroundMusic();
+      } else {
+        console.log('Stopping background music');
+      }
+    }
+    
+    function showLeaderboard() {
+      // Hide main menu
+      const mainMenu = document.getElementById('mainMenuOverlay');
+      if (mainMenu) {
+        mainMenu.style.display = 'none';
+      }
+      
+      // Create leaderboard modal
+      const leaderboardModal = document.createElement('div');
+      leaderboardModal.className = 'leaderboard-modal';
+      leaderboardModal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 3000;
+        backdrop-filter: blur(15px);
+      `;
+      
+      const leaderboardContent = document.createElement('div');
+      leaderboardContent.className = 'leaderboard';
+      leaderboardContent.style.cssText = `
+        width: 400px;
+        max-height: 80vh;
+        overflow-y: auto;
+        position: relative;
+      `;
+      
+      leaderboardContent.innerHTML = `
+        <h2>🏆 Leaderboard</h2>
+        <ul class="leaderboard-list" id="modalLeaderboardList">
+          <!-- Scores will be added dynamically here -->
+        </ul>
+        <button class="menu-btn primary" onclick="hideLeaderboard()" style="margin: 20px auto; display: block;">
+          <span class="btn-icon">←</span> Back to Menu
+        </button>
+      `;
+      
+      leaderboardModal.appendChild(leaderboardContent);
+      document.body.appendChild(leaderboardModal);
+      
+      // Display leaderboard in modal
+      displayLeaderboardModal();
+    }
+    
+    function hideLeaderboard() {
+      const leaderboardModal = document.querySelector('.leaderboard-modal');
+      if (leaderboardModal) {
+        leaderboardModal.remove();
+      }
+      
+      const mainMenu = document.getElementById('mainMenuOverlay');
+      if (mainMenu) {
+        mainMenu.style.display = 'flex';
+      }
+    }
+    
+    function displayLeaderboardModal() {
+      const list = document.getElementById('modalLeaderboardList');
+      if (!list) return;
+      
+      list.innerHTML = '';
+      
+      // Sort by descending score and take top 10
+      const sortedScores = leaderboard.sort((a, b) => b.score - a.score).slice(0, 10);
+      
+      if (sortedScores.length === 0) {
+        list.innerHTML = '<li style="text-align: center; color: #888; padding: 20px;">No scores yet!<br>Be the first to play!</li>';
+        return;
+      }
+      
+      sortedScores.forEach((entry, index) => {
+        const li = document.createElement('li');
+        li.className = 'leaderboard-item';
+        li.innerHTML = `
+          <div style="display: flex; align-items: center;">
+            <div class="rank">${index + 1}</div>
+            <div class="player-name">${entry.name}</div>
+          </div>
+          <div class="player-score">${entry.score.toLocaleString()}</div>
+        `;
+        list.appendChild(li);
+      });
+    }
+    
+    // Settings management
+    function loadSettingsToUI() {
+      document.getElementById('mouseSensitivity').value = gameSettings.mouseSensitivity;
+      document.getElementById('mouseSensitivityValue').textContent = gameSettings.mouseSensitivity;
+      
+      document.getElementById('particleEffects').checked = gameSettings.particleEffects;
+      document.getElementById('screenShake').checked = gameSettings.screenShake;
+      document.getElementById('trailEffects').checked = gameSettings.trailEffects;
+      
+      document.getElementById('masterVolume').value = gameSettings.masterVolume;
+      document.getElementById('masterVolumeValue').textContent = gameSettings.masterVolume + '%';
+      
+      document.getElementById('soundEffectsVolume').value = gameSettings.soundEffectsVolume;
+      document.getElementById('soundEffectsVolumeValue').textContent = gameSettings.soundEffectsVolume + '%';
+      
+      document.getElementById('backgroundMusicVolume').value = gameSettings.backgroundMusicVolume;
+      document.getElementById('backgroundMusicVolumeValue').textContent = gameSettings.backgroundMusicVolume + '%';
+      
+      document.getElementById('soundEffects').checked = gameSettings.soundEffects;
+      document.getElementById('backgroundMusic').checked = gameSettings.backgroundMusic;
+      
+      // Add event listeners for range inputs
+      document.getElementById('mouseSensitivity').addEventListener('input', function() {
+        gameSettings.mouseSensitivity = parseFloat(this.value);
+        document.getElementById('mouseSensitivityValue').textContent = this.value;
+      });
+      
+      document.getElementById('masterVolume').addEventListener('input', function() {
+        gameSettings.masterVolume = parseInt(this.value);
+        document.getElementById('masterVolumeValue').textContent = this.value + '%';
+      });
+      
+      document.getElementById('soundEffectsVolume').addEventListener('input', function() {
+        gameSettings.soundEffectsVolume = parseInt(this.value);
+        document.getElementById('soundEffectsVolumeValue').textContent = this.value + '%';
+      });
+      
+      document.getElementById('backgroundMusicVolume').addEventListener('input', function() {
+        gameSettings.backgroundMusicVolume = parseInt(this.value);
+        document.getElementById('backgroundMusicVolumeValue').textContent = this.value + '%';
+      });
+      
+      // Add event listeners for checkboxes
+      document.getElementById('particleEffects').addEventListener('change', function() {
+        gameSettings.particleEffects = this.checked;
+      });
+      
+      document.getElementById('screenShake').addEventListener('change', function() {
+        gameSettings.screenShake = this.checked;
+      });
+      
+      document.getElementById('trailEffects').addEventListener('change', function() {
+        gameSettings.trailEffects = this.checked;
+      });
+      
+      document.getElementById('soundEffects').addEventListener('change', function() {
+        gameSettings.soundEffects = this.checked;
+      });
+      
+      document.getElementById('backgroundMusic').addEventListener('change', function() {
+        gameSettings.backgroundMusic = this.checked;
+      });
+    }
+    
+    function saveSettings() {
+      saveGameData();
+      applySettings();
+      hideSettings();
+    }
+    
+    function resetSettings() {
+      gameSettings = {
+        mouseSensitivity: 0.2,
+        particleEffects: true,
+        screenShake: true,
+        trailEffects: true,
+        masterVolume: 70,
+        soundEffectsVolume: 80,
+        backgroundMusicVolume: 60,
+        soundEffects: true,
+        backgroundMusic: true
+      };
+      loadSettingsToUI();
+    }
+    
+    // Game over handling
+    function onGameOverMenu(finalScore) {
+      gameState.isGameRunning = false;
+      gameState.isGameOver = true;
+      
+      // Update best score
+      if (finalScore > gameStats.bestScore) {
+        gameStats.bestScore = finalScore;
+        saveGameData();
+      }
+      
+      // Show main menu after a delay
+      setTimeout(() => {
+        showMainMenu();
+      }, 3000);
+    }
+    
+    function showMainMenu() {
+      gameState.isMenuVisible = true;
+      gameState.isGameRunning = false;
+      gameState.isPaused = false;
+      gameState.isGameOver = false;
+      
+      const mainMenu = document.getElementById('mainMenuOverlay');
+      if (mainMenu) {
+        mainMenu.style.display = 'flex';
+      }
+      
+      updateMenuStats();
+    }
+    
+    // Keyboard shortcuts for menu
+    document.addEventListener('keydown', function(e) {
+      if (gameState.isMenuVisible) {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          // Close any open panels
+          hideSettings();
+          hideInstructions();
+        }
+      }
+    });
+    
+    // Initialize menu on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadGameData();
+      
+      // Show main menu initially
+      const mainMenu = document.getElementById('mainMenuOverlay');
+      if (mainMenu) {
+        mainMenu.style.display = 'flex';
+      }
+    });
+    
+    // ==========================================
+    // LEADERBOARD MANAGEMENT (EXISTING CODE)
+    // ==========================================
+    
+    // Leaderboard management
+    let leaderboard = JSON.parse(localStorage.getItem('gameLeaderboard')) || [];
+    let currentGameScore = 0; // Global variable to store score
+
+    // Display leaderboard
+    function displayLeaderboard() {
+      const list = document.getElementById('leaderboardList');
+      list.innerHTML = '';
+      
+      // Sort by descending score and take top 10
+      const sortedScores = leaderboard.sort((a, b) => b.score - a.score).slice(0, 10);
+      
+      if (sortedScores.length === 0) {
+        list.innerHTML = '<li style="text-align: center; color: #888; padding: 20px;">No scores yet!<br>Be the first to play!</li>';
+        return;
+      }
+      
+      sortedScores.forEach((entry, index) => {
+        const li = document.createElement('li');
+        li.className = 'leaderboard-item';
+        li.innerHTML = `
+          <div style="display: flex; align-items: center;">
+            <div class="rank">${index + 1}</div>
+            <div class="player-name">${entry.name}</div>
+          </div>
+          <div class="player-score">${entry.score.toLocaleString()}</div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    // Check if score deserves to be saved
+    function shouldSaveScore(score) {
+      return leaderboard.length < 10 || score > (leaderboard.sort((a, b) => b.score - a.score)[9]?.score || 0);
+    }
+
+    // Show name input modal
+    function showNameInput(score) {
+      console.log("Showing name input for score:", score); // Debug
+      currentGameScore = score; // Store score
+      document.getElementById('finalScoreDisplay').textContent = score.toLocaleString();
+      document.getElementById('nameInputModal').style.display = 'flex';
+      document.getElementById('playerNameInput').focus();
+      
+      // Play achievement sound for new high score
+      if (typeof playAchievementSound === 'function') {
+        playAchievementSound();
+      }
+    }
+
+    // Save score - CORRECTED VERSION
+    function saveScore() {
+      const name = document.getElementById('playerNameInput').value.trim();
+      if (!name) {
+        alert('Please enter your name!');
+        return;
+      }
+      
+      // Use currentGameScore directly instead of parsing display
+      const score = currentGameScore;
+      console.log("Saving score:", score, "for player:", name); // Debug
+      
+      // Add new score
+      leaderboard.push({ name, score, date: new Date().toLocaleDateString() });
+      
+      // Sort and keep only top 10
+      leaderboard.sort((a, b) => b.score - a.score);
+      leaderboard = leaderboard.slice(0, 10);
+      
+      // Save to localStorage
+      localStorage.setItem('gameLeaderboard', JSON.stringify(leaderboard));
+      
+      // Play success sound for high score
+      if (typeof playSuccessSound === 'function') {
+        playSuccessSound();
+      }
+      
+      // Update display
+      displayLeaderboard();
+      displayLeaderboardModal(); // Also update modal if it's open
+      
+      // Close modal
+      hideNameInput();
+      
+      // Show main menu after saving
+      setTimeout(() => {
+        showMainMenu();
+      }, 1000);
+    }
+
+    // Skip save
+    function skipSave() {
+      hideNameInput();
+      
+      // Show main menu after skipping
+      setTimeout(() => {
+        showMainMenu();
+      }, 1000);
+    }
+
+    // Hide modal
+    function hideNameInput() {
+      document.getElementById('nameInputModal').style.display = 'none';
+      document.getElementById('playerNameInput').value = '';
+    }
+
+    // Handle Enter key in input
+    document.getElementById('playerNameInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        saveScore();
+      }
+    });
+
+    // Function called by game on game over
+    function onGameOver(finalScore) {
+      console.log("Game Over - Final Score:", finalScore); // Debug
+      
+      // Update game stats
+      if (finalScore > gameStats.bestScore) {
+        gameStats.bestScore = finalScore;
+        saveGameData();
+      }
+      
+      setTimeout(() => {
+        if (shouldSaveScore(finalScore)) {
+          showNameInput(finalScore);
+        } else {
+          // If no high score, show main menu after delay
+          setTimeout(() => {
+            showMainMenu();
+          }, 2000);
+        }
+      }, 1000); // Delay to let see game over screen
+    }
+
+    // Leaderboard is now handled through the main menu modal
+    
+    // Front Page Handler
+    document.addEventListener('DOMContentLoaded', function() {
+      const frontPage = document.getElementById('frontPage');
+      const enterGameBtn = document.getElementById('enterGameBtn');
+      
+      enterGameBtn.addEventListener('click', function() {
+        // Hide the front page
+        frontPage.style.display = 'none';
+        
+        // Resume audio context and start menu music
+        if (gameAudio && gameAudio.audioContext) {
+          gameAudio.resumeContext();
+          setTimeout(() => {
+            if (gameSettings.backgroundMusic) {
+              startMenuMusic();
+            }
+          }, 100);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
