@@ -44,6 +44,7 @@ const TouchInput = {
    */
   initialize(canvas, forceEnable = false) {
     this.canvas = canvas;
+    this.gameContainer = canvas.closest('.game-container') || canvas.parentElement;
     this.deviceType = DeviceDetection.detectDeviceType();
     
     // Enable touch features on devices with touch support
@@ -62,28 +63,28 @@ const TouchInput = {
    * Setup touch event handling
    */
   setupTouchHandling() {
-    if (!this.canvas) return;
+    if (!this.canvas || !this.gameContainer) return;
     
-    // Touch start
-    this.canvas.addEventListener('touchstart', (e) => {
+    // Touch start - attach to game container for wider touch area
+    this.gameContainer.addEventListener('touchstart', (e) => {
       e.preventDefault();
       this.handleTouchStart(e);
     }, { passive: false });
     
-    // Touch move
-    this.canvas.addEventListener('touchmove', (e) => {
+    // Touch move - attach to game container for wider touch area
+    this.gameContainer.addEventListener('touchmove', (e) => {
       e.preventDefault();
       this.handleTouchMove(e);
     }, { passive: false });
     
-    // Touch end
-    this.canvas.addEventListener('touchend', (e) => {
+    // Touch end - attach to game container for wider touch area
+    this.gameContainer.addEventListener('touchend', (e) => {
       e.preventDefault();
       this.handleTouchEnd(e);
     }, { passive: false });
     
-    // Touch cancel
-    this.canvas.addEventListener('touchcancel', (e) => {
+    // Touch cancel - attach to game container for wider touch area
+    this.gameContainer.addEventListener('touchcancel', (e) => {
       e.preventDefault();
       this.handleTouchEnd(e);
     }, { passive: false });
@@ -310,8 +311,8 @@ const TouchInput = {
       transition: all 0.1s ease;
     `;
     
-    // Add to canvas container
-    const container = this.canvas.parentElement;
+    // Add to game container for wider touch area
+    const container = this.gameContainer || this.canvas.parentElement;
     if (container) {
       container.style.position = 'relative';
       container.appendChild(this.touchIndicator);
@@ -326,7 +327,7 @@ const TouchInput = {
   showTouchIndicator(x, y) {
     if (!this.touchIndicator) return;
     
-    const containerRect = this.canvas.parentElement.getBoundingClientRect();
+    const containerRect = (this.gameContainer || this.canvas.parentElement).getBoundingClientRect();
     const screenCoords = ResponsiveCanvas.gameToScreenCoords(x, y);
     
     // Position relative to container, not screen
@@ -344,7 +345,7 @@ const TouchInput = {
   updateTouchIndicator(x, y) {
     if (!this.touchIndicator) return;
     
-    const containerRect = this.canvas.parentElement.getBoundingClientRect();
+    const containerRect = (this.gameContainer || this.canvas.parentElement).getBoundingClientRect();
     const screenCoords = ResponsiveCanvas.gameToScreenCoords(x, y);
     
     // Position relative to container, not screen
