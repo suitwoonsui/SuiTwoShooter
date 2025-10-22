@@ -651,6 +651,14 @@ function init() {
     }
   });
 
+  // User interaction handling for game over screen
+  function handleGameOverInteraction(e) {
+    if (game.gameOver && !gameState.isMenuVisible) {
+      e.preventDefault();
+      returnToMainMenu();
+    }
+  }
+
   // Keyboard handling (optional) - Modified for menu integration
   document.addEventListener('keydown', e => {
     // Return to main menu if game is over (any key)
@@ -667,6 +675,12 @@ function init() {
       game.keys[e.code] = true;
     }
   });
+
+  // Mouse click handling for game over screen
+  document.addEventListener('click', handleGameOverInteraction);
+
+  // Touch handling for game over screen
+  document.addEventListener('touchstart', handleGameOverInteraction);
   
   document.addEventListener('keyup', e => {
     game.keys[e.code] = false;
