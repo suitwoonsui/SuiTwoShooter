@@ -1150,6 +1150,11 @@
     font-size: 9px !important;
   }
   
+  /* Hide footer on mobile - no command buttons needed */
+  .suitch-footer {
+    display: none !important;
+  }
+  
   /* Game stats panel - move to bottom */
   .game-stats-panel {
     top: auto !important;
