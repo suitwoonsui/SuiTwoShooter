@@ -131,7 +131,7 @@ const MobileUI = {
   },
 
   applyHeaderLayout(headerConfig) {
-    const header = document.querySelector('.suitch-header');
+    const header = document.querySelector('.game-header');
     if (!header) return;
     
     if (!headerConfig.show) {
@@ -251,7 +251,7 @@ const MobileUI = {
   },
 
   applyFooterLayout(footerConfig) {
-    const footer = document.querySelector('.suitch-footer');
+    const footer = document.querySelector('.game-footer');
     if (!footer) return;
     
     if (!footerConfig.show) {

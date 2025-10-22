@@ -868,7 +868,7 @@
 /* ========================================== */
 
 /* Mobile Compact Header */
-.suitch-header.mobile-compact {
+.game-header.mobile-compact {
   padding: 8px 12px !important;
   font-size: 11px !important;
   flex-direction: row;
@@ -959,30 +959,30 @@
   }
 }
 
-.suitch-header.mobile-compact .title {
+.game-header.mobile-compact .title {
   font-size: 18px !important;
 }
 
-.suitch-header.mobile-compact .header-logo {
+.game-header.mobile-compact .header-logo {
   width: 24px !important;
   height: 24px !important;
 }
 
-.suitch-header.mobile-compact .alpha-badge {
+.game-header.mobile-compact .alpha-badge {
   font-size: 8px !important;
   padding: 2px 6px !important;
 }
 
-.suitch-header.mobile-compact .stats {
+.game-header.mobile-compact .stats {
   gap: 8px !important;
 }
 
-.suitch-header.mobile-compact .stat {
+.game-header.mobile-compact .stat {
   padding: 6px 10px !important;
   font-size: 10px !important;
 }
 
-.suitch-header.mobile-compact .stat-icon {
+.game-header.mobile-compact .stat-icon {
   font-size: 12px !important;
 }
 
@@ -1007,26 +1007,26 @@
 }
 
 /* Mobile Compact Footer */
-.suitch-footer.mobile-compact {
+.game-footer.mobile-compact {
   padding: 8px 12px !important;
   font-size: 10px !important;
 }
 
-.suitch-footer.mobile-compact .controls {
+.game-footer.mobile-compact .controls {
   gap: 15px !important;
   font-size: 10px !important;
 }
 
-.suitch-footer.mobile-compact .controls span {
+.game-footer.mobile-compact .controls span {
   padding: 4px 8px !important;
   font-size: 10px !important;
 }
 
-.suitch-footer.mobile-compact .control-icon {
+.game-footer.mobile-compact .control-icon {
   font-size: 12px !important;
 }
 
-.suitch-footer.mobile-compact .version-info {
+.game-footer.mobile-compact .version-info {
   font-size: 9px !important;
 }
 
@@ -1054,7 +1054,7 @@
 /* Mobile Landscape (320px - 767px) */
 @media (max-width: 767px) {
   /* Force mobile layout */
-  .suitch-header {
+  .game-header {
     flex-direction: row !important;
     justify-content: space-between !important;
     padding: 8px 12px !important;
@@ -1064,7 +1064,7 @@
   }
   
   /* Condense distance stat on mobile - JavaScript handles content, CSS handles styling */
-  .suitch-header .stat.distance-stat .stat-value {
+  .game-header .stat.distance-stat .stat-value {
     font-size: 11px !important;
     font-weight: bold !important;
     color: #39ff14 !important;
@@ -1095,24 +1095,7 @@
     overflow: hidden !important;
   }
   
-  .game-wrapper {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    max-height: calc(100vh - 120px) !important; /* Account for header height */
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    overflow: hidden !important;
-  }
-  
-  #gameCanvas {
-    max-width: 100% !important;
-    max-height: 100% !important;
-    width: auto !important;
-    height: auto !important;
-    object-fit: contain !important;
-  }
+  /* Game wrapper and canvas sizing is now handled by viewport-container.css */
   
   .integrated-stat .stat-icon {
     font-size: 10px !important;
@@ -1132,27 +1115,27 @@
     height: 14px !important;
   }
   
-  .suitch-header .title {
+  .game-header .title {
     font-size: 16px !important;
   }
   
-  .suitch-header .header-logo {
+  .game-header .header-logo {
     width: 20px !important;
     height: 20px !important;
   }
   
-  .suitch-header .stats {
+  .game-header .stats {
     gap: 6px !important;
   }
   
-  .suitch-header .stat {
+  .game-header .stat {
     padding: 4px 8px !important;
     font-size: 9px !important;
   }
   
   /* Hide footer on mobile - no command buttons needed */
-  footer.suitch-footer,
-  .suitch-footer {
+  footer.game-footer,
+  .game-footer {
     display: none !important;
     visibility: hidden !important;
   }
@@ -1182,7 +1165,7 @@
   }
   
   /* Hide footer on mobile */
-  .suitch-footer {
+  .game-footer {
     display: none !important;
   }
   
@@ -1645,25 +1628,25 @@
 /* Tablet Landscape (768px - 1023px) */
 @media (min-width: 768px) and (max-width: 1023px) {
   /* Tablet-specific adjustments */
-  .suitch-header {
+  .game-header {
     padding: 12px 20px !important;
     font-size: 13px !important;
   }
   
-  .suitch-header .title {
+  .game-header .title {
     font-size: 20px !important;
   }
   
-  .suitch-header .header-logo {
+  .game-header .header-logo {
     width: 28px !important;
     height: 28px !important;
   }
   
-  .suitch-header .stats {
+  .game-header .stats {
     gap: 12px !important;
   }
   
-  .suitch-header .stat {
+  .game-header .stat {
     padding: 8px 12px !important;
     font-size: 11px !important;
   }
@@ -1693,20 +1676,20 @@
   }
   
   /* Footer adjustments */
-  footer.suitch-footer,
-  .suitch-footer {
+  footer.game-footer,
+  .game-footer {
     display: none !important;
     visibility: hidden !important;
     padding: 12px 20px !important;
     font-size: 12px !important;
   }
   
-  .suitch-footer .controls {
+  .game-footer .controls {
     gap: 20px !important;
     font-size: 12px !important;
   }
   
-  .suitch-footer .controls span {
+  .game-footer .controls span {
     padding: 6px 12px !important;
     font-size: 12px !important;
   }
@@ -1750,25 +1733,25 @@
 /* Desktop (1024px+) */
 @media (min-width: 1024px) {
   /* Desktop gets full layout with mobile-inspired compact design */
-  .suitch-header {
+  .game-header {
     padding: 15px 25px !important;
     font-size: 14px !important;
   }
   
-  .suitch-header .title {
+  .game-header .title {
     font-size: 24px !important;
   }
   
-  .suitch-header .header-logo {
+  .game-header .header-logo {
     width: 32px !important;
     height: 32px !important;
   }
   
-  .suitch-header .stats {
+  .game-header .stats {
     gap: 15px !important;
   }
   
-  .suitch-header .stat {
+  .game-header .stat {
     padding: 10px 15px !important;
     font-size: 14px !important;
   }
@@ -1908,17 +1891,17 @@
   }
   
   /* Footer */
-  .suitch-footer {
+  .game-footer {
     padding: 15px 25px !important;
     font-size: 14px !important;
   }
   
-  .suitch-footer .controls {
+  .game-footer .controls {
     gap: 30px !important;
     font-size: 14px !important;
   }
   
-  .suitch-footer .controls span {
+  .game-footer .controls span {
     padding: 8px 15px !important;
     font-size: 14px !important;
   }
@@ -1960,12 +1943,12 @@
 /* When landscape orientation is enforced */
 @media (orientation: landscape) and (max-width: 1023px) {
   /* Optimize for landscape mobile/tablet */
-  .suitch-header {
+  .game-header {
     height: auto !important;
     min-height: 50px !important;
   }
   
-  .suitch-footer {
+  .game-footer {
     height: auto !important;
     min-height: 40px !important;
   }
@@ -1987,8 +1970,8 @@
 
 /* Reduce animations on mobile for better performance */
 @media (max-width: 767px) {
-  .suitch-header::before,
-  .suitch-footer::before,
+  .game-header::before,
+  .game-footer::before,
   .game-stats-panel::before,
   .leaderboard::before,
   .name-input-content::before,
@@ -2004,7 +1987,7 @@
   
   .menu-btn:hover,
   .sound-btn:hover,
-  .suitch-header .stat:hover {
+  .game-header .stat:hover {
     transform: none !important;
   }
 }
@@ -2015,8 +1998,8 @@
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-  .suitch-header,
-  .suitch-footer,
+  .game-header,
+  .game-footer,
   .game-stats-panel {
     border: 2px solid #fff !important;
     background: #000 !important;

@@ -198,7 +198,7 @@ const LandscapeOrientation = {
    */
   enableGameContent() {
     // Remove portrait-hidden class from game elements
-    const gameElements = document.querySelectorAll('.game-container, .suitch-header, .suitch-footer');
+    const gameElements = document.querySelectorAll('.game-container, .game-header, .game-footer');
     gameElements.forEach(element => {
       element.classList.remove('portrait-hidden');
       element.classList.add('landscape-only');
@@ -210,7 +210,7 @@ const LandscapeOrientation = {
    */
   disableGameContent() {
     // Add portrait-hidden class to game elements
-    const gameElements = document.querySelectorAll('.game-container, .suitch-header, .suitch-footer');
+    const gameElements = document.querySelectorAll('.game-container, .game-header, .game-footer');
     gameElements.forEach(element => {
       element.classList.add('portrait-hidden');
       element.classList.remove('landscape-only');
