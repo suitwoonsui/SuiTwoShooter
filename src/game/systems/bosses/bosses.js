@@ -6,12 +6,12 @@
 function loadBossImage(bossType) {
   // Disable transparency processing to avoid CORS errors
   // Use boss images directly
-  bossImage = bossImages[bossType - 1];
+  bossImage = bossImages[bossType];
 }
 
 // Boss spawn warning
 function spawnBoss() {
-  console.log('spawnBoss() called - currentTier:', game.currentTier);
+  console.log('spawnBoss() called - currentTier:', game.currentTier, 'bossesDefeated:', game.bossesDefeated);
   // Start with warning
   game.bossWarning = true;
   game.bossWarningTime = 2000; // 2 seconds warning
@@ -43,6 +43,8 @@ function createBoss() {
   const currentBossStats = bossStats[game.currentTier] || bossStats[4];
   const size = 60 * 3;
   
+  console.log('Creating boss for tier:', game.currentTier, 'bossesDefeated:', game.bossesDefeated);
+  
   // Load specific boss image - Boss_Scammer for tier 1, Boss_Market_Maker for tier 2, Boss_Bear for tier 3, Boss_Shadow_Figure for tier 4
   let bossImageType;
   if (game.currentTier === 1) {
@@ -54,6 +56,7 @@ function createBoss() {
   } else {
     bossImageType = 3; // Boss_Shadow_Figure for tier 4+ (index 3)
   }
+  console.log('Boss image type selected:', bossImageType, 'for tier:', game.currentTier);
   loadBossImage(bossImageType);
   
   game.boss = {

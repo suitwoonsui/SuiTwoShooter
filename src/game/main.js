@@ -513,6 +513,7 @@ function update() {
     game.bossActive = false;
     game.bossesDefeated++;
     game.currentTier = Math.min(4, Math.floor(game.bossesDefeated / 1) + 1); // New tier after each boss
+    console.log('Boss defeated! bossesDefeated:', game.bossesDefeated, 'currentTier:', game.currentTier);
     game.boss = null;
     
     // Clear boss projectiles when boss is defeated
