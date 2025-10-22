@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enhanced Touch Input Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      color: white;
+    }
+    .test-container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .canvas-container {
+      background: #333;
+      border: 2px solid #4DA2FF;
+      border-radius: 10px;
+      padding: 20px;
+      margin: 20px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 400px;
+      position: relative;
+    }
+    .info-panel {
+      background: #333;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .info-item {
+      background: #444;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .info-label {
+      font-weight: bold;
+      color: #4DA2FF;
+    }
+    .info-value {
+      color: #39ff14;
+    }
+    canvas {
+      border: 2px solid #4DA2FF;
+      background: #000;
+      border-radius: 5px;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: #4DA2FF;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #3A7BD5;
+    }
+    .player {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background: rgba(255, 107, 107, 0.8);
+      border: 3px solid #ff6b6b;
+      border-radius: 50%;
+      transition: all 0.1s ease;
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>👆 Enhanced Touch Input Test</h1>
+    
+    <div class="controls">
+      <button class="btn" onclick="toggleVisualFeedback()">Toggle Visual Feedback</button>
+      <button class="btn" onclick="toggleTouchTrail()">Toggle Touch Trail</button>
+      <button class="btn" onclick="toggleHapticSimulation()">Toggle Haptic Simulation</button>
+      <button class="btn" onclick="updateInfo()">Refresh Info</button>
+    </div>
+    
+    <div class="canvas-container">
+      <canvas id="testCanvas" width="800" height="480"></canvas>
+      <div id="player" class="player"></div>
+    </div>
+    
+    <div class="info-panel">
+      <h2>Touch Information</h2>
+      <div id="touchInfo" class="info-grid">
+        <!-- Info will be populated by JavaScript -->
+      </div>
+    </div>
+    
+    <div class="info-panel">
+      <h2>Instructions</h2>
+      <ul>
+        <li><strong>Touch & Drag:</strong> Touch the canvas and drag vertically to move the red player</li>
+        <li><strong>Blue Circle:</strong> Shows your current touch position (touch indicator)</li>
+        <li><strong>Red Circle:</strong> Shows where the game character would be (player position)</li>
+        <li><strong>Player Movement:</strong> Player stays on the left side (X=50) and moves up/down with your touch</li>
+        <li><strong>Touch Trail:</strong> Blue line shows your touch path</li>
+        <li><strong>Continuous Touch:</strong> Keep your finger down and drag smoothly up/down</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Load mobile detection modules -->
+  <script src="src/game/systems/device/device-detection.js"></script>
+  <script src="src/game/systems/device/device-config.js"></script>
+  <script src="src/game/systems/device/device-monitoring.js"></script>
+  <script src="src/game/systems/device/landscape-orientation.js"></script>
+  <script src="src/game/shared/mobile-utils.js"></script>
+  
+  <!-- Load responsive rendering modules -->
+  <script src="src/game/rendering/responsive/canvas-manager.js"></script>
+  <script src="src/game/rendering/responsive/viewport-manager.js"></script>
+  
+  <!-- Load enhanced input modules -->
+  <script src="src/game/systems/input/touch-input.js"></script>
+
+  <script>
+    // Test enhanced touch input system
+    function initializeTest() {
+      // Initialize landscape orientation
+      if (typeof LandscapeOrientation !== 'undefined') {
+        LandscapeOrientation.initialize();
+      }
+      
+      // Initialize responsive canvas
+      const canvas = document.getElementById('testCanvas');
+      if (canvas && typeof ResponsiveCanvas !== 'undefined') {
+        ResponsiveCanvas.initialize(canvas);
+        ViewportManager.initialize();
+        
+        // Initialize enhanced touch input
+        if (typeof TouchInput !== 'undefined') {
+          TouchInput.initialize(canvas); // Will auto-detect touchscreen
+        }
+        
+        // Draw test content
+        drawTestContent();
+        
+        // Start game loop
+        gameLoop();
+        
+        console.log('👆 Enhanced touch input test initialized');
+      }
+    }
+    
+    function drawTestContent() {
+      const canvas = document.getElementById('testCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Clear canvas
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw test pattern
+      ctx.strokeStyle = '#4DA2FF';
+      ctx.lineWidth = 1;
+      
+      // Draw grid
+      const gridSize = 50;
+      for (let x = 0; x < canvas.width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+      
+      // Draw center cross
+      ctx.strokeStyle = '#39ff14';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(canvas.width/2, 0);
+      ctx.lineTo(canvas.width/2, canvas.height);
+      ctx.moveTo(0, canvas.height/2);
+      ctx.lineTo(canvas.width, canvas.height/2);
+      ctx.stroke();
+      
+      // Draw player X position line (like in the game)
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(50, 0);
+      ctx.lineTo(50, canvas.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Draw dimensions text
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px Arial';
+      ctx.fillText(`${canvas.width}x${canvas.height}`, 10, 25);
+      
+      // Draw touch trail if enabled
+      if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+        TouchInput.renderTouchTrail(ctx);
+      }
+    }
+    
+    function gameLoop() {
+      drawTestContent();
+      
+      // Update player position based on touch input (game-like behavior)
+      if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+        const touchState = TouchInput.getTouchState();
+        if (touchState.isTouching) {
+          const player = document.getElementById('player');
+          if (player) {
+            const canvas = document.getElementById('testCanvas');
+            const containerRect = canvas.parentElement.getBoundingClientRect();
+            
+            // Player X position is fixed (like in the game)
+            const playerX = 50; // Fixed X position like in the game
+            
+            // Convert game coordinates to screen coordinates
+            const screenCoords = ResponsiveCanvas.gameToScreenCoords(playerX, touchState.lastPosition.y);
+            
+            // Position player relative to container (fixed X, variable Y)
+            player.style.left = (screenCoords.x - containerRect.left - 15) + 'px';
+            player.style.top = (screenCoords.y - containerRect.top - 15) + 'px';
+            player.style.display = 'block';
+          }
+        } else {
+          const player = document.getElementById('player');
+          if (player) {
+            player.style.display = 'none';
+          }
+        }
+      }
+      
+      requestAnimationFrame(gameLoop);
+    }
+    
+    function updateInfo() {
+      const infoDiv = document.getElementById('touchInfo');
+      
+      let info = '';
+      
+      // Touch state
+      if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+        const touchState = TouchInput.getTouchState();
+        info += `<div class="info-item">
+          <div class="info-label">Touch Active</div>
+          <div class="info-value">${touchState.isTouching ? 'Yes' : 'No'}</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Touch ID</div>
+          <div class="info-value">${touchState.touchId || 'None'}</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Last Position (Clamped)</div>
+          <div class="info-value">(${touchState.lastPosition.x}, ${touchState.lastPosition.y})</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Velocity</div>
+          <div class="info-value">(${touchState.velocity.x.toFixed(2)}, ${touchState.velocity.y.toFixed(2)})</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Trail Length</div>
+          <div class="info-value">${touchState.trailLength}</div>
+        </div>`;
+      }
+      
+      // Device info
+      if (typeof DeviceDetection !== 'undefined') {
+        const deviceType = DeviceDetection.detectDeviceType();
+        const screenSize = DeviceDetection.detectScreenSize();
+        info += `<div class="info-item">
+          <div class="info-label">Device Type</div>
+          <div class="info-value">${deviceType}</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Screen Size</div>
+          <div class="info-value">${screenSize.width}x${screenSize.height}</div>
+        </div>`;
+      }
+      
+      infoDiv.innerHTML = info;
+    }
+    
+    function toggleVisualFeedback() {
+      if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+        TouchInput.config.enableVisualFeedback = !TouchInput.config.enableVisualFeedback;
+        console.log('Visual feedback:', TouchInput.config.enableVisualFeedback ? 'enabled' : 'disabled');
+      }
+    }
+    
+    function toggleTouchTrail() {
+      if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+        TouchInput.config.enableTouchTrail = !TouchInput.config.enableTouchTrail;
+        console.log('Touch trail:', TouchInput.config.enableTouchTrail ? 'enabled' : 'disabled');
+      }
+    }
+    
+    function toggleHapticSimulation() {
+      if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+        TouchInput.config.enableHapticSimulation = !TouchInput.config.enableHapticSimulation;
+        console.log('Haptic simulation:', TouchInput.config.enableHapticSimulation ? 'enabled' : 'disabled');
+      }
+    }
+    
+    // Initialize when page loads
+    window.addEventListener('load', () => {
+      setTimeout(initializeTest, 100);
+      updateInfo();
+    });
+    
+    // Update info periodically
+    setInterval(updateInfo, 500);
+  </script>
+</body>
+</html>

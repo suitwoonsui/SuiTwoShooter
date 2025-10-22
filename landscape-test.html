@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Landscape Orientation Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      color: white;
+    }
+    .test-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .orientation-info {
+      background: #333;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+    .canvas-preview {
+      background: #000;
+      border: 2px solid #4DA2FF;
+      border-radius: 10px;
+      margin: 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4DA2FF;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>🔄 Landscape Orientation Test</h1>
+    
+    <div class="orientation-info">
+      <h2>Current Status:</h2>
+      <div id="status"></div>
+    </div>
+    
+    <div class="orientation-info">
+      <h2>Canvas Size Preview:</h2>
+      <div id="canvasPreview" class="canvas-preview"></div>
+    </div>
+    
+    <div class="orientation-info">
+      <h2>Instructions:</h2>
+      <ul>
+        <li><strong>Desktop:</strong> No orientation enforcement</li>
+        <li><strong>Mobile/Tablet:</strong> Try rotating your device</li>
+        <li><strong>Portrait:</strong> Should show rotation warning</li>
+        <li><strong>Landscape:</strong> Should show game content</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Load mobile detection modules -->
+  <script src="src/game/systems/device/device-detection.js"></script>
+  <script src="src/game/systems/device/device-config.js"></script>
+  <script src="src/game/systems/device/device-monitoring.js"></script>
+  <script src="src/game/systems/device/landscape-orientation.js"></script>
+  <script src="src/game/shared/mobile-utils.js"></script>
+
+  <script>
+    // Test landscape orientation
+    function updateStatus() {
+      const statusDiv = document.getElementById('status');
+      const canvasPreview = document.getElementById('canvasPreview');
+      
+      try {
+        const deviceType = DeviceDetection.detectDeviceType();
+        const orientation = LandscapeOrientation.getCurrentOrientation();
+        const isEnforced = LandscapeOrientation.isLandscapeEnforced;
+        
+        // Update status
+        statusDiv.innerHTML = `
+          <p><strong>Device Type:</strong> ${deviceType}</p>
+          <p><strong>Current Orientation:</strong> ${orientation}</p>
+          <p><strong>Landscape Enforced:</strong> ${isEnforced ? 'Yes' : 'No'}</p>
+          <p><strong>Screen Size:</strong> ${window.innerWidth}x${window.innerHeight}</p>
+        `;
+        
+        // Update canvas preview
+        if (isEnforced && orientation === 'landscape') {
+          const canvasSize = LandscapeOrientation.getLandscapeCanvasSize(deviceType);
+          canvasPreview.innerHTML = `
+            <div>
+              <div>📱 Landscape Mode Active</div>
+              <div style="font-size: 14px; margin-top: 10px;">
+                Optimal Canvas: ${canvasSize.width}x${canvasSize.height}<br>
+                Scale Factor: ${canvasSize.scale.toFixed(2)}
+              </div>
+            </div>
+          `;
+          canvasPreview.style.height = '200px';
+        } else if (isEnforced && orientation === 'portrait') {
+          canvasPreview.innerHTML = `
+            <div>
+              <div>📱 Portrait Mode</div>
+              <div style="font-size: 14px; margin-top: 10px;">
+                Please rotate to landscape for optimal experience
+              </div>
+            </div>
+          `;
+          canvasPreview.style.height = '150px';
+        } else {
+          canvasPreview.innerHTML = `
+            <div>
+              <div>🖥️ Desktop Mode</div>
+              <div style="font-size: 14px; margin-top: 10px;">
+                No orientation enforcement needed
+              </div>
+            </div>
+          `;
+          canvasPreview.style.height = '100px';
+        }
+        
+      } catch (error) {
+        statusDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    }
+    
+    // Initialize landscape orientation
+    if (typeof LandscapeOrientation !== 'undefined') {
+      LandscapeOrientation.initialize();
+    }
+    
+    // Update status on load and orientation change
+    window.addEventListener('load', updateStatus);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(updateStatus, 100);
+    });
+    window.addEventListener('resize', updateStatus);
+    
+    // Update status every second for testing
+    setInterval(updateStatus, 1000);
+  </script>
+</body>
+</html>

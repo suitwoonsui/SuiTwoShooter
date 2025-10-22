@@ -43,22 +43,42 @@ function updateGameUI() {
   const forceFieldLevelElement = document.getElementById('forceFieldLevel');
   const coinStreakElement = document.getElementById('coinStreak');
   
+  // Also update mobile integrated stats
+  const integratedScoreElement = document.getElementById('integratedScore');
+  const integratedOrbLevelElement = document.getElementById('integratedOrbLevel');
+  const integratedTierElement = document.getElementById('integratedTier');
+  const integratedCoinsElement = document.getElementById('integratedCoins');
+  
+  // Update score (both desktop and mobile)
   if (gameScoreElement) {
     gameScoreElement.textContent = game.score.toLocaleString();
   }
+  if (integratedScoreElement) {
+    integratedScoreElement.textContent = game.score.toLocaleString();
+  }
   
+  // Update orb level (both desktop and mobile)
   if (orbLevelElement) {
     orbLevelElement.textContent = game.projectileLevel;
   }
+  if (integratedOrbLevelElement) {
+    integratedOrbLevelElement.textContent = game.projectileLevel;
+  }
   
+  // Update tier (both desktop and mobile)
   if (gameTierElement) {
     gameTierElement.textContent = game.currentTier;
   }
+  if (integratedTierElement) {
+    integratedTierElement.textContent = game.currentTier;
+  }
   
+  // Update bosses defeated (desktop only)
   if (bossesDefeatedElement) {
     bossesDefeatedElement.textContent = game.bossesDefeated;
   }
   
+  // Update force field level (desktop only)
   if (forceFieldLevelElement) {
     if (game.forceField.active && game.forceField.level > 0) {
       forceFieldLevelElement.textContent = `Level ${game.forceField.level}`;
@@ -69,6 +89,7 @@ function updateGameUI() {
     }
   }
   
+  // Update coin streak (desktop only)
   if (coinStreakElement) {
     coinStreakElement.textContent = game.forceField.coinStreak;
     // Color code the streak based on progress
@@ -79,5 +100,10 @@ function updateGameUI() {
     } else {
       coinStreakElement.style.color = '#39ff14'; // Highlighter green for normal
     }
+  }
+  
+  // Update integrated coins (mobile only)
+  if (integratedCoinsElement) {
+    integratedCoinsElement.textContent = game.coins;
   }
 }

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Detection Test</title>
+</head>
+<body>
+  <h1>Mobile Detection Test</h1>
+  <div id="results"></div>
+
+  <!-- Load mobile detection modules -->
+  <script src="src/game/systems/device/device-detection.js"></script>
+  <script src="src/game/systems/device/device-config.js"></script>
+  <script src="src/game/systems/device/device-monitoring.js"></script>
+  <script src="src/game/shared/mobile-utils.js"></script>
+
+  <script>
+    // Test mobile detection modules
+    function testMobileDetection() {
+      const results = document.getElementById('results');
+      
+      try {
+        // Test DeviceDetection
+        const deviceInfo = DeviceDetection.getDeviceInfo();
+        results.innerHTML += '<h2>Device Detection Results:</h2>';
+        results.innerHTML += '<pre>' + JSON.stringify(deviceInfo, null, 2) + '</pre>';
+        
+        // Test MobileUtils
+        const deviceString = MobileUtils.getDeviceInfoString();
+        results.innerHTML += '<h2>Mobile Utils Results:</h2>';
+        results.innerHTML += '<p>' + deviceString + '</p>';
+        
+        // Test DeviceConfigs
+        const deviceType = DeviceDetection.detectDeviceType();
+        const config = getDeviceConfig(deviceType);
+        results.innerHTML += '<h2>Device Configuration:</h2>';
+        results.innerHTML += '<pre>' + JSON.stringify(config, null, 2) + '</pre>';
+        
+        // Test optimal canvas size
+        const containerSize = { width: 800, height: 600 };
+        const optimalSize = getOptimalCanvasSize(deviceType, containerSize);
+        results.innerHTML += '<h2>Optimal Canvas Size:</h2>';
+        results.innerHTML += '<pre>' + JSON.stringify(optimalSize, null, 2) + '</pre>';
+        
+        results.innerHTML += '<h2>✅ All tests passed!</h2>';
+        
+      } catch (error) {
+        results.innerHTML += '<h2>❌ Error:</h2>';
+        results.innerHTML += '<p>' + error.message + '</p>';
+      }
+    }
+    
+    // Run test when page loads
+    window.addEventListener('load', testMobileDetection);
+  </script>
+</body>
+</html>

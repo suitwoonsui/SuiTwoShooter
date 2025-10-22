@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Responsive Canvas Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      color: white;
+    }
+    .test-container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .canvas-container {
+      background: #333;
+      border: 2px solid #4DA2FF;
+      border-radius: 10px;
+      padding: 20px;
+      margin: 20px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 300px;
+    }
+    .info-panel {
+      background: #333;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .info-item {
+      background: #444;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .info-label {
+      font-weight: bold;
+      color: #4DA2FF;
+    }
+    .info-value {
+      color: #39ff14;
+    }
+    canvas {
+      border: 2px solid #4DA2FF;
+      background: #000;
+      border-radius: 5px;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: #4DA2FF;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #3A7BD5;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>📐 Responsive Canvas Test</h1>
+    
+    <div class="controls">
+      <button class="btn" onclick="testResize()">Test Resize</button>
+      <button class="btn" onclick="testCoordinates()">Test Coordinates</button>
+      <button class="btn" onclick="updateInfo()">Refresh Info</button>
+    </div>
+    
+    <div class="canvas-container">
+      <canvas id="testCanvas" width="800" height="480"></canvas>
+    </div>
+    
+    <div class="info-panel">
+      <h2>Canvas Information</h2>
+      <div id="canvasInfo" class="info-grid">
+        <!-- Info will be populated by JavaScript -->
+      </div>
+    </div>
+    
+    <div class="info-panel">
+      <h2>Instructions</h2>
+      <ul>
+        <li><strong>Canvas Size (Fixed):</strong> Should always be 800x480 (game logic coordinates)</li>
+        <li><strong>CSS Display Size:</strong> Should change as you resize the browser window</li>
+        <li><strong>Scale Factor:</strong> Should change as you resize (e.g., 0.5x when window is half size)</li>
+        <li><strong>Desktop:</strong> Canvas scales to fit container while maintaining aspect ratio</li>
+        <li><strong>Mobile:</strong> Canvas enforces landscape and uses optimized dimensions</li>
+        <li><strong>Touch:</strong> Touch the canvas to test coordinate conversion</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Load mobile detection modules -->
+  <script src="src/game/systems/device/device-detection.js"></script>
+  <script src="src/game/systems/device/device-config.js"></script>
+  <script src="src/game/systems/device/device-monitoring.js"></script>
+  <script src="src/game/systems/device/landscape-orientation.js"></script>
+  <script src="src/game/shared/mobile-utils.js"></script>
+  
+  <!-- Load responsive rendering modules -->
+  <script src="src/game/rendering/responsive/canvas-manager.js"></script>
+  <script src="src/game/rendering/responsive/viewport-manager.js"></script>
+
+  <script>
+    // Test responsive canvas system
+    function initializeTest() {
+      // Initialize landscape orientation
+      if (typeof LandscapeOrientation !== 'undefined') {
+        LandscapeOrientation.initialize();
+      }
+      
+      // Initialize responsive canvas
+      const canvas = document.getElementById('testCanvas');
+      if (canvas && typeof ResponsiveCanvas !== 'undefined') {
+        ResponsiveCanvas.initialize(canvas);
+        ViewportManager.initialize();
+        
+        // Draw test content
+        drawTestContent();
+        
+        // Add mouse/touch interaction
+        setupCanvasInteraction();
+        
+        console.log('📐 Responsive canvas test initialized');
+      }
+    }
+    
+    function drawTestContent() {
+      const canvas = document.getElementById('testCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Clear canvas
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw test pattern
+      ctx.strokeStyle = '#4DA2FF';
+      ctx.lineWidth = 2;
+      
+      // Draw grid
+      const gridSize = 50;
+      for (let x = 0; x < canvas.width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+      
+      // Draw center cross
+      ctx.strokeStyle = '#39ff14';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(canvas.width/2, 0);
+      ctx.lineTo(canvas.width/2, canvas.height);
+      ctx.moveTo(0, canvas.height/2);
+      ctx.lineTo(canvas.width, canvas.height/2);
+      ctx.stroke();
+      
+      // Draw dimensions text
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px Arial';
+      ctx.fillText(`${canvas.width}x${canvas.height}`, 10, 25);
+      
+      // Draw scale info
+      if (ResponsiveCanvas.isInitialized) {
+        const state = ResponsiveCanvas.getCanvasState();
+        ctx.fillText(`Scale: ${state.scaleX.toFixed(2)}x`, 10, 50);
+        ctx.fillText(`Device: ${state.deviceType}`, 10, 75);
+      }
+    }
+    
+    function setupCanvasInteraction() {
+      const canvas = document.getElementById('testCanvas');
+      
+      // Mouse interaction
+      canvas.addEventListener('mousemove', (e) => {
+        if (ResponsiveCanvas.isInitialized) {
+          const coords = ResponsiveCanvas.screenToGameCoords(e.clientX, e.clientY);
+          drawTestContent();
+          
+          // Draw mouse position
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ff6b6b';
+          ctx.beginPath();
+          ctx.arc(coords.x, coords.y, 5, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw coordinate text
+          ctx.fillStyle = '#fff';
+          ctx.font = '12px Arial';
+          ctx.fillText(`(${Math.round(coords.x)}, ${Math.round(coords.y)})`, coords.x + 10, coords.y - 10);
+        }
+      });
+      
+      // Touch interaction
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (ResponsiveCanvas.isInitialized) {
+          const touch = e.touches[0];
+          const coords = ResponsiveCanvas.screenToGameCoords(touch.clientX, touch.clientY);
+          drawTestContent();
+          
+          // Draw touch position
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ff6b6b';
+          ctx.beginPath();
+          ctx.arc(coords.x, coords.y, 8, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw coordinate text
+          ctx.fillStyle = '#fff';
+          ctx.font = '14px Arial';
+          ctx.fillText(`Touch: (${Math.round(coords.x)}, ${Math.round(coords.y)})`, coords.x + 10, coords.y - 10);
+        }
+      });
+    }
+    
+    function updateInfo() {
+      const infoDiv = document.getElementById('canvasInfo');
+      const canvas = document.getElementById('testCanvas');
+      
+      let info = '';
+      
+      // Canvas info (should stay 800x480)
+      info += `<div class="info-item">
+        <div class="info-label">Canvas Size (Fixed)</div>
+        <div class="info-value">${canvas.width}x${canvas.height}</div>
+      </div>`;
+      
+      // CSS display size (should change)
+      const rect = canvas.getBoundingClientRect();
+      info += `<div class="info-item">
+        <div class="info-label">CSS Display Size</div>
+        <div class="info-value">${Math.round(rect.width)}x${Math.round(rect.height)}</div>
+      </div>`;
+      
+      // Device info
+      if (typeof DeviceDetection !== 'undefined') {
+        const deviceType = DeviceDetection.detectDeviceType();
+        const screenSize = DeviceDetection.detectScreenSize();
+        info += `<div class="info-item">
+          <div class="info-label">Device Type</div>
+          <div class="info-value">${deviceType}</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Screen Size</div>
+          <div class="info-value">${screenSize.width}x${screenSize.height}</div>
+        </div>`;
+      }
+      
+      // Responsive canvas info
+      if (ResponsiveCanvas.isInitialized) {
+        const state = ResponsiveCanvas.getCanvasState();
+        info += `<div class="info-item">
+          <div class="info-label">Scale Factor</div>
+          <div class="info-value">${state.scaleX.toFixed(2)}x</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Game Dimensions</div>
+          <div class="info-value">${state.width}x${state.height}</div>
+        </div>`;
+      }
+      
+      // Viewport info
+      if (ViewportManager.isInitialized) {
+        const viewport = ViewportManager.getDebugInfo();
+        info += `<div class="info-item">
+          <div class="info-label">Viewport Size</div>
+          <div class="info-value">${viewport.viewport.width}x${viewport.viewport.height}</div>
+        </div>`;
+        info += `<div class="info-item">
+          <div class="info-label">Viewport Scale</div>
+          <div class="info-value">${viewport.viewport.scale.toFixed(2)}</div>
+        </div>`;
+      }
+      
+      infoDiv.innerHTML = info;
+    }
+    
+    function testResize() {
+      // Simulate resize by changing container size
+      const container = document.querySelector('.canvas-container');
+      const currentWidth = container.style.width;
+      container.style.width = currentWidth === '50%' ? '100%' : '50%';
+      
+      setTimeout(() => {
+        drawTestContent();
+        updateInfo();
+      }, 100);
+    }
+    
+    function testCoordinates() {
+      // Test coordinate conversion
+      if (ResponsiveCanvas.isInitialized) {
+        const testCoords = [
+          { x: 0, y: 0 },
+          { x: 400, y: 240 },
+          { x: 800, y: 480 }
+        ];
+        
+        console.log('Coordinate conversion test:');
+        testCoords.forEach(coord => {
+          const screen = ResponsiveCanvas.gameToScreenCoords(coord.x, coord.y);
+          const back = ResponsiveCanvas.screenToGameCoords(screen.x, screen.y);
+          console.log(`Game (${coord.x}, ${coord.y}) -> Screen (${screen.x}, ${screen.y}) -> Game (${back.x}, ${back.y})`);
+        });
+      }
+    }
+    
+    // Initialize when page loads
+    window.addEventListener('load', () => {
+      setTimeout(initializeTest, 100);
+      updateInfo();
+    });
+    
+    // Update info periodically
+    setInterval(updateInfo, 2000);
+  </script>
+</body>
+</html>

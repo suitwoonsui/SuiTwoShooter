@@ -1,75 +1,124 @@
-Boss progress: 2005 / 5000
-collision.js:147 Coin collected! Streak: 5 Force field level: 0 Active: false
-collision.js:159 Force field activated! Level 1, streak: 5
-main.js:31 Score updated to: 36705
-main.js:31 Score updated to: 36750
-main.js:31 Score updated to: 36765
-main.js:31 Score updated to: 36780
-main.js:31 Score updated to: 36825
-main.js:267 Boss progress: 3001 / 5000
-main.js:31 Score updated to: 36840
-collision.js:147 Coin collected! Streak: 6 Force field level: 1 Active: true
-main.js:31 Score updated to: 36855
-main.js:31 Score updated to: 36870
-main.js:31 Score updated to: 36900
-main.js:267 Boss progress: 4003 / 5000
-collision.js:147 Coin collected! Streak: 7 Force field level: 1 Active: true
-collision.js:147 Coin collected! Streak: 8 Force field level: 1 Active: true
-main.js:31 Score updated to: 36945
-collision.js:147 Coin collected! Streak: 9 Force field level: 1 Active: true
-main.js:31 Score updated to: 36960
-main.js:31 Score updated to: 36990
-main.js:267 Boss progress: 5005 / 5000
-main.js:500 Boss spawning! distanceSinceBoss: 5005.249999999987 bossThreshold: 5000
-bosses.js:14 spawnBoss() called - currentTier: 3
-boss-rendering.js:13 Boss rendering: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-boss-rendering.js:13 Boss rendering: Object
-main.js:358 Boss collision check: Object
-main.js:406 Detailed collision check: Object
-boss-rendering.js:13 Boss rendering: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-main.js:406 Detailed collision check: Object
-boss-projectiles.js:58 Force field blocked boss projectile! Level: 1
-boss-projectiles.js:66 Force field destroyed by boss projectile!
-boss-projectiles.js:82 No force field protection! Player hit by boss projectile
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-main.js:358 Boss collision check: Object
-main.js:406 Detailed collision check: Object
-main.js:358 Boss collision check: Object
-boss-rendering.js:13 Boss rendering: Object
-main.js:358 Boss collision check: {tier: 3, type: 1, bossImage: 'loaded', imageToUse: 'loaded', vulnerable: true, …}
-main.js:406 Detailed collision check: {projectileX: 787, projectileY: 122.52483150616348, projectileWidth: 64, projectileHeight: 64, projectileRightEdge: 851, …}
-main.js:406 Detailed collision check: {projectileX: 831, projectileY: 122.52483150616348, projectileWidth: 64, projectileHeight: 64, projectileRightEdge: 895, …}
-main.js:358 Boss collision check: {tier: 3, type: 1, bossImage: 'loaded', imageToUse: 'loaded', vulnerable: true, …}
-main.js:406 Detailed collision check: {projectileX: 787, projectileY: 123.51661678793965, projectileWidth: 64, projectileHeight: 64, projectileRightEdge: 851, …}
-boss-projectiles.js:82 No force field protection! Player hit by boss projectile
-main.js:536 Game Over triggered!
-main.js:537 Final Score: 36990
-main.js:538 Final Coins: 18
-Shooter.html:786 Game Over - Final Score: 36990
-60main.js:173 Game over, updating particles only
-Shooter.html:719 Showing name input for score: 36990
-833main.js:173 Game over, updating particles only
+Main Menu
+
+element.style {
+}
+@media (max-width: 767px) and (min-width: 480px) {
+    .main-menu-overlay .game-title {
+        display: flex !important
+;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        margin-bottom: 8px !important;
+        flex-wrap: nowrap !important;
+    }
+}
+@media (max-height: 500px) {
+    .game-title {
+        font-size: 2rem !important;
+        margin-bottom: 10px !important;
+    }
+}
+@media (max-width: 767px) and (min-width: 480px) {
+    .game-title {
+        font-size: 2.5rem !important;
+        margin-bottom: 15px !important;
+    }
+}
+.game-title {
+    margin-bottom: 50px;
+    position: relative;
+}
+.game-title {
+    font-size: 3.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(45deg, #00d4ff, #ff6b6b, #4ecdc4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+user agent stylesheet
+div {
+    display: block;
+    unicode-bidi: isolate;
+}
+.main-menu-content {
+    text-align: center;
+    max-width: 600px;
+    width: 90%;
+    animation: menuSlideIn 0.8s 
+ease-out 0.2s both;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
+    color: white !important;
+    display: flex
+;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+}
+
+
+Settings Header:
+
+element.style {
+}
+@media (max-width: 767px) {
+    .settings-header, .instructions-header, .sound-test-header {
+        position: relative !important;
+        padding: 15px 50px 15px 15px !important;
+        margin-bottom: 15px !important;
+        background: rgba(77, 162, 255, 0.1) !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(77, 162, 255, 0.2) !important;
+    }
+}
+@media (max-width: 767px) {
+    .settings-header, .instructions-header, .leaderboard-header, .sound-test-header {
+        display: flex !important
+;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 20px !important;
+        border-bottom: 1px solid rgba(77, 162, 255, 0.2) !important;
+    }
+}
+.settings-header {
+    display: flex
+;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid rgba(77, 162, 255, 0.3);
+}
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+user agent stylesheet
+div {
+    display: block;
+    unicode-bidi: isolate;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
+    color: white !important;
+    display: flex
+;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+}

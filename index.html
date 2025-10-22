@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SuiTwo</title>
   <link rel="stylesheet" href="game-styles.css">
+    <link rel="stylesheet" href="src/game/rendering/responsive/mobile-ui-styles.css">
 </head>
 <body>
   <!-- Front Page Overlay -->
@@ -51,7 +52,7 @@
   <div class="game-container">
     <!-- Game canvas -->
     <main class="game-wrapper">
-      <canvas id="gameCanvas" width="800" height="480"></canvas>
+      <canvas id="gameCanvas"></canvas>
       
       <!-- In-game UI Overlay -->
       <div class="game-ui-overlay">
@@ -115,23 +116,23 @@
       </div>
       
       <div class="menu-buttons">
-        <button class="menu-btn primary" onclick="playButtonPressSound(); startGame()" onmouseover="playMenuHoverSound()">
+        <button class="menu-btn primary" onclick="startGame()" onmouseover="playMenuHoverSound()">
           <span class="btn-icon">▶️</span>
           Start Game
         </button>
-        <button class="menu-btn" onclick="playButtonPressSound(); showSettings()" onmouseover="playMenuHoverSound()">
+        <button class="menu-btn" onclick="showSettings()" onmouseover="playMenuHoverSound()">
           <span class="btn-icon">⚙️</span>
           Settings
         </button>
-        <button class="menu-btn" onclick="playButtonPressSound(); showInstructions()" onmouseover="playMenuHoverSound()">
+        <button class="menu-btn" onclick="showInstructions()" onmouseover="playMenuHoverSound()">
           <span class="btn-icon">📖</span>
           How to Play
         </button>
-        <button class="menu-btn" onclick="playButtonPressSound(); showLeaderboard()" onmouseover="playMenuHoverSound()">
+        <button class="menu-btn" onclick="showLeaderboard()" onmouseover="playMenuHoverSound()">
           <span class="btn-icon">🏆</span>
           Leaderboard
         </button>
-        <button class="menu-btn" onclick="playButtonPressSound(); showSoundTest()" onmouseover="playMenuHoverSound()">
+        <button class="menu-btn" onclick="showSoundTest()" onmouseover="playMenuHoverSound()">
           <span class="btn-icon">🔊</span>
           Sound Test
         </button>
@@ -237,7 +238,6 @@
         <div class="sound-buttons">
           <button class="sound-btn" onclick="testSound('menuClick')">🖱️ Menu Click</button>
           <button class="sound-btn" onclick="testSound('menuHover')">👆 Menu Hover</button>
-          <button class="sound-btn" onclick="testSound('buttonPress')">🔘 Button Press</button>
           <button class="sound-btn" onclick="testSound('achievement')">🏆 Achievement</button>
           <button class="sound-btn" onclick="testSound('warning')">⚠️ Warning</button>
           <button class="sound-btn" onclick="testSound('success')">✅ Success</button>
@@ -262,7 +262,7 @@
         <button class="close-btn" onclick="hideSettings()">✕</button>
       </div>
       
-      <div class="settings-section">
+      <div class="settings-section controls-section">
         <h3>🎮 Controls</h3>
         <div class="setting-item">
           <label for="mouseSensitivity">Mouse Sensitivity:</label>
@@ -315,8 +315,8 @@
       </div>
       
       <div class="settings-buttons">
-        <button class="menu-btn" onclick="playButtonPressSound(); resetSettings()">Reset to Default</button>
-        <button class="menu-btn primary" onclick="playButtonPressSound(); saveSettings()">Save Settings</button>
+        <button class="menu-btn" onclick="resetSettings()">Reset to Default</button>
+        <button class="menu-btn primary" onclick="saveSettings()">Save Settings</button>
       </div>
     </div>
   </div>
@@ -373,7 +373,7 @@
       </div>
       
       <div class="instructions-buttons">
-        <button class="menu-btn primary" onclick="playButtonPressSound(); hideInstructions()">Got it!</button>
+        <button class="menu-btn primary" onclick="hideInstructions()">Got it!</button>
       </div>
     </div>
   </div>
@@ -387,8 +387,8 @@
       </div>
       <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
       <br>
-      <button onclick="playButtonPressSound(); saveScore()">Save Score</button>
-      <button onclick="playButtonPressSound(); skipSave()">Skip</button>
+      <button onclick="saveScore()">Save Score</button>
+      <button onclick="skipSave()">Skip</button>
     </div>
   </div>
 
@@ -396,7 +396,15 @@
   <script src="game-security.js"></script>
 
   <!-- Load audio system -->
-  <script src="game-audio.js"></script>
+  <!-- Modular Audio System -->
+  <script src="src/game/audio/core/audio-context.js"></script>
+  <script src="src/game/audio/settings/audio-settings.js"></script>
+  <script src="src/game/audio/music/music-patterns.js"></script>
+  <script src="src/game/audio/music/music-composer.js"></script>
+  <script src="src/game/audio/music/music-manager.js"></script>
+  <script src="src/game/audio/effects/sound-effects.js"></script>
+  <script src="src/game/audio/audio-manager.js"></script>
+  <script src="src/game/audio/audio-integration.js"></script>
 
   <!-- Game script -->
     <!-- Modular game scripts -->
@@ -410,6 +418,60 @@
     <script src="src/game/rendering/effects/particle.js"></script>
     <script src="src/utils/helpers.js"></script>
     <script src="src/game/shared/sprite-metrics.js"></script>
+    
+    <!-- Mobile Detection Modules (Non-intrusive) -->
+    <script src="src/game/systems/device/device-detection.js"></script>
+    <script src="src/game/systems/device/device-config.js"></script>
+    <script src="src/game/systems/device/device-monitoring.js"></script>
+    <script src="src/game/systems/device/landscape-orientation.js"></script>
+    <script src="src/game/shared/mobile-utils.js"></script>
+    
+    <!-- Responsive Rendering Modules -->
+    <script src="src/game/rendering/responsive/canvas-manager.js"></script>
+    <script src="src/game/rendering/responsive/viewport-manager.js"></script>
+    <script src="src/game/rendering/responsive/mobile-ui.js"></script>
+    
+    <!-- Enhanced Input Modules -->
+    <script src="src/game/systems/input/touch-input.js"></script>
+    
+    <!-- Test mobile detection (non-intrusive) -->
+    <script>
+      // Test mobile detection without affecting gameplay
+      if (typeof DeviceDetection !== 'undefined') {
+        console.log('🔍 Device Detection Test:', DeviceDetection.getDeviceInfo());
+        console.log('📱 Mobile Utils Test:', MobileUtils.getDeviceInfoString());
+      }
+      
+      // Initialize landscape orientation enforcement
+      if (typeof LandscapeOrientation !== 'undefined') {
+        LandscapeOrientation.initialize();
+      }
+      
+      // Initialize responsive canvas system
+      if (typeof ResponsiveCanvas !== 'undefined' && typeof ViewportManager !== 'undefined') {
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+          const canvas = document.getElementById('gameCanvas');
+          if (canvas) {
+            ResponsiveCanvas.initialize(canvas);
+            ViewportManager.initialize();
+            
+            // Initialize enhanced touch input
+            if (typeof TouchInput !== 'undefined') {
+              TouchInput.initialize(canvas);
+            }
+            
+            // Initialize mobile UI system
+            if (typeof MobileUI !== 'undefined') {
+              MobileUI.initialize();
+            }
+            
+            console.log('📐 Responsive canvas system initialized');
+          }
+        });
+      }
+    </script>
+    
     <script src="src/game/main.js"></script>
     
     <!-- Game Systems -->
@@ -883,9 +945,9 @@
         particleEffects: true,
         screenShake: true,
         trailEffects: true,
-        masterVolume: 70,
-        soundEffectsVolume: 80,
-        backgroundMusicVolume: 60,
+        masterVolume: 90,
+        soundEffectsVolume: 70,
+        backgroundMusicVolume: 80,
         soundEffects: true,
         backgroundMusic: true
       };

@@ -46,13 +46,13 @@ function createBoss() {
   // Load specific boss image - Boss_Scammer for tier 1, Boss_Market_Maker for tier 2, Boss_Bear for tier 3, Boss_Shadow_Figure for tier 4
   let bossImageType;
   if (game.currentTier === 1) {
-    bossImageType = 3; // Boss_Scammer for tier 1
+    bossImageType = 0; // Boss_Scammer for tier 1 (index 0)
   } else if (game.currentTier === 2) {
-    bossImageType = 4; // Boss_Market_Maker for tier 2
+    bossImageType = 1; // Boss_Market_Maker for tier 2 (index 1)
   } else if (game.currentTier === 3) {
-    bossImageType = 1; // Boss_Bear for tier 3
+    bossImageType = 2; // Boss_Bear for tier 3 (index 2)
   } else {
-    bossImageType = 5; // Boss_Shadow_Figure for tier 4+
+    bossImageType = 3; // Boss_Shadow_Figure for tier 4+ (index 3)
   }
   loadBossImage(bossImageType);
   

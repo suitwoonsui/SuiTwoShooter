@@ -8,30 +8,26 @@
 
 // Boss images (moved from utils/helpers.js)
 const bossImages = [];
-// Boss 1: Bear Boss
-const bearBossImage = new Image();
-bearBossImage.src = 'assets/Boss_Bear.webp';
-bossImages.push(bearBossImage);
 
-// Boss 2: Keep original BossEnnemy_2
-const boss2Image = new Image();
-boss2Image.src = 'assets/BossEnnemy_2.webp';
-bossImages.push(boss2Image);
-
-// Boss 3: Boss Scammer
+// Boss 0: Boss Scammer (Tier 1)
 const bossScammerImage = new Image();
 bossScammerImage.src = 'assets/Boss_Scammer.webp';
-bossImages.push(bossScammerImage);
+bossImages[0] = bossScammerImage;
 
-// Boss 4: Boss Market Maker
+// Boss 1: Boss Market Maker (Tier 2)
 const bossMarketMakerImage = new Image();
 bossMarketMakerImage.src = 'assets/Boss_Market_Maker.webp';
-bossImages.push(bossMarketMakerImage);
+bossImages[1] = bossMarketMakerImage;
 
-// Boss 5: Boss Shadow Figure
+// Boss 2: Boss Bear (Tier 3)
+const bearBossImage = new Image();
+bearBossImage.src = 'assets/Boss_Bear.webp';
+bossImages[2] = bearBossImage;
+
+// Boss 3: Boss Shadow Figure (Tier 4+)
 const bossShadowFigureImage = new Image();
 bossShadowFigureImage.src = 'assets/Boss_Shadow_Figure.webp';
-bossImages.push(bossShadowFigureImage);
+bossImages[3] = bossShadowFigureImage;
 
 // Boss image processing (clean white for true transparency)
 const bossRawImage = new Image();

@@ -195,6 +195,19 @@ let tiles = [];
 
 // Main update function
 function update() {
+  // Update responsive canvas system
+  if (typeof ResponsiveCanvas !== 'undefined' && ResponsiveCanvas.isInitialized) {
+    ResponsiveCanvas.update();
+  }
+  if (typeof ViewportManager !== 'undefined' && ViewportManager.isInitialized) {
+    ViewportManager.update();
+  }
+  
+  // Update enhanced touch input
+  if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+    TouchInput.update();
+  }
+  
   // Don't update if menu is visible
   if (typeof gameState !== 'undefined' && gameState.isMenuVisible) {
     return;
@@ -611,8 +624,13 @@ function gameLoop() {
 function init() {
   game.canvas = document.getElementById('gameCanvas');
   game.ctx = game.canvas.getContext('2d');
-  game.width = game.canvas.width;
-  game.height = game.canvas.height;
+  
+  // Always use original game dimensions (800x480) for game logic
+  // The responsive canvas system handles display scaling
+  game.width = 800;
+  game.height = 480;
+  console.log('📐 Using original game dimensions:', game.width, 'x', game.height);
+  
   game.laneHeight = game.height / 3;
   player.y = game.height / 2 - player.height / 2;
   game.mouseY = game.height / 2;
@@ -622,8 +640,15 @@ function init() {
 
   // Mouse handling
   game.canvas.addEventListener('mousemove', e => {
-    const rect = game.canvas.getBoundingClientRect();
-    game.mouseY = e.clientY - rect.top;
+    if (typeof ResponsiveCanvas !== 'undefined' && ResponsiveCanvas.isInitialized) {
+      // Use responsive coordinate conversion
+      const coords = ResponsiveCanvas.screenToGameCoords(e.clientX, e.clientY);
+      game.mouseY = coords.y;
+    } else {
+      // Fallback to original method
+      const rect = game.canvas.getBoundingClientRect();
+      game.mouseY = e.clientY - rect.top;
+    }
   });
 
   // Keyboard handling (optional) - Modified for menu integration
@@ -647,21 +672,41 @@ function init() {
     game.keys[e.code] = false;
   });
 
-  // Touch handling
-  let touchY = 0;
-  game.canvas.addEventListener('touchstart', e=>{
-    e.preventDefault();
-    touchY = e.touches[0].clientY;
-    const rect = game.canvas.getBoundingClientRect();
-    game.mouseY = touchY - rect.top;
-  });
-  
-  game.canvas.addEventListener('touchmove', e=>{
-    e.preventDefault();
-    touchY = e.touches[0].clientY;
-    const rect = game.canvas.getBoundingClientRect();
-    game.mouseY = touchY - rect.top;
-  });
+  // Touch handling - Enhanced with TouchInput system
+  if (typeof TouchInput !== 'undefined' && TouchInput.isInitialized) {
+    // TouchInput system handles all touch events
+    console.log('👆 Using enhanced touch input system');
+  } else {
+    // Fallback to original touch handling
+    let touchY = 0;
+    game.canvas.addEventListener('touchstart', e=>{
+      e.preventDefault();
+      touchY = e.touches[0].clientY;
+      if (typeof ResponsiveCanvas !== 'undefined' && ResponsiveCanvas.isInitialized) {
+        // Use responsive coordinate conversion
+        const coords = ResponsiveCanvas.screenToGameCoords(e.touches[0].clientX, touchY);
+        game.mouseY = coords.y;
+      } else {
+        // Fallback to original method
+        const rect = game.canvas.getBoundingClientRect();
+        game.mouseY = touchY - rect.top;
+      }
+    });
+    
+    game.canvas.addEventListener('touchmove', e=>{
+      e.preventDefault();
+      touchY = e.touches[0].clientY;
+      if (typeof ResponsiveCanvas !== 'undefined' && ResponsiveCanvas.isInitialized) {
+        // Use responsive coordinate conversion
+        const coords = ResponsiveCanvas.screenToGameCoords(e.touches[0].clientX, touchY);
+        game.mouseY = coords.y;
+      } else {
+        // Fallback to original method
+        const rect = game.canvas.getBoundingClientRect();
+        game.mouseY = touchY - rect.top;
+      }
+    });
+  }
 
   // Start the game
   game.gameRunning = true;

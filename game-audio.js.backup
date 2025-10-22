@@ -1975,10 +1975,6 @@ function playMenuHoverSound() {
   if (gameAudio) gameAudio.playSound('menuHover');
 }
 
-function playButtonPressSound() {
-  if (gameAudio) gameAudio.playSound('buttonPress');
-}
-
 function playAchievementSound() {
   if (gameAudio) gameAudio.playSound('achievement');
 }
