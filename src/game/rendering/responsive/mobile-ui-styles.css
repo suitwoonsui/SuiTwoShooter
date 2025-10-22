@@ -1151,8 +1151,10 @@
   }
   
   /* Hide footer on mobile - no command buttons needed */
+  footer.suitch-footer,
   .suitch-footer {
     display: none !important;
+    visibility: hidden !important;
   }
   
   /* Game stats panel - move to bottom */
@@ -1691,7 +1693,10 @@
   }
   
   /* Footer adjustments */
+  footer.suitch-footer,
   .suitch-footer {
+    display: none !important;
+    visibility: hidden !important;
     padding: 12px 20px !important;
     font-size: 12px !important;
   }
