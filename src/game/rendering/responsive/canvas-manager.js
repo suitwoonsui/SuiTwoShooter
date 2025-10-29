@@ -52,22 +52,14 @@ const ResponsiveCanvas = {
   setupResponsiveSizing() {
     if (!this.canvas) return;
     
-    // Get optimal canvas size based on device and orientation
-    const containerSize = this.getContainerSize();
-    let optimalSize;
-    
-    if (this.deviceType === 'mobile' || this.deviceType === 'tablet') {
-      // Use landscape orientation sizing for mobile/tablet
-      optimalSize = LandscapeOrientation.getLandscapeCanvasSize(this.deviceType);
-    } else {
-      // For desktop, make it truly responsive to container size
-      optimalSize = this.calculateResponsiveSize(containerSize);
-    }
-    
-    // Apply the sizing
-    this.resizeCanvas(optimalSize.width, optimalSize.height);
-    
-    console.log(`📐 Canvas resized to ${optimalSize.width}x${optimalSize.height} (scale: ${optimalSize.scale.toFixed(2)})`);
+    // For all devices, CSS handles sizing via object-fit: contain
+    // Keep internal canvas at 800x480 for game logic
+    this.canvas.width = 800;
+    this.canvas.height = 480;
+    this.scaleX = 1;
+    this.scaleY = 1;
+    this.offsetX = 0;
+    this.offsetY = 0;
   },
 
   /**
@@ -132,26 +124,16 @@ const ResponsiveCanvas = {
   resizeCanvas(width, height) {
     if (!this.canvas) return;
     
-    // Keep original canvas dimensions (800x480) for game logic
-    // Only change display size via CSS
+    // For all devices, CSS handles display sizing via object-fit: contain
+    // Keep internal dimensions at 800x480 for game logic
+    console.log(`📱 ${this.deviceType} canvas: internal 800x480, CSS handles display sizing`);
     this.canvas.width = 800;
     this.canvas.height = 480;
-    this.currentWidth = width;
-    this.currentHeight = height;
-    
-    // Calculate scaling factors
-    this.scaleX = width / this.originalWidth;
-    this.scaleY = height / this.originalHeight;
-    
-    // Calculate centering offsets
+    // No scaling needed - game logic uses internal dimensions
+    this.scaleX = 1;
+    this.scaleY = 1;
     this.offsetX = 0;
     this.offsetY = 0;
-    
-    // Don't update game dimensions - keep original 800x480
-    // The game logic should always use original dimensions
-    
-    // Update canvas styling for responsive display
-    this.updateCanvasStyling();
   },
 
   /**
@@ -160,27 +142,16 @@ const ResponsiveCanvas = {
   updateCanvasStyling() {
     if (!this.canvas) return;
     
-    // Set CSS dimensions to maintain aspect ratio
-    const container = this.canvas.parentElement;
-    if (container) {
-      const containerRect = container.getBoundingClientRect();
-      const aspectRatio = this.originalWidth / this.originalHeight;
-      
-      let cssWidth, cssHeight;
-      
-      if (containerRect.width / containerRect.height > aspectRatio) {
-        // Container is wider than canvas aspect ratio
-        cssHeight = containerRect.height;
-        cssWidth = cssHeight * aspectRatio;
-      } else {
-        // Container is taller than canvas aspect ratio
-        cssWidth = containerRect.width;
-        cssHeight = cssWidth / aspectRatio;
-      }
-      
-      this.canvas.style.width = cssWidth + 'px';
-      this.canvas.style.height = cssHeight + 'px';
-    }
+    // DON'T set inline styles - let CSS handle dimensions
+    // The CSS modularization uses aspect-ratio for proper sizing
+    console.log('📐 Skipping inline style injection - using CSS aspect-ratio instead');
+    
+    // Just ensure the canvas has the internal dimensions for game logic
+    this.canvas.width = 800;
+    this.canvas.height = 480;
+    
+    // Let CSS handle the display size via aspect-ratio property
+    // This allows the canvas to properly size within the flex layout
   },
 
   /**

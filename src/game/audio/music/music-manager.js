@@ -105,10 +105,10 @@ class MusicManager {
       return;
     }
     
-    // Force enable background music for boss music (boss music should always play)
+    // Check if music is enabled - respect user's preference
     if (!settings.isBackgroundMusicEnabled()) {
-      console.log('⚠️ Background music disabled, but enabling for boss music');
-      settings.setBackgroundMusicEnabled(true);
+      console.log('⚠️ Boss music blocked - background music is disabled');
+      return;
     }
     
     // Always ensure Theme 5 is set for regular gameplay

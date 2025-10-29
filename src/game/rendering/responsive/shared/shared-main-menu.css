@@ -1,0 +1,255 @@
+/* ========================================== */
+/* DESKTOP MAIN MENU MODULE */
+/* ========================================== */
+/* Main menu overlay, content, title, buttons, footer, stats */
+/* Extracted from game-styles.css lines 705-933 */
+
+/* ========================================== */
+/* MAIN MENU STYLES */
+/* ========================================== */
+
+.main-menu-overlay {
+  position: fixed; /* Changed from absolute to fixed for better mobile/overlay support */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(15, 20, 25, 0.98) 100%);
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(20px);
+  display: none; /* Hidden by default - use visibility classes to show */
+}
+
+/* Main menu is flex only when visible */
+.main-menu-overlay[class*="-visible"] {
+  display: flex;
+  animation: menuFadeIn 0.8s ease-out;
+}
+
+/* Main menu is hidden when it has -hidden class */
+.main-menu-overlay[class*="-hidden"] {
+  display: none;
+}
+
+@keyframes menuFadeIn {
+  from { 
+    opacity: 0; 
+    backdrop-filter: blur(0px);
+  }
+  to { 
+    opacity: 1; 
+    backdrop-filter: blur(20px);
+  }
+}
+
+.main-menu-content {
+  text-align: center;
+  max-width: 95vw;
+  max-height: 100%;
+  width: 95%;
+  padding: min(1.5vw, 1.5vh);
+  animation: menuSlideIn 0.8s ease-out 0.2s both;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: min(1vw, 1vh);
+}
+
+@keyframes menuSlideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(50px) scale(0.9);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1);
+  }
+}
+
+.game-title {
+  margin-bottom: min(1.5vw, 1.5vh); /* Responsive margin */
+  position: relative;
+}
+
+.game-title h1 {
+  font-size: min(4vw, 4.5vh); /* Responsive font size */
+  font-weight: bold;
+  background: linear-gradient(135deg, #4DA2FF, #39ff14); /* Sui blue to market green */
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 3s ease-in-out infinite, titleGlow 3s ease-in-out infinite alternate;
+  text-shadow: 0 0 30px rgba(77, 162, 255, 0.5);
+  margin-bottom: 1vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2vw; /* Pure viewport-based gap */
+}
+
+.title-profile-image {
+  width: 8vw; /* Pure viewport-based width */
+  height: 8vw; /* Pure viewport-based height */
+  border-radius: 50%;
+  border: 3px solid #4DA2FF;
+  box-shadow: 0 0 20px rgba(77, 162, 255, 0.5);
+  animation: profileGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes profileGlow {
+  0% { 
+    box-shadow: 0 0 20px rgba(77, 162, 255, 0.5);
+    transform: scale(1);
+  }
+  100% { 
+    box-shadow: 0 0 30px rgba(77, 162, 255, 0.8);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.game-title h2 {
+  font-size: 3vw; /* Pure viewport-based font size */
+  color: #ccc;
+  margin-bottom: 1.5vw;
+  font-weight: 300;
+}
+
+.version-badge {
+  display: inline-block;
+  background: linear-gradient(45deg, #4DA2FF, #3A7BD5);
+  color: var(--text-primary);
+  padding: 1.5vw 3vw; /* Pure viewport-based padding */
+  border-radius: 20px;
+  font-size: 1.5vw; /* Pure viewport-based font size */
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 15px rgba(77, 162, 255, 0.4);
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* Ensure version-badge in main menu is white */
+.main-menu-overlay .game-title .version-badge {
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.menu-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Two equal columns */
+  gap: min(1vw, 1.5vh); /* Responsive gap */
+  margin-bottom: min(1vw, 1.5vh); /* Responsive margin */
+  width: 100%; /* Full width to utilize grid layout */
+}
+
+.menu-btn {
+  background: linear-gradient(135deg, rgba(77, 162, 255, 0.1) 0%, rgba(58, 123, 213, 0.1) 100%);
+  border: 2px solid rgba(77, 162, 255, 0.3);
+  color: white !important;
+  padding: min(1.2vw, 1.5vh) min(1.5vw, 2vh); /* Responsive padding */
+  border-radius: 15px;
+  font-size: min(3vw, 4vh); /* Responsive font size - doubled */
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: min(0.6vw, 0.8vh); /* Responsive gap */
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  width: 100%; /* Full width within grid cell */
+}
+
+.menu-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.menu-btn:hover::before {
+  left: 100%;
+}
+
+.menu-btn:hover {
+  transform: translateY(-3px);
+  border-color: #4DA2FF;
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.3);
+  background: linear-gradient(135deg, rgba(77, 162, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%);
+}
+
+.menu-btn:active {
+  transform: translateY(-1px);
+}
+
+.menu-btn.primary {
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  border-color: #4DA2FF;
+  box-shadow: 0 4px 15px rgba(77, 162, 255, 0.4);
+}
+
+.menu-btn.primary:hover {
+  background: linear-gradient(135deg, #5db3ff, #4a8be6);
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.5);
+}
+
+.btn-icon {
+  font-size: 1.4vw;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+}
+
+.menu-footer {
+  border-top: 1px solid rgba(77, 162, 255, 0.2);
+  padding-top: min(1vw, 1.5vh);
+}
+
+.game-stats {
+  display: flex;
+  justify-content: center;
+  gap: min(2vw, 3vh);
+  flex-wrap: wrap;
+}
+
+.game-stats .stat-item {
+  text-align: center;
+  background: rgba(77, 162, 255, 0.05);
+  padding: min(1vw, 1.5vh) min(1.5vw, 2vh);
+  border-radius: min(1vw, 1.5vh);
+  border: 1px solid rgba(77, 162, 255, 0.2);
+  min-width: auto;
+}
+
+.game-stats .stat-label {
+  display: block;
+  color: #ccc;
+  font-size: min(2.4vw, 3.6vh); /* Doubled from min(1.2vw, 1.8vh) */
+  margin-bottom: min(0.5vw, 0.8vh);
+}
+
+.game-stats .stat-value {
+  color: #39ff14;
+  font-size: min(3.6vw, 5vh); /* Doubled from min(1.8vw, 2.5vh) */
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+}

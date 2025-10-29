@@ -1,0 +1,325 @@
+/* ========================================== */
+/* LANDSCAPE-ONLY DESIGN */
+/* ========================================== */
+
+/* All layouts are designed for landscape orientation */
+/* No forced rotation - game adapts to available space */
+
+/* ========================================== */
+/* VIEWPORT CONTAINER STRUCTURE */
+/* ========================================== */
+
+/* Main viewport container - landscape-optimized layout */
+.viewport-container {
+  position: relative;
+  width: calc(100vw - 2px);
+  height: calc(100vh - 2px);
+  display: flex;
+  flex-direction: column;
+  overflow: auto; /* Allow scrolling if content exceeds viewport */
+  /* Landscape-optimized: wide layout, compact height */
+}
+
+/* Header - landscape-optimized compact height */
+.game-header {
+  flex: 0 0 auto;
+  width: 100%; /* Full width of parent container */
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 20, 25, 0.9) 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: min(1.4vw, 2vh, 14px); /* Responsive font size with minimum readability */
+  border-bottom: 3px solid #4DA2FF;
+  box-shadow: 0 4px 20px rgba(77, 162, 255, 0.3);
+  backdrop-filter: blur(15px);
+  flex-wrap: nowrap;
+  gap: 1.5vh; /* Converted from 15px */
+  min-height: 6vh; /* Minimum visible height */
+  max-height: 12vh; /* Prevent header from taking entire viewport but allow it to be visible */
+  padding: 1vh 1.5vw; /* Responsive padding */
+  position: relative; /* Ensure proper stacking */
+  z-index: 10; /* Ensure header is above canvas */
+  /* Landscape-optimized: compact height, wide layout */
+}
+
+/* Header glow effect */
+.game-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Header title */
+.game-header .title {
+  font-size: min(4.8vw, 6vh, 48px); /* Responsive title size - doubled */
+  font-weight: bold;
+  color: #4DA2FF;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 1vh; /* Responsive gap */
+}
+
+/* Header logo */
+.game-header .header-logo {
+  width: min(3.2vw, 4vh, 32px); /* Responsive logo size */
+  height: min(3.2vw, 4vh, 32px);
+  border-radius: 50%;
+  margin-right: 0.8vh;
+  vertical-align: middle;
+  border: 2px solid #4DA2FF;
+  box-shadow: 0 0 10px rgba(77, 162, 255, 0.3);
+}
+
+/* Alpha badge - Universal base style for all devices */
+.alpha-badge {
+  background: linear-gradient(45deg, #4DA2FF, #3A7BD5);
+  color: var(--text-primary);
+  padding: 0.4vh 0.8vw;
+  border-radius: 12px;
+  font-size: min(2vw, 2.8vh, 20px); /* Responsive font size - doubled */
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 15px rgba(77, 162, 255, 0.4);
+  display: inline-block;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* Alpha badge in game header - ensures white color */
+.game-header .alpha-badge {
+  color: white !important;
+}
+
+@keyframes badgePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Stats container */
+.game-header .stats {
+  display: flex;
+  gap: 1.5vh;
+}
+
+/* Individual stat */
+.game-header .stat {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  padding: 1vh 1.5vw;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.game-header .stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.2);
+}
+
+.game-header .stat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(77, 162, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.game-header .stat:hover::before {
+  left: 100%;
+}
+
+/* Game container - base layout foundation */
+.game-container {
+  flex: 1;
+  min-height: 0; /* Allows flex shrinking */
+  padding: 0.6vh; /* Converted from 6px */
+  /* Note: padding and visual styling handled by desktop modules */
+  /* Landscape-optimized: wide layout, efficient space usage */
+}
+
+/* Game container is hidden by default */
+.game-container[class*="-hidden"] {
+  display: none;
+}
+
+.game-container[class*="-visible"] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  flex: 1; /* Take available space in viewport */
+  min-height: 0; /* Allow shrinking */
+  position: relative; /* Ensure proper positioning */
+  overflow: visible; /* Allow canvas to be visible */
+}
+
+/* Canvas - base sizing: flexible to accommodate other elements */
+/* NOTE: Actual canvas sizing is handled by device-specific modules */
+/* Desktop uses aspect-ratio: 16/9, Mobile uses different layout */
+#gameCanvas {
+  display: block;
+}
+
+/* Footer - landscape-optimized compact height */
+.game-footer {
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.9);
+  border-top: 2px solid rgba(77, 162, 255, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1vw; /* Converted from 10px */
+  flex-wrap: nowrap;
+  gap: 0.6vh; /* Converted from 6px */
+  min-height: 4vh; /* Converted from 40px */
+  padding: 0.8vh 1.5vw; /* Converted from 8px 15px */
+  /* Landscape-optimized: compact height, wide layout */
+}
+
+/* ========================================== */
+/* DEVICE-SPECIFIC RESPONSIVE ADJUSTMENTS */
+/* ========================================== */
+
+/* Mobile devices - landscape-optimized (using device detection) */
+.game-footer.mobile-hidden {
+  display: none; /* No footer on mobile */
+}
+
+.game-header.mobile-compact {
+  padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
+  font-size: 1.1vw; /* Converted from 11px */
+  min-height: 5vh; /* Minimum height for readability */
+  max-height: 10vh; /* Prevent taking too much space */
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8vh; /* Converted from 8px */
+  /* Landscape-optimized: compact height, wide layout */
+}
+
+.game-header.mobile-compact .title {
+  font-size: 3.6vw; /* Doubled from 1.8vw */
+}
+
+.game-header.mobile-compact .header-logo {
+  width: 4.8vw; /* Doubled from 2.4vw */
+  height: 4.8vw;
+}
+
+.game-header.mobile-compact .alpha-badge {
+  font-size: 1.6vw; /* Doubled from 0.8vw */
+  padding: 0.2vh 0.6vw; /* Converted from 2px 6px */
+}
+
+.game-header.mobile-compact .stats {
+  display: flex;
+  gap: 0.8vh; /* Converted from 8px */
+  align-items: center;
+}
+
+.game-header.mobile-compact .stat {
+  display: flex;
+  align-items: center;
+  gap: 0.4vh; /* Converted from 4px */
+  background: rgba(77, 162, 255, 0.1);
+  padding: 0.6vh 1vw; /* Converted from 6px 10px */
+  border-radius: 0.8vh; /* Converted from 8px */
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.2); /* Dynamic border */
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+  min-width: 4vw; /* Converted from 40px */
+  justify-content: center;
+}
+
+.game-header.mobile-compact .stat-icon {
+  font-size: min(3vw, 2.5vh, 20px); /* Responsive font size */
+  filter: drop-shadow(0 0 0.3vh rgba(77, 162, 255, 0.5));
+}
+
+.game-header.mobile-compact .stat-value {
+  color: #39ff14;
+  font-weight: bold;
+  font-size: min(2.8vw, 2.3vh, 18px); /* Responsive font size */
+  text-shadow: 0 0 0.3vh rgba(57, 255, 20, 0.3);
+}
+
+/* Base stat-icon styling for all headers */
+.game-header .stat-icon {
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size - responsive to viewport */
+  filter: drop-shadow(0 0 0.3vh rgba(77, 162, 255, 0.5));
+}
+
+/* Base stat-value styling for all headers */
+.game-header .stat-value {
+  color: #39ff14;
+  font-weight: bold;
+  font-size: min(1.1vw, 1.4vh); /* Dynamic font size - responsive to viewport */
+  text-shadow: 0 0 0.3vh rgba(57, 255, 20, 0.3);
+}
+
+.game-container.mobile-compact {
+  padding: 0.6vh; /* Converted from 6px */
+  /* Landscape-optimized: maximizes game area */
+}
+
+/* Tablet devices - landscape-optimized (using device detection) */
+.game-footer.tablet-compact {
+  padding: 0.6vh 1vw; /* Converted from 6px 10px */
+  font-size: 0.9vw; /* Converted from 9px */
+  min-height: 3.8vh; /* Converted from 38px */
+  /* Landscape-optimized: compact footer */
+}
+
+.game-header.tablet-compact {
+  padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
+  font-size: 1vw; /* Converted from 10px */
+  min-height: 3.8vh; /* Converted from 38px */
+  /* Landscape-optimized: compact header */
+}
+
+/* Desktop devices - landscape-optimized (using device detection) */
+.game-footer.desktop-standard {
+  padding: 0.8vh 1.5vw; /* Converted from 8px 15px */
+  font-size: 1vw; /* Converted from 10px */
+  min-height: 4.2vh; /* Converted from 42px */
+  /* Landscape-optimized: standard footer */
+}
+
+.game-header.desktop-standard {
+  padding: 1vh 1.5vw; /* Converted from 10px 15px */
+  font-size: 1.1vw; /* Converted from 11px */
+  min-height: 4.2vh; /* Converted from 42px */
+  /* Landscape-optimized: standard header */
+}
+
+/* ========================================== */
+/* LEGACY SUPPORT - Map old classes to new ones */
+/* ========================================== */
+
+/* Map old suitch-header to new game-header */
+.suitch-header {
+  /* This will be handled by the new game-header class */
+  /* Landscape-optimized: inherits from .game-header */
+}
+
+/* Map old suitch-footer to new game-footer */
+.suitch-footer {
+  /* This will be handled by the new game-footer class */
+  /* Landscape-optimized: inherits from .game-footer */
+}

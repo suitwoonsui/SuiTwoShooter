@@ -1,0 +1,396 @@
+/* ========================================== */
+/* MOBILE GAME UI MODULE */
+/* ========================================== */
+/* Game UI elements and layout */
+/* Converted from mobile-ui-styles.css - removed media queries, using viewport units */
+
+/* Mobile Game Container */
+.mobile-game-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* Mobile Game Canvas */
+.mobile-game-canvas,
+#gameCanvas {
+  /* Flex layout - take up remaining space */
+  flex: 1;
+  min-width: 0;
+  
+  /* Constrain to viewport dimensions */
+  max-width: 100vw;
+  max-height: calc(100vh - 12vh); /* Viewport minus header height (max 12vh) */
+  
+  /* Scale game content to fit while maintaining 5:3 aspect ratio */
+  object-fit: contain;
+  object-position: center;
+  
+  /* Ensure canvas is visible and centered */
+  position: relative;
+  z-index: 0; /* Lower than header (z-index: 10) */
+  margin: 0 auto; /* Center the canvas */
+  
+  /* No minimum size constraints - let canvas shrink as much as needed */
+  background: transparent;
+  border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+  border-radius: min(1vh, 1.5vw); /* Dynamic border radius */
+  display: block;
+}
+
+/* Mobile Game Header */
+.mobile-game-header {
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.9);
+  border-bottom: 2px solid rgba(77, 162, 255, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
+  font-size: 1.1vw; /* Converted from 11px */
+  flex-wrap: wrap;
+  gap: 0.8vh; /* Converted from 8px */
+}
+
+.mobile-game-header .title {
+  font-size: 3.6vw; /* Doubled from 1.8vw */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.8vh; /* Converted from 8px */
+}
+
+.mobile-game-header .header-logo {
+  width: 4.8vw; /* Doubled from 2.4vw */
+  height: 4.8vw;
+}
+
+/* .mobile-game-header .alpha-badge removed - unused, game-header.mobile-compact handles this */
+
+.mobile-game-header .stats,
+.game-header.mobile-compact .stats,
+.game-header .stats {
+  display: flex;
+  gap: 0.6vh;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.mobile-game-header .stat,
+.game-header.mobile-compact .stat,
+.game-header .stat {
+  display: flex;
+  align-items: center;
+  gap: 0.4vh;
+  background: rgba(77, 162, 255, 0.1);
+  padding: 0.4vh 0.8vw;
+  border-radius: 0.8vh;
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.2);
+  font-size: min(0.9vw, 1.2vh, 9px);
+  min-width: 4vw;
+  justify-content: center;
+  color: #fff;
+}
+
+
+/* Mobile Game Stats Panel */
+.mobile-game-stats-panel {
+  position: absolute;
+  top: 1vh; /* Converted from 10px */
+  right: 1vw; /* Converted from 10px */
+  background: rgba(0, 0, 0, 0.8);
+  border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+  border-radius: min(1vh, 1.5vw); /* Dynamic border radius */
+  padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
+  min-width: 12vw; /* Converted from 120px */
+  font-size: 1.1vw; /* Converted from 11px */
+  backdrop-filter: blur(min(1vh, 1.5vw)); /* Dynamic blur */
+  z-index: 1000;
+}
+
+.mobile-game-stats-panel .stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4vh; /* Converted from 4px */
+  padding: 0.2vh 0; /* Converted from 2px 0 */
+}
+
+.mobile-game-stats-panel .stat-label {
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+  color: #ccc;
+}
+
+.mobile-game-stats-panel .stat-value {
+  font-size: 1.2vw; /* Converted from 12px */
+  color: #39ff14;
+  font-weight: bold;
+  text-shadow: 0 0 0.3vh rgba(57, 255, 20, 0.3);
+}
+
+/* Mobile Game Footer */
+.mobile-game-footer {
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.9);
+  border-top: 2px solid rgba(77, 162, 255, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+  flex-wrap: wrap;
+  gap: 0.8vh; /* Converted from 8px */
+}
+
+.mobile-game-footer .controls {
+  display: flex;
+  gap: 1.5vw; /* Converted from 15px */
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+}
+
+.mobile-game-footer .controls span {
+  padding: 0.4vh 0.8vw; /* Converted from 4px 8px */
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+  background: rgba(77, 162, 255, 0.1);
+  border-radius: 0.4vh; /* Converted from 4px */
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.2); /* Dynamic border */
+}
+
+.mobile-game-footer .control-icon {
+  font-size: 1.2vw; /* Converted from 12px */
+  margin-right: 0.4vh; /* Converted from 4px */
+}
+
+.mobile-game-footer .version-info {
+  font-size: 0.9vw; /* Converted from 9px */
+  color: #888;
+}
+
+/* Mobile Game Controls - REMOVED */
+/* According to mobile-ui.js, mobile layout should NOT have a footer */
+/* Footer is hidden on mobile to save space: footer.show: false */
+
+/* Mobile Game Overlay */
+.mobile-game-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column; /* Stack header and content vertically */
+  align-items: stretch; /* Stretch children to full width */
+  justify-content: flex-start; /* Start from top */
+  z-index: 10000;
+}
+
+/* Mobile Game Content Container */
+.mobile-game-content {
+  flex: 1; /* Take up remaining space after header */
+  width: 100%; /* Use available width, not viewport width */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: min(2vh, 2.5vw); /* Dynamic padding */
+  gap: min(2vh, 2.5vw); /* Dynamic gap */
+  overflow: hidden; /* Prevent content from overflowing */
+}
+
+/* Mobile Game Header within overlay */
+.mobile-game-overlay .game-header.mobile-compact {
+  position: relative; /* Use relative positioning in flexbox */
+  width: 100%; /* Full width of overlay */
+  height: 8vh; /* Fixed header height */
+  min-height: 8vh; /* Override viewport-container min-height */
+  max-height: 8vh; /* Prevent expansion */
+  z-index: 10001; /* Above canvas but below overlay */
+  background: rgba(0, 0, 0, 0.9);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+  padding: min(1vh, 1.5vw) min(1.5vw, 2vh); /* Dynamic padding */
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+  flex-wrap: nowrap;
+  gap: min(0.8vh, 1vw); /* Dynamic gap */
+  justify-content: space-between; /* Separate title, middle stats, and right stats */
+  align-items: center;
+}
+
+/* Mobile Game Header Title */
+.mobile-game-overlay .game-header.mobile-compact .title {
+  font-size: min(3.6vw, 4.4vh); /* Dynamic font size - doubled */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: min(0.8vh, 1vw); /* Dynamic gap */
+}
+
+.mobile-game-overlay .game-header.mobile-compact .header-logo {
+  width: min(4.8vw, 6vh); /* Dynamic size - doubled */
+  height: min(4.8vw, 6vh); /* Dynamic size - doubled */
+}
+
+.mobile-game-overlay .game-header.mobile-compact .alpha-badge {
+  font-size: min(1.6vw, 2vh); /* Dynamic font size - doubled */
+  padding: min(0.2vh, 0.3vw) min(0.6vw, 0.8vh); /* Dynamic padding */
+  margin-left: min(0.8vh, 1vw); /* Dynamic margin */
+}
+
+/* Mobile Game Header Middle Stats */
+.mobile-game-overlay .game-header.mobile-compact .middle-stats {
+  display: flex;
+  gap: min(0.8vh, 1vw); /* Dynamic gap */
+  align-items: center;
+}
+
+/* Mobile Game Header Right Stats */
+.mobile-game-overlay .game-header.mobile-compact .right-stats {
+  display: flex;
+  gap: min(0.8vh, 1vw); /* Dynamic gap */
+  align-items: center;
+}
+
+.mobile-game-overlay .game-header.mobile-compact .integrated-stat {
+  display: flex;
+  align-items: center;
+  gap: min(0.4vh, 0.6vw); /* Dynamic gap */
+  background: rgba(77, 162, 255, 0.1);
+  padding: min(0.4vh, 0.6vw) min(0.8vw, 1vh); /* Dynamic padding */
+  border-radius: min(0.6vh, 0.8vw); /* Dynamic border radius */
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.2); /* Dynamic border */
+  font-size: min(1vw, 1.3vh); /* Dynamic font size */
+  min-width: min(3vw, 4vh); /* Dynamic minimum width */
+  justify-content: center;
+}
+
+.mobile-game-overlay .game-header.mobile-compact .integrated-stat.orb-stat {
+  background: rgba(0, 212, 255, 0.1);
+  border: min(0.1vw, 0.15vh) solid rgba(0, 212, 255, 0.3); /* Dynamic border */
+}
+
+.mobile-game-overlay .game-header.mobile-compact .integrated-stat.coin-stat {
+  background: rgba(255, 215, 0, 0.1);
+  border: min(0.1vw, 0.15vh) solid rgba(255, 215, 0, 0.3); /* Dynamic border */
+}
+
+.mobile-game-overlay .game-header.mobile-compact .orb-icon,
+.mobile-game-overlay .game-header.mobile-compact .coin-icon {
+  width: min(1.2vw, 1.5vh); /* Dynamic size */
+  height: min(1.2vw, 1.5vh); /* Dynamic size */
+}
+
+.mobile-game-overlay .game-header.mobile-compact .stat-icon {
+  font-size: min(1vw, 1.3vh); /* Dynamic icon size */
+}
+
+.mobile-game-overlay .game-header.mobile-compact .stat-value {
+  font-weight: bold;
+  color: #39ff14;
+  font-size: min(1vw, 1.3vh); /* Dynamic font size */
+}
+
+.mobile-game-overlay-content {
+  background: rgba(0, 0, 0, 0.9);
+  border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+  border-radius: min(2vh, 2.5vw); /* Dynamic border radius */
+  padding: min(2vh, 2.5vw); /* Dynamic padding */
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.mobile-game-overlay h2 {
+  font-size: min(2vw, 2.5vh); /* Dynamic font size */
+  margin-bottom: 2vh; /* Converted from 20px */
+  color: #4DA2FF;
+}
+
+.mobile-game-overlay p {
+  font-size: 1.1vw; /* Converted from 1.1rem */
+  margin-bottom: 2vh; /* Converted from 20px */
+  color: #ccc;
+  line-height: 1.4;
+}
+
+.mobile-game-overlay .btn {
+  padding: min(1.8vh, 2.5vw); /* Dynamic padding that scales with smaller dimension */
+  font-size: min(1.4vw, 2vh); /* Dynamic font size - scales with smaller dimension */
+  border-radius: min(1.2vh, 1.8vw); /* Dynamic border radius */
+  min-height: min(6vh, 4vw); /* Dynamic height - scales with smaller dimension */
+  margin: min(0.6vh, 0.8vw); /* Dynamic margin */
+  border: min(0.2vw, 0.3vh) solid; /* Dynamic border */
+  transition: all 0.3s ease;
+}
+
+/* Mobile Game Pause Menu */
+.mobile-pause-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.mobile-pause-menu h2 {
+  font-size: min(3vw, 4vh); /* Dynamic font size */
+  margin-bottom: 3vh; /* Converted from 30px */
+  color: #4DA2FF;
+}
+
+.mobile-pause-menu .menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5vh; /* Converted from 15px */
+  width: 80vw;
+  max-width: 40vw; /* Converted from 400px */
+}
+
+.mobile-pause-menu .menu-btn {
+  padding: min(2vh, 2.5vw) min(3vw, 4vh); /* Dynamic padding */
+  font-size: 1.3vw; /* Converted from 1.3rem */
+  border-radius: 1.5vh; /* Converted from 15px */
+  min-height: 6vh; /* Converted from 60px */
+  width: 100%;
+}
+
+/* Mobile Pause Overlay Button - for the Resume button on pause screen */
+.mobile-pause-overlay-button {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: min(2.5vh, 3vw) min(5vw, 6vh);
+  font-size: min(2.2vw, 3vh);
+  font-weight: bold;
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  color: white;
+  border: min(0.3vh, 0.4vw) solid #4DA2FF;
+  border-radius: min(1.5vh, 2vw);
+  cursor: pointer;
+  z-index: 10001;
+  box-shadow: 0 min(0.8vh, 1vw) min(2.5vh, 3vw) rgba(77, 162, 255, 0.5);
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  touch-action: manipulation;
+  min-width: min(20vw, 25vh);
+  min-height: min(8vh, 10vw);
+}
+
+.mobile-pause-overlay-button:hover {
+  transform: translate(-50%, -50%) scale(1.05);
+  box-shadow: 0 min(1.2vh, 1.5vw) min(3.5vh, 4vw) rgba(77, 162, 255, 0.7);
+}
+
+.mobile-pause-overlay-button:active {
+  transform: translate(-50%, -50%) scale(0.95);
+}

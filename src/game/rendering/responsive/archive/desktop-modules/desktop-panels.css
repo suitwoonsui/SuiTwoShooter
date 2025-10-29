@@ -1,0 +1,448 @@
+/* ========================================== */
+/* DESKTOP PANELS MODULE */
+/* ========================================== */
+/* Settings panel, sound test panel, instructions panel, name input modal */
+/* Extracted from game-styles.css lines 935-1354 */
+
+/* ========================================== */
+/* SETTINGS PANEL STYLES */
+/* ========================================== */
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  backdrop-filter: blur(15px);
+  animation: panelFadeIn 0.3s ease-out;
+  padding: 20px; /* Add padding to ensure content fits within viewport */
+  box-sizing: border-box; /* Include padding in height calculation */
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.settings-content {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(15, 20, 25, 0.95) 100%);
+  border: 3px solid #4DA2FF;
+  border-radius: 25px;
+  padding: 30px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 100%; /* Fit within the padded panel */
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 0 50px rgba(77, 162, 255, 0.5);
+  animation: panelSlideIn 0.3s ease-out;
+}
+
+@keyframes panelSlideIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.9) translateY(20px);
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1) translateY(0);
+  }
+}
+
+.settings-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid rgba(77, 162, 255, 0.3);
+}
+
+.settings-header h2 {
+  color: #4DA2FF;
+  font-size: 1.8rem;
+  margin: 0;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: white !important;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: rgba(255, 0, 0, 0.2);
+  border-color: #ff4444;
+  color: #ff4444;
+  transform: scale(1.1);
+}
+
+.settings-section {
+  margin-bottom: 30px;
+}
+
+.settings-section h3 {
+  color: #4DA2FF;
+  font-size: 1.3rem;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(77, 162, 255, 0.2);
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(77, 162, 255, 0.1);
+}
+
+.setting-item label {
+  color: #ccc;
+  font-weight: 500;
+  flex: 1;
+  margin-right: 15px;
+}
+
+.setting-item input[type="range"] {
+  flex: 1;
+  margin: 0 15px;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(77, 162, 255, 0.4);
+}
+
+.setting-item input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(77, 162, 255, 0.4);
+}
+
+.setting-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #4DA2FF;
+  cursor: pointer;
+}
+
+.setting-item span {
+  color: #39ff14;
+  font-weight: bold;
+  min-width: 60px;
+  text-align: right;
+}
+
+.settings-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid rgba(77, 162, 255, 0.3);
+}
+
+/* ========================================== */
+/* SOUND TEST PANEL STYLES */
+/* ========================================== */
+
+.sound-test-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px; /* Add padding to ensure content fits within viewport */
+  box-sizing: border-box; /* Include padding in height calculation */
+}
+
+.sound-test-content {
+  background: linear-gradient(135deg, #1a2332 0%, #0f1419 100%);
+  border: 2px solid #4DA2FF;
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 100%; /* Fit within the padded panel */
+  overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.sound-test-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(77, 162, 255, 0.1) 50%, transparent 70%);
+  border-radius: 20px;
+  pointer-events: none;
+}
+
+.sound-test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid rgba(77, 162, 255, 0.3);
+}
+
+.sound-test-header h2 {
+  color: #4DA2FF;
+  font-size: 28px;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  margin: 0;
+}
+
+.sound-test-section {
+  margin-bottom: 30px;
+}
+
+.sound-test-section h3 {
+  color: #39ff14;
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+}
+
+.sound-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.sound-test-content .sound-btn {
+  background: linear-gradient(135deg, #2a3a4a 0%, #1a2332 100%) !important;
+  border: 2px solid #4DA2FF !important;
+  border-radius: 10px !important;
+  color: white !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  text-align: center !important;
+  position: relative !important;
+  overflow: visible !important; /* Allow text to be fully visible */
+  white-space: nowrap !important; /* Prevent text wrapping */
+  min-width: fit-content !important; /* Ensure button is wide enough for text */
+  width: 100% !important; /* Fill grid cell properly */
+  height: auto !important; /* Override mobile min-height */
+  text-overflow: unset !important; /* Override mobile text-overflow: ellipsis */
+  box-sizing: border-box !important; /* Include padding in width calculation */
+  z-index: 2; /* Ensure text appears above gradient effect */
+}
+
+.sound-test-content .sound-btn:hover {
+  background: linear-gradient(135deg, #4DA2FF 0%, #2a3a4a 100%) !important;
+  border-color: #39ff14 !important;
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.6), 0 0 20px rgba(57, 255, 20, 0.4) !important; /* Enhanced glow instead of scaling */
+  filter: brightness(1.1) !important; /* Subtle brightness increase */
+}
+
+.sound-test-content .sound-btn:active {
+  box-shadow: 0 2px 5px rgba(77, 162, 255, 0.2) !important;
+  filter: brightness(0.95) !important; /* Subtle dimming for click feedback */
+}
+
+.sound-test-content .sound-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none; /* Ensure it doesn't interfere with hover detection */
+}
+
+.sound-test-content .sound-btn:hover::before {
+  opacity: 1;
+}
+
+/* ========================================== */
+/* INSTRUCTIONS PANEL STYLES */
+/* ========================================== */
+
+.instructions-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  backdrop-filter: blur(15px);
+  animation: panelFadeIn 0.3s ease-out;
+  padding: 20px; /* Add padding to ensure content fits within viewport */
+  box-sizing: border-box; /* Include padding in height calculation */
+}
+
+.instructions-content {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(15, 20, 25, 0.95) 100%);
+  border: 3px solid #4DA2FF;
+  border-radius: 25px;
+  padding: 30px;
+  max-width: 700px;
+  width: 90%;
+  max-height: 100%; /* Fit within the padded panel */
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 0 50px rgba(77, 162, 255, 0.5);
+  animation: panelSlideIn 0.3s ease-out;
+}
+
+.instructions-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.instructions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid rgba(77, 162, 255, 0.3);
+}
+
+.instructions-header h2 {
+  color: #4DA2FF;
+  font-size: 1.8rem;
+  margin: 0;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+}
+
+.instructions-section {
+  margin-bottom: 25px;
+}
+
+.instructions-section h3 {
+  color: #4DA2FF;
+  font-size: 1.3rem;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(77, 162, 255, 0.2);
+}
+
+.instructions-section p {
+  color: #ccc;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.instructions-section ul {
+  color: #ccc;
+  line-height: 1.6;
+  padding-left: 20px;
+}
+
+.instructions-section li {
+  margin-bottom: 8px;
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(77, 162, 255, 0.1);
+}
+
+.control-icon {
+  font-size: 1.5rem;
+  margin-right: 15px;
+  min-width: 30px;
+}
+
+.control-text {
+  color: #ccc;
+  font-weight: 500;
+}
+
+.instructions-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid rgba(77, 162, 255, 0.3);
+}
+
+/* ========================================== */
+/* RESPONSIVE DESIGN FOR MENUS */
+/* ========================================== */
+

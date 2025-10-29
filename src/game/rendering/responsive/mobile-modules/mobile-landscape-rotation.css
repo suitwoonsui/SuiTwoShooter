@@ -1,0 +1,139 @@
+/* ========================================== */
+/* MOBILE LANDSCAPE ROTATION */
+/* ========================================== */
+/* Forces landscape orientation on portrait-held devices */
+/* Uses CSS classes, not inline styles */
+
+/* Portrait mode - rotate viewport container to landscape */
+.viewport-container.portrait-forced {
+  /* Rotate to landscape orientation */
+  transform: rotate(90deg) !important;
+  transform-origin: center center !important;
+  
+  /* Use viewport dimensions swapped to force landscape */
+  width: 100vh !important;
+  height: 100vw !important;
+  
+  /* Position to center the rotated container */
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  margin-left: -50vh !important;
+  margin-top: -50vw !important;
+  
+  /* Keep flex display for child layout - it rotates with the container */
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  will-change: transform !important;
+}
+
+/* Landscape mode - no rotation needed */
+.viewport-container.landscape-normal {
+  /* Reset any rotation - allow base styles */
+  transform: none !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  position: relative !important;
+  margin: 0 !important;
+  top: auto !important;
+  left: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* Body styles to prevent scrolling when forced */
+body.portrait-forced {
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure footer is completely removed from layout on mobile */
+body.mobile .game-footer {
+  display: none !important;
+}
+
+.viewport-container.portrait-forced .game-footer {
+  display: none !important;
+}
+
+/* Remove footer from flex layout when hidden on mobile */
+body.mobile .game-container > footer.game-footer {
+  flex: 0 0 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Canvas sizing when rotated - override broken vw/vh units */
+.viewport-container.portrait-forced #gameCanvas {
+  /* Mobile CSS has max-width: 100vw and max-height: calc(100vh - 12vh) */
+  /* These break when rotated because vw/vh still reference device orientation */
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Ensure .gameplay-area fills available space when footer is hidden */
+body.mobile .gameplay-area {
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+/* Mobile pause overlay button - position relative to rotated container */
+.viewport-container.portrait-forced .mobile-pause-overlay-button {
+  /* Position relative to rotated container, not viewport */
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  /* The viewport-container is already rotated, so the button rotates with it */
+  width: min(20vw, 25vh) !important;
+  height: min(8vh, 10vw) !important;
+  pointer-events: auto !important;
+  z-index: 10001 !important;
+}
+
+/* Main menu overlay - ensure it stays centered when viewport container is rotated */
+/* The main menu is a sibling of viewport-container, positioned fixed */
+/* When body has portrait-forced class, the menu should match the rotated container's dimensions */
+/* The rotated container uses swapped dimensions (100vh width, 100vw height), so menu should too */
+body.portrait-forced .main-menu-overlay {
+  /* Match the rotated viewport-container dimensions (swapped width/height) */
+  width: 100vh !important; /* Viewport height becomes visual width when rotated */
+  height: 100vw !important; /* Viewport width becomes visual height when rotated */
+  /* Reset any transforms - menu should NOT rotate with container */
+  transform: none !important;
+  /* Center the menu overlay within the rotated viewport */
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  margin-top: calc(-100vw / 2) !important; /* Negative half of height (which is 100vw) */
+  margin-left: calc(-100vh / 2) !important; /* Negative half of width (which is 100vh) */
+  /* Ensure flex centering works correctly - but only when visible */
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* When menu is visible, display as flex */
+body.portrait-forced .main-menu-overlay.main-menu-overlay-visible,
+body.portrait-forced .main-menu-overlay[class*="-visible"] {
+  display: flex !important;
+}
+
+/* When menu is hidden, ensure it's actually hidden */
+body.portrait-forced .main-menu-overlay.main-menu-overlay-hidden,
+body.portrait-forced .main-menu-overlay[class*="-hidden"] {
+  display: none !important;
+}
+
+/* ========================================== */
+/* LEADERBOARD MODAL - Landscape Rotation */
+/* ========================================== */
+/* Leaderboard modal is now inside viewport-container (like other panels: settings, instructions, sound-test) */
+/* Since it's inside the rotated viewport-container, it will rotate with the container automatically */
+/* No special handling needed - it behaves like other panels */
+

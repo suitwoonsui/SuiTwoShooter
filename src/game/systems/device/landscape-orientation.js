@@ -1,13 +1,15 @@
 // ==========================================
 // LANDSCAPE ORIENTATION MODULE
 // ==========================================
-// Purpose: Force landscape orientation for mobile devices
+// Purpose: Force landscape orientation for mobile devices by rotating viewport-container
 // Dependencies: device-detection.js
-// Impact: Zero on desktop, enforces landscape on mobile
+// Impact: Zero on desktop, rotates game content to landscape on mobile portrait
+// Approach: Rotates only .viewport-container (not html/body) for better isolation
 
 /**
  * Landscape Orientation Enforcement
- * Forces mobile devices to use landscape orientation
+ * Forces mobile devices to display in landscape orientation
+ * Rotates only .viewport-container for better compatibility with browser UI and Web3 wallets
  * Provides orientation change handling and UI adaptation
  */
 const LandscapeOrientation = {
@@ -22,7 +24,6 @@ const LandscapeOrientation = {
     // Only enforce on mobile devices
     if (DeviceDetection.isMobile() || DeviceDetection.isTablet()) {
       this.enforceLandscape();
-      this.setupOrientationHandling();
       console.log('📱 Landscape orientation enforcement enabled');
     } else {
       console.log('🖥️ Desktop detected - no orientation enforcement needed');
@@ -33,189 +34,77 @@ const LandscapeOrientation = {
    * Enforce landscape orientation
    */
   enforceLandscape() {
-    // Add CSS to lock orientation
-    this.addOrientationCSS();
+    // Initialize body styles for mobile
+    this.setupBodyStyles();
     
-    // Create orientation overlay for portrait warning
-    this.createOrientationOverlay();
+    // Apply rotation based on orientation
+    this.updateRotation();
     
-    // Check initial orientation
-    this.checkOrientation();
+    // Listen for orientation changes
+    this.setupOrientationListener();
     
     this.isLandscapeEnforced = true;
   },
 
   /**
-   * Add CSS to enforce landscape orientation
+   * Setup body styles to prevent scrolling (uses CSS class)
    */
-  addOrientationCSS() {
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Force landscape orientation on mobile */
-      @media screen and (max-width: 768px) {
-        body {
-          overflow: hidden;
-        }
-        
-        /* Hide content when in portrait */
-        .portrait-hidden {
-          display: none !important;
-        }
-        
-        /* Show content only in landscape */
-        .landscape-only {
-          display: block !important;
-        }
-        
-        /* Portrait warning overlay */
-        .orientation-warning {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          z-index: 10000;
-          color: white;
-          text-align: center;
-          padding: 20px;
-        }
-        
-        .orientation-warning h2 {
-          font-size: 2rem;
-          margin-bottom: 20px;
-          color: #4DA2FF;
-        }
-        
-        .orientation-warning p {
-          font-size: 1.2rem;
-          margin-bottom: 30px;
-          color: #ccc;
-        }
-        
-        .orientation-icon {
-          font-size: 4rem;
-          margin-bottom: 20px;
-          animation: rotate 2s linear infinite;
-        }
-        
-        @keyframes rotate {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(90deg); }
-        }
-        
-        /* Hide orientation warning in landscape */
-        @media screen and (orientation: landscape) {
-          .orientation-warning {
-            display: none !important;
-          }
-        }
-        
-        /* Show orientation warning in portrait */
-        @media screen and (orientation: portrait) {
-          .orientation-warning {
-            display: flex !important;
-          }
-        }
-      }
-    `;
-    document.head.appendChild(style);
+  setupBodyStyles() {
+    // CSS handles this via .portrait-forced class on body
   },
 
   /**
-   * Create orientation warning overlay
+   * Apply rotation to viewport container based on current orientation
+   * Uses CSS classes instead of inline styles
    */
-  createOrientationOverlay() {
-    this.orientationOverlay = document.createElement('div');
-    this.orientationOverlay.className = 'orientation-warning';
-    this.orientationOverlay.innerHTML = `
-      <div class="orientation-icon">📱</div>
-      <h2>Rotate Your Device</h2>
-      <p>Please rotate your device to landscape mode for the best gaming experience!</p>
-      <p><small>The game is optimized for landscape orientation.</small></p>
-    `;
-    document.body.appendChild(this.orientationOverlay);
+  updateRotation() {
+    const viewportContainer = document.querySelector('.viewport-container');
+    if (!viewportContainer) return;
+    
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    if (isPortrait) {
+      // Device is in portrait - add rotation classes
+      viewportContainer.classList.add('portrait-forced');
+      viewportContainer.classList.remove('landscape-normal');
+      document.body.classList.add('portrait-forced');
+      
+      console.log('📱 Applied portrait rotation to .viewport-container');
+    } else {
+      // Device is in landscape - remove rotation classes
+      viewportContainer.classList.remove('portrait-forced');
+      viewportContainer.classList.add('landscape-normal');
+      document.body.classList.remove('portrait-forced');
+      
+    }
+    
+    // Trigger resize event to notify canvas manager
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
   },
 
   /**
-   * Setup orientation change handling
+   * Setup listener for orientation changes
    */
-  setupOrientationHandling() {
-    // Listen for orientation changes
+  setupOrientationListener() {
+    // Listen for resize events (orientation change triggers resize)
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        this.updateRotation();
+      }, 100);
+    });
+    
+    // Listen for orientation change events
     window.addEventListener('orientationchange', () => {
       setTimeout(() => {
-        this.checkOrientation();
-      }, 100); // Small delay to ensure orientation has changed
-    });
-
-    // Listen for resize events (fallback)
-    window.addEventListener('resize', () => {
-      this.checkOrientation();
+        this.updateRotation();
+      }, 200);
     });
   },
 
-  /**
-   * Check current orientation and update UI
-   */
-  checkOrientation() {
-    if (!this.isLandscapeEnforced) return;
-
-    const isLandscape = window.innerWidth > window.innerHeight;
-    
-    if (isLandscape) {
-      this.hideOrientationWarning();
-      this.enableGameContent();
-    } else {
-      this.showOrientationWarning();
-      this.disableGameContent();
-    }
-  },
-
-  /**
-   * Show orientation warning
-   */
-  showOrientationWarning() {
-    if (this.orientationOverlay) {
-      this.orientationOverlay.style.display = 'flex';
-    }
-  },
-
-  /**
-   * Hide orientation warning
-   */
-  hideOrientationWarning() {
-    if (this.orientationOverlay) {
-      this.orientationOverlay.style.display = 'none';
-    }
-  },
-
-  /**
-   * Enable game content (landscape mode)
-   */
-  enableGameContent() {
-    // Remove portrait-hidden class from game elements
-    const gameElements = document.querySelectorAll('.game-container, .game-header, .game-footer');
-    gameElements.forEach(element => {
-      element.classList.remove('portrait-hidden');
-      element.classList.add('landscape-only');
-    });
-  },
-
-  /**
-   * Disable game content (portrait mode)
-   */
-  disableGameContent() {
-    // Add portrait-hidden class to game elements
-    const gameElements = document.querySelectorAll('.game-container, .game-header, .game-footer');
-    gameElements.forEach(element => {
-      element.classList.add('portrait-hidden');
-      element.classList.remove('landscape-only');
-    });
-  },
 
   /**
    * Get current orientation
@@ -276,12 +165,25 @@ const LandscapeOrientation = {
 
   /**
    * Cleanup orientation enforcement
+   * Removes CSS classes instead of inline styles
    */
   destroy() {
+    // Remove rotation classes from viewport container
+    const viewportContainer = document.querySelector('.viewport-container');
+    if (viewportContainer) {
+      viewportContainer.classList.remove('portrait-forced', 'landscape-normal');
+    }
+    
+    // Remove body classes
+    document.body.classList.remove('portrait-forced');
+    
+    // Remove orientation overlay if it exists
     if (this.orientationOverlay) {
       this.orientationOverlay.remove();
       this.orientationOverlay = null;
     }
+    
+    // Reset state
     this.isLandscapeEnforced = false;
   }
 };

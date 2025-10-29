@@ -27,8 +27,8 @@ const TouchInput = {
   // Configuration
   config: {
     enableVisualFeedback: true,
-    enableTouchTrail: true,
-    enableHapticSimulation: true,
+    enableTouchTrail: false,
+    enableHapticSimulation: false,
     touchSensitivity: 1.0,
     deadZone: 5 // Minimum movement to register
   },
@@ -60,6 +60,40 @@ const TouchInput = {
   },
 
   /**
+   * Check if touch target is an interactive UI element
+   * @param {TouchEvent} e - Touch event
+   * @returns {boolean} True if target is an interactive element
+   */
+  isInteractiveElement(e) {
+    const target = e.target;
+    if (!target) return false;
+    
+    // Check if target is a button, link, or other interactive element
+    if (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'INPUT') {
+      return true;
+    }
+    
+    // Check if target is the mobile pause overlay button
+    if (target.classList.contains('mobile-pause-overlay-button') || target.id === 'mobile-pause-overlay-button') {
+      return true;
+    }
+    
+    // Check if target is inside the header
+    const header = target.closest('.game-header');
+    if (header) {
+      // Allow interaction with clickable elements in header
+      const clickableElements = header.querySelectorAll('button, .mobile-pause-button, a');
+      for (let el of clickableElements) {
+        if (el.contains(target)) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  },
+
+  /**
    * Setup touch event handling
    */
   setupTouchHandling() {
@@ -67,25 +101,37 @@ const TouchInput = {
     
     // Touch start - attach to game container for wider touch area
     this.gameContainer.addEventListener('touchstart', (e) => {
-      e.preventDefault();
+      // Don't prevent default if touching an interactive element (like pause button)
+      if (!this.isInteractiveElement(e)) {
+        e.preventDefault();
+      }
       this.handleTouchStart(e);
     }, { passive: false });
     
     // Touch move - attach to game container for wider touch area
     this.gameContainer.addEventListener('touchmove', (e) => {
-      e.preventDefault();
+      // Don't prevent default if touching an interactive element
+      if (!this.isInteractiveElement(e)) {
+        e.preventDefault();
+      }
       this.handleTouchMove(e);
     }, { passive: false });
     
     // Touch end - attach to game container for wider touch area
     this.gameContainer.addEventListener('touchend', (e) => {
-      e.preventDefault();
+      // Don't prevent default if touching an interactive element
+      if (!this.isInteractiveElement(e)) {
+        e.preventDefault();
+      }
       this.handleTouchEnd(e);
     }, { passive: false });
     
     // Touch cancel - attach to game container for wider touch area
     this.gameContainer.addEventListener('touchcancel', (e) => {
-      e.preventDefault();
+      // Don't prevent default if touching an interactive element
+      if (!this.isInteractiveElement(e)) {
+        e.preventDefault();
+      }
       this.handleTouchEnd(e);
     }, { passive: false });
   },
@@ -96,6 +142,11 @@ const TouchInput = {
    */
   handleTouchStart(e) {
     if (e.touches.length === 0) return;
+    
+    // Don't process touch if it's on an interactive UI element
+    if (this.isInteractiveElement(e)) {
+      return;
+    }
     
     const touch = e.touches[0];
     this.isTouching = true;
@@ -115,9 +166,9 @@ const TouchInput = {
       this.touchTrail = [coords];
     }
     
-    // Show touch indicator
+    // Show touch indicator with screen coordinates
     if (this.config.enableVisualFeedback) {
-      this.showTouchIndicator(coords.x, coords.y);
+      this.showTouchIndicator(touch.clientX, touch.clientY);
     }
     
     // Simulate haptic feedback
@@ -127,8 +178,6 @@ const TouchInput = {
     
     // Update game input
     this.updateGameInput(coords.x, coords.y);
-    
-    console.log('👆 Touch started at:', coords);
   },
 
   /**
@@ -181,9 +230,9 @@ const TouchInput = {
       }
     }
     
-    // Update touch indicator
+    // Update touch indicator with screen coordinates
     if (this.config.enableVisualFeedback) {
-      this.updateTouchIndicator(coords.x, coords.y);
+      this.updateTouchIndicator(touch.clientX, touch.clientY);
     }
     
     // Update game input
@@ -222,8 +271,6 @@ const TouchInput = {
     
     // Reset game input
     this.resetGameInput();
-    
-    console.log('👆 Touch ended');
   },
 
   /**
@@ -233,15 +280,44 @@ const TouchInput = {
    */
   getTouchCoordinates(touch) {
     let coords;
-    if (typeof ResponsiveCanvas !== 'undefined' && ResponsiveCanvas.isInitialized) {
+    
+    // Check if viewport is rotated (portrait-forced)
+    const viewportContainer = document.querySelector('.viewport-container');
+    const isRotated = viewportContainer && viewportContainer.classList.contains('portrait-forced');
+    
+    if (typeof ResponsiveCanvas !== 'undefined' && ResponsiveCanvas.isInitialized && !isRotated) {
       coords = ResponsiveCanvas.screenToGameCoords(touch.clientX, touch.clientY);
     } else {
-      // Fallback to original method
+      // Fallback to original method - works for both normal and rotated
       const rect = this.canvas.getBoundingClientRect();
-      coords = {
-        x: touch.clientX - rect.left,
-        y: touch.clientY - rect.top
-      };
+      let x = touch.clientX - rect.left;
+      let y = touch.clientY - rect.top;
+      
+      // When rotated, the container is rotated 90deg clockwise
+      // getBoundingClientRect() returns the bounding box as it appears on screen after rotation
+      // So rect.width/height are the VISUAL dimensions, which are swapped
+      if (isRotated) {
+        // After 90deg CW rotation, the visual canvas is rotated
+        // Canvas is 800x480 but appears as 480x800 visually due to container rotation
+        // Local (x, y) in rotated visual space
+        // Maps to game coords (gx, gy) in 800x480 logical space
+        
+        // First, normalize to 0-1 range based on visual rect size
+        const normalizedX = x / rect.width;
+        const normalizedY = y / rect.height;
+        
+        // Apply inverse rotation transformation (rotate back from rotated space to game space)
+        // For 90deg clockwise, inverse is: (nx, ny) -> (ny, 1 - nx)
+        const tempNX = normalizedX;
+        const gameNormX = normalizedY;
+        const gameNormY = 1 - tempNX;
+        
+        // Scale to game dimensions
+        x = gameNormX * this.canvas.width;
+        y = gameNormY * this.canvas.height;
+      }
+      
+      coords = { x, y };
     }
     
     // Clamp coordinates to canvas bounds
@@ -269,13 +345,9 @@ const TouchInput = {
    */
   updateGameInput(x, y) {
     // Update game mouse position for player movement
+    // The smooth interpolation system will handle the actual player movement
     if (typeof game !== 'undefined') {
       game.mouseY = y;
-    }
-    
-    // Update player position directly if available
-    if (typeof player !== 'undefined') {
-      player.y = y - player.height / 2;
     }
     
     // Store last position for external access
@@ -299,7 +371,7 @@ const TouchInput = {
     
     this.touchIndicator = document.createElement('div');
     this.touchIndicator.style.cssText = `
-      position: absolute;
+      position: fixed;
       width: 40px;
       height: 40px;
       border: 3px solid #4DA2FF;
@@ -311,46 +383,37 @@ const TouchInput = {
       transition: all 0.1s ease;
     `;
     
-    // Add to game container for wider touch area
-    const container = this.gameContainer || this.canvas.parentElement;
-    if (container) {
-      container.style.position = 'relative';
-      container.appendChild(this.touchIndicator);
-    }
+    // Add to body for fixed positioning
+    document.body.appendChild(this.touchIndicator);
   },
 
   /**
    * Show touch indicator at position
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
+   * @param {number} x - X coordinate (screen/viewport)
+   * @param {number} y - Y coordinate (screen/viewport)
    */
   showTouchIndicator(x, y) {
     if (!this.touchIndicator) return;
     
-    const containerRect = (this.gameContainer || this.canvas.parentElement).getBoundingClientRect();
-    const screenCoords = ResponsiveCanvas.gameToScreenCoords(x, y);
-    
-    // Position relative to container, not screen
-    this.touchIndicator.style.left = (screenCoords.x - containerRect.left - 20) + 'px';
-    this.touchIndicator.style.top = (screenCoords.y - containerRect.top - 20) + 'px';
+    // Position using fixed viewport coordinates
+    this.touchIndicator.style.position = 'fixed';
+    this.touchIndicator.style.left = x + 'px';
+    this.touchIndicator.style.top = y + 'px';
+    this.touchIndicator.style.transform = 'translate(-50%, -50%)'; // Center it on the touch point
     this.touchIndicator.style.display = 'block';
-    this.touchIndicator.style.transform = 'scale(1)';
   },
 
   /**
    * Update touch indicator position
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
+   * @param {number} x - X coordinate (screen/viewport)
+   * @param {number} y - Y coordinate (screen/viewport)
    */
   updateTouchIndicator(x, y) {
     if (!this.touchIndicator) return;
     
-    const containerRect = (this.gameContainer || this.canvas.parentElement).getBoundingClientRect();
-    const screenCoords = ResponsiveCanvas.gameToScreenCoords(x, y);
-    
-    // Position relative to container, not screen
-    this.touchIndicator.style.left = (screenCoords.x - containerRect.left - 20) + 'px';
-    this.touchIndicator.style.top = (screenCoords.y - containerRect.top - 20) + 'px';
+    // Position using fixed viewport coordinates
+    this.touchIndicator.style.left = x + 'px';
+    this.touchIndicator.style.top = y + 'px';
   },
 
   /**
@@ -428,15 +491,13 @@ const TouchInput = {
 
   /**
    * Update touch input (called by game loop)
+   * Note: We don't reposition the touch indicator here because it's already positioned
+   * by showTouchIndicator/updateTouchIndicator using fixed positioning with screen coordinates.
+   * The touch handlers handle all positioning.
    */
   update() {
-    // Update touch indicator position if touching
-    if (this.isTouching && this.touchIndicator) {
-      const containerRect = this.canvas.parentElement.getBoundingClientRect();
-      const screenCoords = ResponsiveCanvas.gameToScreenCoords(this.lastTouchX, this.lastTouchY);
-      this.touchIndicator.style.left = (screenCoords.x - containerRect.left - 20) + 'px';
-      this.touchIndicator.style.top = (screenCoords.y - containerRect.top - 20) + 'px';
-    }
+    // Touch indicator positioning is handled by touch event handlers
+    // No need to reposition here to avoid coordinate conversion issues
   },
 
   /**

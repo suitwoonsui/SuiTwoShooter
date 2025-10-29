@@ -1,0 +1,424 @@
+/* ========================================== */
+/* SHARED COMPONENT REGISTRY */
+/* ========================================== */
+/* Centralized registry of all CSS classes and IDs */
+/* Used across desktop, mobile, and shared modules */
+/* This file serves as the single source of truth for all component classes */
+
+/* ========================================== */
+/* LAYOUT CONTAINERS */
+/* ========================================== */
+
+/* Main Layout Structure */
+.viewport-container {
+  /* Base viewport container - defined in viewport-container.css */
+}
+
+.game-container {
+  /* Game content container - defined in viewport-container.css */
+}
+
+/* ========================================== */
+/* HEADER COMPONENTS */
+/* ========================================== */
+
+/* Game Header */
+.game-header {
+  /* Base header styles - defined in viewport-container.css */
+}
+
+.game-header.mobile-compact {
+  /* Mobile compact header - defined in mobile modules */
+}
+
+.game-header.desktop {
+  /* Desktop header - defined in desktop modules */
+}
+
+/* Header Elements */
+.header-logo {
+  /* Logo image in header */
+}
+
+.alpha-badge {
+  /* Alpha version badge */
+}
+
+.version-badge {
+  /* Version information badge */
+}
+
+/* ========================================== */
+/* STATS COMPONENTS */
+/* ========================================== */
+
+/* Regular Stats */
+.stats {
+  /* Stats container */
+}
+
+.stat {
+  /* Individual stat item */
+}
+
+.stat-icon {
+  /* Stat icon */
+}
+
+.stat-value {
+  /* Stat value text */
+}
+
+.stat-label {
+  /* Stat label text */
+}
+
+/* Integrated Stats (Mobile) */
+.integrated-game-stats {
+  /* Mobile integrated stats container */
+}
+
+.integrated-stat {
+  /* Individual integrated stat */
+}
+
+.integrated-stat.orb-stat {
+  /* Orb-specific stat styling */
+}
+
+.integrated-stat.coin-stat {
+  /* Coin-specific stat styling */
+}
+
+.orb-icon {
+  /* Orb icon image */
+}
+
+.coin-icon {
+  /* Coin icon image */
+}
+
+/* ========================================== */
+/* MENU COMPONENTS */
+/* ========================================== */
+
+/* Front Page */
+.front-page-overlay {
+  /* Front page overlay container */
+}
+
+.front-page-content {
+  /* Front page content container */
+}
+
+.game-title {
+  /* Game title text */
+}
+
+.title-profile-image {
+  /* Profile image in title */
+}
+
+.game-subtitle {
+  /* Game subtitle text */
+}
+
+.game-description {
+  /* Game description text */
+}
+
+.enter-game-btn {
+  /* Enter game button */
+}
+
+.audio-note {
+  /* Audio recommendation note */
+}
+
+/* Main Menu */
+.main-menu-overlay {
+  /* Main menu overlay container */
+}
+
+.main-menu-content {
+  /* Main menu content container */
+}
+
+.menu-buttons {
+  /* Menu buttons container */
+}
+
+.menu-btn {
+  /* Individual menu button */
+}
+
+.btn-icon {
+  /* Button icon */
+}
+
+.menu-footer {
+  /* Menu footer container */
+}
+
+.version-info {
+  /* Version information text */
+}
+
+/* ========================================== */
+/* BUTTON COMPONENTS */
+/* ========================================== */
+
+/* Universal Buttons */
+.mobile-btn-universal {
+  /* Universal mobile button - defined in shared-base-styles.css */
+}
+
+.mobile-btn {
+  /* General mobile button */
+}
+
+.mobile-control-btn {
+  /* Mobile control button */
+}
+
+.mobile-close-btn {
+  /* Mobile close button */
+}
+
+.mobile-back-button {
+  /* Mobile back button */
+}
+
+/* Button States */
+.mobile-touch-active {
+  /* Touch feedback state */
+}
+
+/* ========================================== */
+/* PANEL COMPONENTS */
+/* ========================================== */
+
+/* Game Stats Panel */
+.game-stats-panel {
+  /* Game statistics panel */
+}
+
+.game-stats-panel.mobile-compact {
+  /* Mobile compact stats panel */
+}
+
+.stat-item {
+  /* Individual stat item in panel */
+}
+
+/* Settings Panel */
+.settings-panel {
+  /* Settings panel */
+}
+
+.settings-content {
+  /* Settings content */
+}
+
+/* Instructions Panel */
+.instructions-panel {
+  /* Instructions panel */
+}
+
+.instructions-content {
+  /* Instructions content */
+}
+
+/* Leaderboard Panel */
+.leaderboard-panel {
+  /* Leaderboard panel */
+}
+
+.leaderboard-content {
+  /* Leaderboard content */
+}
+
+.leaderboard-btn {
+  /* Leaderboard button */
+}
+
+/* Sound Test Panel */
+.sound-test-panel {
+  /* Sound test panel */
+}
+
+.sound-test-content {
+  /* Sound test content */
+}
+
+.sound-btn {
+  /* Sound button */
+}
+
+/* ========================================== */
+/* GAMEPLAY COMPONENTS */
+/* ========================================== */
+
+/* Game Overlay */
+.mobile-game-overlay {
+  /* Mobile game overlay */
+}
+
+.mobile-game-content {
+  /* Mobile game content */
+}
+
+.mobile-game-canvas {
+  /* Mobile game canvas */
+}
+
+.mobile-game-controls {
+  /* Mobile game controls */
+}
+
+/* Game States */
+.game-over-panel {
+  /* Game over panel */
+}
+
+.level-up-panel {
+  /* Level up panel */
+}
+
+.game-paused-panel {
+  /* Game paused panel */
+}
+
+.game-message-overlay {
+  /* Game message overlay */
+}
+
+/* ========================================== */
+/* FOOTER COMPONENTS */
+/* ========================================== */
+
+.game-footer {
+  /* Game footer */
+}
+
+.game-footer.mobile-compact {
+  /* Mobile compact footer */
+}
+
+.controls {
+  /* Controls information */
+}
+
+.control-icon {
+  /* Control icon */
+}
+
+/* ========================================== */
+/* TEST COMPONENTS */
+/* ========================================== */
+
+.mobile-test-panel {
+  /* Mobile test panel */
+}
+
+.test-panel-title {
+  /* Test panel title */
+}
+
+.test-panel-info {
+  /* Test panel information */
+}
+
+.test-panel-buttons {
+  /* Test panel buttons */
+}
+
+/* ========================================== */
+/* UTILITY CLASSES */
+/* ========================================== */
+
+.hidden {
+  /* Hide element */
+}
+
+.visible {
+  /* Show element */
+}
+
+.text-center {
+  /* Center text */
+}
+
+.text-left {
+  /* Left align text */
+}
+
+.text-right {
+  /* Right align text */
+}
+
+/* ========================================== */
+/* RESPONSIVE MODIFIERS */
+/* ========================================== */
+
+.compact {
+  /* Compact layout modifier */
+}
+
+.very-compact {
+  /* Very compact layout modifier */
+}
+
+.portrait {
+  /* Portrait orientation modifier */
+}
+
+.landscape {
+  /* Landscape orientation modifier */
+}
+
+/* ========================================== */
+/* ANIMATION CLASSES */
+/* ========================================== */
+
+.mobile-loader {
+  /* Mobile loading spinner */
+}
+
+.mobile-loader::after {
+  /* Mobile loading spinner pseudo-element */
+}
+
+/* ========================================== */
+/* TYPOGRAPHY COMPONENTS */
+/* ========================================== */
+
+.badge {
+  /* General badge */
+}
+
+.rank {
+  /* Rank badge */
+}
+
+/* ========================================== */
+/* NOTES */
+/* ========================================== */
+/*
+This registry serves as the single source of truth for all CSS classes and IDs
+used across the application. When adding new components:
+
+1. Add the class/ID definition here with a comment
+2. Implement the actual styles in the appropriate module:
+   - shared/ for universal components
+   - desktop-modules/ for desktop-specific components  
+   - mobile-modules/ for mobile-specific components
+3. Update this registry when modifying existing components
+4. Use CSS custom properties from shared-theme.css for consistent styling
+
+This approach ensures:
+- No duplicate class definitions
+- Clear component organization
+- Easy maintenance and updates
+- Consistent naming conventions
+*/

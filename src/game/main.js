@@ -34,7 +34,15 @@ function updateScore(points) {
 
 // Reset and restart game
 function restart() {
-  console.log('Game restarting - starting new game');
+  console.log('🔄 Game restarting - starting new game');
+  console.log('📊 Game state before restart:', {
+    gameRunning: game.gameRunning,
+    gameOver: game.gameOver,
+    paused: game.paused,
+    hasCanvas: !!game.canvas,
+    hasCtx: !!game.ctx
+  });
+  
   // Reinitialize security system
   initSecurity();
   
@@ -78,16 +86,57 @@ function restart() {
   player.trail = [];
   tiles = [];
   generateTiles();
+  
+  console.log('✅ Game restarted. State:', {
+    gameRunning: game.gameRunning,
+    gameOver: game.gameOver,
+    paused: game.paused
+  });
+  
+  // Debug canvas visibility
+  console.log('🎨 Canvas check:', {
+    exists: !!game.canvas,
+    computedWidth: game.canvas ? window.getComputedStyle(game.canvas).width : 'N/A',
+    computedHeight: game.canvas ? window.getComputedStyle(game.canvas).height : 'N/A',
+    offsetWidth: game.canvas ? game.canvas.offsetWidth : 'N/A',
+    offsetHeight: game.canvas ? game.canvas.offsetHeight : 'N/A'
+  });
+  
+  // Restart the game loop
+  console.log('🔄 Restarting game loop...');
+  gameLoop();
 }
 
 // Return to main menu from game over screen
 function returnToMainMenu() {
-  console.log('Returning to main menu from game over');
+  console.log('🟢 [VISIBILITY] returnToMainMenu() called');
+  console.trace('🟢 [VISIBILITY] returnToMainMenu() stack trace');
+  
+  // Check if name input modal is visible - don't show main menu if it is
+  const nameInputModal = document.getElementById('nameInputModal');
+  if (nameInputModal && nameInputModal.classList.contains('name-input-modal-visible')) {
+    console.warn('🟢 [VISIBILITY] ⚠️ returnToMainMenu() called while name input modal is visible - ignoring');
+    return; // Don't show main menu if name input modal is showing
+  }
+  
+  // Stop the game loop
+  game.gameRunning = false;
+  game.gameOver = false;
+  game.paused = false;
+  
+  // Clear game arrays to free memory
+  if (game.projectiles) game.projectiles = [];
+  if (game.enemyProjectiles) game.enemyProjectiles = [];
+  if (game.bossProjectiles) game.bossProjectiles = [];
+  if (game.particles) game.particles = [];
+  if (game.tiles) game.tiles = [];
+  if (game.enemies) game.enemies = [];
   
   // Reset game state
-  game.gameOver = false;
-  game.gameRunning = false;
-  game.paused = false;
+  game.speed = 0;
+  game.bossActive = false;
+  game.bossWarning = false;
+  if (game.boss) game.boss = null;
   
   // Show main menu
   gameState.isMenuVisible = true;
@@ -95,16 +144,37 @@ function returnToMainMenu() {
   gameState.isPaused = false;
   gameState.isGameOver = false;
   
+  // Hide game container
+  const gameContainer = document.querySelector('.game-container');
+  if (gameContainer) {
+    const wasVisible = gameContainer.classList.contains('game-container-visible');
+    const wasHidden = gameContainer.classList.contains('game-container-hidden');
+    console.log('🟢 [VISIBILITY] Game container - was visible:', wasVisible, 'was hidden:', wasHidden);
+    gameContainer.classList.add('game-container-hidden');
+    gameContainer.classList.remove('game-container-visible');
+    console.log('🟢 [VISIBILITY] Game container HIDDEN');
+  }
+  
   // Show main menu overlay
   const mainMenu = document.getElementById('mainMenuOverlay');
   if (mainMenu) {
-    mainMenu.style.display = 'flex';
+    const wasVisible = mainMenu.classList.contains('main-menu-overlay-visible');
+    const wasHidden = mainMenu.classList.contains('main-menu-overlay-hidden');
+    console.log('🟢 [VISIBILITY] Main menu - was visible:', wasVisible, 'was hidden:', wasHidden);
+    mainMenu.classList.add('main-menu-overlay-visible');
+    mainMenu.classList.remove('main-menu-overlay-hidden');
+    console.log('🟢 [VISIBILITY] Main menu SHOWN');
   }
   
-  // Stop background music
+  // Stop all audio
   if (typeof stopBackgroundMusic === 'function') {
     stopBackgroundMusic();
   }
+  if (typeof stopGameplayMusic === 'function') {
+    stopGameplayMusic();
+  }
+  
+  console.log('🟢 [VISIBILITY] ✅ Game closed and memory freed');
 }
 
 // Game configuration (horizontal mode) - MODIFIED for security
@@ -210,11 +280,12 @@ function update() {
   
   // Don't update if menu is visible
   if (typeof gameState !== 'undefined' && gameState.isMenuVisible) {
+    if (Math.random() < 0.01) console.log('⏸️ Update skipped - menu visible'); // Throttled log
     return;
   }
   
   if (game.gameOver) {
-    console.log('Game over, updating particles only');
+    if (Math.random() < 0.01) console.log('Game over, updating particles only'); // Throttled log
     // Update particles even in game over
     game.particles.forEach(p=>p.update());
     game.particles = game.particles.filter(p=>p.life>0);
@@ -222,13 +293,13 @@ function update() {
   }
   
   if (!game.gameRunning) {
-    console.log('Game not running, skipping update');
+    if (Math.random() < 0.01) console.log('Game not running, skipping update'); // Throttled log
     return;
   }
   
   // Skip all game logic if paused
   if (game.paused) {
-    console.log('Game paused, skipping update');
+    if (Math.random() < 0.01) console.log('Game paused, skipping update'); // Throttled log
     return;
   }
   
@@ -612,19 +683,41 @@ function gameOver() {
 function gameLoop() {
   // Only run game logic if not in menu and game is running
   if (typeof gameState !== 'undefined' && gameState.isMenuVisible) {
-    requestAnimationFrame(gameLoop);
+    // Don't continue the loop when in menu - stop it
+    console.log('⏸️ Game loop paused - menu visible');
     return;
   }
   
-  update();
-  draw();
-  requestAnimationFrame(gameLoop);
+  // Continue loop if game is running OR if game is over (to keep rendering game over screen)
+  if (game.gameRunning || game.gameOver) {
+    if (!game.ctx) {
+      console.error('❌ Canvas context is null in gameLoop!');
+      return;
+    }
+    
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+  } else {
+    // Game stopped and not over, don't continue loop
+    console.log('⏹️ Game loop stopped - game not running and not over');
+  }
 }
 
 // Initialization - SECURE VERSION WITH MENU INTEGRATION
 function init() {
   game.canvas = document.getElementById('gameCanvas');
+  console.log('🎯 Canvas found:', game.canvas ? 'YES' : 'NO', game.canvas);
+  
+  if (!game.canvas) {
+    console.error('❌ Canvas not found! Cannot initialize game.');
+    return;
+  }
+  
   game.ctx = game.canvas.getContext('2d');
+  console.log('🎨 Canvas context created:', game.ctx ? 'YES' : 'NO');
+  console.log('📏 Canvas element dimensions:', game.canvas.width, 'x', game.canvas.height);
+  console.log('📏 Canvas computed size:', game.canvas.offsetWidth, 'x', game.canvas.offsetHeight);
   
   // Always use original game dimensions (800x480) for game logic
   // The responsive canvas system handles display scaling
@@ -635,6 +728,14 @@ function init() {
   game.laneHeight = game.height / 3;
   player.y = game.height / 2 - player.height / 2;
   game.mouseY = game.height / 2;
+
+  // Initialize responsive canvas system
+  if (typeof ResponsiveCanvas !== 'undefined') {
+    ResponsiveCanvas.initialize(game.canvas);
+    console.log('📐 Responsive Canvas system initialized');
+  } else {
+    console.warn('⚠ ResponsiveCanvas not available, using fallback sizing');
+  }
 
   // Initialize security system
   initSecurity();
@@ -653,19 +754,37 @@ function init() {
   });
 
   // User interaction handling for game over screen
+  // NOTE: This handler is now only for legacy compatibility.
+  // The leaderboard system's onGameOver() sets up its own handlers.
   function handleGameOverInteraction(e) {
     if (game.gameOver && !gameState.isMenuVisible) {
-      e.preventDefault();
-      returnToMainMenu();
+      // Check if name input modal is visible or about to be shown
+      const nameInputModal = document.getElementById('nameInputModal');
+      if (nameInputModal && nameInputModal.classList.contains('name-input-modal-visible')) {
+        console.log('🛑 [VISIBILITY] Ignoring game over click - name input modal is visible');
+        return; // Don't return to main menu if name input modal is showing
+      }
+      
+      // The leaderboard system will handle the interaction via onGameOver()
+      // This handler should no longer interfere
+      console.log('🛑 [VISIBILITY] Game over interaction detected - leaderboard system will handle');
+      // Don't prevent default or do anything - let the leaderboard system handle it
     }
   }
 
   // Keyboard handling (optional) - Modified for menu integration
   document.addEventListener('keydown', e => {
-    // Return to main menu if game is over (any key)
+    // Game over handling is now done by leaderboard system's onGameOver()
+    // Don't interfere with the game over interaction handling here
     if (game.gameOver && !gameState.isMenuVisible) {
-      e.preventDefault();
-      returnToMainMenu();
+      // Check if name input modal is visible - don't return to main menu if it is
+      const nameInputModal = document.getElementById('nameInputModal');
+      if (nameInputModal && nameInputModal.classList.contains('name-input-modal-visible')) {
+        console.log('🛑 [VISIBILITY] Ignoring game over keypress - name input modal is visible');
+        return; // Don't return to main menu if name input modal is showing
+      }
+      // The leaderboard system will handle the game over interaction
+      // This handler should not interfere
     } else if (e.code==='KeyP') {
       e.preventDefault();
       // Toggle pause only if game is running and not game over and not in menu
@@ -741,13 +860,28 @@ function checkSecuritySystem() {
   }
 }
 
-// Start the game
+// Start the game - BUT DON'T AUTO-INITIALIZE
+// The game will be initialized when the user clicks "Start Game"
 if (document.readyState==='loading') {
   document.addEventListener('DOMContentLoaded', () => {
     checkSecuritySystem();
-    init();
+    // DON'T call init() here - wait for user to start game
+    console.log('🎮 Game ready. Waiting for user to start...');
   });
 } else {
   checkSecuritySystem();
-  init();
+  // DON'T call init() here - wait for user to start game
+  console.log('🎮 Game ready. Waiting for user to start...');
 }
+
+// Track if game is initialized
+let gameInitialized = false;
+
+// Export initialization function for menu system to call
+window.initializeGame = function() {
+  if (!gameInitialized) {
+    console.log('🎮 Initializing game...');
+    init();
+    gameInitialized = true;
+  }
+};

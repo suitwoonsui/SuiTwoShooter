@@ -1,0 +1,30 @@
+/* ========================================== */
+/* SHARED UI CLASSES - VISIBILITY TOGGLES */
+/* ========================================== */
+/* Simple class-based visibility system */
+/* 
+ * PATTERN:
+ * Add/remove classes to show/hide components:
+ * - .visible = display: flex
+ * - .hidden = display: none
+ * - .visible-block = display: block
+ */
+
+/* Universal visibility classes */
+[class*="-visible"] { display: flex; }
+[class*="-hidden"] { display: none; }
+
+/* Block display variant (for footers, stats panels) */
+.game-footer-visible,
+.game-stats-panel-visible,
+.game-stats-panel[class*="-visible"] { display: block; }
+
+/* Override for specific components that need special handling */
+/* Note: main-menu-overlay visibility is handled by shared-main-menu.css */
+/* Note: name-input-modal visibility is handled by shared-ui-components.css */
+/* Note: front-page-overlay visibility is handled by shared-front-page.css */
+/* Note: settings-panel, instructions-panel, sound-test-panel, leaderboard-modal visibility is handled by shared-panels.css */
+/* Note: game-container visibility is handled by shared-viewport-container.css */
+.game-header[class*="-visible"],
+.orientation-overlay[class*="-visible"] { display: flex; }
+

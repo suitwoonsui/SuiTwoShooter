@@ -60,7 +60,7 @@ const MobileUI = {
       header: {
         show: true,
         compact: true,
-        stats: ['distance'], // Only distance - removed status
+        stats: [], // Hide all original stats - use integrated stats instead
         integratedStats: true // NEW: Integrate game stats into header
       },
       gameStats: {
@@ -82,13 +82,17 @@ const MobileUI = {
   },
 
   initialize() {
+    console.log('🔄 MobileUI.initialize() called');
     this.deviceType = DeviceDetection.detectDeviceType();
+    console.log('📱 Device type detected:', this.deviceType);
     this.currentLayout = this.getLayoutForDevice(this.deviceType);
+    console.log('🎨 Layout selected:', this.currentLayout);
     this.isInitialized = true;
     
     console.log(`📱 Mobile UI initialized for ${this.deviceType} (${this.currentLayout} layout)`);
     
     // Apply initial layout
+    console.log('🎯 Applying layout:', this.currentLayout);
     this.applyLayout(this.currentLayout);
     
     // Apply mobile menu optimizations
@@ -131,31 +135,35 @@ const MobileUI = {
   },
 
   applyHeaderLayout(headerConfig) {
+    console.log('🎨 applyHeaderLayout called with config:', headerConfig);
     const header = document.querySelector('.game-header');
+    console.log('📋 Header element found:', !!header);
     if (!header) return;
     
     if (!headerConfig.show) {
-      header.style.display = 'none';
+      header.classList.add('game-header-hidden');
+      header.classList.remove('game-header-visible');
       return;
     }
     
-    header.style.display = 'flex';
+    header.classList.add('game-header-visible');
+    header.classList.remove('game-header-hidden');
     
     // Apply compact styling
     if (headerConfig.compact) {
       header.classList.add('mobile-compact');
-      header.style.padding = '10px 15px';
-      header.style.fontSize = '12px';
+      console.log('📱 Applied mobile-compact class');
     } else {
       header.classList.remove('mobile-compact');
-      header.style.padding = '15px 25px';
-      header.style.fontSize = '14px';
     }
     
     // Handle integrated stats for mobile
+    console.log('🔍 Checking integratedStats:', headerConfig.integratedStats);
     if (headerConfig.integratedStats) {
+      console.log('✅ integratedStats is true, calling integrateGameStatsIntoHeader');
       this.integrateGameStatsIntoHeader(header);
     } else {
+      console.log('❌ integratedStats is false or undefined');
       this.removeIntegratedStats(header);
     }
     
@@ -164,7 +172,8 @@ const MobileUI = {
     stats.forEach((stat, index) => {
       const statType = this.getStatType(stat);
       if (headerConfig.stats.includes(statType)) {
-        stat.style.display = 'flex';
+        stat.classList.add('stat-visible');
+        stat.classList.remove('stat-hidden');
         
         // Condense distance stat on mobile
         if (statType === 'distance' && headerConfig.compact) {
@@ -175,7 +184,8 @@ const MobileUI = {
           this.expandDistanceStat(stat);
         }
       } else {
-        stat.style.display = 'none';
+        stat.classList.add('stat-hidden');
+        stat.classList.remove('stat-visible');
         stat.classList.remove('distance-stat');
       }
     });
@@ -186,11 +196,13 @@ const MobileUI = {
     if (!gameStatsPanel) return;
     
     if (!gameStatsConfig.show) {
-      gameStatsPanel.style.display = 'none';
+      gameStatsPanel.classList.add('game-stats-panel-hidden');
+      gameStatsPanel.classList.remove('game-stats-panel-visible');
       return;
     }
     
-    gameStatsPanel.style.display = 'block';
+    gameStatsPanel.classList.add('game-stats-panel-visible');
+    gameStatsPanel.classList.remove('game-stats-panel-hidden');
     
     // Apply position
     this.positionGameStatsPanel(gameStatsPanel, gameStatsConfig.position);
@@ -198,12 +210,8 @@ const MobileUI = {
     // Apply compact styling
     if (gameStatsConfig.compact) {
       gameStatsPanel.classList.add('mobile-compact');
-      gameStatsPanel.style.padding = '10px 15px';
-      gameStatsPanel.style.minWidth = '150px';
     } else {
       gameStatsPanel.classList.remove('mobile-compact');
-      gameStatsPanel.style.padding = '15px 20px';
-      gameStatsPanel.style.minWidth = '200px';
     }
     
     // Show/hide stats based on config
@@ -211,9 +219,11 @@ const MobileUI = {
     statItems.forEach((statItem, index) => {
       const statType = this.getGameStatType(statItem);
       if (gameStatsConfig.stats.includes(statType)) {
-        statItem.style.display = 'flex';
+        statItem.classList.add('stat-item-visible');
+        statItem.classList.remove('stat-item-hidden');
       } else {
-        statItem.style.display = 'none';
+        statItem.classList.add('stat-item-hidden');
+        statItem.classList.remove('stat-item-visible');
       }
     });
   },
@@ -255,21 +265,19 @@ const MobileUI = {
     if (!footer) return;
     
     if (!footerConfig.show) {
-      footer.style.display = 'none';
+      footer.classList.add('game-footer-hidden');
+      footer.classList.remove('game-footer-visible');
       return;
     }
     
-    footer.style.display = 'block';
+    footer.classList.add('game-footer-visible');
+    footer.classList.remove('game-footer-hidden');
     
     // Apply compact styling
     if (footerConfig.compact) {
       footer.classList.add('mobile-compact');
-      footer.style.padding = '10px 15px';
-      footer.style.fontSize = '12px';
     } else {
       footer.classList.remove('mobile-compact');
-      footer.style.padding = '15px 25px';
-      footer.style.fontSize = '14px';
     }
     
     // Show/hide controls based on config
@@ -277,9 +285,11 @@ const MobileUI = {
     controls.forEach((control, index) => {
       const controlType = this.getControlType(control);
       if (footerConfig.controls.includes(controlType)) {
-        control.style.display = 'flex';
+        control.classList.add('control-item-visible');
+        control.classList.remove('control-item-hidden');
       } else {
-        control.style.display = 'none';
+        control.classList.add('control-item-hidden');
+        control.classList.remove('control-item-visible');
       }
     });
   },
@@ -306,6 +316,7 @@ const MobileUI = {
 
   // NEW: Integrate game stats into header for mobile
   integrateGameStatsIntoHeader(header) {
+    console.log('🔧 integrateGameStatsIntoHeader called');
     // Remove existing integrated stats if any
     this.removeIntegratedStats(header);
     
@@ -329,22 +340,88 @@ const MobileUI = {
         <img src="assets/SuiTwo_Coin.webp" alt="Coins" class="coin-icon">
         <span class="stat-value" id="integratedCoins">0</span>
       </div>
+      <div class="integrated-stat">
+        <span class="stat-icon">📏</span>
+        <span class="stat-value" id="integratedDistance">0</span>
+      </div>
     `;
     
-    // Insert after the title but before existing stats
-    const title = header.querySelector('.title');
-    if (title) {
-      title.parentNode.insertBefore(integratedStats, title.nextSibling);
+    // Replace the .stats container with integrated stats
+    const statsContainer = header.querySelector('.stats');
+    console.log('📋 Stats container found:', !!statsContainer);
+    if (statsContainer) {
+      // Clear existing stats and replace with integrated stats
+      statsContainer.innerHTML = '';
+      statsContainer.appendChild(integratedStats);
+      console.log('✅ Integrated stats inserted into stats container');
+    } else {
+      console.error('❌ No stats container found!');
     }
+    
+    // Add pause button in the middle
+    this.addPauseButton(header);
     
     // Update the stats with current game values
     this.updateIntegratedStats();
+  },
+  
+  addPauseButton(header) {
+    // Check if pause button already exists
+    const existingPauseButton = header.querySelector('.mobile-pause-button');
+    if (existingPauseButton) {
+      console.log('⏸️ Pause button already exists');
+      return;
+    }
+    
+    // Create pause button with text
+    const pauseButton = document.createElement('button');
+    pauseButton.className = 'mobile-pause-button';
+    pauseButton.textContent = 'Pause';
+    pauseButton.setAttribute('aria-label', 'Pause');
+    
+    // Add toggle pause function
+    const togglePause = () => {
+      if (typeof game !== 'undefined' && game.gameRunning && !game.gameOver) {
+        game.paused = !game.paused;
+        console.log('⏸️ Pause toggled:', game.paused);
+      }
+    };
+    
+    // Add click handler to toggle pause
+    pauseButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      togglePause();
+    });
+    
+    // Add touch end handler for mobile
+    pauseButton.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      togglePause();
+    });
+    
+    // Insert in the middle between title and stats
+    const title = header.querySelector('.title');
+    const statsContainer = header.querySelector('.stats');
+    if (title && statsContainer) {
+      // Insert after title but before stats
+      title.parentNode.insertBefore(pauseButton, statsContainer);
+      console.log('✅ Pause button added in middle');
+    } else {
+      console.error('❌ Could not find title or stats container for pause button');
+    }
   },
 
   removeIntegratedStats(header) {
     const existingIntegratedStats = header.querySelector('.integrated-game-stats');
     if (existingIntegratedStats) {
       existingIntegratedStats.remove();
+    }
+    // Also remove pause button if it exists
+    const pauseButton = header.querySelector('.mobile-pause-button');
+    if (pauseButton) {
+      pauseButton.remove();
     }
   },
 
@@ -353,6 +430,7 @@ const MobileUI = {
     const scoreElement = document.getElementById('integratedScore');
     const orbLevelElement = document.getElementById('integratedOrbLevel');
     const tierElement = document.getElementById('integratedTier');
+    const distanceElement = document.getElementById('integratedDistance');
     const coinsElement = document.getElementById('integratedCoins');
     
     if (scoreElement && typeof game !== 'undefined') {
@@ -365,6 +443,11 @@ const MobileUI = {
     
     if (tierElement && typeof game !== 'undefined') {
       tierElement.textContent = game.tier || 1;
+    }
+    
+    if (distanceElement && typeof game !== 'undefined') {
+      const distanceValue = Math.floor(game.distance / 100);
+      distanceElement.textContent = distanceValue;
     }
     
     if (coinsElement && typeof game !== 'undefined') {
@@ -657,3 +740,14 @@ const MobileUI = {
 
 console.log('📱 Mobile UI module loaded');
 window.MobileUI = MobileUI;
+
+// Auto-initialize on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('📱 DOMContentLoaded - attempting to initialize MobileUI');
+  if (typeof MobileUI !== 'undefined') {
+    console.log('✅ MobileUI available, calling initialize()');
+    MobileUI.initialize();
+  } else {
+    console.error('❌ MobileUI not available!');
+  }
+});

@@ -1,0 +1,94 @@
+/* ========================================== */
+/* DESKTOP INTERACTIONS MODULE */
+/* Extracted from game-styles.css - All hover effects and mouse interactions */
+/* ========================================== */
+
+/* Front Page Interactions */
+.enter-game-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(77, 162, 255, 0.4);
+}
+
+.enter-game-btn:active {
+  transform: translateY(0);
+}
+
+/* Header Interactions */
+.game-header .stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.2);
+}
+
+.game-header .stat:hover::before {
+  left: 100%;
+}
+
+/* Canvas Interactions */
+canvas:hover {
+  box-shadow: 
+    0 0 30px rgba(77, 162, 255, 0.5),
+    inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+/* Leaderboard Interactions */
+.leaderboard-item:hover {
+  background: rgba(77, 162, 255, 0.1);
+  transform: translateX(5px);
+}
+
+/* Footer Interactions */
+.game-footer .controls span:hover {
+  background: rgba(77, 162, 255, 0.2);
+  color: #4DA2FF;
+  transform: translateY(-2px);
+}
+
+/* Name Input Modal Interactions */
+.name-input-content input:focus {
+  outline: none;
+  border-color: #00d4ff;
+  box-shadow: 0 0 20px rgba(77, 162, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Name input modal buttons now use .menu-btn universal class */
+/* Button hover/active styles removed - using shared .menu-btn interactions */
+
+/* Menu Button Interactions */
+.menu-btn:hover::before {
+  left: 100%;
+}
+
+.menu-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(77, 162, 255, 0.3);
+}
+
+.menu-btn:active {
+  transform: translateY(0);
+}
+
+.menu-btn.primary:hover {
+  box-shadow: 0 6px 20px rgba(77, 162, 255, 0.4);
+}
+
+/* Close Button Interactions */
+.close-btn:hover {
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff4444;
+}
+
+/* Sound Button Interactions */
+.sound-test-content .sound-btn:hover {
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.6), 0 0 20px rgba(57, 255, 20, 0.4); /* Enhanced glow instead of scaling */
+  filter: brightness(1.1); /* Subtle brightness increase */
+}
+
+.sound-test-content .sound-btn:active {
+  box-shadow: 0 2px 5px rgba(77, 162, 255, 0.2);
+  filter: brightness(0.95); /* Subtle dimming for click feedback */
+}
+
+.sound-test-content .sound-btn:hover::before {
+  opacity: 1;
+}

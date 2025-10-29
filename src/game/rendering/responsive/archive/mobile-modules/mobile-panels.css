@@ -1,0 +1,478 @@
+/* ========================================== */
+/* MOBILE PANELS MODULE */
+/* ========================================== */
+/* Settings, instructions, sound test, leaderboard panels */
+/* Converted from mobile-ui-styles.css - removed media queries, using viewport units */
+/* Structure follows desktop panels but with mobile-optimized dynamic scaling */
+
+/* ========================================== */
+/* MOBILE MENU PANEL BASE CLASS */
+/* ========================================== */
+
+.mobile-menu-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(15, 20, 25, 0.95) 100%);
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(2.5vh, 3vw);
+  padding: min(3vh, 3.5vw);
+  max-width: min(60vh, 80vw);
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
+  animation: panelSlideIn 0.3s ease-out;
+  display: none;
+  z-index: 999999;
+  flex-direction: column;
+}
+
+/* Panel Content Top Border Effect */
+.mobile-menu-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: min(0.3vw, 0.4vh);
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ========================================== */
+/* SHARED PANEL STYLES */
+/* ========================================== */
+
+/* Panel Overlays - Mobile (using .mobile-menu-panel base class) */
+/* Individual panel classes inherit from .mobile-menu-panel */
+
+/* Panel Headers - Mobile (Desktop-like) */
+.settings-header,
+.instructions-header,
+.leaderboard-header,
+.sound-test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: min(3vh, 3.5vw); /* Desktop-like margin */
+  padding-bottom: min(1.5vh, 2vw); /* Desktop-like padding */
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Desktop-like border */
+}
+
+.settings-header h2,
+.instructions-header h2,
+.leaderboard-header h2,
+.sound-test-header h2 {
+  color: #4DA2FF;
+  font-size: min(1.8vw, 2.2vh); /* Desktop-like font size */
+  margin: 0;
+  text-shadow: 0 0 min(1vh, 1.2vw) rgba(77, 162, 255, 0.5); /* Desktop-like shadow */
+}
+
+/* ========================================== */
+/* SETTINGS PANEL STYLES */
+/* ========================================== */
+
+.settings-section {
+  margin-bottom: min(3vh, 3.5vw); /* Desktop-like margin */
+}
+
+.settings-section h3 {
+  color: #4DA2FF;
+  font-size: min(1.3vw, 1.6vh); /* Desktop-like font size */
+  margin-bottom: min(2vh, 2.5vw); /* Desktop-like margin */
+  padding-bottom: min(1vh, 1.2vw); /* Desktop-like padding */
+  border-bottom: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.2); /* Desktop-like border */
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: min(2vh, 2.5vw); /* Desktop-like margin */
+  padding: min(1.5vh, 2vw); /* Desktop-like padding */
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: min(1.2vh, 1.5vw); /* Desktop-like border radius */
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.1); /* Desktop-like border */
+}
+
+.setting-item label {
+  color: #ccc;
+  font-weight: 500;
+  flex: 1;
+  margin-right: min(1.5vh, 2vw); /* Dynamic margin */
+  font-size: min(1vw, 1.3vh); /* Dynamic font size */
+}
+
+.setting-item input[type="range"] {
+  flex: 1;
+  margin: 0 min(1.5vh, 2vw); /* Dynamic margin */
+  -webkit-appearance: none;
+  appearance: none;
+  height: min(0.6vh, 0.8vw); /* Dynamic height */
+  border-radius: min(0.3vh, 0.4vw); /* Dynamic border radius */
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: min(2vh, 2.5vw); /* Dynamic width */
+  height: min(2vh, 2.5vw); /* Dynamic height */
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  cursor: pointer;
+  box-shadow: 0 min(0.2vh, 0.3vw) min(0.8vh, 1vw) rgba(77, 162, 255, 0.4); /* Dynamic shadow */
+}
+
+.setting-item input[type="range"]::-moz-range-thumb {
+  width: min(2vh, 2.5vw); /* Dynamic width */
+  height: min(2vh, 2.5vw); /* Dynamic height */
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 min(0.2vh, 0.3vw) min(0.8vh, 1vw) rgba(77, 162, 255, 0.4); /* Dynamic shadow */
+}
+
+.setting-item input[type="checkbox"] {
+  width: min(2vh, 2.5vw); /* Dynamic width */
+  height: min(2vh, 2.5vw); /* Dynamic height */
+  accent-color: #4DA2FF;
+  cursor: pointer;
+}
+
+.setting-item span {
+  color: #39ff14;
+  font-weight: bold;
+  min-width: min(6vh, 7.5vw); /* Dynamic width */
+  text-align: right;
+  font-size: min(0.9vw, 1.2vh); /* Dynamic font size */
+}
+
+.settings-buttons {
+  display: flex;
+  gap: min(1.5vh, 2vw); /* Dynamic gap */
+  justify-content: center;
+  margin-top: min(3vh, 3.5vw); /* Dynamic margin */
+  padding-top: min(2vh, 2.5vw); /* Dynamic padding */
+  border-top: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+}
+
+/* ========================================== */
+/* INSTRUCTIONS PANEL STYLES */
+/* ========================================== */
+
+.instructions-section {
+  margin-bottom: min(2.5vh, 3vw); /* Dynamic margin */
+}
+
+.instructions-section h3 {
+  color: #4DA2FF;
+  font-size: min(1.3vw, 1.6vh); /* Dynamic font size */
+  margin-bottom: min(1.5vh, 2vw); /* Dynamic margin */
+  padding-bottom: min(0.8vh, 1vw); /* Dynamic padding */
+  border-bottom: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.2); /* Dynamic border */
+}
+
+.instructions-section p {
+  color: #ccc;
+  line-height: 1.6;
+  margin-bottom: min(1vh, 1.2vw); /* Dynamic margin */
+  font-size: min(1vw, 1.3vh); /* Dynamic font size */
+}
+
+.instructions-section ul {
+  color: #ccc;
+  line-height: 1.6;
+  padding-left: min(2vh, 2.5vw); /* Dynamic padding */
+  font-size: min(1vw, 1.3vh); /* Dynamic font size */
+}
+
+.instructions-section li {
+  margin-bottom: min(0.8vh, 1vw); /* Dynamic margin */
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: min(1.2vh, 1.5vw); /* Dynamic margin */
+  padding: min(1vh, 1.2vw); /* Dynamic padding */
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: min(0.8vh, 1vw); /* Dynamic border radius */
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.1); /* Dynamic border */
+}
+
+.control-icon {
+  font-size: min(1.5vw, 2vh); /* Dynamic font size */
+  margin-right: min(1.5vh, 2vw); /* Dynamic margin */
+  min-width: min(3vh, 3.5vw); /* Dynamic width */
+}
+
+.control-text {
+  color: #ccc;
+  font-weight: 500;
+  font-size: min(1vw, 1.3vh); /* Dynamic font size */
+}
+
+.instructions-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: min(3vh, 3.5vw); /* Dynamic margin */
+  padding-top: min(2vh, 2.5vw); /* Dynamic padding */
+  border-top: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+}
+
+/* ========================================== */
+/* SOUND TEST PANEL STYLES */
+/* ========================================== */
+
+.sound-test-section {
+  margin-bottom: min(3vh, 3.5vw); /* Dynamic margin */
+}
+
+.sound-test-section h3 {
+  color: #39ff14;
+  font-size: min(2vw, 2.5vh); /* Dynamic font size */
+  font-weight: bold;
+  margin-bottom: min(1.5vh, 2vw); /* Dynamic margin */
+  text-shadow: 0 0 min(0.5vh, 0.6vw) rgba(57, 255, 20, 0.3); /* Dynamic shadow */
+}
+
+.sound-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20vh, 25vw), 1fr)); /* Dynamic grid */
+  gap: min(1vh, 1.2vw); /* Dynamic gap */
+}
+
+.sound-test-content .sound-btn {
+  background: linear-gradient(135deg, #2a3a4a 0%, #1a2332 100%) !important;
+  border: min(0.2vw, 0.3vh) solid #4DA2FF !important; /* Dynamic border */
+  border-radius: min(1vh, 1.2vw) !important; /* Dynamic border radius */
+  color: white !important;
+  padding: min(1.2vh, 1.5vw) min(1.6vh, 2vw) !important; /* Dynamic padding */
+  font-size: min(1.4vw, 1.8vh) !important; /* Dynamic font size */
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  text-align: center !important;
+  position: relative !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  min-width: fit-content !important;
+  width: 100% !important;
+  height: auto !important;
+  text-overflow: unset !important;
+  box-sizing: border-box !important;
+  z-index: 2;
+}
+
+.sound-test-content .sound-btn:hover {
+  background: linear-gradient(135deg, #4DA2FF 0%, #2a3a4a 100%) !important;
+  border-color: #39ff14 !important;
+  box-shadow: 0 min(0.8vh, 1vw) min(2.5vh, 3vw) rgba(77, 162, 255, 0.6), 0 0 min(2vh, 2.5vw) rgba(57, 255, 20, 0.4) !important; /* Dynamic shadow */
+  filter: brightness(1.1) !important;
+}
+
+.sound-test-content .sound-btn:active {
+  box-shadow: 0 min(0.2vh, 0.3vw) min(0.5vh, 0.6vw) rgba(77, 162, 255, 0.2) !important; /* Dynamic shadow */
+  filter: brightness(0.95) !important;
+}
+
+.sound-test-content .sound-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.sound-test-content .sound-btn:hover::before {
+  opacity: 1;
+}
+
+/* ========================================== */
+/* LEADERBOARD PANEL STYLES */
+/* ========================================== */
+
+.leaderboard-title {
+  font-size: min(2vw, 2.5vh); /* Dynamic font size */
+  margin-bottom: min(2.5vh, 3vw); /* Dynamic margin */
+  color: #4DA2FF;
+  text-align: center;
+}
+
+.leaderboard-list {
+  margin-bottom: min(2.5vh, 3vw); /* Dynamic margin */
+}
+
+.leaderboard-item {
+  padding: min(1.5vh, 2vw); /* Dynamic padding */
+  margin-bottom: min(1vh, 1.2vw); /* Dynamic margin */
+  border-radius: min(1.5vh, 2vw); /* Dynamic border radius */
+  background: rgba(77, 162, 255, 0.05);
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.1); /* Dynamic border */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.leaderboard-rank {
+  font-size: min(1.2vw, 1.5vh); /* Dynamic font size */
+  min-width: min(4vh, 5vw); /* Dynamic width */
+  color: #39ff14;
+  font-weight: bold;
+}
+
+.leaderboard-score {
+  font-size: min(1.1vw, 1.4vh); /* Dynamic font size */
+  color: #ccc;
+  flex: 1;
+  text-align: center;
+}
+
+.leaderboard-date {
+  font-size: min(0.9vw, 1.2vh); /* Dynamic font size */
+  color: #999;
+  min-width: min(8vh, 10vw); /* Dynamic width */
+  text-align: right;
+}
+
+.leaderboard-buttons {
+  flex-direction: column;
+  gap: min(1.5vh, 2vw); /* Dynamic gap */
+  margin-top: min(3vh, 3.5vw); /* Dynamic margin */
+  display: flex;
+  justify-content: center;
+  padding-top: min(2vh, 2.5vw); /* Dynamic padding */
+  border-top: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+}
+
+/* ========================================== */
+/* GAME STATS PANEL STYLES */
+/* ========================================== */
+
+.game-stats-panel.mobile-compact {
+  padding: min(0.8vh, 1vw) min(1.2vh, 1.5vw); /* Dynamic padding */
+  min-width: min(12vh, 15vw); /* Dynamic width */
+  font-size: min(1.1vw, 1.4vh); /* Dynamic font size */
+  background: rgba(0, 0, 0, 0.8);
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+  border-radius: min(0.8vh, 1vw); /* Dynamic border radius */
+  position: fixed;
+  top: min(1vh, 1.2vw); /* Dynamic positioning */
+  left: min(1vh, 1.2vw); /* Dynamic positioning */
+  z-index: 2000;
+}
+
+.game-stats-panel.mobile-compact .stat-item {
+  margin-bottom: min(0.4vh, 0.5vw); /* Dynamic margin */
+  padding: min(0.2vh, 0.3vw) 0; /* Dynamic padding */
+}
+
+.game-stats-panel.mobile-compact .stat-label {
+  font-size: min(1vw, 1.3vh); /* Dynamic font size */
+  color: #ccc;
+}
+
+.game-stats-panel.mobile-compact .stat-value {
+  font-size: min(1.2vw, 1.5vh); /* Dynamic font size */
+  color: #39ff14;
+  font-weight: bold;
+}
+
+/* ========================================== */
+/* MOBILE-SPECIFIC OVERRIDES */
+/* ========================================== */
+
+/* Hide mouse sensitivity elements on mobile */
+#mouseSensitivity,
+#mouseSensitivity + span,
+label[for="mouseSensitivity"] {
+  display: none !important;
+}
+
+/* Mobile-optimized close buttons */
+.settings-panel .close-btn,
+.instructions-panel .close-btn,
+.sound-test-panel .close-btn,
+.leaderboard-panel .close-btn {
+  position: absolute;
+  top: min(0.6vh, 0.8vw); /* Dynamic positioning */
+  right: min(0.6vh, 0.8vw); /* Dynamic positioning */
+  width: min(2.4vh, 3vw); /* Dynamic width */
+  height: min(2.4vh, 3vw); /* Dynamic height */
+  min-width: min(2.4vh, 3vw); /* Dynamic width */
+  min-height: min(2.4vh, 3vw); /* Dynamic height */
+  max-width: min(2.4vh, 3vw); /* Dynamic width */
+  max-height: min(2.4vh, 3vw); /* Dynamic height */
+  border-radius: 50%;
+  font-size: min(1.2vw, 1.5vh); /* Dynamic font size */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(77, 162, 255, 0.2);
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.4); /* Dynamic border */
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-panel .close-btn:hover,
+.instructions-panel .close-btn:hover,
+.sound-test-panel .close-btn:hover,
+.leaderboard-panel .close-btn:hover {
+  background: rgba(77, 162, 255, 0.4);
+  border-color: rgba(77, 162, 255, 0.6);
+}
+
+.settings-panel .close-btn:active,
+.instructions-panel .close-btn:active,
+.sound-test-panel .close-btn:active,
+.leaderboard-panel .close-btn:active {
+  transform: scale(0.9);
+}
+
+/* ========================================== */
+/* PANEL ANIMATIONS */
+/* ========================================== */
+
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes panelSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}

@@ -6,11 +6,17 @@
 function draw() {
   const ctx = game.ctx;
   
+  if (!ctx) {
+    if (Math.random() < 0.01) console.error('❌ Draw called but ctx is null!'); // Throttled log
+    return;
+  }
+  
   // Always clear canvas
   ctx.clearRect(0, 0, game.width, game.height);
   
   // Show menu message if menu is visible
   if (typeof gameState !== 'undefined' && gameState.isMenuVisible) {
+    if (Math.random() < 0.01) console.log('⏸️ Drawing menu overlay'); // Throttled log
     renderMenuOverlay(ctx);
     return;
   }
@@ -21,17 +27,25 @@ function draw() {
 
   // Enhanced Game Over screen
   if (game.gameOver) {
+    if (Math.random() < 0.01) console.log('🎬 Drawing game over screen'); // Throttled log
     renderGameOverScreen(ctx);
     return;
   }
 
   // Enhanced Pause overlay
   if (game.paused) {
+    if (Math.random() < 0.01) console.log('⏸️ Drawing pause overlay'); // Throttled log
     renderPauseOverlay(ctx);
     return;
+  } else {
+    // Hide mobile pause overlay when not paused
+    if (typeof toggleMobilePauseOverlay === 'function') {
+      toggleMobilePauseOverlay(false);
+    }
   }
 
   // Render background
+  if (Math.random() < 0.01) console.log('🎮 Drawing game content'); // Throttled log
   renderBackground(ctx);
   
   // Render lane dividers

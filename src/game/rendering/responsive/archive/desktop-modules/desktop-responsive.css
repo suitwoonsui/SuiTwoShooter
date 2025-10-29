@@ -1,0 +1,29 @@
+/* ========================================== */
+/* DESKTOP RESPONSIVE MODULE */
+/* Extracted from game-styles.css lines 1356-1402 */
+/* Enhanced to work with viewport-container.css */
+/* ========================================== */
+
+/* Desktop Viewport Container - Base Layout */
+.viewport-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Restored to prevent overflow */
+}
+
+/* Desktop Game Header - Base Styles */
+.game-header {
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.9);
+  border-bottom: 2px solid rgba(77, 162, 255, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  min-height: 50px;
+}
+
+/* Responsive Design for Menus */

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SuiTwo - Modular CSS Test</title>
+  
+  <!-- Modular CSS System -->
+  <!-- All CSS loading handled by device detection -->
+  <!-- Device Detection and CSS Loading -->
+  <script src="src/game/systems/device/device-detection.js"></script>
+  <script src="src/game/systems/device/css-loader.js"></script>
+  <script src="src/game/systems/device/footer-loader.js"></script>
+  
+  <!-- Device Detection Verification -->
+  <script>
+    // Verify device detection is working
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const deviceType = DeviceDetection.detectDeviceType();
+        const verificationDiv = document.createElement('div');
+        verificationDiv.style.cssText = `
+          position: fixed;
+          bottom: 10px;
+          left: 10px;
+          background: rgba(0, 0, 0, 0.8);
+          color: #00d4ff;
+          padding: 10px;
+          border-radius: 5px;
+          font-family: monospace;
+          font-size: 12px;
+          z-index: 9999;
+          border: 1px solid #00d4ff;
+        `;
+        verificationDiv.innerHTML = `
+          <strong>Device Detection:</strong><br>
+          Type: ${deviceType}<br>
+          Screen: ${window.screen.width}x${window.screen.height}<br>
+          Touch: ${'ontouchstart' in window ? 'Yes' : 'No'}<br>
+          User Agent: ${navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'}
+        `;
+        document.body.appendChild(verificationDiv);
+        
+        // Also log to console
+        console.log('=== DEVICE DETECTION VERIFICATION ===');
+        console.log('Device Type:', deviceType);
+        console.log('Screen Size:', window.screen.width + 'x' + window.screen.height);
+        console.log('Touch Support:', 'ontouchstart' in window);
+        console.log('User Agent Mobile:', navigator.userAgent.includes('Mobile'));
+        console.log('Loaded CSS Files:', document.querySelectorAll('link[rel="stylesheet"]').length);
+        console.log('=====================================');
+      }, 1000); // Wait 1 second for CSS to load
+    });
+  </script>
+
+  <!-- Responsive modules - loaded last -->
+</head>
+<body>
+  <!-- Main Viewport Container -->
+  <div class="viewport-container">
+    <!-- Front Page Overlay -->
+    <div id="frontPage" class="front-page-overlay front-page-overlay-visible">
+      <div class="front-page-content">
+        <h1 class="game-title"><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+        <p class="game-subtitle">Space Shooter Alpha v0.1</p>
+        <div class="game-description">
+          <p>Navigate through the cosmos, defeat enemies, and survive as long as possible!</p>
+          <p>Use MOUSE to move and P to pause. Auto-fire is enabled!</p>
+        </div>
+        <button id="enterGameBtn" class="enter-game-btn">
+          🎮 Enter Game
+        </button>
+        <div class="audio-note">
+          <small>🔊 Audio will start after clicking Enter</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Container (lazy loaded with visibility toggle) -->
+    <div class="game-container game-container-hidden">
+      <!-- Enhanced Top information bar (only visible during game) -->
+      <header class="game-header">
+        <div class="title">
+          <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="header-logo"> SuiTwo
+          <span class="alpha-badge">Alpha v0.1</span>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-icon">📏</span>
+            Distance: <span id="distance">0</span> m
+          </div>
+          <div class="stat">
+            <span class="stat-icon">🪙</span>
+            Coins: <span id="coins">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-icon">⚡</span>
+            Status: <span id="status">Ready</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Gameplay Area -->
+      <div class="gameplay-area">
+        <!-- Game canvas -->
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- In-game UI - Side-by-side with canvas -->
+        <div class="game-ui-overlay">
+          <div class="game-stats-panel">
+            <div class="stat-item">
+              <span class="stat-label">Score:</span>
+              <span class="stat-value" id="gameScore">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Magic Orb Level:</span>
+              <span class="stat-value" id="orbLevel">1</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Tier:</span>
+              <span class="stat-value" id="gameTier">1</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Bosses Defeated:</span>
+              <span class="stat-value" id="bossesDefeated">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Force Field:</span>
+              <span class="stat-value" id="forceFieldLevel">None</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Coin Streak:</span>
+              <span class="stat-value" id="coinStreak">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer will be loaded dynamically by footer-loader.js for desktop/tablet only -->
+      <!-- For mobile, footer is not needed and will not be inserted -->
+    </div>
+
+  <!-- Main Menu Overlay -->
+  <div class="main-menu-overlay main-menu-overlay-hidden" id="mainMenuOverlay">
+    <div class="main-menu-content">
+      <div class="game-title">
+        <h1><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+        <div class="version-badge">Alpha v0.1</div>
+      </div>
+      
+      <div class="menu-buttons">
+        <button class="menu-btn primary" onclick="startGame()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">▶️</span>
+          Start Game
+        </button>
+        <button class="menu-btn" onclick="showSettings()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">⚙️</span>
+          Settings
+        </button>
+        <button class="menu-btn" onclick="showInstructions()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">📖</span>
+          How to Play
+        </button>
+        <button class="menu-btn" onclick="showLeaderboard()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">🏆</span>
+          Leaderboard
+        </button>
+        <button class="menu-btn" onclick="showSoundTest()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">🔊</span>
+          Sound Test
+        </button>
+      </div>
+      
+      <div class="menu-footer">
+        <div class="game-stats">
+          <div class="stat-item">
+            <span class="stat-label">Best Score:</span>
+            <span class="stat-value" id="bestScoreDisplay">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Games Played:</span>
+            <span class="stat-value" id="gamesPlayedDisplay">0</span>
+          </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Panels as siblings to main menu, inside viewport container -->
+
+    <!-- Sound Test Panel -->
+  <div class="sound-test-panel sound-test-panel-hidden" id="soundTestPanel">
+    <div class="sound-test-content">
+      <div class="sound-test-header">
+        <h2>🔊 Sound Test</h2>
+        <button class="close-btn" onclick="hideSoundTest()">✕</button>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎵 Game Sounds</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testSound('shoot')">🔫 Shoot</button>
+          <button class="sound-btn" onclick="testSound('enemyHit')">💥 Enemy Hit</button>
+          <button class="sound-btn" onclick="testSound('enemyDestroyed')">💀 Enemy Destroyed</button>
+          <button class="sound-btn" onclick="testSound('coinCollect')">🪙 Coin Collect</button>
+          <button class="sound-btn" onclick="testSound('powerupCollect')">⚡ Power Up</button>
+          <button class="sound-btn" onclick="testSound('powerupNegative')">⚠️ Power Down</button>
+          <button class="sound-btn" onclick="testSound('bossHit')">🎯 Boss Hit</button>
+          <button class="sound-btn" onclick="testSound('bossDestroyed')">💀 Boss Destroyed</button>
+          <button class="sound-btn" onclick="testSound('gameOver')">💀 Game Over</button>
+          <button class="sound-btn" onclick="testSound('levelUp')">📈 Level Up</button>
+          <button class="sound-btn" onclick="testSound('playerHit')">💢 Player Hit</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🛡️ Force Field Sounds</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testForceFieldSound('activate')">🟢 Force Field Activate</button>
+          <button class="sound-btn" onclick="testForceFieldSound('powerUp')">🔵 Force Field Power Up</button>
+          <button class="sound-btn" onclick="testForceFieldSound('powerDown')">🟡 Force Field Power Down</button>
+          <button class="sound-btn" onclick="testForceFieldSound('destroyed')">🔴 Force Field Destroyed</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎼 Musical Sequences</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testSequence('ascending')">📈 Ascending Sequence</button>
+          <button class="sound-btn" onclick="testSequence('descending')">📉 Descending Sequence</button>
+          <button class="sound-btn" onclick="testSequence('destruction')">💥 Destruction Sequence</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎵 Gameplay Music</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testGameplayMusic()">🎶 Play Gameplay Music</button>
+          <button class="sound-btn" onclick="testBossMusic()">👹 Play Boss Music</button>
+          <button class="sound-btn" onclick="stopBackgroundMusic()">⏹️ Stop Music</button>
+        </div>
+        
+        <h4>🎵 Theme Testing</h4>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(1)">🌌 Theme 1: Atmospheric</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(2)">⚡ Theme 2: Driving Action</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(3)">🔇 Theme 3: Minimalist</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(4)">🕹️ Theme 4: Retro Sci-Fi</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(5)">🚀 Theme 5: Action Packed</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(6)">🎖️ Theme 6: Militaristic</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(7)">⚡ Theme 7: High Energy</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(8)">💥 Theme 8: Aggressive</button>
+        </div>
+        
+        <h4>🌙 Menu Themes (Soothing)</h4>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(9)">🌸 Theme 9: Gentle Ambient</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(10)">🕊️ Theme 10: Peaceful Melody</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(11)">✨ Theme 11: Soft Harmony</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(12)">🌌 Theme 12: Tranquil Space</button>
+        </div>
+        
+        <h4>🎼 Instrument Testing</h4>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('sine')">🔔 Sine Wave (Pure)</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('square')">📦 Square Wave (Digital)</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('sawtooth')">🔺 Sawtooth Wave (Buzzy)</button>
+          <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('triangle')">🔺 Triangle Wave (Soft)</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🎮 UI & Feedback Sounds</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="testSound('menuClick')">🖱️ Menu Click</button>
+          <button class="sound-btn" onclick="testSound('menuHover')">👆 Menu Hover</button>
+          <button class="sound-btn" onclick="testSound('achievement')">🏆 Achievement</button>
+          <button class="sound-btn" onclick="testSound('warning')">⚠️ Warning</button>
+          <button class="sound-btn" onclick="testSound('success')">✅ Success</button>
+        </div>
+      </div>
+      
+      <div class="sound-test-section">
+        <h3>🔧 Audio Debug</h3>
+        <div class="sound-buttons">
+          <button class="sound-btn" onclick="showAudioStats()">📊 Audio Stats</button>
+          <button class="sound-btn" onclick="testAllSounds()">🎵 Test All Sounds</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Settings Panel -->
+  <div class="settings-panel settings-panel-hidden" id="settingsPanel">
+    <div class="settings-content">
+      <div class="settings-header">
+        <h2>⚙️ Game Settings</h2>
+        <button class="close-btn" onclick="hideSettings()">✕</button>
+      </div>
+      
+      <div class="settings-section controls-section">
+        <h3>🎮 Controls</h3>
+        <div class="setting-item">
+          <label for="mouseSensitivity">Mouse Sensitivity:</label>
+          <input type="range" id="mouseSensitivity" min="0.1" max="0.5" step="0.05" value="0.2">
+          <span id="mouseSensitivityValue">0.2</span>
+        </div>
+      </div>
+      
+      <div class="settings-section">
+        <h3>🎨 Graphics</h3>
+        <div class="setting-item">
+          <label for="particleEffects">Particle Effects:</label>
+          <input type="checkbox" id="particleEffects" checked>
+        </div>
+        <div class="setting-item">
+          <label for="screenShake">Screen Shake:</label>
+          <input type="checkbox" id="screenShake" checked>
+        </div>
+        <div class="setting-item">
+          <label for="trailEffects">Player Trail:</label>
+          <input type="checkbox" id="trailEffects" checked>
+        </div>
+      </div>
+      
+      <div class="settings-section">
+        <h3>🔊 Audio</h3>
+        <div class="setting-item">
+          <label for="masterVolume">Master Volume:</label>
+          <input type="range" id="masterVolume" min="0" max="100" step="10" value="70">
+          <span id="masterVolumeValue">70%</span>
+        </div>
+        <div class="setting-item">
+          <label for="soundEffectsVolume">Sound Effects Volume:</label>
+          <input type="range" id="soundEffectsVolume" min="0" max="100" step="10" value="80">
+          <span id="soundEffectsVolumeValue">80%</span>
+        </div>
+        <div class="setting-item">
+          <label for="backgroundMusicVolume">Background Music Volume:</label>
+          <input type="range" id="backgroundMusicVolume" min="0" max="100" step="10" value="60">
+          <span id="backgroundMusicVolumeValue">60%</span>
+        </div>
+        <div class="setting-item">
+          <label for="soundEffects">Sound Effects:</label>
+          <input type="checkbox" id="soundEffects" checked>
+        </div>
+        <div class="setting-item">
+          <label for="backgroundMusic">Background Music:</label>
+          <input type="checkbox" id="backgroundMusic" checked>
+        </div>
+      </div>
+      
+      <div class="settings-buttons">
+        <button class="menu-btn" onclick="resetSettings()">Reset to Default</button>
+        <button class="menu-btn primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- Instructions Panel -->
+  <div class="instructions-panel instructions-panel-hidden" id="instructionsPanel">
+    <div class="instructions-content">
+      <div class="instructions-header">
+        <h2>📖 How to Play</h2>
+        <button class="close-btn" onclick="hideInstructions()">✕</button>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🎯 Objective</h3>
+        <p>Survive as long as possible, defeat bosses, and achieve the highest score!</p>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🎮 Controls</h3>
+        <div class="control-item">
+          <span class="control-icon">🖱️</span>
+          <span class="control-text">Mouse: Move your character vertically</span>
+        </div>
+        <div class="control-item">
+          <span class="control-icon">⏸️</span>
+          <span class="control-text">P: Pause/Resume game</span>
+        </div>
+        <div class="control-item">
+          <span class="control-icon">🔫</span>
+          <span class="control-text">Auto-Fire: Your character shoots automatically</span>
+        </div>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🎯 Gameplay</h3>
+        <ul>
+          <li>Move your character to avoid enemies and collect power-ups</li>
+          <li>Collect coins to increase your score</li>
+          <li>Pick up green power-ups to increase firepower</li>
+          <li>Avoid red power-ups that decrease firepower</li>
+          <li>Defeat bosses to progress to higher tiers</li>
+          <li>Higher tiers feature stronger enemies and bosses</li>
+        </ul>
+      </div>
+      
+      <div class="instructions-section">
+        <h3>🏆 Scoring</h3>
+        <ul>
+          <li>Destroy enemies: 15 points × enemy tier</li>
+          <li>Collect coins: 10 points each</li>
+          <li>Defeat bosses: 5000 points × tier</li>
+          <li>Survival bonus: Continuous points based on speed</li>
+        </ul>
+      </div>
+      
+      <div class="instructions-buttons">
+        <button class="menu-btn primary" onclick="hideInstructions()">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- Name input modal -->
+    <div class="name-input-modal name-input-modal-hidden" id="nameInputModal">
+      <div class="name-input-content">
+        <h2>🎉 New High Score!</h2>
+        <div class="score-display">
+          Final Score: <span id="finalScoreDisplay">0</span>
+        </div>
+        <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
+        <br>
+        <button class="menu-btn primary" onclick="saveScore()">Save Score</button>
+        <button class="menu-btn" onclick="skipSave()">Skip</button>
+      </div>
+    </div>
+
+  </div> <!-- End viewport-container -->
+
+  <!-- Load security FIRST -->
+  <script src="game-security.js"></script>
+
+  <!-- Load CSS Loader FIRST -->
+  <script src="src/game/systems/device/css-loader.js"></script>
+
+  <!-- Load audio system -->
+  <!-- Modular Audio System -->
+  <script src="src/game/audio/core/audio-context.js"></script>
+  <script src="src/game/audio/settings/audio-settings.js"></script>
+  <script src="src/game/audio/music/music-patterns.js"></script>
+  <script src="src/game/audio/music/music-composer.js"></script>
+  <script src="src/game/audio/music/music-manager.js"></script>
+  <script src="src/game/audio/effects/sound-effects.js"></script>
+  <script src="src/game/audio/audio-manager.js"></script>
+  <script src="src/game/audio/audio-integration.js"></script>
+
+  <!-- Game script -->
+    <!-- Modular game scripts -->
+    <script src="src/game/rendering/background-images.js"></script>
+    <script src="src/game/rendering/player/player-images.js"></script>
+    <script src="src/game/rendering/ui/life-images.js"></script>
+    <script src="src/game/rendering/collectibles/collectible-images.js"></script>
+    <script src="src/game/rendering/enemies/enemy-images.js"></script>
+    <script src="src/game/rendering/bosses/boss-images.js"></script>
+    <script src="src/game/rendering/projectiles/projectile-images.js"></script>
+    <script src="src/game/rendering/effects/particle.js"></script>
+    <script src="src/utils/helpers.js"></script>
+    <script src="src/game/shared/sprite-metrics.js"></script>
+    
+    <!-- Mobile Detection Modules (Non-intrusive) -->
+    <script src="src/game/systems/device/device-detection.js"></script>
+    <script src="src/game/systems/device/device-config.js"></script>
+    <script src="src/game/systems/device/device-monitoring.js"></script>
+    <script src="src/game/systems/device/landscape-orientation.js"></script>
+    <script src="src/game/shared/mobile-utils.js"></script>
+    
+    <!-- Responsive Rendering Modules -->
+    <script src="src/game/rendering/responsive/canvas-manager.js"></script>
+    <script src="src/game/rendering/responsive/viewport-manager.js"></script>
+    <script src="src/game/rendering/responsive/mobile-ui.js"></script>
+    
+    <!-- Enhanced Input Modules -->
+    <script src="src/game/systems/input/touch-input.js"></script>
+    
+    <!-- Test mobile detection (non-intrusive) -->
+    <script>
+      // Test mobile detection without affecting gameplay
+      if (typeof DeviceDetection !== 'undefined') {
+        console.log('🔍 Device Detection Test:', DeviceDetection.getDeviceInfo());
+        console.log('📱 Mobile Utils Test:', MobileUtils.getDeviceInfoString());
+      }
+      
+      // Initialize landscape orientation enforcement
+      if (typeof LandscapeOrientation !== 'undefined') {
+        LandscapeOrientation.initialize();
+      }
+      
+      // Initialize responsive canvas system
+      if (typeof ResponsiveCanvas !== 'undefined' && typeof ViewportManager !== 'undefined') {
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+          const canvas = document.getElementById('gameCanvas');
+          if (canvas) {
+            ResponsiveCanvas.initialize(canvas);
+            ViewportManager.initialize();
+            
+            // Initialize enhanced touch input
+            if (typeof TouchInput !== 'undefined') {
+              TouchInput.initialize(canvas);
+            }
+            
+            // Initialize mobile UI system
+            if (typeof MobileUI !== 'undefined') {
+              MobileUI.initialize();
+            }
+            
+            console.log('📐 Responsive canvas system initialized');
+          }
+        });
+      }
+    </script>
+    
+    <script src="src/game/main.js"></script>
+    
+    <!-- Game Systems -->
+    <script src="src/game/systems/player/player.js"></script>
+    <script src="src/game/systems/bosses/bosses.js"></script>
+      <script src="src/game/systems/projectiles/player-projectiles.js"></script>
+      <script src="src/game/systems/projectiles/enemy-projectiles.js"></script>
+      <script src="src/game/systems/projectiles/boss-projectiles.js"></script>
+    <script src="src/game/systems/collision/collision.js"></script>
+    <script src="src/game/systems/tiles/tiles.js"></script>
+    <script src="src/game/systems/core/scoring.js"></script>
+    <script src="src/game/systems/collectibles/collectibles.js"></script>
+    <script src="src/game/systems/enemies/enemy-stats.js"></script>
+    <script src="src/game/systems/enemies/enemy-behavior.js"></script>
+    <script src="src/game/systems/effects/effects.js"></script>
+    
+    <!-- Rendering modules -->
+    <script src="src/game/rendering/ui/ui-rendering.js"></script>
+    <script src="src/game/rendering/ui/game-state-rendering.js"></script>
+    <script src="src/game/rendering/ui/lives-rendering.js"></script>
+    <script src="src/game/rendering/background-rendering.js"></script>
+    <script src="src/game/rendering/player/player-rendering.js"></script>
+      <script src="src/game/rendering/projectiles/player-projectile-rendering.js"></script>
+      <script src="src/game/rendering/projectiles/enemy-projectile-rendering.js"></script>
+      <script src="src/game/rendering/projectiles/boss-projectile-rendering.js"></script>
+    <script src="src/game/rendering/enemies/enemy-rendering.js"></script>
+    <script src="src/game/rendering/collectibles/collectibles-rendering.js"></script>
+    <script src="src/game/rendering/bosses/boss-rendering.js"></script>
+    <script src="src/game/rendering/effects/effects-rendering.js"></script>
+    <script src="src/game/rendering/main-rendering.js"></script>
+  
+  <!-- UI Management System -->
+  <script src="src/game/systems/core/game-state-manager.js"></script>
+  <script src="src/game/systems/ui/settings-management.js"></script>
+  <script src="src/game/systems/ui/sound-test-system.js"></script>
+  <script src="src/game/systems/ui/leaderboard-system.js"></script>
+  <script src="src/game/systems/ui/menu-system.js"></script>
+  <script src="src/game/systems/ui/ui-initialization.js"></script>
+</body>
+</html>

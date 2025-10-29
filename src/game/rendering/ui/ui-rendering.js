@@ -48,6 +48,7 @@ function updateGameUI() {
   const integratedOrbLevelElement = document.getElementById('integratedOrbLevel');
   const integratedTierElement = document.getElementById('integratedTier');
   const integratedCoinsElement = document.getElementById('integratedCoins');
+  const integratedDistanceElement = document.getElementById('integratedDistance');
   
   // Update score (both desktop and mobile)
   if (gameScoreElement) {
@@ -105,5 +106,11 @@ function updateGameUI() {
   // Update integrated coins (mobile only)
   if (integratedCoinsElement) {
     integratedCoinsElement.textContent = game.coins;
+  }
+  
+  // Update integrated distance (mobile only)
+  if (integratedDistanceElement) {
+    const distanceValue = Math.floor(game.distance / 100);
+    integratedDistanceElement.textContent = distanceValue;
   }
 }

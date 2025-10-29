@@ -1,0 +1,125 @@
+/* ========================================== */
+/* SHARED THEME SYSTEM */
+/* ========================================== */
+/* CSS Custom Properties for consistent theming */
+/* Eliminates need for !important declarations */
+
+:root {
+  /* Color Palette */
+  --color-primary: #4DA2FF;
+  --color-secondary: #3A7BD5;
+  --color-accent: #39ff14; /* Highlighter Green */
+  --color-accent-secondary: #00ff00; /* Bright Green */
+  --color-success: #39ff14;
+  --color-warning: #ff6b6b;
+  
+  /* Text Colors */
+  --text-primary: white;
+  --text-secondary: #ccc;
+  --text-muted: #888;
+  
+  /* Background Colors */
+  --bg-primary: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
+  --bg-overlay: rgba(0, 0, 0, 0.8);
+  --bg-panel: rgba(0, 0, 0, 0.8);
+  --bg-button: linear-gradient(135deg, rgba(77, 162, 255, 0.1) 0%, rgba(58, 123, 213, 0.1) 100%);
+  --bg-button-primary: linear-gradient(45deg, #4DA2FF, #3A7BD5);
+  --bg-button-accent: linear-gradient(45deg, #39ff14, #00ff00);
+  
+  /* Border Colors */
+  --border-primary: rgba(77, 162, 255, 0.3);
+  --border-secondary: rgba(255, 255, 255, 0.2);
+  --border-accent: #39ff14;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  
+  /* Border Radius */
+  --radius-sm: 5px;
+  --radius-md: 10px;
+  --radius-lg: 15px;
+  --radius-xl: 20px;
+  --radius-full: 50px;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(57, 255, 20, 0.5);
+}
+
+/* High Specificity Base Styles - No !important needed */
+html,
+body {
+  color: var(--text-primary);
+}
+
+/* Button Base Styles with High Specificity */
+button,
+.btn,
+.menu-btn,
+.enter-game-btn,
+.close-btn,
+.sound-btn {
+  color: var(--text-primary);
+}
+
+/* Specific Button Variants */
+button[class*="btn"],
+.menu-btn,
+.enter-game-btn {
+  color: var(--text-primary);
+}
+
+/* Badge Styles */
+.alpha-badge,
+.version-badge,
+.rank {
+  color: var(--text-primary);
+}
+
+/* Panel and Modal Styles */
+.panel,
+.modal,
+.settings-panel,
+.instructions-panel,
+.name-input-modal {
+  color: var(--text-primary);
+}
+
+/* Header Styles */
+.game-header,
+.suitch-header {
+  color: var(--text-primary);
+}
+
+.game-header .alpha-badge,
+.suitch-header .alpha-badge {
+  color: var(--text-primary);
+}
+
+/* Leaderboard Styles */
+.leaderboard h2,
+.leaderboard-item .rank {
+  color: var(--text-primary);
+}
+
+/* Input Styles */
+input[type="text"],
+input[type="range"],
+select {
+  color: var(--text-primary);
+}
+
+/* Ensure all interactive elements use theme colors */
+*[class*="btn"]:not([class*="disabled"]),
+*[class*="button"]:not([class*="disabled"]),
+*[class*="badge"],
+*[class*="panel"],
+*[class*="modal"] {
+  color: var(--text-primary);
+}

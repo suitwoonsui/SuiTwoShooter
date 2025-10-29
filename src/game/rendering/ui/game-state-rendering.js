@@ -71,12 +71,129 @@ function renderGameOverScreen(ctx) {
   ctx.fillText('Press any key to return to menu', centerX, centerY + 140);
 }
 
+// Mobile pause button overlay state
+let mobilePauseOverlay = null;
+
+// Create mobile pause button overlay if it doesn't exist
+function createMobilePauseOverlay() {
+  if (mobilePauseOverlay) return mobilePauseOverlay;
+  
+  mobilePauseOverlay = document.createElement('button');
+  mobilePauseOverlay.id = 'mobile-pause-overlay-button';
+  mobilePauseOverlay.className = 'mobile-pause-overlay-button';
+  mobilePauseOverlay.textContent = 'Resume';
+  // Styling is handled by CSS class in mobile-game-ui.css
+  
+  mobilePauseOverlay.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof game !== 'undefined' && game.gameRunning) {
+      game.paused = false;
+    }
+  });
+  
+  // Also handle touch for mobile
+  mobilePauseOverlay.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof game !== 'undefined' && game.gameRunning) {
+      game.paused = false;
+    }
+  });
+  
+  return mobilePauseOverlay;
+}
+
+// Show/hide mobile pause overlay
+function toggleMobilePauseOverlay(show) {
+  const overlay = createMobilePauseOverlay();
+  // Append to viewport-container instead of body so it rotates with the game
+  const viewportContainer = document.querySelector('.viewport-container');
+  const parent = viewportContainer || document.body;
+  
+  if (show) {
+    if (!parent.contains(overlay)) {
+      parent.appendChild(overlay);
+    }
+  } else {
+    if (parent.contains(overlay)) {
+      overlay.remove();
+    }
+  }
+}
+
 // Render pause overlay
 function renderPauseOverlay(ctx) {
   // Animated semi-transparent overlay
   const pulseAlpha = 0.6 + 0.2 * Math.sin(Date.now() * 0.008);
   ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha})`;
   ctx.fillRect(0, 0, game.width, game.height);
+  
+  // Check if mobile device
+  const isMobile = typeof DeviceDetection !== 'undefined' && DeviceDetection.isMobile();
+  
+  if (isMobile) {
+    // Render mobile-specific pause screen
+    renderMobilePauseOverlay(ctx);
+    
+    // Show mobile pause button overlay
+    toggleMobilePauseOverlay(true);
+  } else {
+    // Render desktop pause screen
+    renderDesktopPauseOverlay(ctx);
+    
+    // Hide mobile pause button overlay if present
+    toggleMobilePauseOverlay(false);
+  }
+}
+
+function renderMobilePauseOverlay(ctx) {
+  const centerX = game.width / 2;
+  const centerY = game.height / 2;
+  
+  // Calculate responsive sizes based on canvas dimensions
+  // Assume game.width is 800 for base calculations, scale proportionally
+  const baseWidth = 800;
+  const scale = game.width / baseWidth;
+  
+  // Button is centered at 50% (centerY)
+  // Position PAUSED above, instruction below
+  
+  // Enhanced PAUSED text with glow - responsive sizing
+  ctx.save();
+  ctx.shadowColor = '#4DA2FF';
+  ctx.shadowBlur = 25 * scale;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.strokeStyle = '#4DA2FF';
+  ctx.lineWidth = 5 * scale;
+  ctx.font = `bold ${64 * scale}px Arial`;
+  ctx.textAlign = 'center';
+  const pausedText = 'PAUSED';
+  // Position PAUSED text above the button
+  const pausedY = centerY - 120 * scale;
+  ctx.strokeText(pausedText, centerX, pausedY);
+  ctx.fillText(pausedText, centerX, pausedY);
+  ctx.restore();
+  
+  // Instructions with animation - responsive sizing, BELOW the button
+  ctx.save();
+  ctx.textAlign = 'center';
+  const blinkAlpha = 0.6 + 0.4 * Math.sin(Date.now() * 0.012);
+  ctx.fillStyle = `rgba(204, 204, 204, ${blinkAlpha})`;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2 * scale;
+  ctx.font = `bold ${24 * scale}px Arial`;
+  const instructionText = 'Tap the button above to resume';
+  // Position instruction text BELOW the button
+  const instructionY = centerY + 100 * scale;
+  ctx.strokeText(instructionText, centerX, instructionY);
+  ctx.fillText(instructionText, centerX, instructionY);
+  ctx.restore();
+}
+
+function renderDesktopPauseOverlay(ctx) {
+  const centerX = game.width / 2;
+  const centerY = game.height / 2 - 60;
   
   // Enhanced PAUSED text with glow
   ctx.save();
@@ -88,8 +205,6 @@ function renderPauseOverlay(ctx) {
   ctx.font = 'bold 72px Arial';
   ctx.textAlign = 'center';
   const pausedText = 'PAUSED';
-  const centerX = game.width / 2;
-  const centerY = game.height / 2 - 60;
   ctx.strokeText(pausedText, centerX, centerY);
   ctx.fillText(pausedText, centerX, centerY);
   ctx.restore();

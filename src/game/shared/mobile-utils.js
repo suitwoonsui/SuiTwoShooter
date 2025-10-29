@@ -74,7 +74,12 @@ const MobileUtils = {
    */
   getOptimalCanvasSize(containerSize) {
     const deviceType = this.getDeviceType();
-    return getOptimalCanvasSize(deviceType, containerSize);
+    // Default canvas sizing - can be extended by device-specific modules
+    return {
+      width: Math.min(containerSize.width || 800, 800),
+      height: Math.min(containerSize.height || 480, 480),
+      scale: 1
+    };
   },
 
   /**
@@ -83,7 +88,8 @@ const MobileUtils = {
    */
   getUIScale() {
     const deviceType = this.getDeviceType();
-    return getUIScale(deviceType);
+    // Default UI scale - can be extended by device-specific modules
+    return deviceType === 'mobile' ? 0.8 : 1.0;
   },
 
   /**
@@ -92,7 +98,12 @@ const MobileUtils = {
    */
   getPerformanceSettings() {
     const deviceType = this.getDeviceType();
-    return getPerformanceSettings(deviceType);
+    // Default performance settings - can be extended by device-specific modules
+    return {
+      particleCount: deviceType === 'mobile' ? 50 : 100,
+      animationQuality: deviceType === 'mobile' ? 'medium' : 'high',
+      textureQuality: deviceType === 'mobile' ? 'medium' : 'high'
+    };
   },
 
   /**

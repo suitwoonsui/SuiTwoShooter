@@ -1,0 +1,546 @@
+/* ========================================== */
+/* DESKTOP PANELS MODULE */
+/* ========================================== */
+/* Settings panel, sound test panel, instructions panel, leaderboard modal, name input modal */
+/* Extracted from game-styles.css lines 935-1354 */
+
+/* ========================================== */
+/* SETTINGS PANEL STYLES */
+/* ========================================== */
+
+.settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 1) 0%, rgba(15, 20, 25, 1) 100%);
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(2.5vh, 3vw);
+  max-width: min(80vh, 90vw);
+  width: 90%;
+  max-height: 95%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
+  z-index: 999999;
+  flex-direction: column;
+  transition: opacity 0.3s ease-out;
+}
+
+.settings-panel[class*="-visible"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.settings-panel[class*="-hidden"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@keyframes panelSlideIn {
+  from { 
+    opacity: 0; 
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to { 
+    opacity: 1; 
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.settings-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.settings-content {
+  width: 100%;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: min(3vh, 3.5vw);
+  padding-bottom: min(1.5vh, 2vw);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}
+
+.settings-header h2 {
+  color: #4DA2FF;
+  font-size: min(4vw, 4.5vh);
+  margin: 0;
+  text-shadow: 0 0 min(1vh, 1.2vw) rgba(77, 162, 255, 0.5);
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: min(0.2vw, 0.3vh) solid rgba(255, 255, 255, 0.2);
+  color: white !important;
+  width: min(4vh, 5vw);
+  height: min(4vh, 5vw);
+  border-radius: 50%;
+  font-size: min(1.2vw, 1.5vh);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: rgba(255, 0, 0, 0.2);
+  border-color: #ff4444;
+  color: #ff4444;
+  transform: scale(1.1);
+}
+
+.settings-section {
+  margin-bottom: min(3vh, 3.5vw);
+}
+
+.settings-section h3 {
+  color: #4DA2FF;
+  font-size: min(2.5vw, 3vh);
+  margin-bottom: min(2vh, 2.5vw);
+  padding-bottom: min(1vh, 1.2vw);
+  border-bottom: min(0.1vh, 0.15vw) solid rgba(77, 162, 255, 0.2);
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: min(2vh, 2.5vw);
+  padding: min(1.5vh, 2vw);
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: min(1.2vh, 1.5vw);
+  border: min(0.1vh, 0.15vw) solid rgba(77, 162, 255, 0.1);
+}
+
+.setting-item label {
+  color: #ccc;
+  font-weight: 500;
+  font-size: min(2vw, 2.5vh);
+  flex: 1;
+  margin-right: 15px;
+}
+
+.setting-item input[type="range"] {
+  flex: 1;
+  margin: 0 min(1.5vh, 2vw);
+  -webkit-appearance: none;
+  appearance: none;
+  height: min(0.6vh, 0.8vw);
+  border-radius: min(0.3vh, 0.4vw);
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: min(2vh, 2.5vw);
+  height: min(2vh, 2.5vw);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  cursor: pointer;
+  box-shadow: 0 min(0.2vh, 0.3vw) min(0.8vh, 1vw) rgba(77, 162, 255, 0.4);
+}
+
+.setting-item input[type="range"]::-moz-range-thumb {
+  width: min(2vh, 2.5vw);
+  height: min(2vh, 2.5vw);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 min(0.2vh, 0.3vw) min(0.8vh, 1vw) rgba(77, 162, 255, 0.4);
+}
+
+.setting-item input[type="checkbox"] {
+  width: min(2vh, 2.5vw);
+  height: min(2vh, 2.5vw);
+  accent-color: #4DA2FF;
+  cursor: pointer;
+}
+
+.setting-item span {
+  color: #39ff14;
+  font-weight: bold;
+  min-width: min(6vh, 7.5vw);
+  text-align: right;
+  font-size: min(1.8vw, 2.3vh);
+}
+
+.settings-buttons {
+  display: flex;
+  gap: min(1.5vh, 2vw);
+  justify-content: center;
+  margin-top: min(3vh, 3.5vw);
+  padding-top: min(2vh, 2.5vw);
+  border-top: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}
+
+.settings-buttons .menu-btn {
+  padding: min(2vh, 2.5vw) min(3.5vh, 4vw);
+  font-size: min(2vw, 2.5vh);
+  min-width: auto;
+  flex: 0 1 auto;
+}
+
+/* Hide controls section on mobile - mouse sensitivity is desktop-only */
+.mobile .controls-section {
+  display: none;
+}
+
+/* ========================================== */
+/* SOUND TEST PANEL STYLES */
+/* ========================================== */
+
+.sound-test-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(26, 35, 50, 1) 0%, rgba(15, 20, 25, 1) 100%);
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(2.5vh, 3vw);
+  max-width: min(80vh, 90vw);
+  width: 90%;
+  max-height: 95%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
+  box-shadow: 0 min(2vh, 3vw) min(4vh, 5vw) rgba(0, 0, 0, 0.5);
+  z-index: 999999;
+  flex-direction: column;
+  transition: opacity 0.3s ease-out;
+}
+
+.sound-test-panel[class*="-visible"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.sound-test-panel[class*="-hidden"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sound-test-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(77, 162, 255, 0.1) 50%, transparent 70%);
+  border-radius: 20px;
+  pointer-events: none;
+}
+
+.sound-test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: min(3vh, 3.5vw);
+  padding-bottom: min(2vh, 2.5vw);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}
+
+.sound-test-header h2 {
+  color: #4DA2FF;
+  font-size: min(4vw, 4.5vh);
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  margin: 0;
+}
+
+.sound-test-section {
+  margin-bottom: min(3vh, 3.5vw);
+}
+
+.sound-test-section h3 {
+  color: #39ff14;
+  font-size: min(3vw, 3.5vh);
+  font-weight: bold;
+  margin-bottom: 15px;
+  text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+}
+
+.sound-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.sound-test-content .sound-btn {
+  background: linear-gradient(135deg, #2a3a4a 0%, #1a2332 100%) !important;
+  border: min(0.2vw, 0.3vh) solid #4DA2FF !important;
+  border-radius: min(1vh, 1.2vw) !important;
+  color: white !important;
+  padding: min(1.5vh, 2vw) min(2vh, 2.5vw) !important;
+  font-size: min(1.8vw, 2.3vh) !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  text-align: center !important;
+  position: relative !important;
+  overflow: visible !important; /* Allow text to be fully visible */
+  white-space: nowrap !important; /* Prevent text wrapping */
+  min-width: fit-content !important; /* Ensure button is wide enough for text */
+  width: 100% !important; /* Fill grid cell properly */
+  height: auto !important; /* Override mobile min-height */
+  text-overflow: unset !important; /* Override mobile text-overflow: ellipsis */
+  box-sizing: border-box !important; /* Include padding in width calculation */
+  z-index: 2; /* Ensure text appears above gradient effect */
+}
+
+.sound-test-content .sound-btn:hover {
+  background: linear-gradient(135deg, #4DA2FF 0%, #2a3a4a 100%) !important;
+  border-color: #39ff14 !important;
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.6), 0 0 20px rgba(57, 255, 20, 0.4) !important; /* Enhanced glow instead of scaling */
+  filter: brightness(1.1) !important; /* Subtle brightness increase */
+}
+
+.sound-test-content .sound-btn:active {
+  box-shadow: 0 2px 5px rgba(77, 162, 255, 0.2) !important;
+  filter: brightness(0.95) !important; /* Subtle dimming for click feedback */
+}
+
+.sound-test-content .sound-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none; /* Ensure it doesn't interfere with hover detection */
+}
+
+.sound-test-content .sound-btn:hover::before {
+  opacity: 1;
+}
+
+/* ========================================== */
+/* INSTRUCTIONS PANEL STYLES */
+/* ========================================== */
+
+.instructions-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 1) 0%, rgba(15, 20, 25, 1) 100%);
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(2.5vh, 3vw);
+  max-width: min(80vh, 90vw);
+  width: 90%;
+  max-height: 95%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
+  z-index: 999999;
+  flex-direction: column;
+  transition: opacity 0.3s ease-out;
+}
+
+.instructions-panel[class*="-visible"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.instructions-panel[class*="-hidden"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.instructions-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.instructions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: min(3vh, 3.5vw);
+  padding-bottom: min(1.5vh, 2vw);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}
+
+.instructions-header h2 {
+  color: #4DA2FF;
+  font-size: min(4vw, 4.5vh);
+  margin: 0;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+}
+
+.instructions-section {
+  margin-bottom: min(2.5vh, 3vw);
+}
+
+.instructions-section h3 {
+  color: #4DA2FF;
+  font-size: min(2.5vw, 3vh);
+  margin-bottom: min(1.5vh, 2vw);
+  padding-bottom: min(0.8vh, 1vw);
+  border-bottom: min(0.1vh, 0.15vw) solid rgba(77, 162, 255, 0.2);
+}
+
+.instructions-section p {
+  color: #ccc;
+  line-height: 1.6;
+  margin-bottom: min(1vh, 1.2vw);
+  font-size: min(1.8vw, 2.3vh);
+}
+
+.instructions-section ul {
+  color: #ccc;
+  line-height: 1.6;
+  padding-left: min(2vh, 2.5vw);
+  font-size: min(1.8vw, 2.3vh);
+}
+
+.instructions-section li {
+  margin-bottom: min(0.8vh, 1vw);
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: min(1.2vh, 1.5vw);
+  padding: min(1vh, 1.2vw);
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: min(0.8vh, 1vw);
+  border: min(0.1vh, 0.15vw) solid rgba(77, 162, 255, 0.1);
+}
+
+.control-icon {
+  font-size: min(2vw, 2.5vh);
+  margin-right: min(1.5vh, 2vw);
+  min-width: min(3vh, 3.5vw);
+}
+
+.control-text {
+  color: #ccc;
+  font-weight: 500;
+  font-size: min(1.8vw, 2.3vh);
+}
+
+.instructions-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: min(3vh, 3.5vw);
+  padding-top: min(2vh, 2.5vw);
+  border-top: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}
+
+/* ========================================== */
+/* LEADERBOARD MODAL STYLES */
+/* ========================================== */
+
+.leaderboard-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 1) 0%, rgba(15, 20, 25, 1) 100%);
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(2.5vh, 3vw);
+  max-width: min(80vh, 90vw);
+  width: 90%;
+  max-height: 95%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
+  z-index: 999999;
+  flex-direction: column;
+  transition: opacity 0.3s ease-out;
+}
+
+.leaderboard-modal[class*="-visible"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.leaderboard-modal[class*="-hidden"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.leaderboard-modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Leaderboard content inside modal */
+.leaderboard-modal .leaderboard {
+  width: 100%;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* ========================================== */
+/* RESPONSIVE DESIGN FOR MENUS */
+/* ========================================== */
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+

@@ -1,0 +1,132 @@
+/* ========================================== */
+/* MOBILE HEADER INTEGRATED STATS */
+/* ========================================== */
+/* Exact copy from Backup for reference */
+
+/* Integrated Game Stats for Mobile */
+.integrated-game-stats {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+}
+
+/* Mobile Pause Button - positioned in the middle */
+.mobile-pause-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(77, 162, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(77, 162, 255, 0.2);
+  font-size: 16px;
+  min-width: 45px;
+  min-height: 28px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #fff;
+  position: relative;
+  z-index: 100;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.mobile-pause-button:hover {
+  background: rgba(77, 162, 255, 0.3);
+  border-color: rgba(77, 162, 255, 0.5);
+}
+
+.mobile-pause-button:active {
+  transform: scale(0.95);
+}
+
+/* Ensure the header doesn't interfere with game canvas touch events */
+.game-header {
+  position: relative;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Make clickable elements in header work */
+.game-header .title,
+.game-header .stats,
+.game-header .mobile-pause-button {
+  pointer-events: auto;
+}
+
+.integrated-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(77, 162, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(77, 162, 255, 0.2);
+  min-width: 40px;
+  min-height: 28px;
+  justify-content: center;
+}
+
+/* Integrated stat icon and value - larger for readability on mobile */
+.integrated-stat .stat-icon {
+  font-size: 28px;
+}
+
+.integrated-stat .stat-value {
+  color: #39ff14;
+  font-weight: bold;
+  font-size: 30px;
+  text-shadow: 0 0 3px rgba(57, 255, 20, 0.3);
+}
+
+
+/* Orb-specific styling */
+.integrated-stat.orb-stat {
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.orb-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 3px rgba(0, 212, 255, 0.5));
+  animation: orbGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes orbGlow {
+  0% { 
+    filter: drop-shadow(0 0 3px rgba(0, 212, 255, 0.5));
+    transform: scale(1);
+  }
+  100% { 
+    filter: drop-shadow(0 0 6px rgba(0, 212, 255, 0.8));
+    transform: scale(1.05);
+  }
+}
+
+/* Coin-specific styling */
+.integrated-stat.coin-stat {
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.coin-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.5));
+  animation: coinGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes coinGlow {
+  0% { 
+    filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.5));
+    transform: scale(1);
+  }
+  100% { 
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.8));
+    transform: scale(1.05);
+  }
+}

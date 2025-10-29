@@ -1,0 +1,203 @@
+/* ========================================== */
+/* MOBILE FRONT PAGE MODULE */
+/* ========================================== */
+/* Front page overlay, content, title, subtitle, description, enter button */
+/* Converted from mobile-ui-styles.css - removed media queries, using viewport units */
+/* Note: .enter-game-btn styles are now in shared-ui-components-consolidated.css */
+
+/* Front Page Overlay - Mobile Landscape Optimized */
+.front-page-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(min(1vh, 1.5vw)); /* Dynamic blur */
+  padding: min(2.5vh, 3vw) min(1.5vw, 2vh); /* Dynamic padding */
+}
+
+.front-page-content {
+  text-align: center;
+  max-width: 90vw; /* Converted from 90% */
+  height: 85vh; /* Increased from max-height to height, and increased percentage */
+  width: 90vw; /* Converted from 90% */
+  padding: min(2.5vh, 3vw); /* Increased padding for better spacing */
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: min(2vh, 2.5vw); /* Dynamic border radius */
+  border: min(0.2vw, 0.3vh) solid #00d4ff; /* Dynamic border */
+  box-shadow: 0 0 min(3vh, 4vw) rgba(0, 212, 255, 0.3); /* Dynamic shadow */
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.game-title {
+  font-size: min(2.8vw, 3.5vh); /* Dynamic font size */
+  margin-bottom: min(2vh, 2.5vw); /* Added margin for better spacing */
+}
+
+.title-profile-image {
+  width: min(7vw, 8vh); /* Dynamic size */
+  height: min(7vw, 8vh); /* Dynamic size */
+  margin-bottom: min(2vh, 2.5vw); /* Added margin for better spacing */
+}
+
+.game-subtitle {
+  font-size: min(1.4vw, 1.9vh); /* Dynamic font size */
+  margin-bottom: min(2vh, 2.5vw); /* Added margin for better spacing */
+}
+
+.game-description {
+  font-size: min(1.4vw, 1.9vh); /* Dynamic font size */
+  line-height: 1.4;
+  margin-bottom: min(3vh, 4vw); /* Increased margin for better spacing */
+}
+
+/* Mobile-specific enter button overrides */
+.enter-game-btn {
+  padding: min(2.5vh, 3vw); /* Dynamic padding that scales with smaller dimension */
+  font-size: min(1.8vw, 2.5vh); /* Dynamic font size - scales with smaller dimension */
+  min-height: min(12vh, 8vw); /* Dynamic height - scales with smaller dimension */
+  max-width: 35vw; /* Converted from 350px */
+  margin-bottom: min(2vh, 2.5vw); /* Added margin for better spacing */
+}
+
+.audio-note {
+  font-size: min(1.1vw, 1.5vh); /* Dynamic font size */
+  margin-top: min(2vh, 2.5vw); /* Dynamic margin */
+}
+
+/* Responsive adjustments using viewport units */
+/* These replace the media queries with fluid scaling */
+
+/* Compact layout for smaller screens */
+.front-page-overlay.compact {
+  padding: min(1.5vh, 2vw) min(1vw, 1.5vh); /* Dynamic padding for compact screens */
+}
+
+.front-page-content.compact {
+  max-width: 95vw; /* Slightly larger for compact screens */
+  max-height: 95vh;
+  padding: min(1.5vh, 2vw); /* Dynamic padding */
+}
+
+.game-title.compact {
+  font-size: min(2.5vw, 3vh); /* Dynamic font size */
+  margin-bottom: min(1.5vh, 2vw); /* Dynamic margin */
+}
+
+.title-profile-image.compact {
+  width: min(6vw, 7vh); /* Dynamic size */
+  height: min(6vw, 7vh); /* Dynamic size */
+}
+
+.game-subtitle.compact {
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+  margin-bottom: min(2vh, 2.5vw); /* Dynamic margin */
+}
+
+.game-description.compact {
+  font-size: min(1.2vw, 1.6vh); /* Dynamic font size */
+  line-height: 1.4;
+  margin-bottom: min(2.5vh, 3vw); /* Dynamic margin */
+}
+
+.enter-game-btn.compact {
+  padding: min(1.8vh, 2.5vw) min(3.5vw, 4.5vh); /* Dynamic padding */
+  font-size: min(1.4vw, 1.9vh); /* Dynamic font size */
+  border-radius: min(2.5vh, 3vw); /* Dynamic border radius */
+  min-height: min(6vh, 8vw); /* Dynamic height */
+  width: 100%;
+  max-width: 30vw; /* Converted from 300px */
+}
+
+/* Very compact layout for very small screens */
+.front-page-content.very-compact {
+  max-height: 95vh;
+  padding: 1vh;
+}
+
+.game-title.very-compact {
+  font-size: 2vw;
+  margin-bottom: 1vh;
+}
+
+.title-profile-image.very-compact {
+  width: 4vw;
+  height: 4vw;
+}
+
+.game-subtitle.very-compact {
+  font-size: 1vw;
+  margin-bottom: 1.5vh;
+}
+
+.game-description.very-compact {
+  font-size: 0.9vw;
+  line-height: 1.3;
+  margin-bottom: 1.5vh;
+}
+
+.enter-game-btn.very-compact {
+  padding: 1.2vh 2.5vw;
+  font-size: 1.1vw;
+  min-height: 4.5vh;
+}
+
+/* Portrait-specific adjustments (for when orientation changes) */
+.front-page-overlay.portrait {
+  padding: 1.5vh 1vw;
+}
+
+.front-page-content.portrait {
+  max-width: 100vw;
+  max-height: 100vh;
+  padding: 1.2vh;
+}
+
+.game-title.portrait {
+  font-size: 2.2vw;
+  margin-bottom: 1.2vh;
+}
+
+.title-profile-image.portrait {
+  width: 5vw;
+  height: 5vw;
+}
+
+.game-subtitle.portrait {
+  font-size: 1.1vw;
+  margin-bottom: 1.8vh;
+}
+
+.game-description.portrait {
+  font-size: 0.95vw;
+  line-height: 1.3;
+  margin-bottom: 2vh;
+}
+
+.game-description.portrait p {
+  margin-bottom: 0.8vh;
+}
+
+.enter-game-btn.portrait {
+  padding: 1.6vh 3vw;
+  font-size: 1.2vw;
+  border-radius: 2vh;
+  min-height: 5.5vh;
+  width: 100%;
+  max-width: 28vw;
+}
+
+.audio-note.portrait {
+  font-size: 0.85vw;
+  margin-top: 1.8vh;
+}

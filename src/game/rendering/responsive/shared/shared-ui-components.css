@@ -1,0 +1,291 @@
+/* ========================================== */
+/* SHARED UI COMPONENTS */
+/* ========================================== */
+/* Base component styles used across all platforms */
+/* Buttons, panels, modals, and common UI elements */
+
+/* ========================================== */
+/* BUTTON COMPONENTS */
+/* ========================================== */
+
+/* Menu Button - Base Styles */
+.menu-btn {
+  background: linear-gradient(135deg, rgba(77, 162, 255, 0.1) 0%, rgba(58, 123, 213, 0.1) 100%);
+  border: 2px solid rgba(77, 162, 255, 0.3);
+  color: white !important;
+  padding: 18px 30px;
+  border-radius: 15px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.menu-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.menu-btn:hover::before {
+  left: 100%;
+}
+
+.menu-btn:hover {
+  transform: translateY(-3px);
+  border-color: #4DA2FF;
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.3);
+  background: linear-gradient(135deg, rgba(77, 162, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%);
+}
+
+.menu-btn:active {
+  transform: translateY(-1px);
+}
+
+.menu-btn.primary {
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  border-color: #4DA2FF;
+  box-shadow: 0 4px 15px rgba(77, 162, 255, 0.4);
+}
+
+.menu-btn.primary:hover {
+  background: linear-gradient(135deg, #5db3ff, #4a8be6);
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.5);
+}
+
+/* Sound Button - Base Styles */
+.sound-btn {
+  background: linear-gradient(135deg, #2a3a4a 0%, #1a2332 100%);
+  border: 2px solid #4DA2FF;
+  border-radius: 10px;
+  color: white !important;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.sound-btn:hover {
+  background: linear-gradient(135deg, #4DA2FF 0%, #2a3a4a 100%);
+  border-color: #39ff14;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(77, 162, 255, 0.4);
+}
+
+.sound-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(77, 162, 255, 0.2);
+}
+
+.sound-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.sound-btn:hover::before {
+  left: 100%;
+}
+
+/* Close Button - Base Styles */
+.close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: white !important;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: rgba(255, 0, 0, 0.2);
+  border-color: #ff4444;
+  color: #ff4444;
+  transform: scale(1.1);
+}
+
+/* Button Icon */
+.btn-icon {
+  font-size: 1.4rem;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+}
+
+/* ========================================== */
+/* PANEL COMPONENTS */
+/* ========================================== */
+
+/* Base Panel Styles */
+.settings-panel,
+.instructions-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  backdrop-filter: blur(15px);
+  animation: panelFadeIn 0.3s ease-out;
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Panel Content */
+.settings-content,
+.instructions-content {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(15, 20, 25, 0.95) 100%);
+  border: 3px solid #4DA2FF;
+  border-radius: 25px;
+  padding: 30px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Panel Sections */
+.settings-section {
+  margin-bottom: 30px;
+}
+
+/* ========================================== */
+/* MODAL COMPONENTS */
+/* ========================================== */
+
+/* Name Input Modal - Hidden by default */
+.name-input-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  display: none; /* Hidden by default */
+}
+
+/* Name Input Modal - Visible when active */
+.name-input-modal.name-input-modal-visible {
+  display: flex;
+}
+
+/* Name Input Modal - Hidden when has -hidden class */
+.name-input-modal.name-input-modal-hidden {
+  display: none;
+}
+
+.name-input-content {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(15, 20, 25, 0.95) 100%);
+  padding: 40px;
+  border-radius: 25px;
+  border: 3px solid #4DA2FF;
+  box-shadow: 0 0 50px rgba(77, 162, 255, 0.5);
+  text-align: center;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+  overflow: hidden;
+}
+
+.name-input-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(77, 162, 255, 0.1) 50%, transparent 70%);
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+/* Name Input Modal Buttons - Spacing */
+.name-input-content .menu-btn {
+  margin: 0 10px;
+}
+
+/* ========================================== */
+/* COMMON UI ELEMENTS */
+/* ========================================== */
+
+/* Game Title */
+.game-title {
+  font-size: 3.5rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(45deg, #00d4ff, #ff6b6b, #4ecdc4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Version Badge */
+.version-badge {
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Leaderboard Base */
+.leaderboard {
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(77, 162, 255, 0.3);
+  border-radius: 15px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+
+/* Menu Footer */
+.menu-footer {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(77, 162, 255, 0.2);
+  text-align: center;
+  color: #888;
+}

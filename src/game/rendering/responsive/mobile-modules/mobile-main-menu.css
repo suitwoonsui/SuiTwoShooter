@@ -1,0 +1,72 @@
+/* ========================================== */
+/* MOBILE MAIN MENU MODULE */
+/* ========================================== */
+/* Mobile-specific overrides for main menu */
+/* Extends shared-main-menu.css with mobile optimizations */
+
+/* Mobile Main Menu Overlay - Optimized for small screens */
+/* These styles override shared-main-menu.css for mobile devices */
+
+/* Ensure main menu works well on mobile with viewport units */
+.main-menu-overlay {
+  /* Mobile-specific: Use viewport units for better scaling */
+  width: 100vw;
+  height: 100vh;
+  /* Padding for mobile to prevent content from touching edges */
+  padding: min(2vh, 3vw);
+}
+
+/* Mobile Main Menu Content - Optimized sizing */
+.main-menu-content {
+  /* Mobile: More compact max-width to fit smaller screens */
+  max-width: 95vw;
+  max-height: 95vh;
+  width: 95vw;
+  /* Better scrolling on mobile */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  /* Mobile: Smaller padding */
+  padding: min(2vh, 2.5vw);
+}
+
+/* Mobile: Optimize title sizing */
+.main-menu-overlay .game-title h1 {
+  font-size: min(5vw, 6vh); /* Scales with viewport, smaller max */
+  margin-bottom: min(1.5vh, 2vw);
+}
+
+.main-menu-overlay .title-profile-image {
+  width: min(8vw, 10vh);
+  height: min(8vw, 10vh);
+}
+
+/* Mobile: Compact menu buttons */
+.main-menu-overlay .menu-buttons {
+  gap: min(1vh, 1.5vw);
+  margin: min(2vh, 3vw) 0;
+  width: 100%;
+}
+
+.main-menu-overlay .menu-btn {
+  padding: min(1.5vh, 2vw) min(2vw, 3vh);
+  font-size: min(3.6vw, 5vh); /* Doubled from min(1.8vw, 2.5vh) */
+  min-height: min(6vh, 8vw);
+  /* Ensure buttons are touch-friendly on mobile */
+  touch-action: manipulation;
+}
+
+/* Mobile: Compact footer stats */
+.main-menu-overlay .menu-footer {
+  margin-top: min(2vh, 3vw);
+  padding-top: min(1.5vh, 2vw);
+}
+
+.main-menu-overlay .game-stats {
+  gap: min(1.5vw, 2vh);
+}
+
+.main-menu-overlay .game-stats .stat-item {
+  padding: min(1vh, 1.5vw) min(1.5vw, 2vh);
+  font-size: min(2.4vw, 3.6vh); /* Doubled from min(1.2vw, 1.8vh) */
+}
+

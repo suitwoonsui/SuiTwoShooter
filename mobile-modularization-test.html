@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>SuiTwo - Mobile CSS Modularization Test</title>
+  
+  <!-- Device Detection and CSS Loading -->
+         <script src="src/game/systems/device/device-detection.js"></script>
+         <script src="src/game/systems/device/css-loader.js"></script>
+         <script src="src/game/systems/device/landscape-orientation.js"></script>
+         <script src="src/game/rendering/responsive/canvas-manager.js"></script>
+         <script src="src/game/rendering/responsive/viewport-manager.js"></script>
+</head>
+<body>
+  <!-- Mobile viewport container -->
+  <div class="viewport-container">
+      <!-- Front Page Test -->
+      <div class="front-page-overlay front-page-overlay-visible">
+        <div class="front-page-content">
+          <h1 class="game-title">SuiTwo Space Shooter</h1>
+          <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image">
+          <h2 class="game-subtitle">Mobile CSS Modularization Test</h2>
+          <div class="game-description">
+            <p>Testing mobile CSS modularization with viewport units and landscape optimization.</p>
+            <p>All media queries have been removed and replaced with fluid scaling.</p>
+          </div>
+          <button class="enter-game-btn" onclick="toggleMenu()">Enter Game</button>
+          <p class="audio-note">🔊 Audio recommended for best experience</p>
+        </div>
+      </div>
+      
+      <!-- Main Menu Test -->
+      <div class="main-menu-overlay main-menu-overlay-hidden">
+        <div class="main-menu-content">
+          <div class="game-title">
+            <h1>SuiTwo</h1>
+            <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image">
+          </div>
+          <div class="menu-buttons">
+            <button class="menu-btn" onclick="toggleGame()">
+              <span class="btn-icon">🎮</span>
+              <span>Play Game</span>
+            </button>
+            <button class="menu-btn" onclick="openPanel('settings')">
+              <span class="btn-icon">⚙️</span>
+              <span>Settings</span>
+            </button>
+            <button class="menu-btn" onclick="openPanel('instructions')">
+              <span class="btn-icon">📋</span>
+              <span>Instructions</span>
+            </button>
+            <button class="menu-btn" onclick="openPanel('leaderboard')">
+              <span class="btn-icon">🏆</span>
+              <span>Leaderboard</span>
+            </button>
+            <button class="menu-btn" onclick="openPanel('sound-test')">
+              <span class="btn-icon">🔊</span>
+              <span>Sound Test</span>
+            </button>
+          </div>
+          <div class="menu-footer">
+            <p class="version-info">Version 1.0.0 Alpha</p>
+          </div>
+        </div>
+        
+        <!-- Mobile Game UI Test -->
+        <div class="mobile-game-overlay" style="display: none;">
+               <!-- Mobile Game Header -->
+               <div class="game-header mobile-compact">
+                  <div class="title">
+                    <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="header-logo">
+                    <span>SuiTwo</span>
+                    <span class="alpha-badge">ALPHA</span>
+                  </div>
+                  <div class="middle-stats">
+                    <div class="integrated-stat orb-stat">
+                      <img src="assets/Blue_Orb_Shot.webp" alt="Orb Level" class="orb-icon">
+                      <span class="stat-value">3</span>
+                    </div>
+                    <div class="integrated-stat coin-stat">
+                      <img src="assets/SuiTwo_Coin.webp" alt="Coins" class="coin-icon">
+                      <span class="stat-value">50</span>
+                    </div>
+                    <div class="integrated-stat">
+                      <span class="stat-icon">🎯</span>
+                      <span class="stat-value">1,250</span>
+                    </div>
+                    <div class="integrated-stat">
+                      <span class="stat-icon">🏆</span>
+                      <span class="stat-value">1</span>
+                    </div>
+                  </div>
+                  <div class="right-stats">
+                    <div class="integrated-stat">
+                      <span class="stat-icon">📏</span>
+                      <span class="stat-value">7m</span>
+                    </div>
+                  </div>
+                </div>
+         
+         <div class="mobile-game-content">
+           <canvas id="gameCanvas" width="800" height="480"></canvas>
+         </div>
+       </div>
+  </div>
+  
+  <!-- Panel Overlays (Outside viewport container - true viewport overlays) -->
+  <!-- Settings Panel -->
+  <div class="mobile-menu-panel settings-panel" id="settingsPanel">
+          <div class="settings-header">
+            <h2>⚙️ Game Settings</h2>
+            <button class="close-btn" onclick="closePanel('settings')">✕</button>
+          </div>
+          
+          <div class="settings-section controls-section">
+            <h3>🎮 Controls</h3>
+            <div class="setting-item">
+              <label for="mouseSensitivity">Mouse Sensitivity:</label>
+              <input type="range" id="mouseSensitivity" min="0.1" max="0.5" step="0.05" value="0.2">
+              <span id="mouseSensitivityValue">0.2</span>
+            </div>
+          </div>
+          
+          <div class="settings-section">
+            <h3>🎨 Graphics</h3>
+            <div class="setting-item">
+              <label for="particleEffects">Particle Effects:</label>
+              <input type="checkbox" id="particleEffects" checked>
+            </div>
+            <div class="setting-item">
+              <label for="screenShake">Screen Shake:</label>
+              <input type="checkbox" id="screenShake" checked>
+            </div>
+            <div class="setting-item">
+              <label for="trailEffects">Player Trail:</label>
+              <input type="checkbox" id="trailEffects" checked>
+            </div>
+          </div>
+          
+          <div class="settings-section">
+            <h3>🔊 Audio</h3>
+            <div class="setting-item">
+              <label for="masterVolume">Master Volume:</label>
+              <input type="range" id="masterVolume" min="0" max="100" step="10" value="70">
+              <span id="masterVolumeValue">70%</span>
+            </div>
+            <div class="setting-item">
+              <label for="soundEffectsVolume">Sound Effects Volume:</label>
+              <input type="range" id="soundEffectsVolume" min="0" max="100" step="10" value="80">
+              <span id="soundEffectsVolumeValue">80%</span>
+            </div>
+            <div class="setting-item">
+              <label for="backgroundMusicVolume">Background Music Volume:</label>
+              <input type="range" id="backgroundMusicVolume" min="0" max="100" step="10" value="60">
+              <span id="backgroundMusicVolumeValue">60%</span>
+            </div>
+            <div class="setting-item">
+              <label for="soundEffects">Sound Effects:</label>
+              <input type="checkbox" id="soundEffects" checked>
+            </div>
+            <div class="setting-item">
+              <label for="backgroundMusic">Background Music:</label>
+              <input type="checkbox" id="backgroundMusic" checked>
+            </div>
+          </div>
+          
+          <div class="settings-buttons">
+            <button class="menu-btn" onclick="resetSettings()">Reset to Default</button>
+            <button class="menu-btn primary" onclick="saveSettings()">Save Settings</button>
+          </div>
+        </div>
+        
+        <!-- Instructions Panel -->
+        <div class="mobile-menu-panel instructions-panel" id="instructionsPanel">
+          <div class="instructions-header">
+            <h2>📖 How to Play</h2>
+            <button class="close-btn" onclick="closePanel('instructions')">✕</button>
+          </div>
+          
+          <div class="instructions-section">
+            <h3>🎯 Objective</h3>
+            <p>Survive as long as possible, defeat bosses, and achieve the highest score!</p>
+          </div>
+          
+          <div class="instructions-section">
+            <h3>🎮 Controls</h3>
+            <div class="control-item">
+              <span class="control-icon">🖱️</span>
+              <span class="control-text">Mouse: Move your character vertically</span>
+            </div>
+            <div class="control-item">
+              <span class="control-icon">⏸️</span>
+              <span class="control-text">P: Pause/Resume game</span>
+            </div>
+            <div class="control-item">
+              <span class="control-icon">🔫</span>
+              <span class="control-text">Auto-Fire: Your character shoots automatically</span>
+            </div>
+          </div>
+          
+          <div class="instructions-section">
+            <h3>🎯 Gameplay</h3>
+            <ul>
+              <li>Move your character to avoid enemies and collect power-ups</li>
+              <li>Collect coins to increase your score</li>
+              <li>Pick up green power-ups to increase firepower</li>
+              <li>Avoid red power-ups that decrease firepower</li>
+              <li>Defeat bosses to progress to higher tiers</li>
+              <li>Higher tiers feature stronger enemies and bosses</li>
+            </ul>
+          </div>
+          
+          <div class="instructions-section">
+            <h3>🏆 Scoring</h3>
+            <ul>
+              <li>Destroy enemies: 15 points × enemy tier</li>
+              <li>Collect coins: 10 points each</li>
+              <li>Defeat bosses: 5000 points × tier</li>
+              <li>Survival bonus: Continuous points based on speed</li>
+            </ul>
+          </div>
+          
+          <div class="instructions-buttons">
+            <button class="menu-btn" onclick="closePanel('instructions')">Got It!</button>
+          </div>
+        </div>
+        
+        <!-- Sound Test Panel -->
+        <div class="mobile-menu-panel sound-test-panel" id="soundTestPanel">
+          <div class="sound-test-header">
+            <h2>🔊 Sound Test</h2>
+            <button class="close-btn" onclick="closePanel('sound-test')">✕</button>
+          </div>
+          
+          <div class="sound-test-section">
+            <h3>🎵 Game Sounds</h3>
+            <div class="sound-buttons">
+              <button class="sound-btn" onclick="testSound('shoot')">🔫 Shoot</button>
+              <button class="sound-btn" onclick="testSound('enemyHit')">💥 Enemy Hit</button>
+              <button class="sound-btn" onclick="testSound('enemyDestroyed')">💀 Enemy Destroyed</button>
+              <button class="sound-btn" onclick="testSound('coinCollect')">🪙 Coin Collect</button>
+              <button class="sound-btn" onclick="testSound('powerupCollect')">⚡ Power Up</button>
+              <button class="sound-btn" onclick="testSound('powerupNegative')">⚠️ Power Down</button>
+              <button class="sound-btn" onclick="testSound('bossHit')">🎯 Boss Hit</button>
+              <button class="sound-btn" onclick="testSound('bossDestroyed')">💀 Boss Destroyed</button>
+              <button class="sound-btn" onclick="testSound('gameOver')">💀 Game Over</button>
+              <button class="sound-btn" onclick="testSound('levelUp')">📈 Level Up</button>
+              <button class="sound-btn" onclick="testSound('playerHit')">💢 Player Hit</button>
+            </div>
+          </div>
+          
+          <div class="sound-test-section">
+            <h3>🛡️ Force Field Sounds</h3>
+            <div class="sound-buttons">
+              <button class="sound-btn" onclick="testForceFieldSound('activate')">🟢 Force Field Activate</button>
+              <button class="sound-btn" onclick="testForceFieldSound('powerUp')">🔵 Force Field Power Up</button>
+              <button class="sound-btn" onclick="testForceFieldSound('powerDown')">🟡 Force Field Power Down</button>
+              <button class="sound-btn" onclick="testForceFieldSound('destroyed')">🔴 Force Field Destroyed</button>
+            </div>
+          </div>
+          
+          <div class="sound-test-section">
+            <h3>🎼 Musical Sequences</h3>
+            <div class="sound-buttons">
+              <button class="sound-btn" onclick="testSequence('ascending')">📈 Ascending Sequence</button>
+              <button class="sound-btn" onclick="testSequence('descending')">📉 Descending Sequence</button>
+              <button class="sound-btn" onclick="testSequence('destruction')">💥 Destruction Sequence</button>
+            </div>
+          </div>
+          
+          <div class="sound-test-section">
+            <h3>🎵 Gameplay Music</h3>
+            <div class="sound-buttons">
+              <button class="sound-btn" onclick="testGameplayMusic()">🎶 Play Gameplay Music</button>
+              <button class="sound-btn" onclick="testBossMusic()">👹 Play Boss Music</button>
+              <button class="sound-btn" onclick="stopBackgroundMusic()">⏹️ Stop Music</button>
+            </div>
+          </div>
+          
+          <div class="sound-test-section">
+            <h3>🔧 Audio Debug</h3>
+            <div class="sound-buttons">
+              <button class="sound-btn" onclick="showAudioStats()">📊 Audio Stats</button>
+              <button class="sound-btn" onclick="testAllSounds()">🎵 Test All Sounds</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Leaderboard Panel -->
+        <div class="mobile-menu-panel leaderboard-panel" id="leaderboardPanel">
+          <div class="leaderboard-header">
+            <h2>🏆 Leaderboard</h2>
+            <button class="close-btn" onclick="closePanel('leaderboard')">✕</button>
+          </div>
+          <h3 class="leaderboard-title">Top Scores</h3>
+          <div class="leaderboard-list">
+            <div class="leaderboard-item">
+              <span class="leaderboard-rank">1</span>
+              <span class="leaderboard-score">125,000</span>
+              <span class="leaderboard-date">Today</span>
+            </div>
+            <div class="leaderboard-item">
+              <span class="leaderboard-rank">2</span>
+              <span class="leaderboard-score">98,500</span>
+              <span class="leaderboard-date">Today</span>
+            </div>
+            <div class="leaderboard-item">
+              <span class="leaderboard-rank">3</span>
+              <span class="leaderboard-score">87,200</span>
+              <span class="leaderboard-date">Yesterday</span>
+            </div>
+            <div class="leaderboard-item">
+              <span class="leaderboard-rank">4</span>
+              <span class="leaderboard-score">76,800</span>
+              <span class="leaderboard-date">Yesterday</span>
+            </div>
+            <div class="leaderboard-item">
+              <span class="leaderboard-rank">5</span>
+              <span class="leaderboard-score">65,400</span>
+              <span class="leaderboard-date">2 days ago</span>
+            </div>
+          </div>
+          <div class="leaderboard-buttons">
+            <button class="menu-btn" onclick="closePanel('leaderboard')">Close</button>
+          </div>
+        </div>
+  
+  <script>
+    // Test functions
+    function toggleMenu() {
+      const frontPage = document.querySelector('.front-page-overlay');
+      const mainMenu = document.querySelector('.main-menu-overlay');
+      const gameOverlay = document.querySelector('.mobile-game-overlay');
+      
+      if (mainMenu.classList.contains('main-menu-overlay-visible')) {
+        // Hide menu, show front page
+        mainMenu.classList.remove('main-menu-overlay-visible');
+        mainMenu.classList.add('main-menu-overlay-hidden');
+        if (frontPage) {
+          frontPage.classList.remove('front-page-overlay-hidden');
+          frontPage.classList.add('front-page-overlay-visible');
+        }
+        if (gameOverlay) {
+          gameOverlay.style.display = 'none';
+        }
+      } else {
+        // Show menu, hide front page
+        mainMenu.classList.remove('main-menu-overlay-hidden');
+        mainMenu.classList.add('main-menu-overlay-visible');
+        if (frontPage) {
+          frontPage.classList.remove('front-page-overlay-visible');
+          frontPage.classList.add('front-page-overlay-hidden');
+        }
+        if (gameOverlay) {
+          gameOverlay.style.display = 'none';
+        }
+      }
+    }
+    
+    function toggleGame() {
+      const frontPage = document.querySelector('.front-page-overlay');
+      const mainMenu = document.querySelector('.main-menu-overlay');
+      const gameOverlay = document.querySelector('.mobile-game-overlay');
+      
+      // Hide menu and front page, show game
+      if (frontPage) {
+        frontPage.classList.remove('front-page-overlay-visible');
+        frontPage.classList.add('front-page-overlay-hidden');
+      }
+      if (mainMenu) {
+        mainMenu.classList.remove('main-menu-overlay-visible');
+        mainMenu.classList.add('main-menu-overlay-hidden');
+      }
+      if (gameOverlay) {
+        gameOverlay.style.display = 'flex';
+      }
+      
+      // Initialize canvas for testing
+      if (typeof initTestCanvas === 'function') {
+        initTestCanvas();
+      }
+    }
+    
+    function testTouch() {
+      const btn = event.target;
+      btn.classList.add('mobile-touch-active');
+      setTimeout(() => {
+        btn.classList.remove('mobile-touch-active');
+      }, 100);
+    }
+    
+    // Panel functions
+    function openPanel(panelType) {
+      console.log(`🔍 Opening panel: ${panelType}`);
+      
+      // Close all panels first
+      closeAllPanels();
+      
+      // Open the requested panel
+      let panelId = panelType + 'Panel';
+      
+      // Fix ID mapping for kebab-case to camelCase
+      if (panelType === 'sound-test') {
+        panelId = 'soundTestPanel';
+      }
+      
+      const panel = document.getElementById(panelId);
+      console.log(`🔍 Panel ID: ${panelId}, Found: ${!!panel}`);
+      
+      if (panel) {
+        panel.style.setProperty('display', 'flex', 'important');
+        console.log(`✅ Panel ${panelType} opened successfully`);
+      } else {
+        console.error(`❌ Panel ${panelId} not found!`);
+      }
+    }
+    
+    function closePanel(panelType) {
+      console.log(`🔍 Closing panel: ${panelType}`);
+      let panelId = panelType + 'Panel';
+      
+      // Fix ID mapping for kebab-case to camelCase
+      if (panelType === 'sound-test') {
+        panelId = 'soundTestPanel';
+      }
+      
+      const panel = document.getElementById(panelId);
+      if (panel) {
+        panel.style.setProperty('display', 'none', 'important');
+        console.log(`✅ Panel ${panelType} closed successfully`);
+      } else {
+        console.error(`❌ Panel ${panelId} not found!`);
+      }
+    }
+    
+    function closeAllPanels() {
+      const panels = ['settingsPanel', 'instructionsPanel', 'soundTestPanel', 'leaderboardPanel'];
+      panels.forEach(panelId => {
+        const panel = document.getElementById(panelId);
+        if (panel) {
+          panel.style.setProperty('display', 'none', 'important');
+        }
+      });
+    }
+    
+    // Test function for debugging
+    function testPanels() {
+      console.log('🧪 Testing panel functionality...');
+      const panels = ['settingsPanel', 'instructionsPanel', 'soundTestPanel', 'leaderboardPanel'];
+      panels.forEach(panelId => {
+        const panel = document.getElementById(panelId);
+        console.log(`Panel ${panelId}: ${panel ? 'Found' : 'NOT FOUND'}`);
+        if (panel) {
+          const computedStyle = getComputedStyle(panel);
+          console.log(`  - Display: ${panel.style.display} (computed: ${computedStyle.display})`);
+          console.log(`  - Z-index: ${panel.style.zIndex} (computed: ${computedStyle.zIndex})`);
+          console.log(`  - Position: ${computedStyle.position}`);
+          console.log(`  - Visibility: ${computedStyle.visibility}`);
+          console.log(`  - Opacity: ${computedStyle.opacity}`);
+          console.log(`  - Width: ${computedStyle.width}`);
+          console.log(`  - Height: ${computedStyle.height}`);
+          console.log(`  - Top: ${computedStyle.top}`);
+          console.log(`  - Left: ${computedStyle.left}`);
+        }
+      });
+    }
+    
+    // Make test function available globally
+    window.testPanels = testPanels;
+    
+           // Initialize test canvas with some content
+           function initTestCanvas() {
+             const canvas = document.getElementById('gameCanvas');
+             if (!canvas) return;
+             
+             // Initialize responsive canvas manager for proper scaling
+             if (typeof ResponsiveCanvas !== 'undefined' && typeof ViewportManager !== 'undefined') {
+               ResponsiveCanvas.initialize(canvas);
+               ViewportManager.initialize();
+             }
+             
+             const ctx = canvas.getContext('2d');
+             const width = canvas.width; // 800
+             const height = canvas.height; // 480
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, width, height);
+      
+      // Draw background gradient
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, '#0a0a0a');
+      gradient.addColorStop(0.5, '#0f1419');
+      gradient.addColorStop(1, '#1a2332');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      
+      // Draw some test elements
+      ctx.fillStyle = '#4DA2FF';
+      ctx.font = '24px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('SuiTwo Game Canvas', width / 2, height / 2 - 20);
+      
+      ctx.fillStyle = '#39ff14';
+      ctx.font = '16px Arial';
+      ctx.fillText('Mobile CSS Test - Game UI', width / 2, height / 2 + 20);
+      
+      // Draw some animated circles
+      const time = Date.now() * 0.001;
+      for (let i = 0; i < 5; i++) {
+        const x = width / 2 + Math.cos(time + i) * 50;
+        const y = height / 2 + Math.sin(time + i) * 30;
+        const radius = 10 + Math.sin(time * 2 + i) * 5;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(77, 162, 255, ${0.3 + Math.sin(time + i) * 0.2})`;
+        ctx.fill();
+      }
+      
+      // Draw border
+      ctx.strokeStyle = '#4DA2FF';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, width - 2, height - 2);
+    }
+    
+    // Update test panel with device info
+    function updateDeviceInfo() {
+      document.getElementById('device-type').textContent = DeviceDetection.detectDeviceType();
+      document.getElementById('screen-size').textContent = `${window.screen.width}x${window.screen.height}`;
+      document.getElementById('orientation').textContent = window.screen.orientation ? window.screen.orientation.type : 'Unknown';
+      document.getElementById('touch-support').textContent = 'ontouchstart' in window ? 'Yes' : 'No';
+    }
+
+    // Settings functions
+    function resetSettings() {
+      console.log('Reset settings to default');
+      alert('Settings reset to default values');
+    }
+
+    function saveSettings() {
+      console.log('Settings saved');
+      alert('Settings saved successfully');
+    }
+
+    // Sound test functions
+    function testSound(soundType) {
+      console.log('Testing sound:', soundType);
+      alert('Playing sound: ' + soundType);
+    }
+
+    function testForceFieldSound(soundType) {
+      console.log('Testing force field sound:', soundType);
+      alert('Playing force field sound: ' + soundType);
+    }
+
+    function testSequence(sequenceType) {
+      console.log('Testing sequence:', sequenceType);
+      alert('Playing sequence: ' + sequenceType);
+    }
+
+    function testGameplayMusic() {
+      console.log('Playing gameplay music');
+      alert('Playing gameplay music');
+    }
+
+    function testBossMusic() {
+      console.log('Playing boss music');
+      alert('Playing boss music');
+    }
+
+    function stopBackgroundMusic() {
+      console.log('Stopping background music');
+      alert('Background music stopped');
+    }
+
+    function showAudioStats() {
+      console.log('Showing audio stats');
+      alert('Audio Stats:\n- Active sounds: 0\n- Memory usage: 0MB\n- Sample rate: 44.1kHz');
+    }
+
+    function testAllSounds() {
+      console.log('Testing all sounds');
+      alert('Testing all game sounds...');
+    }
+    
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      updateDeviceInfo();
+      
+      // Initialize landscape orientation
+      if (typeof LandscapeOrientation !== 'undefined') {
+        LandscapeOrientation.initialize();
+      }
+      
+    });
+  </script>
+</body>
+</html>

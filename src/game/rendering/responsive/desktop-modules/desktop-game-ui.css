@@ -1,0 +1,532 @@
+/* ========================================== */
+/* DESKTOP GAME UI MODULE */
+/* Extracted from game-styles.css lines 133-477, 479-645 */
+/* ========================================== */
+
+/* Enhanced Header */
+.game-header {
+  width: 100%; /* Full width of parent container */
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 20, 25, 0.9) 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  border-bottom: 3px solid #4DA2FF;
+  box-shadow: 0 4px 20px rgba(77, 162, 255, 0.3);
+  backdrop-filter: blur(15px);
+  position: relative;
+}
+
+.game-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.game-header .title {
+  font-size: 48px; /* Doubled from 24px */
+  font-weight: bold;
+  color: #4DA2FF;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+  border: 2px solid #4DA2FF;
+  box-shadow: 0 0 10px rgba(77, 162, 255, 0.3);
+}
+
+/* Alpha badge base style moved to shared-viewport-container.css */
+/* Desktop-specific overrides removed - using universal responsive styles from shared */
+
+/* Force white color for alpha badge in header (color only, styling is in shared) */
+.game-header .title .alpha-badge,
+.game-header .alpha-badge,
+header.game-header div.title span.alpha-badge {
+  color: white !important;
+}
+
+.game-header .stats {
+  display: flex;
+  gap: 15px;
+}
+
+.game-header .stat {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  padding: 10px 15px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.game-header .stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.2);
+}
+
+.game-header .stat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.game-header .stat:hover::before {
+  left: 100%;
+}
+
+.stat-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+/* Enhanced Game Container - wrapper for header, gameplay, and footer */
+.game-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column; /* Vertical layout: header, gameplay, footer */
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 20px;
+  position: relative;
+  
+  /* Desktop-specific visual styling */
+  background: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
+  border-radius: 20px;
+  border: 2px solid rgba(77, 162, 255, 0.3);
+  box-shadow: 
+    inset 0 0 50px rgba(77, 162, 255, 0.1),
+    0 0 30px rgba(0, 0, 0, 0.5);
+  /* Wrapper for game content */
+}
+
+/* Desktop Gameplay Area - contains canvas and UI overlay */
+/* INFO BOX ON LEFT, CANVAS ON RIGHT */
+.gameplay-area {
+  /* Layout */
+  width: 100%; /* Full width of parent container */
+  flex: 1 1 auto; /* Take remaining space after header/footer */
+  min-height: 0; /* Allow flex shrinking */
+  min-width: 0; /* Allow flex shrinking */
+  
+  display: flex;
+  flex-direction: row;
+  align-items: center; /* Center items vertically instead of stretch */
+  justify-content: flex-start;
+  gap: 1vw; /* Space between info box and canvas */
+  
+  /* Appearance */
+  padding: 8px;
+  overflow: hidden;
+  position: relative; /* Establish positioning context for children */
+  
+  /* Desktop-specific: Side-by-side layout for info box and canvas */
+}
+
+/* Desktop: Make .game-wrapper work like .gameplay-area for side-by-side layout */
+/* This ensures compatibility with the existing HTML structure */
+.game-wrapper {
+  /* Override centering to allow side-by-side layout */
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 1vw !important;
+  padding: 8px !important;
+  
+  /* Maintain other styling */
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Game Container Background Effects */
+.game-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(77, 162, 255, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(58, 123, 213, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  border-radius: 20px;
+}
+
+
+canvas {
+  display: block;
+  border: 3px solid #4DA2FF;
+  background: #000;
+  border-radius: 15px;
+  box-shadow: 
+    0 0 20px rgba(77, 162, 255, 0.3),
+    inset 0 0 20px rgba(0, 0, 0, 0.8);
+  transition: all 0.3s ease;
+}
+
+canvas:hover {
+  box-shadow: 
+    0 0 30px rgba(77, 162, 255, 0.5),
+    inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+/* In-Game UI - Side-by-side with canvas */
+/* INFO BOX - appears on LEFT side */
+.game-ui-overlay {
+  /* Override absolute positioning from game-styles.css */
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  
+  /* Flex layout properties */
+  flex: 0 0 auto; /* Fixed width, don't grow/shrink */
+  padding: 0; /* No padding - maximize space for canvas */
+  pointer-events: auto; /* Allow interaction with UI elements */
+  order: -1; /* Place info box BEFORE canvas in flex layout (on the left) */
+  z-index: 1; /* Ensure it's above canvas for pointer events */
+  /* Info box is positioned inline with canvas, not as true overlay */
+}
+
+.game-stats-panel {
+  /* Override absolute positioning from game-styles.css */
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 20, 25, 0.9) 100%);
+  border: 2px solid rgba(77, 162, 255, 0.3);
+  border-radius: 15px;
+  padding: 1.5vw 1vw; /* Reduced padding for more compact display */
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  width: 18vw; /* Reduced from 25vw - more space for canvas */
+  /* Scales with viewport width */
+}
+
+/* Desktop Canvas - flexible sizing to accommodate info box */
+/* Matches game's internal 800x480 resolution (5:3 aspect ratio) */
+#gameCanvas {
+  /* Flex layout - take up remaining space */
+  flex: 1;
+  min-width: 0;
+  
+  /* Constrain dimensions */
+  max-width: calc(100% - 19vw); /* Leave space for info box (18vw + 1vw gap) */
+  max-height: 100%;
+  
+  /* Scale game content to fit while maintaining 5:3 aspect ratio */
+  object-fit: contain;
+  object-position: center;
+  
+  /* Ensure canvas fills available flex space */
+  width: auto;
+  height: auto;
+  
+  /* No minimum size constraints - let canvas shrink as much as needed */
+  /* Note: aspect-ratio conflicts with object-fit, so we let the canvas internal 800x480 dimensions maintain the ratio */
+}
+
+.game-stats-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8vw; /* Pure viewport-based margin */
+  padding: 0.5vw 0; /* Pure viewport-based padding */
+}
+
+.stat-item:last-child {
+  margin-bottom: 0;
+}
+
+.stat-label {
+  color: #ccc;
+  font-size: 1.4vw; /* Pure viewport-based font size */
+  font-weight: 500;
+}
+
+.stat-value {
+  color: var(--color-accent); /* Market green for scores */
+  font-size: 1.6vw; /* Pure viewport-based font size */
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.3); /* Market green glow */
+  animation: statPulse 2s ease-in-out infinite alternate;
+}
+
+/* Responsive adjustments for game UI */
+
+
+/* Enhanced Leaderboard */
+.leaderboard {
+  width: 300px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 20, 25, 0.9) 100%);
+  border-radius: 20px;
+  border: 2px solid rgba(77, 162, 255, 0.3);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(15px);
+  overflow: hidden;
+  position: relative;
+}
+
+.leaderboard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.leaderboard h2 {
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  color: white !important;
+  padding: 20px;
+  margin: 0;
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+}
+
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.leaderboard-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.leaderboard-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.leaderboard-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  border-radius: 4px;
+}
+
+.leaderboard-item {
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.leaderboard-item:hover {
+  background: rgba(77, 162, 255, 0.1);
+  transform: translateX(5px);
+}
+
+.leaderboard-item .rank {
+  background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
+  color: white !important;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  margin-right: 15px;
+}
+
+.leaderboard-item .player-name {
+  flex: 1;
+  font-weight: 500;
+  color: #fff;
+}
+
+.leaderboard-item .player-score {
+  font-weight: bold;
+  color: #39ff14;
+  font-size: 16px;
+}
+
+/* Enhanced Footer */
+.game-footer {
+  width: 100%; /* Full width of parent container */
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 20, 25, 0.9) 100%);
+  border-top: 3px solid #00d4ff;
+  box-shadow: 0 -4px 20px rgba(0, 212, 255, 0.3);
+  backdrop-filter: blur(15px);
+  position: relative;
+}
+
+.game-footer::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.game-footer .controls {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  font-size: 14px;
+  color: #ccc;
+  margin-bottom: 10px;
+}
+
+.game-footer .controls span {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 15px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.game-footer .controls span:hover {
+  background: rgba(77, 162, 255, 0.2);
+  color: #4DA2FF;
+  transform: translateY(-2px);
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-icon {
+  font-size: 16px;
+}
+
+.version-info {
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+  opacity: 0.8;
+}
+
+/* Enhanced Name Input Modal */
+/* Note: Visibility classes (hidden/visible) are handled by shared-ui-components.css */
+/* This section only contains desktop-specific content styling extensions */
+
+.name-input-content {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(15, 20, 25, 0.95) 100%);
+  padding: 40px;
+  border-radius: 25px;
+  border: 3px solid #4DA2FF;
+  box-shadow: 0 0 50px rgba(77, 162, 255, 0.5);
+  text-align: center;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+  overflow: hidden;
+}
+
+.name-input-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.name-input-content h2 {
+  color: #4DA2FF;
+  font-size: 28px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+}
+
+.score-display {
+  background: rgba(77, 162, 255, 0.1);
+  padding: 15px;
+  border-radius: 15px;
+  margin-bottom: 25px;
+  border: 2px solid rgba(77, 162, 255, 0.3);
+}
+
+.score-display span {
+  color: #39ff14;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.name-input-content input {
+  width: 100%;
+  padding: 15px 20px;
+  font-size: 18px;
+  border: 2px solid rgba(77, 162, 255, 0.3);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white !important;
+  margin-bottom: 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.name-input-content input:focus {
+  outline: none;
+  border-color: #00d4ff;
+  box-shadow: 0 0 20px rgba(77, 162, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.name-input-content input::placeholder {
+  color: #888;
+}
+
+/* Name input modal buttons now use .menu-btn universal class */
+/* Styles removed - using shared .menu-btn from shared-ui-components.css */
+
