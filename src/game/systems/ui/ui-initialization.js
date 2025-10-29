@@ -75,8 +75,8 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// Initialize menu on page load
-document.addEventListener('DOMContentLoaded', function() {
+// Initialize menu on page load - wait for CSS to load first
+function initializeUI() {
   loadGameData();
   
   // Hide main menu initially (front page should be visible first)
@@ -97,10 +97,13 @@ document.addEventListener('DOMContentLoaded', function() {
       gameContainer.classList.remove('game-container-visible');
     }
   }
-});
+  
+  // Initialize front page handler
+  initializeFrontPage();
+}
 
 // Front Page Handler
-document.addEventListener('DOMContentLoaded', function() {
+function initializeFrontPage() {
   console.log('🎬 UI Initialization: DOMContentLoaded fired');
   
   const frontPage = document.getElementById('frontPage');
@@ -148,21 +151,36 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Resume audio context and start menu music
-    if (typeof gameAudio !== 'undefined' && gameAudio && gameAudio.audioContext) {
-      console.log('🔊 Resuming audio context...');
-      gameAudio.resumeContext();
-      setTimeout(() => {
-        if (typeof gameSettings !== 'undefined' && gameSettings && gameSettings.backgroundMusic) {
-          if (typeof startMenuMusic === 'function') {
-            console.log('🎵 Starting menu music...');
-            startMenuMusic();
-          }
-        }
-      }, 100);
-    } else {
-      console.log('⚠️ Audio not available or not initialized');
+    if (typeof resumeAudioContext === 'function') {
+      resumeAudioContext();
+    }
+    if (typeof startMenuMusic === 'function' && gameSettings.backgroundMusic) {
+      startMenuMusic();
     }
   });
-  
-  console.log('✅ Enter Game button event listener attached');
+}
+
+// Wait for CSS to load before initializing UI
+// This prevents race conditions where UI code runs before CSS styles are available
+document.addEventListener('DOMContentLoaded', function() {
+  // Check if CSS is already loaded (check for CSSLoader.isLoaded flag)
+  if (window.CSSLoader && window.CSSLoader.isLoaded) {
+    console.log('🎬 CSS already loaded - initializing UI immediately');
+    initializeUI();
+  } else {
+    console.log('🎬 Waiting for CSS to load before initializing UI...');
+    // Wait for CSS to load
+    window.addEventListener('cssLoaded', function() {
+      console.log('🎬 CSS loaded - initializing UI');
+      initializeUI();
+    }, { once: true });
+    
+    // Fallback: if CSS doesn't signal loaded within 3 seconds, proceed anyway
+    setTimeout(() => {
+      if (!window.CSSLoader || !window.CSSLoader.isLoaded) {
+        console.warn('⚠️ CSS load timeout - initializing UI anyway');
+        initializeUI();
+      }
+    }, 3000);
+  }
 });
