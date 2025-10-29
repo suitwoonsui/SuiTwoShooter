@@ -79,32 +79,55 @@ document.addEventListener('keydown', function(e) {
 function initializeUI() {
   loadGameData();
   
+  // CRITICAL: Ensure front page is visible and stays visible
+  const frontPage = document.getElementById('frontPage');
+  if (frontPage) {
+    frontPage.classList.add('front-page-overlay-visible');
+    frontPage.classList.remove('front-page-overlay-hidden');
+    console.log('✅ Front page explicitly set to visible');
+  }
+  
   // Hide main menu initially (front page should be visible first)
   const mainMenu = document.getElementById('mainMenuOverlay');
   if (mainMenu) {
     mainMenu.classList.add('main-menu-overlay-hidden');
     mainMenu.classList.remove('main-menu-overlay-visible');
+    console.log('✅ Main menu explicitly hidden');
   }
   
   // Close game completely initially (game should be closed until start)
-  if (typeof closeGame === 'function') {
-    closeGame();
-  } else {
-    // Fallback: just hide game container
-    const gameContainer = document.querySelector('.game-container');
-    if (gameContainer) {
-      gameContainer.classList.add('game-container-hidden');
-      gameContainer.classList.remove('game-container-visible');
-    }
+  // IMPORTANT: Don't call closeGame() if it might affect the front page
+  const gameContainer = document.querySelector('.game-container');
+  if (gameContainer) {
+    gameContainer.classList.add('game-container-hidden');
+    gameContainer.classList.remove('game-container-visible');
+    console.log('✅ Game container explicitly hidden');
+  }
+  
+  // Ensure game state is correct - game should NOT be running
+  if (typeof gameState !== 'undefined') {
+    gameState.isMenuVisible = false; // Front page is showing, not menu
+    gameState.isGameRunning = false;
+    gameState.isPaused = false;
+    gameState.isGameOver = false;
+    console.log('✅ Game state reset - waiting for user interaction');
   }
   
   // Initialize front page handler
   initializeFrontPage();
 }
 
-// Front Page Handler
+// Front Page Handler - ensure it only runs once
+let frontPageInitialized = false;
+
 function initializeFrontPage() {
-  console.log('🎬 UI Initialization: DOMContentLoaded fired');
+  if (frontPageInitialized) {
+    console.warn('⚠️ Front page already initialized, skipping');
+    return;
+  }
+  frontPageInitialized = true;
+  
+  console.log('🎬 UI Initialization: Initializing front page handler');
   
   const frontPage = document.getElementById('frontPage');
   const enterGameBtn = document.getElementById('enterGameBtn');
@@ -117,8 +140,15 @@ function initializeFrontPage() {
     return;
   }
   
-  enterGameBtn.addEventListener('click', function() {
-    console.log('🎮 Enter Game button clicked!');
+  // IMPORTANT: Remove any existing listeners first (if any somehow got attached)
+  const newBtn = enterGameBtn.cloneNode(true);
+  enterGameBtn.parentNode.replaceChild(newBtn, enterGameBtn);
+  
+  // Now attach the listener to the fresh button
+  newBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🎮 Enter Game button clicked! (PREVENTING DEFAULT)');
     
     // Hide the front page
     if (frontPage) {
@@ -158,6 +188,8 @@ function initializeFrontPage() {
       startMenuMusic();
     }
   });
+  
+  console.log('✅ Front page button event listener attached - user MUST click to proceed');
 }
 
 // Wait for CSS to load before initializing UI
