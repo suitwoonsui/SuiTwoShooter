@@ -13,7 +13,8 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  /* Use --vh for accurate mobile Safari viewport calculation */
+  height: calc(var(--vh, 1vh) * 100);
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(15, 20, 25, 0.98) 100%);
   align-items: center;
   justify-content: center;
