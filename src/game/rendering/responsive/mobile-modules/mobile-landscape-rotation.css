@@ -11,9 +11,8 @@
   transform-origin: center center !important;
   
   /* Use viewport dimensions swapped to force landscape */
-  /* Use --vh and --vw for accurate mobile Safari viewport calculation */
-  width: calc(var(--vh, 1vh) * 100) !important;
-  height: calc(var(--vw, 1vw) * 100) !important;
+  width: 100vh !important;
+  height: 100vw !important;
   
   /* Position to center the rotated container */
   position: fixed !important;
@@ -104,17 +103,16 @@ body.mobile .gameplay-area {
 /* The rotated container uses swapped dimensions (100vh width, 100vw height), so menu should too */
 body.portrait-forced .main-menu-overlay {
   /* Match the rotated viewport-container dimensions (swapped width/height) */
-  /* Use --vh for accurate mobile Safari height calculation */
-  width: calc(var(--vh, 1vh) * 100) !important; /* Viewport height becomes visual width when rotated */
-  height: calc(var(--vw, 1vw) * 100) !important; /* Viewport width becomes visual height when rotated */
+  width: 100vh !important; /* Viewport height becomes visual width when rotated */
+  height: 100vw !important; /* Viewport width becomes visual height when rotated */
   /* Reset any transforms - menu should NOT rotate with container */
   transform: none !important;
   /* Center the menu overlay within the rotated viewport */
   position: fixed !important;
   top: 50% !important;
   left: 50% !important;
-  margin-top: calc(calc(var(--vw, 1vw) * 100) / -2) !important; /* Negative half of height (which is 100vw) */
-  margin-left: calc(calc(var(--vh, 1vh) * 100) / -2) !important; /* Negative half of width (which is 100vh) */
+  margin-top: calc(-100vw / 2) !important; /* Negative half of height (which is 100vw) */
+  margin-left: calc(-100vh / 2) !important; /* Negative half of width (which is 100vh) */
   /* Ensure flex centering works correctly - but only when visible */
   align-items: center !important;
   justify-content: center !important;

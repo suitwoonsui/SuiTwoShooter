@@ -13,8 +13,7 @@
 .viewport-container {
   position: relative;
   width: calc(100vw - 2px);
-  /* Use --vh (dynamic viewport height) on mobile, fallback to 100vh on desktop */
-  height: calc(var(--vh, 1vh) * 100 - 2px);
+  height: calc(100vh - 2px);
   display: flex;
   flex-direction: column;
   overflow: auto; /* Allow scrolling if content exceeds viewport */

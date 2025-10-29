@@ -169,7 +169,7 @@ function saveScore() {
   hideNameInput();
   
   // Show main menu immediately after saving
-  showMainMenu();
+    showMainMenu();
 }
 
 // Skip save
@@ -180,7 +180,7 @@ function skipSave() {
   hideNameInput();
   
   // Show main menu immediately after skipping
-  showMainMenu();
+    showMainMenu();
 }
 
 // Hide modal
@@ -286,11 +286,11 @@ function onGameOver(finalScore) {
     document.removeEventListener('touchstart', handleInteraction, { capture: true });
     
     // Small delay to let the click/keypress finish processing
-    setTimeout(() => {
-      if (shouldSaveScore(finalScore)) {
+  setTimeout(() => {
+    if (shouldSaveScore(finalScore)) {
         console.log('🎮 [GAME OVER] High score detected - showing name input modal');
-        showNameInput(finalScore);
-      } else {
+      showNameInput(finalScore);
+    } else {
         console.log('🎮 [GAME OVER] No high score - showing main menu');
         // If no high score, show main menu
         showMainMenu();
