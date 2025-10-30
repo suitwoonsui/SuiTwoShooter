@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <script>
     (function initializeAppViewportUnit() {
-      const getViewportHeight = () => {
-        if (window.visualViewport && typeof window.visualViewport.height === 'number') {
-          return window.visualViewport.height;
-        }
-        return window.innerHeight;
-      };
+      const getVV = () => ({
+        width: (window.visualViewport && typeof window.visualViewport.width === 'number') ? window.visualViewport.width : window.innerWidth,
+        height: (window.visualViewport && typeof window.visualViewport.height === 'number') ? window.visualViewport.height : window.innerHeight
+      });
       const setAppVh = () => {
-        const vh = getViewportHeight() * 0.01;
-        document.documentElement.style.setProperty('--app-vh', vh + 'px');
+        const { width, height } = getVV();
+        document.documentElement.style.setProperty('--app-vh', (height * 0.01) + 'px');
+        document.documentElement.style.setProperty('--vvh', height + 'px');
+        document.documentElement.style.setProperty('--vvw', width + 'px');
       };
       // Initial set after DOM is interactive to avoid zero heights
       if (document.readyState === 'loading') {
@@ -451,9 +451,10 @@
           Final Score: <span id="finalScoreDisplay">0</span>
         </div>
         <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
-        <br>
-        <button class="menu-btn primary" onclick="saveScore()">Save Score</button>
-        <button class="menu-btn" onclick="skipSave()">Skip</button>
+        <div class="name-input-buttons">
+          <button class="menu-btn primary" onclick="saveScore()">Save Score</button>
+          <button class="menu-btn" onclick="skipSave()">Skip</button>
+        </div>
       </div>
     </div>
 

@@ -1,0 +1,130 @@
+/* ========================================== */
+/* LANDSCAPE-ONLY DESIGN */
+/* ========================================== */
+
+/* All layouts are designed for landscape orientation */
+/* No forced rotation - game adapts to available space */
+
+/* ========================================== */
+/* VIEWPORT CONTAINER STRUCTURE */
+/* ========================================== */
+
+/* Main viewport container - landscape-optimized layout */
+.viewport-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Landscape-optimized: wide layout, compact height */
+}
+
+/* Header - landscape-optimized compact height */
+.game-header {
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.9);
+  border-bottom: 2px solid rgba(77, 162, 255, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1vw; /* Converted from 10px */
+  flex-wrap: nowrap;
+  gap: 0.6vh; /* Converted from 6px */
+  min-height: 4vh; /* Converted from 40px */
+  padding: 0.8vh 1vw; /* Converted from 8px 12px */
+  /* Landscape-optimized: compact height, wide layout */
+}
+
+/* Game container - base layout foundation */
+.game-container {
+  flex: 1;
+  min-height: 0; /* Allows flex shrinking */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6vh; /* Converted from 6px */
+  /* Note: padding and visual styling handled by desktop modules */
+  /* Landscape-optimized: wide layout, efficient space usage */
+}
+
+/* Canvas - base sizing: flexible to accommodate other elements */
+#gameCanvas {
+  height: 100%; /* Fill available height */
+  max-height: 100%; /* Don't exceed parent container height */
+  width: auto; /* Width adjusts to maintain aspect ratio */
+  object-fit: contain; /* Maintain aspect ratio, scale to fit */
+  /* Base canvas sizing - desktop modules can extend this */
+}
+
+/* Footer - landscape-optimized compact height */
+.game-footer {
+  flex: 0 0 auto;
+  background: rgba(0, 0, 0, 0.9);
+  border-top: 2px solid rgba(77, 162, 255, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1vw; /* Converted from 10px */
+  flex-wrap: nowrap;
+  gap: 0.6vh; /* Converted from 6px */
+  min-height: 4vh; /* Converted from 40px */
+  padding: 0.8vh 1.5vw; /* Converted from 8px 15px */
+  /* Landscape-optimized: compact height, wide layout */
+}
+
+/* ========================================== */
+/* DEVICE-SPECIFIC RESPONSIVE ADJUSTMENTS */
+/* ========================================== */
+
+/* Mobile devices - landscape-optimized (using device detection) */
+.game-footer.mobile-hidden {
+  display: none; /* No footer on mobile */
+}
+
+.game-header.mobile-compact {
+  padding: 0.6vh 1vw; /* Converted from 6px 10px */
+  font-size: 0.9vw; /* Converted from 9px */
+  min-height: 3.5vh; /* Converted from 35px */
+  /* Landscape-optimized: compact height, wide layout */
+}
+
+.game-container.mobile-compact {
+  padding: 0.6vh; /* Converted from 6px */
+  /* Landscape-optimized: maximizes game area */
+}
+
+/* Tablet devices - landscape-optimized (using device detection) */
+.game-footer.tablet-compact {
+  padding: 0.6vh 1vw; /* Converted from 6px 10px */
+  font-size: 0.9vw; /* Converted from 9px */
+  min-height: 3.8vh; /* Converted from 38px */
+  /* Landscape-optimized: compact footer */
+}
+
+.game-header.tablet-compact {
+  padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
+  font-size: 1vw; /* Converted from 10px */
+  min-height: 3.8vh; /* Converted from 38px */
+  /* Landscape-optimized: compact header */
+}
+
+/* Desktop devices - landscape-optimized (using device detection) */
+.game-footer.desktop-standard {
+  padding: 0.8vh 1.5vw; /* Converted from 8px 15px */
+  font-size: 1vw; /* Converted from 10px */
+  min-height: 4.2vh; /* Converted from 42px */
+  /* Landscape-optimized: standard footer */
+}
+
+.game-header.desktop-standard {
+  padding: 1vh 1.5vw; /* Converted from 10px 15px */
+  font-size: 1.1vw; /* Converted from 11px */
+  min-height: 4.2vh; /* Converted from 42px */
+  /* Landscape-optimized: standard header */
+}
+
+/* ========================================== */
+/* LEGACY SUPPORT - REMOVED */
+/* ========================================== */
+/* No legacy class mappings - game uses .game-header and .game-footer */
+

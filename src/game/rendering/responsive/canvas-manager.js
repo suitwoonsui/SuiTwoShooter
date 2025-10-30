@@ -187,11 +187,10 @@ const ResponsiveCanvas = {
    */
   screenToGameCoords(screenX, screenY) {
     const rect = this.canvas.getBoundingClientRect();
-    
-    // Get position relative to canvas
+    // Direct mapping; rotation handling is done by touch-input fallback when needed
     const canvasX = screenX - rect.left;
     const canvasY = screenY - rect.top;
-    
+
     // Convert to game coordinates using the actual canvas dimensions
     // The canvas is always 800x480, so we scale based on that
     const gameX = (canvasX / rect.width) * this.originalWidth;

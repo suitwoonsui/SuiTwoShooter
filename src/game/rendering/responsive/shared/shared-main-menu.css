@@ -48,10 +48,8 @@
   text-align: center;
   max-width: 95vw;
   width: 95%;
-  /* Use most of the viewport height (with modern fallbacks) */
-  height: 95vh;
-  height: 95dvh;
-  height: 95svh;
+  /* Size relative to overlay so rotated overlay controls actual height */
+  height: 95%;
   padding: min(1.5vw, 1.5vh);
   animation: menuSlideIn 0.8s ease-out 0.2s both;
   overflow: auto; /* scroll if contents exceed max-height */

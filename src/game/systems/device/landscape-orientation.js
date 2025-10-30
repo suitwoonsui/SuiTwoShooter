@@ -76,6 +76,7 @@ const LandscapeOrientation = {
       viewportContainer.classList.add('landscape-normal');
       document.body.classList.remove('portrait-forced');
       
+      console.log('📱 Reset rotation - device in landscape');
     }
     
     // Trigger resize event to notify canvas manager

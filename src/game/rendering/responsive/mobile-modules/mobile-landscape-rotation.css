@@ -11,8 +11,12 @@
   transform-origin: center center !important;
   
   /* Use viewport dimensions swapped to force landscape */
+  /* Override modern viewport units (svh/dvh) that break with rotation */
   width: 100vh !important;
   height: 100vw !important;
+  max-width: 100vh !important; /* Override shared-viewport-container.css max-width */
+  min-height: 100vw !important; /* Override shared-viewport-container.css min-height */
+  /* Note: height 100vw overrides any dvh/svh/calc from shared-viewport-container.css */
   
   /* Position to center the rotated container */
   position: fixed !important;
@@ -20,6 +24,10 @@
   left: 50% !important;
   margin-left: -50vh !important;
   margin-top: -50vw !important;
+  
+  /* Reset padding from shared-viewport-container.css that breaks rotation */
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
   
   /* Keep flex display for child layout - it rotates with the container */
   display: flex !important;
@@ -31,10 +39,12 @@
 
 /* Landscape mode - no rotation needed */
 .viewport-container.landscape-normal {
-  /* Reset any rotation - allow base styles */
+  /* Reset any rotation - allow base styles from shared-viewport-container.css */
   transform: none !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  /* Reset forced dimensions - allow shared-viewport-container.css to handle sizing */
+  width: 100% !important;
+  max-width: 100svw !important; /* Restore shared-viewport-container.css value */
+  min-height: 100svh !important; /* Restore shared-viewport-container.css value */
   position: relative !important;
   margin: 0 !important;
   top: auto !important;
@@ -97,38 +107,24 @@ body.mobile .gameplay-area {
   z-index: 10001 !important;
 }
 
-/* Main menu overlay - ensure it stays centered when viewport container is rotated */
-/* The main menu is a sibling of viewport-container, positioned fixed */
-/* When body has portrait-forced class, the menu should match the rotated container's dimensions */
-/* The rotated container uses swapped dimensions (100vh width, 100vw height), so menu should too */
-body.portrait-forced .main-menu-overlay {
-  /* Match the rotated viewport-container dimensions (swapped width/height) */
-  width: 100vh !important; /* Viewport height becomes visual width when rotated */
-  height: 100vw !important; /* Viewport width becomes visual height when rotated */
-  /* Reset any transforms - menu should NOT rotate with container */
-  transform: none !important;
-  /* Center the menu overlay within the rotated viewport */
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  margin-top: calc(-100vw / 2) !important; /* Negative half of height (which is 100vw) */
-  margin-left: calc(-100vh / 2) !important; /* Negative half of width (which is 100vh) */
-  /* Ensure flex centering works correctly - but only when visible */
-  align-items: center !important;
-  justify-content: center !important;
+/* Main menu overlay - fix vw/vh units that break with rotation */
+.viewport-container.portrait-forced .main-menu-overlay {
+  /* Override vw/vh units - use percentages to reference rotated container */
+  width: 100% !important; /* Use percentage instead of 100vw */
+  height: 100% !important; /* Use percentage instead of 100vh */
+  /* Reset any vw/vh-based padding */
+  padding: min(2%, 2%) !important; /* Use percentage or remove vw/vh */
 }
 
-/* When menu is visible, display as flex */
-body.portrait-forced .main-menu-overlay.main-menu-overlay-visible,
-body.portrait-forced .main-menu-overlay[class*="-visible"] {
-  display: flex !important;
+.viewport-container.portrait-forced .main-menu-content {
+  /* Override vw/vh units - use percentages to reference rotated container */
+  max-width: 95% !important; /* Use percentage instead of 95vw */
+  max-height: 95% !important; /* Use percentage instead of 95vh */
+  width: 95% !important; /* Use percentage instead of 95vw */
 }
 
-/* When menu is hidden, ensure it's actually hidden */
-body.portrait-forced .main-menu-overlay.main-menu-overlay-hidden,
-body.portrait-forced .main-menu-overlay[class*="-hidden"] {
-  display: none !important;
-}
+/* Front page overlay: no special portrait-forced overrides required.
+   The overlay uses percentages (100%) which work correctly with rotation. */
 
 /* ========================================== */
 /* LEADERBOARD MODAL - Landscape Rotation */

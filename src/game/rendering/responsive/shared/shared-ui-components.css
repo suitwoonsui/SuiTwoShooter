@@ -265,9 +265,25 @@
   50% { transform: translateX(100%); }
 }
 
-/* Name Input Modal Buttons - Spacing */
-.name-input-content .menu-btn {
-  margin: 0 10px;
+/* Name Input Modal Buttons Container */
+.name-input-buttons {
+  display: flex;
+  flex-direction: row; /* Explicitly set to horizontal layout */
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+/* Name Input Modal Buttons - Larger size */
+.name-input-buttons .menu-btn {
+  margin: 0;
+  flex: 0 0 auto; /* Prevent buttons from stretching to fill space */
+  width: auto; /* Allow buttons to size naturally */
+  /* Make buttons bigger */
+  padding: clamp(10px, min(1.6vh, 1.8vw), 18px) clamp(24px, min(4.2vh, 4.8vw), 40px); /* Increased padding */
+  font-size: clamp(16px, min(2.8vh, 3.2vw), 24px); /* Larger font size */
+  min-height: clamp(48px, min(7vh, 8vw), 60px); /* Taller buttons */
 }
 
 /* ========================================== */
