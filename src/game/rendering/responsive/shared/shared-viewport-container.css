@@ -25,6 +25,11 @@
   /* Landscape-optimized: wide layout, compact height */
 }
 
+/*
+ * GAME HEADER - Source of truth
+ * - This file owns header structure, layout, and sizing
+ * - Device modules (desktop/mobile) may add visual embellishments only
+ */
 /* Header - landscape-optimized compact height */
 .game-header {
   flex: 0 0 auto;
@@ -39,8 +44,8 @@
   backdrop-filter: blur(15px);
   flex-wrap: nowrap;
   gap: 1.5vh; /* Converted from 15px */
-  min-height: 6vh; /* Minimum visible height */
-  max-height: 12vh; /* Prevent header from taking entire viewport but allow it to be visible */
+  min-height: max(6vh, fit-content); /* Ensure header not smaller than contents */
+  max-height: none; /* Allow header to grow with content height */
   padding: 1vh 1.5vw; /* Responsive padding */
   position: relative; /* Ensure proper stacking */
   z-index: 10; /* Ensure header is above canvas */
@@ -209,8 +214,8 @@
 .game-header.mobile-compact {
   padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
   font-size: 1.1vw; /* Converted from 11px */
-  min-height: 5vh; /* Minimum height for readability */
-  max-height: 10vh; /* Prevent taking too much space */
+  min-height: max(5vh, fit-content); /* Grow to at least content height */
+  max-height: none; /* Allow expansion with content */
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
@@ -317,14 +322,4 @@
 /* LEGACY SUPPORT - Map old classes to new ones */
 /* ========================================== */
 
-/* Map old suitch-header to new game-header */
-.suitch-header {
-  /* This will be handled by the new game-header class */
-  /* Landscape-optimized: inherits from .game-header */
-}
-
-/* Map old suitch-footer to new game-footer */
-.suitch-footer {
-  /* This will be handled by the new game-footer class */
-  /* Landscape-optimized: inherits from .game-footer */
-}
+/* Legacy class mappings removed in MVP */

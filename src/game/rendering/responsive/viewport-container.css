@@ -24,21 +24,7 @@
   /* Landscape-optimized: wide layout, compact height */
 }
 
-/* Header - landscape-optimized compact height */
-.game-header {
-  flex: 0 0 auto;
-  background: rgba(0, 0, 0, 0.9);
-  border-bottom: 2px solid rgba(77, 162, 255, 0.3);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 1vw; /* Converted from 10px */
-  flex-wrap: nowrap;
-  gap: 0.6vh; /* Converted from 6px */
-  min-height: 4vh; /* Converted from 40px */
-  padding: 0.8vh 1vw; /* Converted from 8px 12px */
-  /* Landscape-optimized: compact height, wide layout */
-}
+/* Header styles are defined in shared/shared-viewport-container.css */
 
 /* Game container - base layout foundation */
 .game-container {
@@ -86,12 +72,7 @@
   display: none; /* No footer on mobile */
 }
 
-.game-header.mobile-compact {
-  padding: 0.6vh 1vw; /* Converted from 6px 10px */
-  font-size: 0.9vw; /* Converted from 9px */
-  min-height: 3.5vh; /* Converted from 35px */
-  /* Landscape-optimized: compact height, wide layout */
-}
+/* .game-header.mobile-compact is defined in shared/shared-viewport-container.css */
 
 .game-container.mobile-compact {
   padding: 0.6vh; /* Converted from 6px */
@@ -106,12 +87,7 @@
   /* Landscape-optimized: compact footer */
 }
 
-.game-header.tablet-compact {
-  padding: 0.8vh 1.2vw; /* Converted from 8px 12px */
-  font-size: 1vw; /* Converted from 10px */
-  min-height: 3.8vh; /* Converted from 38px */
-  /* Landscape-optimized: compact header */
-}
+/* .game-header.tablet-compact is defined in shared/shared-viewport-container.css */
 
 /* Desktop devices - landscape-optimized (using device detection) */
 .game-footer.desktop-standard {
@@ -121,25 +97,10 @@
   /* Landscape-optimized: standard footer */
 }
 
-.game-header.desktop-standard {
-  padding: 1vh 1.5vw; /* Converted from 10px 15px */
-  font-size: 1.1vw; /* Converted from 11px */
-  min-height: 4.2vh; /* Converted from 42px */
-  /* Landscape-optimized: standard header */
-}
+/* .game-header.desktop-standard is defined in shared/shared-viewport-container.css */
 
 /* ========================================== */
 /* LEGACY SUPPORT - Map old classes to new ones */
 /* ========================================== */
 
-/* Map old suitch-header to new game-header */
-.suitch-header {
-  /* This will be handled by the new game-header class */
-  /* Landscape-optimized: inherits from .game-header */
-}
-
-/* Map old suitch-footer to new game-footer */
-.suitch-footer {
-  /* This will be handled by the new game-footer class */
-  /* Landscape-optimized: inherits from .game-footer */
-}
+/* Legacy class mappings removed in MVP */

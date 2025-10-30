@@ -755,16 +755,7 @@
 /* MOBILE UI RESPONSIVE STYLES */
 /* ========================================== */
 
-/* Mobile Compact Header */
-.game-header.mobile-compact {
-  padding: 8px 12px !important;
-  font-size: 11px !important;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+/* Mobile Compact Header - moved to shared/shared-viewport-container.css (source of truth) */
 
 /* Integrated Game Stats for Mobile */
 .integrated-game-stats {
@@ -847,32 +838,7 @@
   }
 }
 
-.game-header.mobile-compact .title {
-  font-size: 18px !important;
-}
-
-.game-header.mobile-compact .header-logo {
-  width: 24px !important;
-  height: 24px !important;
-}
-
-.game-header.mobile-compact .alpha-badge {
-  font-size: 8px !important;
-  padding: 2px 6px !important;
-}
-
-.game-header.mobile-compact .stats {
-  gap: 8px !important;
-}
-
-.game-header.mobile-compact .stat {
-  padding: 6px 10px !important;
-  font-size: 10px !important;
-}
-
-.game-header.mobile-compact .stat-icon {
-  font-size: 12px !important;
-}
+/* game-header.mobile-compact sub-elements moved to shared */
 
 /* Mobile Compact Game Stats Panel */
 .game-stats-panel.mobile-compact {
@@ -941,15 +907,7 @@
 
 /* Mobile Landscape (320px - 767px) */
 @media (max-width: 767px) {
-  /* Force mobile layout */
-  .game-header {
-    flex-direction: row !important;
-    justify-content: space-between !important;
-    padding: 8px 12px !important;
-    font-size: 11px !important;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
-  }
+  /* Force mobile layout - header layout now owned by shared styles */
   
   /* Condense distance stat on mobile - JavaScript handles content, CSS handles styling */
   .game-header .stat.distance-stat .stat-value {
@@ -1003,23 +961,7 @@
     height: 14px !important;
   }
   
-  .game-header .title {
-    font-size: 16px !important;
-  }
-  
-  .game-header .header-logo {
-    width: 20px !important;
-    height: 20px !important;
-  }
-  
-  .game-header .stats {
-    gap: 6px !important;
-  }
-  
-  .game-header .stat {
-    padding: 4px 8px !important;
-    font-size: 9px !important;
-  }
+  /* game-header sub-elements sizing moved to shared */
   
   /* Hide footer on mobile - no command buttons needed */
   footer.game-footer,

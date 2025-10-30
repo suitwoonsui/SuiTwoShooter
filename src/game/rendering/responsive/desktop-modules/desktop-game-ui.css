@@ -104,6 +104,10 @@ header.game-header div.title span.alpha-badge {
   font-size: 16px;
 }
 
+/*
+ * NOTE: Desktop module may enhance visuals (colors, shadows, hover effects).
+ * Do not set header container heights here; structure lives in shared.
+ */
 /* Enhanced Game Container - wrapper for header, gameplay, and footer */
 .game-container {
   flex: 1;

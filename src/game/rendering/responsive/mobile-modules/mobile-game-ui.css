@@ -45,7 +45,7 @@
   display: block;
 }
 
-/* Mobile Game Header */
+/* Mobile Game Header - visuals only; structure is owned by shared header */
 .mobile-game-header {
   flex: 0 0 auto;
   background: rgba(0, 0, 0, 0.9);
@@ -214,9 +214,9 @@
 .mobile-game-overlay .game-header.mobile-compact {
   position: relative; /* Use relative positioning in flexbox */
   width: 100%; /* Full width of overlay */
-  height: 8vh; /* Fixed header height */
-  min-height: 8vh; /* Override viewport-container min-height */
-  max-height: 8vh; /* Prevent expansion */
+  height: auto; /* Let header height expand to fit contents */
+  min-height: max(8vh, fit-content); /* Ensure baseline size but fit content */
+  max-height: none; /* Allow expansion when contents are taller */
   z-index: 10001; /* Above canvas but below overlay */
   background: rgba(0, 0, 0, 0.9);
   border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
