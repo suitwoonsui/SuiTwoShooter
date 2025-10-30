@@ -46,16 +46,20 @@
 
 .main-menu-content {
   text-align: center;
-  max-width: 95vw;
-  width: 95%;
-  /* Size relative to overlay so rotated overlay controls actual height */
-  height: 95%;
+  /* Fill available space from main-menu-overlay */
+  width: 100%;
+  height: 100%;
+  /* Match game-container approach: use flex properties instead of fixed height */
+  flex: 1; /* Take available space from flex parent (main-menu-overlay) */
+  min-height: 0; /* Allow flexbox shrinking - critical for Safari */
   padding: min(1.5vw, 1.5vh);
   animation: menuSlideIn 0.8s ease-out 0.2s both;
-  overflow: auto; /* scroll if contents exceed max-height */
+  overflow-y: auto; /* Enable vertical scrolling when content exceeds available space */
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS Safari */
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* use available height between header/buttons/footer */
+  justify-content: flex-start; /* Content flows from top */
   align-items: center;
   gap: min(1vw, 1vh);
 }
@@ -237,6 +241,9 @@
 .menu-footer {
   border-top: 1px solid rgba(77, 162, 255, 0.2);
   padding-top: min(1vw, 1.5vh);
+  margin-top: auto; /* Push footer to bottom when content is shorter than container */
+  padding-bottom: min(2vh, 2vw); /* Add bottom padding so footer isn't cut off when scrolling */
+  flex-shrink: 0; /* Prevent footer from shrinking */
 }
 
 .game-stats {
