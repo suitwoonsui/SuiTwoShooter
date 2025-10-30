@@ -7,6 +7,11 @@ let secureGame = null;
 let onEnemyDestroyed = null;
 let onSecureGameOver = null;
 
+// --- Debug diagnostics for speed/loop issues ---
+let __debugFrameCount = 0;
+let __debugLastFpsAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+let __debugLoopEntries = 0;
+
 // Initialize security system
 function initSecurity() {
   if (window.GameSecurity) {
@@ -35,6 +40,7 @@ function updateScore(points) {
 // Reset and restart game
 function restart() {
   console.log('🔄 Game restarting - starting new game');
+  console.log('🧪 [DEBUG] restart() called. baseSpeed:', game.baseSpeed, 'speedIncrement:', game.speedIncrement, 'maxSpeed:', game.maxSpeed);
   console.log('📊 Game state before restart:', {
     gameRunning: game.gameRunning,
     gameOver: game.gameOver,
@@ -104,6 +110,11 @@ function restart() {
   
   // Restart the game loop
   console.log('🔄 Restarting game loop...');
+  if (typeof game !== 'undefined' && game._rafId) {
+    console.warn('⚠️ [DEBUG] restart() detected existing RAF id. Cancelling:', game._rafId);
+    try { cancelAnimationFrame(game._rafId); } catch (e) { /* ignore */ }
+    game._rafId = null;
+  }
   gameLoop();
 }
 
@@ -681,6 +692,10 @@ function gameOver() {
 
 // Main game loop
 function gameLoop() {
+  __debugLoopEntries++;
+  if (__debugLoopEntries % 300 === 1) {
+    console.log('🧪 [DEBUG] gameLoop entry count:', __debugLoopEntries, 'RAF id:', (typeof game !== 'undefined' ? game._rafId : 'n/a'), 'speed:', (typeof game !== 'undefined' ? game.speed : 'n/a'));
+  }
   // Only run game logic if not in menu and game is running
   if (typeof gameState !== 'undefined' && gameState.isMenuVisible) {
     // Don't continue the loop when in menu - stop it
@@ -697,7 +712,17 @@ function gameLoop() {
     
     update();
     draw();
-    requestAnimationFrame(gameLoop);
+    __debugFrameCount++;
+    const __now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if (__now - __debugLastFpsAt >= 1000) {
+      console.log('🎯 [DEBUG] FPS≈', __debugFrameCount, '| speed:', game.speed, 'base:', game.baseSpeed, 'inc:', game.speedIncrement, 'max:', game.maxSpeed);
+      __debugFrameCount = 0;
+      __debugLastFpsAt = __now;
+    }
+    const nextId = requestAnimationFrame(gameLoop);
+    if (typeof game !== 'undefined') {
+      game._rafId = nextId;
+    }
   } else {
     // Game stopped and not over, don't continue loop
     console.log('⏹️ Game loop stopped - game not running and not over');
@@ -708,6 +733,7 @@ function gameLoop() {
 function init() {
   game.canvas = document.getElementById('gameCanvas');
   console.log('🎯 Canvas found:', game.canvas ? 'YES' : 'NO', game.canvas);
+  console.log('🧪 [DEBUG] init() starting. Current speeds -> speed:', game.speed, 'baseSpeed:', game.baseSpeed, 'inc:', game.speedIncrement, 'max:', game.maxSpeed);
   
   if (!game.canvas) {
     console.error('❌ Canvas not found! Cannot initialize game.');
@@ -845,6 +871,11 @@ function init() {
   // Start the game
   game.gameRunning = true;
   console.log('Game initialized and starting game loop');
+  if (typeof game !== 'undefined' && game._rafId) {
+    console.warn('⚠️ [DEBUG] init() detected existing RAF id. Cancelling:', game._rafId);
+    try { cancelAnimationFrame(game._rafId); } catch (e) { /* ignore */ }
+    game._rafId = null;
+  }
   gameLoop();
 }
 
