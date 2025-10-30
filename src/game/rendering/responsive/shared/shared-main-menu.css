@@ -13,13 +13,18 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  /* Use same viewport units as viewport-container for Safari compatibility */
+  height: calc(var(--app-vh, 1vh) * 100); /* Legacy/JS fallback */
+  height: 100dvh; /* Dynamic viewport (modern) */
+  height: 100svh; /* Safe viewport (iOS 16+). Last wins when supported */
+  max-height: 100svh; /* Constrain to safe viewport - critical for Safari */
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(15, 20, 25, 0.98) 100%);
   align-items: center;
   justify-content: center;
   z-index: 2000;
   backdrop-filter: blur(20px);
   display: none; /* Hidden by default - use visibility classes to show */
+  overflow: hidden; /* Prevent overlay from extending beyond viewport */
 }
 
 /* Main menu is flex only when visible */
@@ -48,18 +53,16 @@
   text-align: center;
   /* Fill available space from main-menu-overlay */
   width: 100%;
-  height: 100%;
   /* Match game-container approach: use flex properties instead of fixed height */
   flex: 1; /* Take available space from flex parent (main-menu-overlay) */
   min-height: 0; /* Allow flexbox shrinking - critical for Safari */
+  max-height: 100%; /* Constrain to parent overlay height - critical for Safari */
   padding: min(1.5vw, 1.5vh);
   animation: menuSlideIn 0.8s ease-out 0.2s both;
-  overflow-y: auto; /* Enable vertical scrolling when content exceeds available space */
-  overflow-x: hidden; /* Prevent horizontal scroll */
-  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS Safari */
+  overflow: hidden; /* No scrolling - content must fit within available space */
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Content flows from top */
+  justify-content: space-between; /* Distribute space: title at top, footer at bottom */
   align-items: center;
   gap: min(1vw, 1vh);
 }
@@ -82,6 +85,7 @@
   align-items: center;
   justify-content: center;
   gap: min(2vw, 2vh);
+  flex-shrink: 0; /* Don't shrink the title */
   flex-wrap: nowrap;
 }
 
@@ -174,9 +178,10 @@
   gap: min(1vw, 1.5vh); /* Responsive gap */
   margin-bottom: min(1vw, 1.5vh); /* Responsive margin */
   width: 100%; /* Full width to utilize grid layout */
-  /* Allow the buttons area to expand and consume vertical space */
+  /* Allow the buttons area to flex and shrink to fit available space */
   flex: 1 1 auto;
-  height: 90%; /* occupy most of the menu height */
+  min-height: 0; /* Allow shrinking if space is tight */
+  overflow: hidden; /* Prevent buttons from overflowing */
   align-content: stretch;
   justify-content: center;
   grid-auto-rows: 1fr; /* equal-height rows */
@@ -186,9 +191,10 @@
    Only scope layout specifics here to avoid conflicts. */
 .menu-buttons .menu-btn {
   width: 100%;
-  /* Ensure main menu buttons can shrink vertically; padding handled globally */
-  height: 90%; /* use most of the grid cell height */
-  line-height: 1;
+  /* Make buttons taller */
+  min-height: clamp(50px, min(8vh, 9vw), 70px); /* Taller buttons with responsive sizing */
+  padding: clamp(12px, min(2vh, 2.4vw), 18px) clamp(16px, min(3vh, 3.5vw), 28px); /* Increased padding for taller buttons */
+  line-height: 1.2; /* Slightly more line height for better vertical centering */
 }
 
 /* When space is tight, auto-flow to one column without media queries */
