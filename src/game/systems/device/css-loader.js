@@ -18,9 +18,9 @@ const CSSLoader = {
   // Load CSS file dynamically and return promise
   loadCSS(href) {
     return new Promise((resolve, reject) => {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = href;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
       
       link.onload = () => {
         console.log(`✅ Loaded CSS: ${href}`);
@@ -33,7 +33,7 @@ const CSSLoader = {
         resolve();
       };
       
-      document.head.appendChild(link);
+    document.head.appendChild(link);
     });
   },
   

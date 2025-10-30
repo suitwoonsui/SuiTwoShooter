@@ -3,145 +3,116 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SuiTwo - Modular CSS Test</title>
-  
-  <!-- Modular CSS System -->
-  <!-- All CSS loading handled by device detection -->
-  <!-- Device Detection and CSS Loading -->
-  <script src="src/game/systems/device/device-detection.js"></script>
-  <script src="src/game/systems/device/css-loader.js"></script>
-  <script src="src/game/systems/device/footer-loader.js"></script>
-  
-  <!-- Device Detection Verification -->
-  <script>
-    // Verify device detection is working
-    document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        const deviceType = DeviceDetection.detectDeviceType();
-        const verificationDiv = document.createElement('div');
-        verificationDiv.style.cssText = `
-          position: fixed;
-          bottom: 10px;
-          left: 10px;
-          background: rgba(0, 0, 0, 0.8);
-          color: #00d4ff;
-          padding: 10px;
-          border-radius: 5px;
-          font-family: monospace;
-          font-size: 12px;
-          z-index: 9999;
-          border: 1px solid #00d4ff;
-        `;
-        verificationDiv.innerHTML = `
-          <strong>Device Detection:</strong><br>
-          Type: ${deviceType}<br>
-          Screen: ${window.screen.width}x${window.screen.height}<br>
-          Touch: ${'ontouchstart' in window ? 'Yes' : 'No'}<br>
-          User Agent: ${navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'}
-        `;
-        document.body.appendChild(verificationDiv);
-        
-        // Also log to console
-        console.log('=== DEVICE DETECTION VERIFICATION ===');
-        console.log('Device Type:', deviceType);
-        console.log('Screen Size:', window.screen.width + 'x' + window.screen.height);
-        console.log('Touch Support:', 'ontouchstart' in window);
-        console.log('User Agent Mobile:', navigator.userAgent.includes('Mobile'));
-        console.log('Loaded CSS Files:', document.querySelectorAll('link[rel="stylesheet"]').length);
-        console.log('=====================================');
-      }, 1000); // Wait 1 second for CSS to load
-    });
-  </script>
-
-  <!-- Responsive modules - loaded last -->
+  <title>SuiTwo</title>
+  <link rel="stylesheet" href="game-styles.css">
+  <link rel="stylesheet" href="src/game/rendering/responsive/viewport-container.css">
+  <link rel="stylesheet" href="src/game/rendering/responsive/mobile-ui-styles.css">
 </head>
 <body>
+  <!-- Front Page Overlay -->
+  <div id="frontPage" class="front-page-overlay">
+    <div class="front-page-content">
+      <h1 class="game-title"><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+      <p class="game-subtitle">Space Shooter Alpha v0.1</p>
+      <div class="game-description">
+        <p>Navigate through the cosmos, defeat enemies, and survive as long as possible!</p>
+        <p>Use MOUSE to move and P to pause. Auto-fire is enabled!</p>
+      </div>
+      <button id="enterGameBtn" class="enter-game-btn">
+        🎮 Enter Game
+      </button>
+      <div class="audio-note">
+        <small>🔊 Audio will start after clicking Enter</small>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Viewport Container -->
   <div class="viewport-container">
-    <!-- Front Page Overlay -->
-    <div id="frontPage" class="front-page-overlay front-page-overlay-visible">
-      <div class="front-page-content">
-        <h1 class="game-title"><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
-        <p class="game-subtitle">Space Shooter Alpha v0.1</p>
-        <div class="game-description">
-          <p>Navigate through the cosmos, defeat enemies, and survive as long as possible!</p>
-          <p>Use MOUSE to move and P to pause. Auto-fire is enabled!</p>
+    <!-- Enhanced Top information bar -->
+    <header class="game-header">
+      <div class="title">
+        <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="header-logo"> SuiTwo
+        <span class="alpha-badge">Alpha v0.1</span>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-icon">📏</span>
+          Distance: <span id="distance">0</span> m
         </div>
-        <button id="enterGameBtn" class="enter-game-btn">
-          🎮 Enter Game
-        </button>
-        <div class="audio-note">
-          <small>🔊 Audio will start after clicking Enter</small>
+        <div class="stat">
+          <span class="stat-icon">🪙</span>
+          Coins: <span id="coins">0</span>
+        </div>
+        <div class="stat">
+          <span class="stat-icon">⚡</span>
+          Status: <span id="status">Ready</span>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- Game Container (lazy loaded with visibility toggle) -->
-    <div class="game-container game-container-hidden">
-      <!-- Enhanced Top information bar (only visible during game) -->
-      <header class="game-header">
-        <div class="title">
-          <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="header-logo"> SuiTwo
-          <span class="alpha-badge">Alpha v0.1</span>
-        </div>
-        <div class="stats">
-          <div class="stat">
-            <span class="stat-icon">📏</span>
-            Distance: <span id="distance">0</span> m
+  <!-- Main container with canvas -->
+  <div class="game-container">
+    <!-- Game canvas -->
+    <main class="game-wrapper">
+      <canvas id="gameCanvas"></canvas>
+      
+      <!-- In-game UI Overlay -->
+      <div class="game-ui-overlay">
+        <div class="game-stats-panel">
+          <div class="stat-item">
+            <span class="stat-label">Score:</span>
+            <span class="stat-value" id="gameScore">0</span>
           </div>
-          <div class="stat">
-            <span class="stat-icon">🪙</span>
-            Coins: <span id="coins">0</span>
+          <div class="stat-item">
+            <span class="stat-label">Magic Orb Level:</span>
+            <span class="stat-value" id="orbLevel">1</span>
           </div>
-          <div class="stat">
-            <span class="stat-icon">⚡</span>
-            Status: <span id="status">Ready</span>
+          <div class="stat-item">
+            <span class="stat-label">Tier:</span>
+            <span class="stat-value" id="gameTier">1</span>
           </div>
-        </div>
-      </header>
-
-      <!-- Gameplay Area -->
-      <div class="gameplay-area">
-        <!-- Game canvas -->
-        <canvas id="gameCanvas"></canvas>
-        
-        <!-- In-game UI - Side-by-side with canvas -->
-        <div class="game-ui-overlay">
-          <div class="game-stats-panel">
-            <div class="stat-item">
-              <span class="stat-label">Score:</span>
-              <span class="stat-value" id="gameScore">0</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Magic Orb Level:</span>
-              <span class="stat-value" id="orbLevel">1</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Tier:</span>
-              <span class="stat-value" id="gameTier">1</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Bosses Defeated:</span>
-              <span class="stat-value" id="bossesDefeated">0</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Force Field:</span>
-              <span class="stat-value" id="forceFieldLevel">None</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Coin Streak:</span>
-              <span class="stat-value" id="coinStreak">0</span>
-            </div>
+          <div class="stat-item">
+            <span class="stat-label">Bosses Defeated:</span>
+            <span class="stat-value" id="bossesDefeated">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Force Field:</span>
+            <span class="stat-value" id="forceFieldLevel">None</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Coin Streak:</span>
+            <span class="stat-value" id="coinStreak">0</span>
           </div>
         </div>
       </div>
-
-      <!-- Footer will be loaded dynamically by footer-loader.js for desktop/tablet only -->
-      <!-- For mobile, footer is not needed and will not be inserted -->
+    </main>
     </div>
+
+    <!-- Enhanced Bottom controls bar -->
+    <footer class="game-footer">
+      <div class="controls">
+        <span class="control-item">
+          <span class="control-icon">🖱️</span>
+          Mouse: Move Player
+        </span>
+        <span class="control-item">
+          <span class="control-icon">⏸️</span>
+          P: Pause/Resume
+        </span>
+        <span class="control-item">
+          <span class="control-icon">🔫</span>
+          Auto-Fire: Enabled
+        </span>
+      </div>
+      <div class="version-info">
+        Alpha Release • Build 2024.01 • Anti-Cheat Enabled • Secure Scoring
+      </div>
+    </footer>
+  </div>
 
   <!-- Main Menu Overlay -->
-  <div class="main-menu-overlay main-menu-overlay-hidden" id="mainMenuOverlay">
+  <div class="main-menu-overlay" id="mainMenuOverlay">
     <div class="main-menu-content">
       <div class="game-title">
         <h1><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
@@ -183,13 +154,10 @@
           </div>
       </div>
     </div>
-    </div>
   </div>
 
-  <!-- Panels as siblings to main menu, inside viewport container -->
-
-    <!-- Sound Test Panel -->
-  <div class="sound-test-panel sound-test-panel-hidden" id="soundTestPanel">
+  <!-- Sound Test Panel -->
+  <div class="sound-test-panel" id="soundTestPanel">
     <div class="sound-test-content">
       <div class="sound-test-header">
         <h2>🔊 Sound Test</h2>
@@ -290,8 +258,8 @@
     </div>
   </div>
 
-    <!-- Settings Panel -->
-  <div class="settings-panel settings-panel-hidden" id="settingsPanel">
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settingsPanel">
     <div class="settings-content">
       <div class="settings-header">
         <h2>⚙️ Game Settings</h2>
@@ -357,8 +325,8 @@
     </div>
   </div>
 
-    <!-- Instructions Panel -->
-  <div class="instructions-panel instructions-panel-hidden" id="instructionsPanel">
+  <!-- Instructions Panel -->
+  <div class="instructions-panel" id="instructionsPanel">
     <div class="instructions-content">
       <div class="instructions-header">
         <h2>📖 How to Play</h2>
@@ -414,27 +382,22 @@
     </div>
   </div>
 
-    <!-- Name input modal -->
-    <div class="name-input-modal name-input-modal-hidden" id="nameInputModal">
-      <div class="name-input-content">
-        <h2>🎉 New High Score!</h2>
-        <div class="score-display">
-          Final Score: <span id="finalScoreDisplay">0</span>
-        </div>
-        <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
-        <br>
-        <button class="menu-btn primary" onclick="saveScore()">Save Score</button>
-        <button class="menu-btn" onclick="skipSave()">Skip</button>
+  <!-- Name input modal -->
+  <div class="name-input-modal" id="nameInputModal">
+    <div class="name-input-content">
+      <h2>🎉 New High Score!</h2>
+      <div class="score-display">
+        Final Score: <span id="finalScoreDisplay">0</span>
       </div>
+      <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
+      <br>
+      <button onclick="saveScore()">Save Score</button>
+      <button onclick="skipSave()">Skip</button>
     </div>
-
-  </div> <!-- End viewport-container -->
+  </div>
 
   <!-- Load security FIRST -->
   <script src="game-security.js"></script>
-
-  <!-- Load CSS Loader FIRST -->
-  <script src="src/game/systems/device/css-loader.js"></script>
 
   <!-- Load audio system -->
   <!-- Modular Audio System -->
@@ -464,6 +427,7 @@
     <script src="src/game/systems/device/device-detection.js"></script>
     <script src="src/game/systems/device/device-config.js"></script>
     <script src="src/game/systems/device/device-monitoring.js"></script>
+    <script src="src/game/systems/device/css-loader.js"></script>
     <script src="src/game/systems/device/landscape-orientation.js"></script>
     <script src="src/game/shared/mobile-utils.js"></script>
     
