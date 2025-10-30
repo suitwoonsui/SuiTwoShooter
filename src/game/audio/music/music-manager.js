@@ -196,14 +196,14 @@ class MusicManager {
         musicState: this.musicState
       });
       
+      // Respect user's background music setting; do not auto-enable
+      if (!settings.isBackgroundMusicEnabled()) {
+        console.log('❌ Resume blocked - background music is disabled by settings');
+        return;
+      }
+
       this.stopBackgroundMusic();
       this.audioContext.resume();
-      
-      // Ensure background music is enabled for gameplay
-      if (!settings.isBackgroundMusicEnabled()) {
-        console.log('⚠️ Enabling background music for gameplay');
-        settings.setBackgroundMusicEnabled(true);
-      }
       
       this.musicState.isPlaying = true;
       this.musicState.patternIndex = 0;
