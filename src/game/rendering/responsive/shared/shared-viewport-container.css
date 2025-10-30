@@ -13,10 +13,15 @@
 .viewport-container {
   position: relative;
   width: calc(100vw - 2px);
-  height: calc(100vh - 2px);
+  /* Prefer dynamic viewport on modern browsers, fallback to JS-set --app-vh */
+  height: calc(100dvh - 2px);
+  height: calc((var(--app-vh, 1vh) * 100) - 2px);
   display: flex;
   flex-direction: column;
   overflow: auto; /* Allow scrolling if content exceeds viewport */
+  /* Prevent content under iOS Safari bars */
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
   /* Landscape-optimized: wide layout, compact height */
 }
 

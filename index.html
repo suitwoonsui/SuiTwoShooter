@@ -2,7 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <script>
+    (function initializeAppViewportUnit() {
+      const setAppVh = () => {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--app-vh', vh + 'px');
+      };
+      setAppVh();
+      window.addEventListener('resize', setAppVh, { passive: true });
+      window.addEventListener('orientationchange', setAppVh);
+      window.addEventListener('pageshow', function (e) { if (e.persisted) setAppVh(); });
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) setAppVh(); });
+    })();
+  </script>
   <title>SuiTwo - Modular CSS Test</title>
   
   <!-- Modular CSS System -->
