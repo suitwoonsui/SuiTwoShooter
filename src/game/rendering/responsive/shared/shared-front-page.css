@@ -82,8 +82,11 @@
   background: linear-gradient(45deg, #00d4ff, #4ecdc4);
   border: none;
   color: white !important;
-  padding: 1.5vw 3vw; /* Pure viewport-based padding, no minimum */
-  font-size: 2vw; /* Pure viewport-based font size, no minimum */
+  /* Bound vertical size explicitly so it shrinks on small heights */
+  height: clamp(28px, min(7vh, 12vw), 56px);
+  padding-block: 0; /* height controls vertical size */
+  padding-inline: 3vw;
+  font-size: 2vw; /* Pure viewport-based font size */
   font-weight: bold;
   border-radius: 50px;
   cursor: pointer;

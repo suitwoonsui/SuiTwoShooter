@@ -1,6 +1,9 @@
 /* ========================================== */
-/* SHARED UI COMPONENTS */
+/* SHARED UI COMPONENTS  — AUTHORITATIVE SOURCE */
 /* ========================================== */
+/* This file is the single source of truth for UI button styles
+   and shared components across the app. Avoid redefining `.menu-btn`
+   in feature files; scope only layout there (e.g., widths, grids). */
 /* Base component styles used across all platforms */
 /* Buttons, panels, modals, and common UI elements */
 
@@ -13,19 +16,32 @@
   background: linear-gradient(135deg, rgba(77, 162, 255, 0.1) 0%, rgba(58, 123, 213, 0.1) 100%);
   border: 2px solid rgba(77, 162, 255, 0.3);
   color: white !important;
-  padding: 18px 30px;
+  /* Fluid sizing with a small vertical pad */
+  padding: clamp(2px, min(0.8vh, 1vw), 6px) clamp(8px, min(2.4vh, 2.8vw), 20px);
   border-radius: 15px;
-  font-size: 1.2rem;
+  font-size: clamp(10px, min(2.2vh, 2.6vw), 16px);
+  /* Let height be driven by text size */
+  height: auto;
+  line-height: 1; /* avoid extra vertical expansion */
+  /* Defeat UA/iOS default button min-tap-height */
+  min-height: 0 !important;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: clamp(4px, min(1vh, 1.2vw), 10px);
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(10px);
+  /* Allow buttons to shrink inside grids/flex */
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .menu-btn::before {
@@ -133,8 +149,17 @@
 
 /* Button Icon */
 .btn-icon {
-  font-size: 1.4rem;
+  font-size: clamp(10px, min(2vh, 2.4vw), 16px);
   filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+}
+
+/* Neutralize legacy mobile size classes if present */
+.menu-btn.mobile-extra-large,
+.menu-btn.mobile-large,
+.menu-btn.mobile-compact {
+  min-height: 0 !important;
+  padding-block: 0 !important;
+  line-height: 1 !important;
 }
 
 /* ========================================== */

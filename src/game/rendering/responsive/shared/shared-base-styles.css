@@ -44,8 +44,9 @@
 }
 
 /* ========================================== */
-/* SHARED BASE STYLES */
+/* SHARED BASE STYLES — AUTHORITATIVE SOURCE */
 /* ========================================== */
+/* Global resets, html/body viewport behavior, and base utilities. */
 /* CSS reset, body styles, colors, typography */
 /* Used across all platforms */
 
@@ -57,14 +58,28 @@
 }
 
 /* Body Styles */
+html {
+  height: 100%;
+}
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* Prefer modern viewport units to avoid iOS URL bar issues */
+  min-height: 100svh;
+  min-height: 100dvh;
+  min-height: 100vh; /* legacy fallback */
   overflow-x: hidden;
+}
+
+/* WebKit/iOS specific fill-available to eliminate letterboxing in some contexts */
+@supports (-webkit-touch-callout: none) {
+  html, body {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+  }
 }
 
 /* Animated Background */

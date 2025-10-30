@@ -47,14 +47,17 @@
 .main-menu-content {
   text-align: center;
   max-width: 95vw;
-  max-height: 100%;
   width: 95%;
+  /* Use most of the viewport height (with modern fallbacks) */
+  height: 95vh;
+  height: 95dvh;
+  height: 95svh;
   padding: min(1.5vw, 1.5vh);
   animation: menuSlideIn 0.8s ease-out 0.2s both;
-  overflow: hidden;
+  overflow: auto; /* scroll if contents exceed max-height */
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between; /* use available height between header/buttons/footer */
   align-items: center;
   gap: min(1vw, 1vh);
 }
@@ -73,6 +76,20 @@
 .game-title {
   margin-bottom: min(1.5vw, 1.5vh); /* Responsive margin */
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: min(2vw, 2vh);
+  flex-wrap: nowrap;
+}
+
+/* Ensure badge has breathing room next to title */
+.game-title .version-badge {
+  margin-left: min(1vw, 1vh);
+  /* Smaller than the title text */
+  font-size: clamp(10px, min(1.8vw, 2.2vh), 14px);
+  padding: clamp(2px, min(0.6vh, 0.8vw), 6px) clamp(6px, min(1vw, 1.4vh), 12px);
+  border-radius: 12px;
 }
 
 .game-title h1 {
@@ -155,26 +172,29 @@
   gap: min(1vw, 1.5vh); /* Responsive gap */
   margin-bottom: min(1vw, 1.5vh); /* Responsive margin */
   width: 100%; /* Full width to utilize grid layout */
+  /* Allow the buttons area to expand and consume vertical space */
+  flex: 1 1 auto;
+  height: 90%; /* occupy most of the menu height */
+  align-content: stretch;
+  justify-content: center;
+  grid-auto-rows: 1fr; /* equal-height rows */
 }
 
-.menu-btn {
-  background: linear-gradient(135deg, rgba(77, 162, 255, 0.1) 0%, rgba(58, 123, 213, 0.1) 100%);
-  border: 2px solid rgba(77, 162, 255, 0.3);
-  color: white !important;
-  padding: min(1.2vw, 1.5vh) min(1.5vw, 2vh); /* Responsive padding */
-  border-radius: 15px;
-  font-size: min(3vw, 4vh); /* Responsive font size - doubled */
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: min(0.6vw, 0.8vh); /* Responsive gap */
-  position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(10px);
-  width: 100%; /* Full width within grid cell */
+/* Buttons in the menu use the shared `.menu-btn` base styles.
+   Only scope layout specifics here to avoid conflicts. */
+.menu-buttons .menu-btn {
+  width: 100%;
+  /* Ensure main menu buttons can shrink vertically; padding handled globally */
+  height: 90%; /* use most of the grid cell height */
+  line-height: 1;
+}
+
+/* When space is tight, auto-flow to one column without media queries */
+.menu-buttons { grid-auto-rows: minmax(0, auto); }
+@supports (width: clamp(0px, 1cqw, 100vw)) {
+  .menu-buttons { grid-template-columns: repeat(
+    clamp(1, calc(100cqw / 420), 2)
+  , 1fr); }
 }
 
 .menu-btn::before {
@@ -214,10 +234,7 @@
   box-shadow: 0 8px 25px rgba(77, 162, 255, 0.5);
 }
 
-.btn-icon {
-  font-size: 1.4vw;
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
-}
+/* Icon size now governed by global `.btn-icon` */
 
 .menu-footer {
   border-top: 1px solid rgba(77, 162, 255, 0.2);

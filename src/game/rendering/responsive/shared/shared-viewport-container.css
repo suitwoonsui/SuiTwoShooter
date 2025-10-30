@@ -1,6 +1,9 @@
 /* ========================================== */
-/* LANDSCAPE-ONLY DESIGN */
+/* VIEWPORT CONTAINER — AUTHORITATIVE SOURCE */
 /* ========================================== */
+/* Landscape-first. This file owns the viewport sizing rules
+   (svh/dvh/--app-vh and iOS -webkit-fill-available fallback).
+   Do not define container sizing elsewhere. */
 
 /* All layouts are designed for landscape orientation */
 /* No forced rotation - game adapts to available space */
@@ -12,17 +15,33 @@
 /* Main viewport container - landscape-optimized layout */
 .viewport-container {
   position: relative;
-  width: calc(100vw - 2px);
-  /* Prefer dynamic viewport on modern browsers, fallback to JS-set --app-vh */
-  height: calc(100dvh - 2px);
-  height: calc((var(--app-vh, 1vh) * 100) - 2px);
+  /* Avoid 100vw scrollbar inclusion on iOS; prefer 100% where possible */
+  width: 100%;
+  max-width: 100svw; /* modern small viewport width when available */
+  /* Layered fallbacks: JS first, then dvh, finally svh as the winner */
+  height: calc(var(--app-vh, 1vh) * 100); /* Legacy/JS fallback */
+  height: 100dvh; /* Dynamic viewport (modern) */
+  height: 100svh; /* Safe viewport (iOS 16+). Last wins when supported */
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
-  overflow: auto; /* Allow scrolling if content exceeds viewport */
+  overflow: hidden; /* Game should not scroll; prevents iOS zoom/resize jitter */
   /* Prevent content under iOS Safari bars */
   padding-top: env(safe-area-inset-top, 0);
   padding-bottom: env(safe-area-inset-bottom, 0);
   /* Landscape-optimized: wide layout, compact height */
+}
+
+/* iOS/WebKit-specific fill-available fallback */
+@supports (-webkit-touch-callout: none) {
+  html, body {
+    height: -webkit-fill-available;
+  }
+  .viewport-container {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+    width: 100%;
+  }
 }
 
 /*

@@ -5,15 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <script>
     (function initializeAppViewportUnit() {
+      const getViewportHeight = () => {
+        if (window.visualViewport && typeof window.visualViewport.height === 'number') {
+          return window.visualViewport.height;
+        }
+        return window.innerHeight;
+      };
       const setAppVh = () => {
-        const vh = window.innerHeight * 0.01;
+        const vh = getViewportHeight() * 0.01;
         document.documentElement.style.setProperty('--app-vh', vh + 'px');
       };
-      setAppVh();
+      // Initial set after DOM is interactive to avoid zero heights
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setAppVh, { once: true });
+      } else {
+        setAppVh();
+      }
+      // Update on viewport changes
       window.addEventListener('resize', setAppVh, { passive: true });
       window.addEventListener('orientationchange', setAppVh);
       window.addEventListener('pageshow', function (e) { if (e.persisted) setAppVh(); });
       document.addEventListener('visibilitychange', function () { if (!document.hidden) setAppVh(); });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setAppVh, { passive: true });
+        window.visualViewport.addEventListener('scroll', setAppVh, { passive: true });
+      }
     })();
   </script>
   <title>SuiTwo - Modular CSS Test</title>

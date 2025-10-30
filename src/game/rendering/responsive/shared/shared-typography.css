@@ -17,10 +17,7 @@
   line-height: 1.6;
 }
 
-.enter-game-btn {
-  font-size: 1.2rem;
-  font-weight: bold;
-}
+/* Button typography now governed by shared-ui-components.css */
 
 /* Body Typography */
 body {
@@ -129,6 +126,4 @@ body {
   letter-spacing: 1px;
 }
 
-.menu-btn {
-  font-size: 1.2rem;
-}
+/* Button typography now governed by shared-ui-components.css */
