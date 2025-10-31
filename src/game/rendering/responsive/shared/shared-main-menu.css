@@ -25,6 +25,7 @@
   backdrop-filter: blur(20px);
   display: none; /* Hidden by default - use visibility classes to show */
   overflow: hidden; /* Prevent overlay from extending beyond viewport */
+  /* Allow content to determine its own size within viewport constraints */
 }
 
 /* Main menu is flex only when visible */
@@ -53,10 +54,12 @@
   text-align: center;
   /* Fill available space from main-menu-overlay */
   width: 100%;
-  /* Match game-container approach: use flex properties instead of fixed height */
-  flex: 1; /* Take available space from flex parent (main-menu-overlay) */
-  min-height: 0; /* Allow flexbox shrinking - critical for Safari */
+  /* Size based on content but constrained to overlay viewport */
+  max-width: 95vw; /* Prevent horizontal overflow */
   max-height: 100%; /* Constrain to parent overlay height - critical for Safari */
+  min-height: 0; /* Allow flexbox shrinking - critical for Safari */
+  /* Use percentage height to allow growth */
+  height: 85%;
   padding: min(1.5vw, 1.5vh);
   animation: menuSlideIn 0.8s ease-out 0.2s both;
   overflow: hidden; /* No scrolling - content must fit within available space */
@@ -65,6 +68,7 @@
   justify-content: space-between; /* Distribute space: title at top, footer at bottom */
   align-items: center;
   gap: min(1vw, 1vh);
+  /* Ensure content can grow to fit buttons but respects max-height */
 }
 
 @keyframes menuSlideIn {
@@ -178,13 +182,13 @@
   gap: min(1vw, 1.5vh); /* Responsive gap */
   margin-bottom: min(1vw, 1.5vh); /* Responsive margin */
   width: 100%; /* Full width to utilize grid layout */
-  /* Allow the buttons area to flex and shrink to fit available space */
+  /* Allow the buttons area to flex and grow to accommodate taller buttons */
   flex: 1 1 auto;
-  min-height: 0; /* Allow shrinking if space is tight */
-  overflow: hidden; /* Prevent buttons from overflowing */
+  min-height: 0; /* Allow shrinking if space is tight, but can grow */
+  overflow: visible; /* Allow buttons to be fully visible */
   align-content: stretch;
   justify-content: center;
-  grid-auto-rows: 1fr; /* equal-height rows */
+  grid-auto-rows: minmax(auto, 1fr); /* Allow rows to grow based on button content */
 }
 
 /* Buttons in the menu use the shared `.menu-btn` base styles.
