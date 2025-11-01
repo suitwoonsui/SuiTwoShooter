@@ -5,7 +5,22 @@
 // Generate tiles (vertical columns of enemies)
 function generateTiles() {
   while (tiles.length < 30) {
-    const lastX = tiles.length ? tiles[tiles.length-1].x : game.width;
+    // Determine starting X position - same logic for both systems
+    let lastX;
+    if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies()) {
+      // After tier 4: Use the last enemy X if enemies exist, otherwise use tiles or start at game.width (same as tier 1-4)
+      if (typeof enemies !== 'undefined' && enemies.length > 0) {
+        lastX = Math.max(...enemies.map(e => e.x));
+      } else if (tiles.length > 0) {
+        lastX = tiles[tiles.length-1].x;
+      } else {
+        // Start fresh: use same starting position as tier 1-4 (game.width)
+        lastX = game.width;
+      }
+    } else {
+      // Before tier 4: Use tiles as normal
+      lastX = tiles.length ? tiles[tiles.length-1].x : game.width;
+    }
     const x = lastX + game.width / 10;
     const lanes = [0,1,2];
 
@@ -41,7 +56,8 @@ function generateTiles() {
       
       let power = null;
       if (Math.random() < 0.2) power = Math.random() < 0.5 ? 'freeze' : 'slow';
-      obstacles.push({ 
+      
+      const enemyData = { 
         lane, 
         type, 
         power, 
@@ -49,7 +65,21 @@ function generateTiles() {
         lastShot: 0,
         hp: enemyStats[type].hp,
         maxHp: enemyStats[type].hp
-      });
+      };
+      
+      // After tier 4: Add to separate enemies array instead of tile obstacles
+      if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies()) {
+        // Add to separate enemies array with absolute X position
+        if (typeof enemies !== 'undefined') {
+          enemies.push({
+            x: x + 20, // ENEMY_X_OFFSET (same as tile.x + 20)
+            ...enemyData
+          });
+        }
+      } else {
+        // Before tier 4: Add to tile obstacles (current behavior)
+        obstacles.push(enemyData);
+      }
     }
 
     // Coin

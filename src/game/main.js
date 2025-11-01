@@ -52,7 +52,9 @@ function restart() {
   // Reinitialize security system
   initSecurity();
   
-  game.speed = game.baseSpeed;
+  game.scrollSpeed = game.baseScrollSpeed;
+  game.enemySpeed = game.baseEnemySpeed;
+  // Distance speed remains constant
   // Don't reset score directly anymore - security system handles it
   game.coins = 0;
   game.distance = 0;
@@ -80,6 +82,7 @@ function restart() {
   game.paused = false; // Reset pause state
   game.bossesDefeated = 0; // Reset progression
   game.currentTier = 1; // Reset to tier 1
+  game.levelStartDelay = game.levelStartDelayDuration; // Start with spawn delay
   // Reset force field system
   game.forceField.level = 0;
   resetCoinStreak();
@@ -91,6 +94,7 @@ function restart() {
   game.mouseY = game.height / 2;
   player.trail = [];
   tiles = [];
+  enemies = []; // Reset separate enemies array
   generateTiles();
   
   console.log('✅ Game restarted. State:', {
@@ -144,7 +148,8 @@ function returnToMainMenu() {
   if (game.enemies) game.enemies = [];
   
   // Reset game state
-  game.speed = 0;
+  game.scrollSpeed = 0;
+  // Distance speed remains constant
   game.bossActive = false;
   game.bossWarning = false;
   if (game.boss) game.boss = null;
@@ -195,10 +200,26 @@ const game = {
   width: 800,
   height: 480,
   laneHeight: 480 / 3, // 3 horizontal lanes
-  speed: 2.5,
-  baseSpeed: 2.5,
-  speedIncrement: 0.01,
-  maxSpeed: 6,
+  // Visual/scroll speed - controls visual movement and gameplay difficulty
+  scrollSpeed: 2.5,
+  baseScrollSpeed: 2.5,
+  scrollSpeedIncrement: 0.01,
+  maxScrollSpeed: 6,
+  // Enemy speed (after tier 4) - separate from scrollSpeed, cap increases with each boss
+  enemySpeed: 2.5,
+  baseEnemySpeed: 2.5,
+  enemySpeedIncrement: 0.01,
+  // Distance speed - constant for consistent boss timing (increased to spawn bosses sooner)
+  distanceSpeed: 3.5,
+  // Legacy 'speed' property for backward compatibility (maps to scrollSpeed)
+  get speed() { return this.scrollSpeed; },
+  set speed(value) { this.scrollSpeed = value; },
+  get baseSpeed() { return this.baseScrollSpeed; },
+  set baseSpeed(value) { this.baseScrollSpeed = value; },
+  get speedIncrement() { return this.scrollSpeedIncrement; },
+  set speedIncrement(value) { this.scrollSpeedIncrement = value; },
+  get maxSpeed() { return this.maxScrollSpeed; },
+  set maxSpeed(value) { this.maxScrollSpeed = value; },
   // SECURE SCORE: Use getter that accesses security system
   get score() {
     return secureGame ? secureGame.score : this._fallbackScore || 0;
@@ -232,6 +253,9 @@ const game = {
   bossWarningTime: 0,
   boss: null,
   bossFireInterval: 2000,
+  // Level start spawn delay - prevent enemies/projectiles from spawning immediately
+  levelStartDelay: 0, // Milliseconds remaining in delay
+  levelStartDelayDuration: 1000, // 1 second delay after level starts
   autoFireInterval: 300, // Auto fire every 300ms (slower)
   lastAutoFire: 0,
   mouseY: 240, // Mouse Y position
@@ -248,6 +272,16 @@ const game = {
 
 // Fire intervals by monster tier (faster = more dangerous)
 const enemyFireInterval = [0, 3000, 2500, 2000, 1500];
+
+// Projectile speed multiplier for post-tier-4 scaling
+// Option 1: +5% per boss after tier 4 (gentle progression, matches tier scaling)
+function getProjectileSpeedMultiplier() {
+  if (game.bossesDefeated <= 4) {
+    return 1.0; // No change for first 4 bosses (tiers 1-4)
+  }
+  // +5% per boss after tier 4: Boss 5 = 1.05x, Boss 10 = 1.30x, Boss 20 = 1.80x
+  return 1.0 + (game.bossesDefeated - 4) * 0.05;
+}
 
 // Monster stats by tier - MOVED TO systems/enemies/enemy-stats.js
 
@@ -273,6 +307,14 @@ const player = {
 
 // Tiles (obstacles + coins + powerups) - adapted for horizontal mode
 let tiles = [];
+
+// Separate enemies array (used after tier 4 boss is defeated)
+let enemies = [];
+
+// Check if we should use separate enemies system (after tier 4)
+function shouldUseSeparateEnemies() {
+  return game.bossesDefeated > 4;
+}
 
 // Main update function
 function update() {
@@ -379,28 +421,98 @@ function update() {
         }
   }
 
+  // Handle boss victory timeout - STOP ALL MOVEMENT during victory screen
+  if (game.bossVictoryTimeout) {
+    game.bossVictoryTime -= 16; // Approximation of 60fps
+    if (game.bossVictoryTime <= 0) {
+      // Victory period over, start next stage
+      game.bossVictoryTimeout = false;
+      game.scrollSpeed = game.baseScrollSpeed;
+      // Reset enemySpeed when using separate enemies system (after tier 4)
+      // This ensures enemies start at base speed and gradually increase each stage
+      if (shouldUseSeparateEnemies()) {
+        game.enemySpeed = game.baseEnemySpeed;
+        // Clear tiles and enemies to ensure clean start - prevent enemies/projectiles from being on screen
+        tiles = [];
+        enemies = [];
+        game.enemyProjectiles = []; // Clear enemy projectiles
+        game.projectiles = []; // Clear player projectiles too for clean start
+        console.log('Enemy speed reset to base for new stage after boss', game.bossesDefeated);
+        console.log('Cleared tiles, enemies, and projectiles for clean stage start');
+      }
+      // Start spawn delay timer - prevent enemies/projectiles from spawning for 1 second
+      game.levelStartDelay = game.levelStartDelayDuration;
+      console.log('Level start delay activated:', game.levelStartDelay, 'ms');
+      // Distance speed remains constant
+      
+      // Start regular music after victory screen ends
+      if (typeof resumeGameplayMusic === 'function') {
+        resumeGameplayMusic();
+      }
+      
+      // Don't reset distanceSinceBoss here - it should reset when boss warning appears
+    }
+    return; // Skip ALL game updates during victory period - no movement, no spawning, nothing!
+  }
+
   // Only update game progression if not in boss fight
   if (!game.bossActive) {
-    // Update game speed
-    game.speed = Math.min(game.maxSpeed, game.speed + game.speedIncrement);
-    game.distance += game.speed;
-    game.distanceSinceBoss += game.speed;
-    game.bgX += game.speed;
+    // Update visual/scroll speed (for gameplay difficulty)
+    game.scrollSpeed = Math.min(game.maxScrollSpeed, game.scrollSpeed + game.scrollSpeedIncrement);
+    
+    // Update enemy speed (after tier 4: separate speed with increasing cap)
+    if (shouldUseSeparateEnemies()) {
+      // Calculate enemy speed cap based on bosses defeated after tier 4
+      // Base cap is maxScrollSpeed (6.0), increase by 0.25 per boss after tier 4
+      const enemySpeedCap = game.maxScrollSpeed + (game.bossesDefeated - 4) * 0.25;
+      game.enemySpeed = Math.min(enemySpeedCap, game.enemySpeed + game.enemySpeedIncrement);
+    } else {
+      // Before tier 4: Enemy speed matches scrollSpeed (they're in tiles)
+      // Keep enemySpeed synced to scrollSpeed so it's ready when separate system activates
+      game.enemySpeed = game.scrollSpeed;
+    }
+    
+    // Update distance calculations (constant speed for consistent boss timing)
+    game.distance += game.distanceSpeed;
+    game.distanceSinceBoss += game.distanceSpeed;
+    
+    // Update visual scrolling (background)
+    game.bgX += game.scrollSpeed;
     if (game.bgX >= game.width) game.bgX = 0;
     
     // Debug boss progress
-    if (game.distanceSinceBoss > 0 && game.distanceSinceBoss % 1000 < game.speed) {
+    if (game.distanceSinceBoss > 0 && game.distanceSinceBoss % 1000 < game.distanceSpeed) {
       console.log('Boss progress:', Math.floor(game.distanceSinceBoss), '/', game.bossThreshold);
     }
   }
 
+  // Update level start delay timer
+  if (game.levelStartDelay > 0) {
+    game.levelStartDelay -= 16; // Approximation of 60fps (16ms per frame)
+    if (game.levelStartDelay < 0) game.levelStartDelay = 0;
+  }
+
   // Only scroll tiles and generate new ones if not in boss fight
   if (!game.bossActive) {
-    // Scroll tiles (to the left)
-    tiles.forEach(t => t.x -= game.speed);
+    if (shouldUseSeparateEnemies()) {
+      // After tier 4: Separate enemies move at enemySpeed (increases beyond scrollSpeed cap), tiles move at scrollSpeed
+      // Move separate enemies at enemySpeed (has its own increasing cap)
+      enemies.forEach(e => e.x -= game.enemySpeed);
+      
+      // Move tiles at scrollSpeed (same speed as before tier 4)
+      tiles.forEach(t => t.x -= game.scrollSpeed);
+      
+      // Remove off-screen enemies
+      enemies = enemies.filter(e => e.x > -200);
+    } else {
+      // Before tier 4: Enemies are in tiles, everything moves together at scrollSpeed
+      tiles.forEach(t => t.x -= game.scrollSpeed);
+    }
     
-    // Generate new tiles (before filtering out off-screen tiles)
-    generateTiles();
+    // Generate new tiles ONLY if spawn delay has passed (before filtering out off-screen tiles)
+    if (game.levelStartDelay <= 0) {
+      generateTiles();
+    }
     
     // Remove off-screen tiles
     tiles = tiles.filter(t => t.x > -200);
@@ -428,56 +540,84 @@ function update() {
     
     // Check collision with enemies
     let projectileHit = false;
+    
+    // Helper function to check projectile collision with enemy
+    function checkProjectileEnemyCollision(enemy, enemyX) {
+      const oy = enemy.lane * game.laneHeight + (game.laneHeight - 60) / 2;
+      
+      // Calculate dynamic enemy dimensions (same as rendering)
+      const enemyImage = enemyImages[enemy.type - 1];
+      const enemyDims = getEnemyDimensions(enemyImage);
+      const drawX = enemyX + enemyDims.centerOffset;
+      const enemyY = oy;
+      
+      // Calculate projectile collision box (proper collision detection)
+      const projectileX = b.x;
+      const projectileY = b.y - orbSize / 2;
+      const projectileWidth = orbSize;
+      const projectileHeight = orbSize;
+      
+      // Check collision between projectile and enemy
+      if (projectileX < drawX + enemyDims.width && projectileX + projectileWidth > drawX &&
+          projectileY < enemyY + enemyDims.height && projectileY + projectileHeight > enemyY) {
+        enemy.hp -= b.level; // Decrease HP by orb level (bigger orbs = more damage)
+        
+        // Calculate collision point (where projectile intersects with enemy)
+        const collisionX = Math.max(projectileX, drawX);
+        const collisionY = Math.max(projectileY, enemyY);
+        
+        if (enemy.hp <= 0) {
+          // Monster destroyed - SECURE SCORING
+          updateScore(15 * enemy.type); // SECURE: More points for high tier monsters
+          // Play enemy destroyed sound
+          if (typeof playEnemyDestroyedSound === 'function') {
+            playEnemyDestroyedSound();
+          }
+          createExplosionEffect(collisionX, collisionY);
+          return true; // Enemy destroyed
+        } else {
+          // Monster hit but not destroyed
+          // Play enemy hit sound
+          if (typeof playEnemyHitSound === 'function') {
+            playEnemyHitSound();
+          }
+          createProjectileHitEffect(collisionX, collisionY);
+          return false; // Enemy still alive
+        }
+      }
+      return null; // No collision
+    }
+    
+    // Check tile-based enemies (before tier 4)
     tiles.forEach(tile => {
       tile.obstacles = tile.obstacles.filter(obs => {
         const ox = tile.x + 20;
-        const oy = obs.lane * game.laneHeight + (game.laneHeight - 60) / 2;
-        
-        // Calculate dynamic enemy dimensions (same as rendering)
-        const enemyImage = enemyImages[obs.type - 1];
-        const enemyDims = getEnemyDimensions(enemyImage);
-        const enemyX = ox + enemyDims.centerOffset;
-        const enemyY = oy;
-        
-        // Calculate projectile collision box (proper collision detection)
-        const projectileX = b.x;
-        const projectileY = b.y - orbSize / 2;
-        const projectileWidth = orbSize;
-        const projectileHeight = orbSize;
-        
-        // Check collision between projectile and enemy
-        if (projectileX < enemyX + enemyDims.width && projectileX + projectileWidth > enemyX &&
-            projectileY < enemyY + enemyDims.height && projectileY + projectileHeight > enemyY) {
-          obs.hp -= b.level; // Decrease HP by orb level (bigger orbs = more damage)
-          
-          // Calculate collision point (where projectile intersects with enemy)
-          const collisionX = Math.max(projectileX, enemyX);
-          const collisionY = Math.max(projectileY, enemyY);
-          
-          if (obs.hp <= 0) {
-            // Monster destroyed - SECURE SCORING
-            updateScore(15 * obs.type); // SECURE: More points for high tier monsters
-            // Play enemy destroyed sound
-            if (typeof playEnemyDestroyedSound === 'function') {
-              playEnemyDestroyedSound();
-            }
-            createExplosionEffect(collisionX, collisionY);
-            projectileHit = true;
-            return false;
-          } else {
-            // Monster hit but not destroyed
-            // Play enemy hit sound
-            if (typeof playEnemyHitSound === 'function') {
-              playEnemyHitSound();
-            }
-            createProjectileHitEffect(collisionX, collisionY);
-            projectileHit = true;
-            return true;
-          }
+        const result = checkProjectileEnemyCollision(obs, ox);
+        if (result === true) {
+          projectileHit = true;
+          return false; // Enemy destroyed
+        } else if (result === false) {
+          projectileHit = true;
+          return true; // Enemy hit but alive
         }
-        return true;
+        return true; // No collision
       });
     });
+    
+    // Check separate enemies (after tier 4)
+    if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
+      enemies = enemies.filter(enemy => {
+        const result = checkProjectileEnemyCollision(enemy, enemy.x);
+        if (result === true) {
+          projectileHit = true;
+          return false; // Enemy destroyed
+        } else if (result === false) {
+          projectileHit = true;
+          return true; // Enemy hit but alive
+        }
+        return true; // No collision
+      });
+    }
     
     // Check collision with boss
     if (game.bossActive && game.boss && game.boss.vulnerable && game.boss.x <= game.boss.targetX && !projectileHit) {
@@ -596,6 +736,15 @@ function update() {
     game.bossesDefeated++;
     game.currentTier = Math.min(4, Math.floor(game.bossesDefeated / 1) + 1); // New tier after each boss
     console.log('Boss defeated! bossesDefeated:', game.bossesDefeated, 'currentTier:', game.currentTier);
+    
+    // When separate enemies system activates (after tier 4 boss), clear enemies array
+    // EnemySpeed will be reset when victory timeout ends, ensuring clean start
+    if (game.bossesDefeated === 5) {
+      // Clear any existing separate enemies and projectiles to ensure clean start
+      enemies = [];
+      game.enemyProjectiles = []; // Clear enemy projectiles immediately
+      console.log('Separate enemies system activated. Cleared enemies array and projectiles for fresh start.');
+    }
     game.boss = null;
     
     // Clear boss projectiles when boss is defeated
@@ -618,23 +767,6 @@ function update() {
     }
   }
   
-  // Handle boss victory timeout
-  if (game.bossVictoryTimeout) {
-    game.bossVictoryTime -= 16; // Approximation of 60fps
-    if (game.bossVictoryTime <= 0) {
-      // Victory period over, start next stage
-      game.bossVictoryTimeout = false;
-      game.speed = game.baseSpeed;
-      
-      // Start regular music after victory screen ends
-      if (typeof resumeGameplayMusic === 'function') {
-        resumeGameplayMusic();
-      }
-      
-      // Don't reset distanceSinceBoss here - it should reset when boss warning appears
-    }
-    return; // Skip normal game updates during victory period
-  }
 }
 
 // Game over function
@@ -916,3 +1048,4 @@ window.initializeGame = function() {
     gameInitialized = true;
   }
 };
+

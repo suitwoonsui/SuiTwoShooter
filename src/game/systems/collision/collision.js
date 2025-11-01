@@ -2,6 +2,80 @@
 // COLLISION DETECTION - ALL COLLISION LOGIC
 // ==========================================
 
+// Helper function to check collision with a single enemy
+function checkEnemyCollisionWithPlayer(enemy, enemyX, enemyArray, enemyIndex) {
+  const bodyWidth = player.width * 0.4;
+  const bodyHeight = player.height * 0.65;
+  const bodyX = player.x + (player.width - bodyWidth) / 2;
+  const bodyY = player.y + (player.height - bodyHeight) / 2;
+  
+  const oy = enemy.lane * game.laneHeight + (game.laneHeight - 60) / 2;
+  
+  // Calculate dynamic enemy dimensions (same as rendering)
+  const enemyImage = enemyImages[enemy.type - 1];
+  const enemyDims = getEnemyDimensions(enemyImage);
+  const drawX = enemyX + enemyDims.centerOffset;
+  const enemyY = oy;
+  
+  // Check collision between player body and enemy
+  if (bodyX < drawX + enemyDims.width && bodyX + bodyWidth > drawX &&
+      bodyY < enemyY + enemyDims.height && bodyY + bodyHeight > enemyY) {
+    
+    // If force field is active, it blocks the enemy collision
+    if (game.forceField.active && game.forceField.level > 0 && game.forceField.invulnerabilityTime <= 0) {
+      console.log('Force field blocked enemy collision! Level:', game.forceField.level);
+      enemyArray.splice(enemyIndex, 1);
+      
+      // Force field takes damage and loses a level
+      game.forceField.level--;
+      game.forceField.invulnerabilityTime = 60; // 1 second of invulnerability
+      if (game.forceField.level <= 0) {
+        game.forceField.active = false;
+        game.forceField.level = 0;
+        console.log('Force field destroyed by enemy!');
+        // Play force field destroyed sound
+        if (typeof playForceFieldDestroyedSound === 'function') {
+          playForceFieldDestroyedSound();
+        }
+        // Give player invulnerability when force field is destroyed
+        game.invulnerabilityTime = 60; // 1 second of invulnerability
+      } else {
+        console.log('Force field damaged by enemy! New level:', game.forceField.level);
+        // Play force field power down sound
+        if (typeof playForceFieldPowerDownSound === 'function') {
+          playForceFieldPowerDownSound();
+        }
+      }
+      
+      // Reset coin streak when force field is hit
+      resetCoinStreak();
+      
+      // Visual effect for force field hit
+      createForceFieldHitEffect(drawX + enemyDims.width/2, enemyY + enemyDims.height/2);
+      
+      // Flash effect (lighter than direct hit)
+      game.flashTime = 10;
+      
+      return true; // Collision handled
+    } else {
+      console.log('No force field protection! Player hit by enemy');
+      game.flashTime = 20;
+      game.invulnerabilityTime = 60; // 1 second of invulnerability (60 frames at 60fps)
+      // Play player hit sound
+      if (typeof playPlayerHitSound === 'function') {
+        playPlayerHitSound();
+      }
+      enemyArray.splice(enemyIndex, 1);
+      
+      // Reset coin streak when player hits enemy
+      resetCoinStreak();
+      
+      return true; // Player hit
+    }
+  }
+  return false; // No collision
+}
+
 // Check collision between player and obstacles (enemies)
 function checkObstacleCollision() {
   // Don't check collision if player is invulnerable
@@ -9,84 +83,27 @@ function checkObstacleCollision() {
     return false;
   }
   
-  // Use refined collision box for player (same as enemy projectile collision)
-  const bodyWidth = player.width * 0.4;  // 40% of sprite width (hands extend far out)
-  const bodyHeight = player.height * 0.65; // 65% of sprite height (feet and tails extend down)
-  const bodyX = player.x + (player.width - bodyWidth) / 2;
-  const bodyY = player.y + (player.height - bodyHeight) / 2;
-  
+  // Check tile-based enemies (before tier 4)
   for (let tile of tiles) {
-    if (tile.x > bodyX-50 && tile.x < bodyX+bodyWidth+50) {
-      for (let i=0;i<tile.obstacles.length;i++) {
-        const obs = tile.obstacles[i];
-        const ox = tile.x + 20;
-        const oy = obs.lane*game.laneHeight + (game.laneHeight-60)/2;
-        
-        // Calculate dynamic enemy dimensions (same as rendering)
-        const enemyImage = enemyImages[obs.type - 1];
-        const enemyDims = getEnemyDimensions(enemyImage);
-        const enemyX = ox + enemyDims.centerOffset;
-        const enemyY = oy;
-        
-        // Check collision between player body and enemy
-        if (bodyX < enemyX + enemyDims.width && bodyX + bodyWidth > enemyX &&
-            bodyY < enemyY + enemyDims.height && bodyY + bodyHeight > enemyY) {
-          
-          // If force field is active, it blocks the enemy collision
-          if (game.forceField.active && game.forceField.level > 0 && game.forceField.invulnerabilityTime <= 0) {
-            console.log('Force field blocked enemy collision! Level:', game.forceField.level);
-            tile.obstacles.splice(i,1);
-            
-            // Force field takes damage and loses a level
-            game.forceField.level--;
-            game.forceField.invulnerabilityTime = 60; // 1 second of invulnerability
-            if (game.forceField.level <= 0) {
-              game.forceField.active = false;
-              game.forceField.level = 0;
-              console.log('Force field destroyed by enemy!');
-              // Play force field destroyed sound
-              if (typeof playForceFieldDestroyedSound === 'function') {
-                playForceFieldDestroyedSound();
-              }
-              // Give player invulnerability when force field is destroyed
-              game.invulnerabilityTime = 60; // 1 second of invulnerability
-            } else {
-              console.log('Force field damaged by enemy! New level:', game.forceField.level);
-              // Play force field power down sound
-              if (typeof playForceFieldPowerDownSound === 'function') {
-                playForceFieldPowerDownSound();
-              }
-            }
-            
-            // Reset coin streak when force field is hit
-            resetCoinStreak();
-            
-            // Visual effect for force field hit
-            createForceFieldHitEffect(enemyX + enemyDims.width/2, enemyY + enemyDims.height/2);
-            
-            // Flash effect (lighter than direct hit)
-            game.flashTime = 10;
-            
-            return false; // Player not hit, force field absorbed the damage
-          } else {
-            console.log('No force field protection! Player hit by enemy');
-            game.flashTime = 20;
-            game.invulnerabilityTime = 60; // 1 second of invulnerability (60 frames at 60fps)
-            // Play player hit sound
-            if (typeof playPlayerHitSound === 'function') {
-              playPlayerHitSound();
-            }
-            tile.obstacles.splice(i,1);
-            
-            // Reset coin streak when player hits enemy
-            resetCoinStreak();
-            
-            return true;
-          }
-        }
+    for (let i = tile.obstacles.length - 1; i >= 0; i--) {
+      const obs = tile.obstacles[i];
+      const ox = tile.x + 20;
+      if (checkEnemyCollisionWithPlayer(obs, ox, tile.obstacles, i)) {
+        return true; // Player hit
       }
     }
   }
+  
+  // Check separate enemies (after tier 4)
+  if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const enemy = enemies[i];
+      if (checkEnemyCollisionWithPlayer(enemy, enemy.x, enemies, i)) {
+        return true; // Player hit
+      }
+    }
+  }
+  
   return false;
 }
 

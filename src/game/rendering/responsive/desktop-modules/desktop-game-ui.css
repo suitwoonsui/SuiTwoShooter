@@ -284,6 +284,21 @@ canvas:hover {
   margin-bottom: 0;
 }
 
+.stat-section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(77, 162, 255, 0.3), transparent);
+  margin: 1vw 0;
+}
+
+.stat-section-title {
+  color: #4DA2FF;
+  font-size: 1.2vw;
+  font-weight: bold;
+  margin-bottom: 0.5vw;
+  text-transform: uppercase;
+  letter-spacing: 0.1vw;
+}
+
 .stat-label {
   color: #ccc;
   font-size: 1.4vw; /* Pure viewport-based font size */

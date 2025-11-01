@@ -26,13 +26,16 @@ function spawnBoss() {
   
   // Clear all existing content
   tiles = [];
+  if (typeof enemies !== 'undefined') {
+    enemies = []; // Clear separate enemies array
+  }
   game.enemyProjectiles = [];
   game.bossProjectiles = [];
   game.projectiles = [];
   game.particles = [];
   
-  // Stop scrolling
-  game.speed = 0;
+  // Stop scrolling (visual only - distance continues at constant rate)
+  game.scrollSpeed = 0;
   
   // Cancel any charge in progress
   game.chargeStart = null;
@@ -119,7 +122,10 @@ function handleBossFire() {
     const by = game.boss.y + game.boss.height/2;
     const px = player.x + player.width/2;
     const py = player.y + player.height/2;
-    const projectileSpeed = (5 + game.boss.tier) * (game.boss.enraged ? 1.5 : 1); // Faster when enraged
+    const baseProjectileSpeed = (5 + game.boss.tier) * (game.boss.enraged ? 1.5 : 1); // Faster when enraged
+    // Apply post-tier-4 scaling multiplier (+5% per boss after tier 4)
+    const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
+    const projectileSpeed = baseProjectileSpeed * speedMultiplier;
     const enrageMultiplier = game.boss.enraged ? 2 : 1; // Double projectiles when enraged
     
     switch(game.boss.attackPattern) {
