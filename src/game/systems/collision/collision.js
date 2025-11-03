@@ -4,6 +4,11 @@
 
 // Helper function to check collision with a single enemy
 function checkEnemyCollisionWithPlayer(enemy, enemyX, enemyArray, enemyIndex) {
+  // Don't check collision if player is invulnerable (protects against multiple hits in same frame)
+  if (game.invulnerabilityTime > 0) {
+    return false;
+  }
+  
   const bodyWidth = player.width * 0.4;
   const bodyHeight = player.height * 0.65;
   const bodyX = player.x + (player.width - bodyWidth) / 2;
@@ -56,7 +61,7 @@ function checkEnemyCollisionWithPlayer(enemy, enemyX, enemyArray, enemyIndex) {
       // Flash effect (lighter than direct hit)
       game.flashTime = 10;
       
-      return true; // Collision handled
+      return false; // Player not hit, force field absorbed the damage
     } else {
       console.log('No force field protection! Player hit by enemy');
       game.flashTime = 20;
@@ -88,9 +93,12 @@ function checkObstacleCollision() {
     for (let i = tile.obstacles.length - 1; i >= 0; i--) {
       const obs = tile.obstacles[i];
       const ox = tile.x + 20;
-      if (checkEnemyCollisionWithPlayer(obs, ox, tile.obstacles, i)) {
+      const result = checkEnemyCollisionWithPlayer(obs, ox, tile.obstacles, i);
+      // Only return true if player was actually hit (not blocked by forcefield)
+      if (result === true) {
         return true; // Player hit
       }
+      // If result is false, forcefield blocked it - continue checking other enemies
     }
   }
   
@@ -98,9 +106,12 @@ function checkObstacleCollision() {
   if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
     for (let i = enemies.length - 1; i >= 0; i--) {
       const enemy = enemies[i];
-      if (checkEnemyCollisionWithPlayer(enemy, enemy.x, enemies, i)) {
+      const result = checkEnemyCollisionWithPlayer(enemy, enemy.x, enemies, i);
+      // Only return true if player was actually hit (not blocked by forcefield)
+      if (result === true) {
         return true; // Player hit
       }
+      // If result is false, forcefield blocked it - continue checking other enemies
     }
   }
   

@@ -1,0 +1,29 @@
+{
+  "name": "Sui Smart Contract Examples",
+  "short_name": "Sui Examples",
+  "description": "Comprehensive Sui smart contract examples with Next.js frontend integration. Learn blockchain development patterns.",
+  "theme_color": "#6366f1",
+  "background_color": "#0f0f23",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "start_url": "/",
+  "id": "sui-smart-contract-examples",
+  "categories": ["education", "developer-tools"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/next.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "features": [
+    "Smart Contract Examples",
+    "Wallet Integration",
+    "Educational Content"
+  ],
+  "prefer_related_applications": false
+}
