@@ -120,10 +120,16 @@ function updateGameUI() {
 
 // Calculate and display speed information (desktop only)
 function updateSpeedDisplays() {
-  // Enemy speed (scrollSpeed)
+  // Enemy speed - show enemySpeed after tier 4, scrollSpeed before tier 4
   const enemySpeedElement = document.getElementById('enemySpeed');
   if (enemySpeedElement) {
-    enemySpeedElement.textContent = game.scrollSpeed.toFixed(2);
+    if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies()) {
+      // After tier 4: Show actual enemy speed (can exceed scrollSpeed cap)
+      enemySpeedElement.textContent = game.enemySpeed.toFixed(2);
+    } else {
+      // Before tier 4: Enemy speed matches scrollSpeed
+      enemySpeedElement.textContent = game.scrollSpeed.toFixed(2);
+    }
   }
   
   // Enemy projectile speed (average of all current tier enemies with multiplier)

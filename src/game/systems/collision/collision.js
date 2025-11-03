@@ -29,6 +29,8 @@ function checkEnemyCollisionWithPlayer(enemy, enemyX, enemyArray, enemyIndex) {
       // Force field takes damage and loses a level
       game.forceField.level--;
       game.forceField.invulnerabilityTime = 60; // 1 second of invulnerability
+      // Give player invulnerability immediately to protect against other enemies/projectiles in same frame
+      game.invulnerabilityTime = 60; // 1 second of invulnerability
       if (game.forceField.level <= 0) {
         game.forceField.active = false;
         game.forceField.level = 0;
@@ -37,8 +39,6 @@ function checkEnemyCollisionWithPlayer(enemy, enemyX, enemyArray, enemyIndex) {
         if (typeof playForceFieldDestroyedSound === 'function') {
           playForceFieldDestroyedSound();
         }
-        // Give player invulnerability when force field is destroyed
-        game.invulnerabilityTime = 60; // 1 second of invulnerability
       } else {
         console.log('Force field damaged by enemy! New level:', game.forceField.level);
         // Play force field power down sound
@@ -135,6 +135,8 @@ function checkEnemyProjectileCollision() {
         // Force field takes damage and loses a level
         game.forceField.level--;
         game.forceField.invulnerabilityTime = 60; // 1 second of invulnerability
+        // Give player invulnerability immediately to protect against other projectiles in same frame
+        game.invulnerabilityTime = 60; // 1 second of invulnerability
         if (game.forceField.level <= 0) {
           game.forceField.active = false;
           game.forceField.level = 0;
@@ -143,8 +145,6 @@ function checkEnemyProjectileCollision() {
           if (typeof playForceFieldDestroyedSound === 'function') {
             playForceFieldDestroyedSound();
           }
-          // Give player invulnerability when force field is destroyed
-          game.invulnerabilityTime = 60; // 1 second of invulnerability
         } else {
           console.log('Force field damaged! New level:', game.forceField.level);
           // Play force field power down sound

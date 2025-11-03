@@ -51,12 +51,12 @@ function checkEnemyProjectileCollision() {
         // Force field takes damage and loses a level
         game.forceField.level--;
         game.forceField.invulnerabilityTime = 60; // 1 second of invulnerability
+        // Give player invulnerability immediately to protect against other projectiles in same frame
+        game.invulnerabilityTime = 60; // 1 second of invulnerability
         if (game.forceField.level <= 0) {
           game.forceField.active = false;
           game.forceField.level = 0;
           console.log('Force field destroyed!');
-          // Give player invulnerability when force field is destroyed
-          game.invulnerabilityTime = 60; // 1 second of invulnerability
         } else {
           console.log('Force field damaged! New level:', game.forceField.level);
         }
