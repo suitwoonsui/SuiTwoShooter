@@ -82,19 +82,26 @@ This guide is organized into focused sections for easier navigation:
 - Questions to consider
 - Implementation roadmap
 
+### **[Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md)** ⭐ **START HERE**
+- Prioritized task order with dependencies
+- MVP vs. Post-MVP features
+- Estimated timelines
+- Quick start checklist
+
 ---
 
 ## 🚀 Quick Start (For Your MVP)
 
-**Your Setup:** Next.js (App Router) + $Mews Token + 1 Month Timeline
+**Your Setup:** Vanilla JavaScript + $Mews Token + Testnet First
 
-1. **Start Here:** Read [01. Overview & Architecture](./01-overview-and-architecture.md) - Already updated with your config
-2. **Backend Setup:** Follow [02. Backend Setup](./02-backend-setup.md) - Create separate `backend/` directory (Express.js)
-3. **SDK Integration:** Implement [03. Sui SDK Integration](./03-sui-sdk-integration.md) - Create backend API routes and Sui service
-4. **Token Gatekeeping:** **PRIORITY** - [07. Token Gatekeeping](./07-token-gatekeeping.md) - Required to play
-5. **Frontend:** Add [04. Frontend Integration](./04-frontend-integration.md) - Wallet connection using `@mysten/dapp-kit`
-6. **Smart Contracts:** Adapt from [05. Smart Contracts](./05-smart-contracts.md) or your `Sui Smart Contract Examples/`
-7. **Deploy:** Follow [06. Testing & Deployment](./06-testing-deployment.md) - Vercel deployment
+1. **⭐ Start Here:** Read [Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md) - Prioritized task order
+2. **Overview:** Read [01. Overview & Architecture](./01-overview-and-architecture.md) - Understand your setup
+3. **Backend Setup:** Follow [02. Backend Setup](./02-backend-setup.md) - Create separate `backend/` directory (Express.js)
+4. **SDK Integration:** Implement [03. Sui SDK Integration](./03-sui-sdk-integration.md) - Create backend API routes and Sui service
+5. **Token Gatekeeping:** **PRIORITY** - [07. Token Gatekeeping](./07-token-gatekeeping.md) - Required to play
+6. **Frontend:** Add [04. Frontend Integration](./04-frontend-integration.md) - Wallet connection using `@mysten/dapp-kit`
+7. **Smart Contracts:** Adapt from [05. Smart Contracts](./05-smart-contracts.md) or your `Sui Smart Contract Examples/`
+8. **Deploy:** Follow [06. Testing & Deployment](./06-testing-deployment.md) - **Testnet first!**
 
 ---
 

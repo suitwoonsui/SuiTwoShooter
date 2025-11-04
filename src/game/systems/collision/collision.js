@@ -88,22 +88,9 @@ function checkObstacleCollision() {
     return false;
   }
   
-  // Check tile-based enemies (before tier 4)
-  for (let tile of tiles) {
-    for (let i = tile.obstacles.length - 1; i >= 0; i--) {
-      const obs = tile.obstacles[i];
-      const ox = tile.x + 20;
-      const result = checkEnemyCollisionWithPlayer(obs, ox, tile.obstacles, i);
-      // Only return true if player was actually hit (not blocked by forcefield)
-      if (result === true) {
-        return true; // Player hit
-      }
-      // If result is false, forcefield blocked it - continue checking other enemies
-    }
-  }
-  
-  // Check separate enemies (after tier 4)
+  // After tier 4: Only check separate enemies (tile obstacles are for lane tracking only)
   if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
+    // Check separate enemies (after tier 4)
     for (let i = enemies.length - 1; i >= 0; i--) {
       const enemy = enemies[i];
       const result = checkEnemyCollisionWithPlayer(enemy, enemy.x, enemies, i);
@@ -112,6 +99,20 @@ function checkObstacleCollision() {
         return true; // Player hit
       }
       // If result is false, forcefield blocked it - continue checking other enemies
+    }
+  } else {
+    // Before tier 4: Check tile-based enemies
+    for (let tile of tiles) {
+      for (let i = tile.obstacles.length - 1; i >= 0; i--) {
+        const obs = tile.obstacles[i];
+        const ox = tile.x + 20;
+        const result = checkEnemyCollisionWithPlayer(obs, ox, tile.obstacles, i);
+        // Only return true if player was actually hit (not blocked by forcefield)
+        if (result === true) {
+          return true; // Player hit
+        }
+        // If result is false, forcefield blocked it - continue checking other enemies
+      }
     }
   }
   

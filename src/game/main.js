@@ -82,6 +82,8 @@ function restart() {
   game.paused = false; // Reset pause state
   game.bossesDefeated = 0; // Reset progression
   game.currentTier = 1; // Reset to tier 1
+  game.enemiesDefeated = 0; // Reset enemy defeat counter
+  game.bossTiers = []; // Reset boss tiers array
   game.levelStartDelay = game.levelStartDelayDuration; // Start with spawn delay
   // Reset force field system
   game.forceField.level = 0;
@@ -241,6 +243,8 @@ const game = {
   paused: false, // Pause state
   bossesDefeated: 0, // Number of bosses defeated
   currentTier: 1, // Current tier (1-4)
+  enemiesDefeated: 0, // Number of enemies defeated (for blockchain/burn tracking)
+  bossTiers: [], // Array tracking tier of each boss defeated (for accurate burn calculation)
   keys: {},
   particles: [],
   bgX: 0, // Background scrolls horizontally
@@ -406,8 +410,11 @@ function update() {
         }
         
         // Boss vertical movement once in position (more aggressive by tier and when enraged)
+        // Apply post-tier-4 speed multiplier to vertical movement speed (same as projectile speeds)
         if (game.boss.vulnerable && game.boss.x <= game.boss.targetX) {
-          const moveSpeed = (1 + (game.boss.tier * 0.5)) * (game.boss.enraged ? 2 : 1);
+          const baseVerticalSpeed = (1 + (game.boss.tier * 0.5));
+          const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
+          const moveSpeed = baseVerticalSpeed * speedMultiplier * (game.boss.enraged ? 2 : 1);
           game.boss.y += game.boss.moveDirection * moveSpeed;
           if (game.boss.y <= 0 || game.boss.y >= game.height - game.boss.height) {
             game.boss.moveDirection *= -1;
@@ -569,6 +576,8 @@ function update() {
         if (enemy.hp <= 0) {
           // Monster destroyed - SECURE SCORING
           updateScore(15 * enemy.type); // SECURE: More points for high tier monsters
+          // Track enemy defeat for blockchain/burn calculation
+          game.enemiesDefeated++;
           // Play enemy destroyed sound
           if (typeof playEnemyDestroyedSound === 'function') {
             playEnemyDestroyedSound();
@@ -735,6 +744,8 @@ function update() {
     game.bossActive = false;
     game.bossesDefeated++;
     game.currentTier = Math.min(4, Math.floor(game.bossesDefeated / 1) + 1); // New tier after each boss
+    // Track boss tier for accurate burn calculation
+    game.bossTiers.push(game.currentTier);
     console.log('Boss defeated! bossesDefeated:', game.bossesDefeated, 'currentTier:', game.currentTier);
     
     // When separate enemies system activates (after tier 4 boss), clear enemies array

@@ -233,7 +233,7 @@ Once you've completed the implementation and testing:
 
 ## 🔄 Next Steps
 
-1. **Start Here:** Read [README](./README.md) for overview
+1. **⭐ Start Here:** Read [Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md) - Prioritized task order with dependencies
 2. **Follow Implementation Order:**
    - [01. Overview & Architecture](./01-overview-and-architecture.md) - Understand your setup
    - [02. Backend Setup](./02-backend-setup.md) - Set up backend directory

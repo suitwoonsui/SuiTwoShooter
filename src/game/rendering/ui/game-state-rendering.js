@@ -55,20 +55,54 @@ function renderGameOverScreen(ctx) {
   ctx.fillText(`Final Score: ${game.score.toLocaleString()}`, centerX, centerY + 40);
   ctx.restore();
   
-  // Enhanced stats display
+  // Stats display - organized in two columns for better layout
+  const statsStartY = centerY + 80;
+  const statsLineHeight = 22;
+  const leftColumnX = centerX - 180;
+  const rightColumnX = centerX + 180;
+  let currentY = statsStartY;
+  
+  // Left column stats
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 22px Arial'; // Reduced font size
-  ctx.fillText(`Coins Collected: ${game.coins}`, centerX, centerY + 80);
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'left';
+  
+  ctx.fillText(`Distance: ${Math.floor(game.distance)} m`, leftColumnX, currentY);
+  currentY += statsLineHeight;
+  
+  ctx.fillText(`Coins: ${game.coins}`, leftColumnX, currentY);
+  currentY += statsLineHeight;
+  
+  ctx.fillText(`Enemies Defeated: ${game.enemiesDefeated || 0}`, leftColumnX, currentY);
+  currentY += statsLineHeight;
+  
+  // Right column stats
+  currentY = statsStartY;
+  ctx.textAlign = 'left';
   
   ctx.fillStyle = '#4DA2FF';
-  ctx.font = 'bold 20px Arial'; // Reduced font size
-  ctx.fillText(`Bosses Defeated: ${game.bossesDefeated}`, centerX, centerY + 105);
+  ctx.fillText(`Bosses Defeated: ${game.bossesDefeated}`, rightColumnX, currentY);
+  currentY += statsLineHeight;
+  
+  ctx.fillText(`Current Tier: ${game.currentTier}`, rightColumnX, currentY);
+  currentY += statsLineHeight;
+  
+  ctx.fillText(`Projectile Level: ${game.projectileLevel}`, rightColumnX, currentY);
+  currentY += statsLineHeight;
+  
+  // Boss tiers display (if any bosses were defeated)
+  if (game.bossTiers && game.bossTiers.length > 0) {
+    const bossTiersText = `Boss Tiers: ${game.bossTiers.join(', ')}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(bossTiersText, rightColumnX, currentY);
+  }
   
   // Enhanced return to menu instructions with animation
+  ctx.textAlign = 'center';
   const blinkAlpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
   ctx.fillStyle = `rgba(170, 170, 170, ${blinkAlpha})`;
   ctx.font = 'bold 22px Arial'; // Reduced font size
-  ctx.fillText('Press any key to return to menu', centerX, centerY + 140);
+  ctx.fillText('Press any key to return to menu', centerX, centerY + 200);
 }
 
 // Mobile pause button overlay state

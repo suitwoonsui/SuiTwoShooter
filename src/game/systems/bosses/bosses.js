@@ -48,6 +48,10 @@ function createBoss() {
   
   console.log('Creating boss for tier:', game.currentTier, 'bossesDefeated:', game.bossesDefeated);
   
+  // Apply post-tier-4 speed multiplier to boss movement speed (same as projectile speeds)
+  const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
+  const scaledBossSpeed = currentBossStats.speed * speedMultiplier;
+  
   // Load specific boss image - Boss_Scammer for tier 1, Boss_Market_Maker for tier 2, Boss_Bear for tier 3, Boss_Shadow_Figure for tier 4
   let bossImageType;
   if (game.currentTier === 1) {
@@ -74,7 +78,7 @@ function createBoss() {
     height: size,
     lastShot: 0,
     hitTime: 0,
-    moveSpeed: currentBossStats.speed,
+    moveSpeed: scaledBossSpeed, // Apply post-tier-4 speed scaling
     vulnerable: false, // Boss invulnerable at start
     entranceTime: 2000, // 2 seconds entrance
     entranceStart: game.now(),
