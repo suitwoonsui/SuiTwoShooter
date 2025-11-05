@@ -147,7 +147,6 @@ Instead of static manual burning, burning is tied to gameplay performance:
 - ✅ **Coin kickback option:** Give players choice (burn or reward)
 - ✅ **Minimum burn threshold:** Only burn if total > 50 $Mews (prevent dust burns)
 - ✅ **Maximum burn cap:** Cap at 2000 $Mews per game (prevent exploitation)
-- ✅ **Skill multiplier:** Bonus multiplier for tier progression (e.g., 1.2x at tier 4)
 
 **Benefits:**
 - ✅ **Rewards skill** - Better players burn more (performance-based)
@@ -155,7 +154,7 @@ Instead of static manual burning, burning is tied to gameplay performance:
 - ✅ **Engaging** - Players want to perform better to burn more
 - ✅ **Fair** - Everyone burns based on their actual performance
 - ✅ **Deflationary** - Better gameplay = more tokens burned = higher scarcity
-- ✅ **Tier progression** - Higher tiers get skill multiplier bonuses
+- ✅ **Tier progression** - Higher tiers get higher boss burn rewards
 - ✅ **Player choice** - Coins can be burned OR rewarded (kickback)
 - ✅ **Balanced** - Minimum threshold prevents dust, maximum cap prevents abuse
 - ✅ **Transparent** - Players see exactly how burn is calculated
@@ -163,10 +162,9 @@ Instead of static manual burning, burning is tied to gameplay performance:
 ## ✅ **Current Design Review - What Works Well:**
 
 1. **✅ Tier-Based Boss Rewards** - Implemented! (100/150/200/250 per tier)
-2. **✅ Skill Multipliers** - Implemented! (+10%/20%/30% for tier progression)
-3. **✅ Balance Controls** - Min threshold (50) and max cap (2000) prevent abuse
-4. **✅ Coin Flexibility** - Player choice (burn or kickback) is good
-5. **✅ Transparent Calculation** - Players see breakdown, builds trust
+2. **✅ Balance Controls** - Min threshold (50) and max cap (2000) prevent abuse
+3. **✅ Coin Flexibility** - Player choice (burn or kickback) is good
+4. **✅ Transparent Calculation** - Players see breakdown, builds trust
 
 ## 🔧 **Potential Improvements & Considerations:**
 
@@ -236,7 +234,6 @@ Instead of static manual burning, burning is tied to gameplay performance:
 
 **What to Keep:**
 - ✅ Tier-based boss rewards (100/150/200/250)
-- ✅ Skill multipliers (+10%/20%/30%)
 - ✅ Coin burn/kickback choice
 - ✅ Min/max thresholds
 - ✅ Transparent breakdown
@@ -1512,12 +1509,7 @@ function calculatePerformanceBurn(gameStats) {
     
     // Balance controls
     minBurnThreshold: 50,    // Minimum burn to trigger (prevent dust burns)
-    maxBurnCap: 2000,        // Maximum burn per game (prevent exploitation)
-    skillMultiplier: {
-      tier2: 1.1,           // 10% bonus at tier 2
-      tier3: 1.2,           // 20% bonus at tier 3
-      tier4: 1.3            // 30% bonus at tier 4
-    }
+    maxBurnCap: 2000        // Maximum burn per game (prevent exploitation)
   };
 
   // Get current tier for calculations
@@ -1530,7 +1522,6 @@ function calculatePerformanceBurn(gameStats) {
     distance: 0,
     coins: 0,
     scoreBonus: 0,
-    skillBonus: 0, // Tier-based multiplier
     total: 0
   };
 
@@ -1570,27 +1561,13 @@ function calculatePerformanceBurn(gameStats) {
     burns.scoreBonus = scoreMultiplier * BURN_RATES.scoreBonus.reward;
   }
 
-  // Skill multiplier based on tier progression
-  let skillMultiplier = 1.0;
-  if (currentTier >= 4) {
-    skillMultiplier = BURN_RATES.skillMultiplier.tier4;
-  } else if (currentTier >= 3) {
-    skillMultiplier = BURN_RATES.skillMultiplier.tier3;
-  } else if (currentTier >= 2) {
-    skillMultiplier = BURN_RATES.skillMultiplier.tier2;
-  }
-
-  // Calculate base total (excluding coins if kickback, skill bonus not yet applied)
+  // Calculate base total (excluding coins if kickback)
   const baseTotal = burns.enemies + burns.bosses + burns.distance + 
                    (burns.coins > 0 ? burns.coins : 0) + // Only include coins if burning
                    burns.scoreBonus;
   
-  // Apply skill multiplier
-  const multiplierBonus = baseTotal * (skillMultiplier - 1.0);
-  burns.skillBonus = multiplierBonus;
-  
   // Calculate final total
-  let totalBurn = baseTotal * skillMultiplier;
+  let totalBurn = baseTotal;
   
   // Handle coin kickback (if coins are rewards, subtract from total)
   if (burns.coins < 0) {

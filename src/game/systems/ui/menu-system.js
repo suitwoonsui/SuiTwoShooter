@@ -2,6 +2,191 @@
 // MENU SYSTEM (EXACT COPY FROM HTML)
 // ==========================================
 
+// Wallet connection handlers
+async function handleConnectWallet() {
+  console.log('🔗 Connecting wallet...');
+  
+  if (typeof WalletAPI === 'undefined' || !window.walletAPIInstance) {
+    alert('Wallet API not initialized. Please refresh the page.');
+    return;
+  }
+  
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const connectBtnText = document.getElementById('connectWalletBtnText');
+  
+  // Disable button during connection
+  if (connectBtn) {
+    connectBtn.disabled = true;
+    if (connectBtnText) connectBtnText.textContent = 'Connecting...';
+  }
+  
+  try {
+    const result = await window.walletAPIInstance.connect();
+    
+    if (result.success) {
+      console.log('✅ Wallet connected:', result.address);
+      updateWalletUI(result.address);
+      // Enable start game button (token gatekeeping will check balance)
+      enableStartGameButton();
+    } else {
+      console.error('❌ Wallet connection failed:', result.error);
+      alert(`Failed to connect wallet: ${result.error || 'Unknown error'}`);
+      updateWalletUI(null);
+      disableStartGameButton();
+    }
+  } catch (error) {
+    console.error('❌ Error connecting wallet:', error);
+    alert(`Error connecting wallet: ${error.message}`);
+    updateWalletUI(null);
+    disableStartGameButton();
+  } finally {
+    // Re-enable button
+    if (connectBtn) {
+      connectBtn.disabled = false;
+      if (connectBtnText) connectBtnText.textContent = 'Connect Wallet';
+    }
+  }
+}
+
+async function handleDisconnectWallet() {
+  console.log('🔓 Disconnecting wallet...');
+  
+  if (typeof WalletAPI === 'undefined' || !window.walletAPIInstance) {
+    return;
+  }
+  
+  try {
+    const result = await window.walletAPIInstance.disconnect();
+    if (result.success) {
+      console.log('✅ Wallet disconnected');
+      updateWalletUI(null);
+      disableStartGameButton();
+    }
+  } catch (error) {
+    console.error('❌ Error disconnecting wallet:', error);
+  }
+}
+
+function updateWalletUI(address) {
+  const walletStatus = document.getElementById('walletStatus');
+  const walletStatusText = document.getElementById('walletStatusText');
+  const connectBtn = document.getElementById('connectWalletBtn');
+  const connectBtnText = document.getElementById('connectWalletBtnText');
+  const walletAddressDisplay = document.getElementById('walletAddressDisplay');
+  const walletAddressValue = document.getElementById('walletAddressValue');
+  
+  if (address) {
+    // Wallet connected
+    if (walletStatusText) {
+      walletStatusText.innerHTML = '<span class="wallet-icon">✅</span><span>Wallet connected</span>';
+    }
+    if (connectBtn) {
+      connectBtn.style.display = 'none';
+    }
+    if (walletAddressDisplay) {
+      walletAddressDisplay.style.display = 'flex';
+    }
+    if (walletAddressValue && window.walletAPIInstance) {
+      walletAddressValue.textContent = window.walletAPIInstance.formatAddress(address);
+    }
+  } else {
+    // Wallet not connected
+    if (walletStatusText) {
+      walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect wallet to play</span>';
+    }
+    if (connectBtn) {
+      connectBtn.style.display = 'flex';
+    }
+    if (walletAddressDisplay) {
+      walletAddressDisplay.style.display = 'none';
+    }
+  }
+}
+
+function enableStartGameButton() {
+  const startGameBtn = document.getElementById('startGameBtn');
+  if (startGameBtn) {
+    startGameBtn.disabled = false;
+  }
+}
+
+function disableStartGameButton() {
+  const startGameBtn = document.getElementById('startGameBtn');
+  if (startGameBtn) {
+    startGameBtn.disabled = true;
+  }
+}
+
+// Initialize wallet connection on page load
+async function initializeWalletIntegration() {
+  // Wait a bit for React and WalletAPI to load
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  if (typeof WalletAPI !== 'undefined') {
+    try {
+      // Initialize wallet API (determine network from backend config or default to mainnet)
+      const network = 'mainnet'; // TODO: Get from backend config
+      const api = await WalletAPI.initialize({ network });
+      
+      // Store globally for easy access
+      window.walletAPIInstance = api;
+      
+      console.log('✅ Wallet API initialized');
+      
+      // Listen for wallet changes
+      api.on(async (event) => {
+        console.log('🔔 Wallet event:', event);
+        updateWalletUI(event.address);
+        
+        if (event.type === 'connected' && event.address) {
+          // Check MEWS balance when wallet connects
+          await checkMEWSBalanceAndUpdateUI(event.address);
+        } else if (event.type === 'disconnected') {
+          disableStartGameButton();
+          updateBalanceUI(null, false);
+          updateWalletRequirementsUI(false, false);
+          const walletStatusText = document.getElementById('walletStatusText');
+          if (walletStatusText) {
+            walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect Slush Wallet to play</span>';
+          }
+        }
+      });
+      
+      // Check if wallet is already connected
+      if (api.isConnected()) {
+        const address = api.getAddress();
+        updateWalletUI(address);
+        // Check balance for already connected wallet
+        checkMEWSBalanceAndUpdateUI(address);
+      } else {
+        // Show requirements when wallet not connected
+        updateWalletRequirementsUI(false, false);
+        // Show available wallets
+        const wallets = api.getWallets();
+        console.log('Available wallets:', wallets);
+        if (wallets.length === 0) {
+          const walletStatusText = document.getElementById('walletStatusText');
+          if (walletStatusText) {
+            walletStatusText.innerHTML = '<span class="wallet-icon">⚠️</span><span>Install Slush Wallet extension</span>';
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize wallet API:', error);
+      const walletStatusText = document.getElementById('walletStatusText');
+      if (walletStatusText) {
+        walletStatusText.innerHTML = '<span class="wallet-icon">⚠️</span><span>Wallet initialization failed</span>';
+      }
+    }
+  } else {
+    console.warn('⚠️ WalletAPI not loaded');
+    const walletStatusText = document.getElementById('walletStatusText');
+    if (walletStatusText) {
+      walletStatusText.innerHTML = '<span class="wallet-icon">⚠️</span><span>Wallet API not loaded</span>';
+    }
+  }
+}
+
 // Close game completely - stop engine and free resources
 function closeGame() {
   console.log('Closing game completely');
@@ -43,7 +228,130 @@ function closeGame() {
 }
 
 // Main menu functions
+// Update wallet requirements UI
+function updateWalletRequirementsUI(walletConnected, hasMinimumBalance) {
+  const walletRequirement = document.getElementById('walletRequirement');
+  const mewsRequirement = document.getElementById('mewsRequirement');
+  const requirementsNotice = document.getElementById('walletRequirementsNotice');
+  
+  if (requirementsNotice) {
+    requirementsNotice.style.display = (!walletConnected || !hasMinimumBalance) ? 'block' : 'none';
+  }
+  
+  if (walletRequirement) {
+    if (walletConnected) {
+      walletRequirement.innerHTML = '✅ <span style="text-decoration: line-through;">Connect your Slush Wallet</span>';
+      walletRequirement.style.color = '#00ff00';
+    } else {
+      walletRequirement.innerHTML = '🔗 Connect your Slush Wallet';
+      walletRequirement.style.color = '#ff4444';
+    }
+  }
+  
+  if (mewsRequirement) {
+    if (hasMinimumBalance) {
+      mewsRequirement.innerHTML = '✅ <span style="text-decoration: line-through;">Have at least 500,000 $MEWS tokens</span>';
+      mewsRequirement.style.color = '#00ff00';
+    } else {
+      mewsRequirement.innerHTML = '💰 Have at least 500,000 $MEWS tokens';
+      mewsRequirement.style.color = '#ff4444';
+    }
+  }
+}
+
+// Check MEWS balance and update UI
+async function checkMEWSBalanceAndUpdateUI(address) {
+  if (!window.walletAPIInstance) {
+    console.warn('⚠️ Wallet API not available');
+    return;
+  }
+  
+  try {
+    const balanceResult = await window.walletAPIInstance.checkMEWSBalance(address);
+    
+    if (balanceResult.success) {
+      updateBalanceUI(balanceResult.formattedBalance, balanceResult.hasMinimumBalance);
+      
+      // Update requirements UI
+      updateWalletRequirementsUI(true, balanceResult.hasMinimumBalance);
+      
+      if (balanceResult.hasMinimumBalance) {
+        enableStartGameButton();
+        const walletStatusText = document.getElementById('walletStatusText');
+        if (walletStatusText) {
+          walletStatusText.innerHTML = '<span class="wallet-icon">✅</span><span>Wallet connected • Ready to play!</span>';
+        }
+      } else {
+        disableStartGameButton();
+        const walletStatusText = document.getElementById('walletStatusText');
+        if (walletStatusText) {
+          walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Insufficient $MEWS. Need ${balanceResult.formattedMinimum} $MEWS (You have ${balanceResult.formattedBalance})</span>`;
+        }
+      }
+    } else {
+      console.error('❌ Failed to check balance:', balanceResult.error);
+      disableStartGameButton();
+      updateBalanceUI(null, false);
+      updateWalletRequirementsUI(true, false);
+    }
+  } catch (error) {
+    console.error('❌ Error checking balance:', error);
+    disableStartGameButton();
+    updateBalanceUI(null, false);
+    updateWalletRequirementsUI(true, false);
+  }
+}
+
+// Update balance UI display
+function updateBalanceUI(balance, hasMinimum) {
+  // Update balance display if element exists
+  const balanceDisplay = document.getElementById('mewsBalanceDisplay');
+  const balanceElement = document.getElementById('mewsBalance');
+  
+  if (balanceDisplay && balanceElement) {
+    if (balance) {
+      balanceDisplay.style.display = 'block';
+      balanceElement.textContent = `${balance} $MEWS`;
+      balanceElement.style.color = hasMinimum ? '#00ff00' : '#ff4444';
+    } else {
+      balanceDisplay.style.display = 'none';
+    }
+  }
+}
+
+function enableStartGameButton() {
+  const startGameBtn = document.getElementById('startGameBtn');
+  if (startGameBtn) {
+    startGameBtn.disabled = false;
+    startGameBtn.title = 'Start Game';
+    startGameBtn.style.opacity = '1';
+    startGameBtn.style.cursor = 'pointer';
+  }
+}
+
+function disableStartGameButton() {
+  const startGameBtn = document.getElementById('startGameBtn');
+  if (startGameBtn) {
+    startGameBtn.disabled = true;
+    startGameBtn.title = 'Requirements: Connect wallet and have at least 500,000 $MEWS tokens';
+    startGameBtn.style.opacity = '0.5';
+    startGameBtn.style.cursor = 'not-allowed';
+  }
+}
+
 function startGame() {
+  // Check balance before starting game
+  if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    const balanceStatus = window.walletAPIInstance.getBalanceStatus();
+    
+    if (!balanceStatus.hasMinimumBalance) {
+      alert(`Insufficient $MEWS balance. You need at least 500,000 $MEWS to start the game.\n\nCurrent balance: ${balanceStatus.balance ? (Number(balanceStatus.balance) / 1_000_000_000).toLocaleString() : '0'} $MEWS`);
+      return;
+    }
+  } else {
+    alert('Please connect your wallet first.');
+    return;
+  }
   console.log('🎮 startGame() called');
   console.log('📊 Current gameState:', {
     isMenuVisible: gameState.isMenuVisible,
@@ -283,4 +591,11 @@ function showMainMenu() {
   closeGame();
   
   updateMenuStats();
+  
+  // Update wallet UI when menu is shown
+  if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    updateWalletUI(window.walletAPIInstance.getAddress());
+  } else {
+    updateWalletUI(null);
+  }
 }

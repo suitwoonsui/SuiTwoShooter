@@ -14,6 +14,11 @@ let __debugLoopEntries = 0;
 
 // Initialize security system
 function initSecurity() {
+  // Prevent multiple initializations
+  if (secureGame) {
+    return; // Already initialized
+  }
+  
   if (window.GameSecurity) {
     const securitySystem = window.GameSecurity.initializeSecureGame();
     secureGame = securitySystem.secureGame;

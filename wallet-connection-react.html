@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wallet Connection Test with @mysten/dapp-kit</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Note: @mysten/dapp-kit requires bundling. This is a test to see if we can load it via CDN -->
+  <!-- For production, you'll need to bundle @mysten/dapp-kit -->
+</head>
+<body>
+  <div id="wallet-root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Note: This won't work without bundling @mysten/dapp-kit
+    // This is just to show the structure
+    function WalletConnectionTest() {
+      const [status, setStatus] = useState('Checking...');
+      
+      useEffect(() => {
+        // Check if Wallet Standard API becomes available
+        const checkWallet = () => {
+          if (window.navigator && window.navigator.wallets) {
+            setStatus('Wallet Standard API available!');
+            window.navigator.wallets.get().then(wallets => {
+              console.log('Available wallets:', wallets.map(w => w.name));
+              setStatus(`Found ${wallets.length} wallet(s): ${wallets.map(w => w.name).join(', ')}`);
+            });
+          } else {
+            setStatus('Wallet Standard API not available. Need @mysten/dapp-kit.');
+          }
+        };
+        
+        checkWallet();
+        // Check every 2 seconds
+        const interval = setInterval(checkWallet, 2000);
+        return () => clearInterval(interval);
+      }, []);
+
+      return (
+        <div style={{ padding: '20px', fontFamily: 'Arial' }}>
+          <h2>Wallet Connection Test</h2>
+          <p>Status: {status}</p>
+          <p><strong>Note:</strong> Wallet Standard API requires @mysten/dapp-kit to be loaded.</p>
+          <p>To use @mysten/dapp-kit, you need to bundle it (Vite, Webpack, etc.)</p>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<WalletConnectionTest />, document.getElementById('wallet-root'));
+  </script>
+</body>
+</html>
+

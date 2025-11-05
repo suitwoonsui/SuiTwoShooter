@@ -114,79 +114,41 @@ function updateGameUI() {
     integratedDistanceElement.textContent = distanceValue;
   }
   
-  // Update speed displays (desktop only)
-  updateSpeedDisplays();
+  // Update gameplay stats displays (desktop only)
+  updateGameplayStatsDisplays();
 }
 
-// Calculate and display speed information (desktop only)
-function updateSpeedDisplays() {
-  // Enemy speed - show enemySpeed after tier 4, scrollSpeed before tier 4
-  const enemySpeedElement = document.getElementById('enemySpeed');
-  if (enemySpeedElement) {
-    if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies()) {
-      // After tier 4: Show actual enemy speed (can exceed scrollSpeed cap)
-      enemySpeedElement.textContent = game.enemySpeed.toFixed(2);
-    } else {
-      // Before tier 4: Enemy speed matches scrollSpeed
-      enemySpeedElement.textContent = game.scrollSpeed.toFixed(2);
-    }
+// Calculate and display gameplay stats (desktop only)
+function updateGameplayStatsDisplays() {
+  // Enemies Defeated
+  const enemiesDefeatedElement = document.getElementById('enemiesDefeated');
+  if (enemiesDefeatedElement) {
+    enemiesDefeatedElement.textContent = game.enemiesDefeated || 0;
   }
   
-  // Enemy projectile speed (average of all current tier enemies with multiplier)
-  const enemyProjectileSpeedElement = document.getElementById('enemyProjectileSpeed');
-  if (enemyProjectileSpeedElement) {
-    if (typeof enemyStats !== 'undefined') {
-      // Calculate average projectile speed for current tier enemies
-      let totalSpeed = 0;
-      let count = 0;
-      for (let tier = 1; tier <= Math.min(game.currentTier, 4); tier++) {
-        if (enemyStats[tier]) {
-          const baseSpeed = 4 * enemyStats[tier].speed;
-          totalSpeed += baseSpeed;
-          count++;
-        }
-      }
-      const avgBaseSpeed = count > 0 ? totalSpeed / count : 0;
-      const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
-      const finalSpeed = avgBaseSpeed * speedMultiplier;
-      enemyProjectileSpeedElement.textContent = finalSpeed.toFixed(2);
-    } else {
-      enemyProjectileSpeedElement.textContent = 'N/A';
-    }
+  // Boss Progress (distance until next boss)
+  const bossProgressElement = document.getElementById('bossProgress');
+  if (bossProgressElement) {
+    const progress = Math.floor(game.distanceSinceBoss);
+    const threshold = game.bossThreshold;
+    bossProgressElement.textContent = `${progress}/${threshold}`;
   }
   
-  // Boss speed (current boss or tier 4 default)
-  const bossSpeedElement = document.getElementById('bossSpeed');
-  if (bossSpeedElement) {
-    if (game.bossActive && game.boss) {
-      // Current boss speed (horizontal movement speed)
-      const bossSpeed = game.boss.enraged ? game.boss.moveSpeed * 1.5 : game.boss.moveSpeed;
-      bossSpeedElement.textContent = bossSpeed.toFixed(2);
-    } else if (typeof bossStats !== 'undefined' && bossStats[game.currentTier]) {
-      // Use current tier boss speed
-      bossSpeedElement.textContent = bossStats[game.currentTier].speed.toFixed(2);
-    } else {
-      bossSpeedElement.textContent = 'N/A';
-    }
+  // Max Coin Streak (highest streak achieved this game)
+  const maxCoinStreakElement = document.getElementById('maxCoinStreak');
+  if (maxCoinStreakElement) {
+    maxCoinStreakElement.textContent = game.forceField.maxStreak || 0;
   }
   
-  // Boss projectile speed (current boss or tier 4 default)
-  const bossProjectileSpeedElement = document.getElementById('bossProjectileSpeed');
-  if (bossProjectileSpeedElement) {
-    if (game.bossActive && game.boss) {
-      // Current boss projectile speed (if we had access to it)
-      const baseProjectileSpeed = (5 + game.boss.tier) * (game.boss.enraged ? 1.5 : 1);
-      const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
-      const finalSpeed = baseProjectileSpeed * speedMultiplier;
-      bossProjectileSpeedElement.textContent = finalSpeed.toFixed(2);
-    } else if (typeof bossStats !== 'undefined' && bossStats[game.currentTier]) {
-      // Use current tier boss projectile speed
-      const baseProjectileSpeed = 5 + game.currentTier;
-      const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
-      const finalSpeed = baseProjectileSpeed * speedMultiplier;
-      bossProjectileSpeedElement.textContent = finalSpeed.toFixed(2);
+  // Boss Tiers Cleared (show unique tiers or count)
+  const bossTiersClearedElement = document.getElementById('bossTiersCleared');
+  if (bossTiersClearedElement && game.bossTiers) {
+    if (game.bossTiers.length === 0) {
+      bossTiersClearedElement.textContent = '-';
     } else {
-      bossProjectileSpeedElement.textContent = 'N/A';
+      // Show unique tiers cleared, e.g., "1,2,3" or "4"
+      const uniqueTiers = [...new Set(game.bossTiers)].sort((a, b) => a - b);
+      bossTiersClearedElement.textContent = uniqueTiers.join(',');
     }
   }
 }

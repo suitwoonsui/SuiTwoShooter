@@ -245,22 +245,33 @@ class SecureShooterGame extends ProtectedGame {
   }
 
   protectConsole() {
-    // Store original methods
-    const originalLog = console.log;
-    const originalWarn = console.warn;
+    // Store original methods (only if not already stored)
+    if (!this._consoleProtected) {
+      const originalLog = console.log;
+      const originalWarn = console.warn;
+      
+      // Override but still allow logging (just monitor)
+      console.log = (...args) => {
+        this.logConsoleActivity('log', args);
+        originalLog.apply(console, args);
+      };
+      
+      this._consoleProtected = true;
+    }
     
-    // Override but still allow logging (just monitor)
-    console.log = (...args) => {
-      this.logConsoleActivity('log', args);
-      originalLog.apply(console, args);
-    };
-    
-    // Prevent direct game object access
-    Object.defineProperty(window, 'game', {
-      get: () => undefined,
-      set: () => {},
-      configurable: false
-    });
+    // Prevent direct game object access (only if not already defined)
+    if (!window.hasOwnProperty('game') || Object.getOwnPropertyDescriptor(window, 'game')?.configurable) {
+      try {
+        Object.defineProperty(window, 'game', {
+          get: () => undefined,
+          set: () => {},
+          configurable: true // Allow redefinition if needed
+        });
+      } catch (e) {
+        // Property already exists and is not configurable - ignore
+        console.warn('⚠️ Could not protect game property:', e.message);
+      }
+    }
   }
 
   detectDevTools() {
@@ -473,6 +484,17 @@ if (typeof module !== 'undefined' && module.exports) {
     SecureShooterGame,
     initializeSecureGame
   };
+}
+
+// Expose on window for browser use
+if (typeof window !== 'undefined') {
+  window.GameSecurity = GameSecurity;
+  window.GameSecurity.initializeSecureGame = initializeSecureGame; // Attach as method on GameSecurity
+  window.ProtectedGame = ProtectedGame;
+  window.SecureInput = SecureInput;
+  window.RateLimiter = RateLimiter;
+  window.SecureShooterGame = SecureShooterGame;
+  window.initializeSecureGame = initializeSecureGame; // Also expose standalone for backwards compatibility
 }
 
 console.log('Game security measures loaded. Key features:');

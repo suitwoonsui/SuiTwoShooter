@@ -19,7 +19,6 @@
 - **Balance Controls:**
   - Min: 50 $Mews (prevents dust)
   - Max: 2000 $Mews (prevents abuse)
-  - Skill multiplier: +10%/20%/30% for tier progression
 - **Status:** ✅ Makes sense, rewards skill
 
 ---

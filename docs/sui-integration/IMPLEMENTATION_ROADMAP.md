@@ -19,19 +19,19 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 ## Phase 1: Foundation Setup (Week 1)
 
-### 🔴 **1.1 Game Statistics Tracking** (MVP Critical) ⭐ **START HERE**
+### ✅ **1.1 Game Statistics Tracking** (MVP Critical) ⭐ **COMPLETED**
 **Estimated Time:** 1-2 hours  
 **Dependencies:** None  
 **Blocks:** Score submission, burn calculation
 
 **Tasks:**
-- [ ] Add `game.enemiesDefeated` counter:
+- [x] Add `game.enemiesDefeated` counter:
   - Increment in enemy collision/destruction logic
   - Reset at game start
-- [ ] Add `game.bossTiers` array:
+- [x] Add `game.bossTiers` array:
   - Track tier when each boss is defeated: `game.bossTiers.push(game.currentTier)`
   - Reset at game start
-- [ ] Verify all stats are collected at game end:
+- [x] Verify all stats are collected at game end:
   - `game.score`
   - `game.distance`
   - `game.coins`
@@ -39,6 +39,13 @@ This document provides a prioritized, step-by-step implementation order for inte
   - `game.currentTier`
   - `game.enemiesDefeated` (new)
   - `game.bossTiers` (new)
+
+**Completion Notes:**
+- ✅ `enemiesDefeated` counter added and increments when enemies are destroyed in `checkProjectileEnemyCollision()`
+- ✅ `bossTiers` array added and populated when bosses are defeated
+- ✅ Both stats initialized in game object and reset in `restart()` function
+- ✅ All stats verified on game over screen display
+- ✅ Stats also displayed in real-time desktop gameplay stats panel
 
 **Why First:** 
 - ✅ **Quickest task** (1-2 hours vs 2-6 hours for others)
@@ -55,31 +62,37 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 ---
 
-### 🔴 **1.2 Backend Infrastructure** (MVP Critical)
+### ✅ **1.2 Backend Infrastructure** (MVP Critical) **COMPLETED**
 **Estimated Time:** 2-3 hours  
 **Dependencies:** None (can parallel with 1.3)  
 **Blocks:** All backend work
 
 **Tasks:**
-- [ ] Create `backend/` directory structure
-- [ ] Initialize Node.js project (`package.json`)
-- [ ] Install core dependencies:
-  - `express` (server)
-  - `@mysten/sui.js` (Sui SDK)
-  - `cors` (CORS middleware)
-  - `dotenv` (environment variables)
-- [ ] Set up basic Express server (`server.js`)
-- [ ] Create `.env` template file
-- [ ] Add `/health` endpoint (fast, no blockchain queries) - **Required for Render free tier**
-- [ ] Test server runs locally
+- [x] Create `backend/` directory structure
+- [x] Initialize Node.js project (`package.json`)
+- [x] Install core dependencies:
+  - `next` (framework)
+  - `@mysten/sui` (Sui SDK)
+  - `typescript` (TypeScript support)
+- [x] Set up basic Next.js server
+- [x] Create `.env` template file
+- [x] Add `/api/health` endpoint (fast, no blockchain queries) - **Required for Render free tier**
+- [x] Test server runs locally
 
-**Why Critical:** Backend API work depends on infrastructure being ready. Can be done in parallel with smart contracts.
+**Completion Notes:**
+- ✅ Backend restructured to Next.js with TypeScript
+- ✅ All dependencies updated and deprecation warnings resolved
+- ✅ Health endpoint working
+- ✅ Network switching configured (mainnet/testnet via SUI_NETWORK)
+- ✅ Token ID configured and verified
 
-**Files to Create:**
-- `backend/server.js`
+**Files Created:**
+- `backend/app/api/health/route.ts`
 - `backend/package.json`
 - `backend/.env.example`
 - `backend/.gitignore`
+- `backend/next.config.ts`
+- `backend/tsconfig.json`
 
 ---
 
@@ -111,59 +124,69 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 **Note:** Deploy to testnet immediately - don't wait for mainnet!
 
-**Note:** Tasks 1.2 and 1.3 can be done in parallel after completing 1.1.
+**Note:** **Recommended order:** Do Wallet Connection (3.1) BEFORE smart contracts. You can test wallet connection and token gatekeeping without contracts deployed. Smart contracts are only needed for score submission (Phase 4).
 
 ---
 
 ## Phase 2: Backend API Development (Week 1-2)
 
-### 🔴 **2.1 Sui Service Module** (MVP Critical)
+### ✅ **2.1 Sui Service Module** (MVP Critical) **COMPLETED**
 **Estimated Time:** 3-4 hours  
 **Dependencies:** 1.1, 1.2  
 **Blocks:** All API routes
 
 **Tasks:**
-- [ ] Create `backend/services/suiService.js`:
-  - Initialize Sui client (testnet)
+- [x] Create `backend/lib/sui/suiService.ts`:
+  - Initialize Sui client (testnet/mainnet)
   - Connect to Sui network
   - Get contract addresses from env
-- [ ] Implement helper functions:
-  - `getTokenBalance(address, tokenType)`
-  - `verifyTransaction(txHash)`
-  - `queryEvents(eventType)` (for leaderboard)
-- [ ] Test connection to Sui testnet
-- [ ] Handle errors gracefully
+- [x] Implement helper functions:
+  - `getTokenBalance(address, tokenType)` - ✅ Verified working
+  - `verifyTransaction(txHash)` - ✅ Implemented
+  - `queryEvents(eventType)` (for leaderboard) - ✅ Implemented
+- [x] Test connection to Sui testnet/mainnet - ✅ Verified
+- [x] Handle errors gracefully - ✅ Implemented
 
-**Why Critical:** All blockchain interactions go through this service.
+**Completion Notes:**
+- ✅ Created TypeScript SuiService class with full type safety
+- ✅ Token balance checking verified working on mainnet
+- ✅ All API routes integrated and using the service
+- ✅ Supports both testnet and mainnet via SUI_NETWORK env variable
+- ✅ Uses `getCoins()` method for reliable custom token balance queries
+- ✅ Debug logging added for development
 
-**Files to Create:**
-- `backend/services/suiService.js`
+**Files Created:**
+- `backend/lib/sui/suiService.ts`
 
 ---
 
-### 🔴 **2.2 Core API Routes** (MVP Critical)
+### ✅ **2.2 Core API Routes** (MVP Critical) **COMPLETED**
 **Estimated Time:** 4-5 hours  
 **Dependencies:** 2.1  
 **Blocks:** Frontend integration
 
 **Tasks:**
-- [ ] Create `backend/routes/` directory
-- [ ] `GET /api/tokens/balance/:address` - Check token balance (required for gatekeeping)
-- [ ] `GET /api/leaderboard` - Query blockchain events for top scores
-- [ ] `POST /api/scores/verify` - Verify transaction hash (optional, for MVP)
-- [ ] `GET /health` - Health check (already done in 1.1)
-- [ ] Add error handling middleware
-- [ ] Add CORS configuration
-- [ ] Test all endpoints locally
+- [x] Create API route files in `backend/app/api/`
+- [x] `GET /api/tokens/balance/[address]` - Check token balance (required for gatekeeping) - ✅ Integrated with SuiService
+- [x] `GET /api/leaderboard` - Query blockchain events for top scores - ✅ Integrated with SuiService
+- [x] `POST /api/scores/verify` - Verify transaction hash - ✅ Integrated with SuiService
+- [x] `GET /api/health` - Health check (already done in 1.2)
+- [x] Add error handling - ✅ Implemented in all routes
+- [x] Add CORS configuration - ✅ Configured in next.config.ts
+- [x] Test all endpoints locally - ✅ Token balance endpoint verified
 
-**Why Critical:** Frontend needs these endpoints to function.
+**Completion Notes:**
+- ✅ All API routes created as Next.js API routes (TypeScript)
+- ✅ Routes integrated with SuiService for blockchain interactions
+- ✅ Proper error handling and validation in all endpoints
+- ✅ CORS configured for frontend access
+- ✅ Token balance endpoint tested and working
 
-**Files to Create:**
-- `backend/routes/tokens.js`
-- `backend/routes/scores.js`
-- `backend/routes/leaderboard.js`
-
-**Note:** Keep routes simple for MVP - can add payment processing later.
+**Files Created:**
+- `backend/app/api/tokens/balance/[address]/route.ts`
+- `backend/app/api/scores/verify/route.ts`
+- `backend/app/api/leaderboard/route.ts`
+- `backend/app/api/health/route.ts`
 
 ---
 
@@ -395,7 +418,6 @@ This document provides a prioritized, step-by-step implementation order for inte
   - Calculate burn from distance
   - Calculate burn from coins (user choice)
   - Calculate burn from score
-  - Apply skill multiplier
   - Apply min/max caps (50-2000 $Mews)
 - [ ] Display burn breakdown to user
 - [ ] Integrate with score submission
@@ -657,15 +679,17 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 **To launch MVP, you MUST complete:**
 
-✅ **Phase 1:** All tasks (Foundation)
-  - Start with 1.1 Game Statistics Tracking ⭐
-  - Then 1.2 Backend Infrastructure (can parallel with 1.3)
-  - Then 1.3 Smart Contracts (can parallel with 1.2)
-✅ **Phase 2:** 2.1, 2.2 (Backend API)  
-✅ **Phase 3:** All tasks (Wallet Integration)  
-✅ **Phase 4:** 4.1, 4.2 (Score Submission)  
-✅ **Phase 6:** 6.1 (Testnet Testing)  
-✅ **Phase 7:** All tasks (Deployment)
+✅ **Phase 1:** 
+  - ✅ 1.1 Game Statistics Tracking ⭐ **COMPLETED**
+  - ✅ 1.2 Backend Infrastructure ⭐ **COMPLETED**
+  - [ ] 1.3 Smart Contracts (can parallel with frontend)
+✅ **Phase 2:** 
+  - ✅ 2.1 Sui Service Module ⭐ **COMPLETED**
+  - ✅ 2.2 Core API Routes ⭐ **COMPLETED**
+[ ] **Phase 3:** All tasks (Wallet Integration)  
+[ ] **Phase 4:** 4.1, 4.2 (Score Submission)  
+[ ] **Phase 6:** 6.1 (Testnet Testing)  
+[ ] **Phase 7:** All tasks (Deployment)
 
 **Can Skip for MVP (add later):**
 - ⚪ Payment system (Phase 5) - Can launch with free games initially
@@ -712,9 +736,9 @@ This document provides a prioritized, step-by-step implementation order for inte
   └─> 4.1 Score Submission UI
   └─> 5.3 Burn Calculator
 
-1.2 Backend Setup (can parallel with 1.3)
-  └─> 2.1 Sui Service
-      └─> 2.2 API Routes
+1.2 Backend Setup ✅ COMPLETED
+  └─> 2.1 Sui Service ✅ COMPLETED
+      └─> 2.2 API Routes ✅ COMPLETED
           └─> 3.2 API Client
               └─> 3.3 Token Gatekeeping
                   └─> 4.1 Score Submission UI
@@ -723,15 +747,15 @@ This document provides a prioritized, step-by-step implementation order for inte
                               └─> 7.1 Testnet Deployment
                                   └─> 7.2 Mainnet Deployment
 
-1.3 Smart Contracts (can parallel with 1.2)
+3.1 Wallet Connection (do this BEFORE smart contracts!)
+  └─> 3.3 Token Gatekeeping
   └─> 4.2 Transaction Signing
+
+1.3 Smart Contracts (can parallel with 3.1, but wallet connection recommended first)
+  └─> 4.2 Transaction Signing (needs contracts deployed)
   └─> 5.2 Token Burn Contract
       └─> 5.3 Burn Calculator
   └─> 5.5 Subscription Contract
-
-3.1 Wallet Connection
-  └─> 3.3 Token Gatekeeping
-  └─> 4.2 Transaction Signing
 
 4.2 Transaction Signing
   └─> 5.1 Payment UI
@@ -754,14 +778,14 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 For fastest MVP launch:
 
-1. [ ] **Game statistics tracking (1.1)** ⭐ **START HERE**
-2. [ ] Backend setup (1.2) - Can parallel with 1.3
-3. [ ] Smart contracts - game score (1.3) - Can parallel with 1.2
-4. [ ] Sui service (2.1)
-5. [ ] Core API routes (2.2)
-6. [ ] Wallet connection (3.1)
-7. [ ] API client (3.2)
-8. [ ] Token gatekeeping (3.3)
+1. [x] **Game statistics tracking (1.1)** ⭐ **COMPLETED**
+2. [x] **Backend setup (1.2)** ✅ **COMPLETED**
+3. [x] **Sui service (2.1)** ✅ **COMPLETED**
+4. [x] **Core API routes (2.2)** ✅ **COMPLETED**
+5. [ ] **Wallet connection (3.1)** ⭐ **NEXT - Recommended before smart contracts**
+6. [ ] API client (3.2)
+7. [ ] Token gatekeeping (3.3)
+8. [ ] Smart contracts - game score (1.3) - Can be done in parallel with 3.1-3.3
 9. [ ] Score submission UI (4.1)
 10. [ ] Transaction signing (4.2)
 11. [ ] Testnet testing (6.1)

@@ -54,7 +54,9 @@ function renderPlayerProjectiles(ctx) {
     ctx.globalAlpha=0.7+0.3*(b.level/3);
     ctx.shadowColor='cyan'; ctx.shadowBlur=10+b.level*5;
     // Draw Blue Orb Shot image instead of rectangle
-    ctx.drawImage(blueOrbShotImage, bx, by, orbSize, orbSize);
+    if (blueOrbShotImage && blueOrbShotImage.complete && blueOrbShotImage.naturalWidth > 0) {
+      ctx.drawImage(blueOrbShotImage, bx, by, orbSize, orbSize);
+    }
     ctx.restore(); ctx.shadowBlur=0;
     
     // Restore alpha if it was modified for frozen effect

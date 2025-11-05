@@ -9,7 +9,7 @@
 
 // Projectile images (moved from utils/helpers.js)
 const blueOrbShotImage = new Image();
-blueOrbShotImage.src = 'assets/Blue Orb Shot.webp';
+blueOrbShotImage.src = 'assets/Blue_Orb_Shot.webp';
 
 const bossArrowImage = new Image();
 bossArrowImage.src = 'assets/Boss_Arrow_Bolt.webp';

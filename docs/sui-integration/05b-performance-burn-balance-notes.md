@@ -19,7 +19,6 @@ This document captures design decisions, balance considerations, and potential i
 | **Coins (Burn)** | 0.1 $Mews/coin | Burned from supply |
 | **Coins (Kickback)** | 0.05 $Mews/coin | Reward from treasury |
 | **Score Bonus** | 10 $Mews per 1000 pts | Overall excellence |
-| **Skill Multiplier** | +10% tier 2, +20% tier 3, +30% tier 4 | Progression reward |
 
 ---
 
@@ -89,23 +88,6 @@ This document captures design decisions, balance considerations, and potential i
 
 ---
 
-### **5. Skill Multiplier System**
-
-**Implementation:**
-- Tier 1: 1.0x (base)
-- Tier 2: 1.1x (+10% bonus)
-- Tier 3: 1.2x (+20% bonus)
-- Tier 4: 1.3x (+30% bonus)
-
-**Why:**
-- Rewards progression through difficulty tiers
-- Skilled players who reach higher tiers get multiplicative bonuses
-- Creates incentive to improve and progress
-
-**Alternative:** Linear bonus (e.g., +5% per tier) or exponential (+15% per tier)
-
----
-
 ## 🔍 Potential Issues & Solutions
 
 ### **Issue 1: Coin Farming Exploitation**
@@ -143,7 +125,7 @@ This document captures design decisions, balance considerations, and potential i
 
 ### **Issue 4: Tier Progression Gaming**
 
-**Risk:** Players might try to game tier progression to get skill multipliers
+**Risk:** Players might try to game tier progression to get higher burn rewards
 
 **Mitigation:**
 - Tier progression tied to boss defeats (can't fake)
@@ -188,8 +170,7 @@ This document captures design decisions, balance considerations, and potential i
 - 400 distance ÷ 100 × 10 = 40 $Mews
 - 25 coins × 0.1 = 2.5 $Mews (burn) or 1.25 $Mews (kickback)
 - 4000 score ÷ 1000 × 10 = 40 $Mews
-- Skill multiplier (tier 2): +10%
-- **Total: ~310 $Mews (with 10% bonus) = ~341 $Mews**
+- **Total: ~310 $Mews**
 
 **Skilled Player (60 min session):**
 - 100 enemies × 1 = 100 $Mews
@@ -197,12 +178,11 @@ This document captures design decisions, balance considerations, and potential i
 - 1000 distance ÷ 100 × 10 = 100 $Mews
 - 60 coins × 0.1 = 6 $Mews (burn)
 - 15000 score ÷ 1000 × 10 = 150 $Mews
-- Skill multiplier (tier 4): +30%
-- **Total: ~1056 $Mews (with 30% bonus) = ~1373 $Mews**
+- **Total: ~1056 $Mews**
 
 **Daily Projection (100 players):**
-- Average: 341 $Mews × 100 = 34,100 $Mews/day
-- Monthly: ~1,023,000 $Mews/month burned
+- Average: 310 $Mews × 100 = 31,000 $Mews/day
+- Monthly: ~930,000 $Mews/month burned
 - **Significant deflationary pressure!**
 
 ---
@@ -212,7 +192,6 @@ This document captures design decisions, balance considerations, and potential i
 - [x] Define burn rates
 - [x] Add balance controls (min/max caps)
 - [x] Implement tier-based boss rewards
-- [x] Add skill multiplier system
 - [x] Coin burn/kickback choice
 - [ ] Track enemies defeated (need to add to game)
 - [ ] Integrate with game events

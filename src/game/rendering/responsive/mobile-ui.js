@@ -329,7 +329,7 @@ const MobileUI = {
         <span class="stat-value" id="integratedScore">0</span>
       </div>
       <div class="integrated-stat orb-stat">
-        <img src="assets/Blue Orb Shot.webp" alt="Orb Level" class="orb-icon">
+        <img src="assets/Blue_Orb_Shot.webp" alt="Orb Level" class="orb-icon">
         <span class="stat-value" id="integratedOrbLevel">1</span>
       </div>
       <div class="integrated-stat">

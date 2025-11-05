@@ -93,11 +93,6 @@ Tiers control which enemy types can spawn and their spawn rates:
 - Tier 3 Boss: 200 $Mews (2× multiplier)
 - Tier 4 Boss: 250 $Mews (2.5× multiplier)
 
-**Skill Multiplier Bonus:**
-- Tier 2: +10% to total burn
-- Tier 3: +20% to total burn
-- Tier 4: +30% to total burn
-
 **Impact:** Higher tiers = more token burns = increased scarcity = community value
 
 ### **5. Anti-Cheat Validation**

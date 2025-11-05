@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>" />
   <script>
     (function initializeAppViewportUnit() {
       const getVV = () => ({
@@ -59,6 +60,7 @@
   </script>
 
   <!-- Responsive modules - loaded last -->
+  <!-- Note: css-loader.js and device-detection.js already loaded in <head>, don't load again -->
 </head>
 <body>
   <!-- Main Viewport Container -->
@@ -67,9 +69,9 @@
     <div id="frontPage" class="front-page-overlay front-page-overlay-visible">
       <div class="front-page-content">
         <h1 class="game-title"><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
-        <p class="game-subtitle">Space Shooter Alpha v0.1</p>
+        <p class="game-subtitle">Market Shooter Alpha v0.1</p>
         <div class="game-description">
-          <p>Navigate through the cosmos, defeat enemies, and survive as long as possible!</p>
+          <p>Fight against the negative forces of the market chart! Defeat bearish enemies and dodge downward projectiles!</p>
           <p>Use MOUSE to move and P to pause. Auto-fire is enabled!</p>
         </div>
         <button id="enterGameBtn" class="enter-game-btn">
@@ -137,24 +139,24 @@
               <span class="stat-label">Coin Streak:</span>
               <span class="stat-value" id="coinStreak">0</span>
             </div>
-            <!-- Speed Display Section (Desktop Only) -->
+            <!-- Gameplay Stats Section (Desktop Only) -->
             <div class="stat-section-divider"></div>
-            <div class="stat-section-title">Speeds</div>
+            <div class="stat-section-title">Gameplay Stats</div>
             <div class="stat-item">
-              <span class="stat-label">Enemy Speed:</span>
-              <span class="stat-value" id="enemySpeed">0</span>
+              <span class="stat-label">Enemies Defeated:</span>
+              <span class="stat-value" id="enemiesDefeated">0</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Enemy Projectile:</span>
-              <span class="stat-value" id="enemyProjectileSpeed">0</span>
+              <span class="stat-label">Boss Progress:</span>
+              <span class="stat-value" id="bossProgress">0</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Boss Speed:</span>
-              <span class="stat-value" id="bossSpeed">0</span>
+              <span class="stat-label">Max Coin Streak:</span>
+              <span class="stat-value" id="maxCoinStreak">0</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Boss Projectile:</span>
-              <span class="stat-value" id="bossProjectileSpeed">0</span>
+              <span class="stat-label">Boss Tiers Cleared:</span>
+              <span class="stat-value" id="bossTiersCleared">-</span>
             </div>
           </div>
         </div>
@@ -173,7 +175,37 @@
       </div>
       
       <div class="menu-buttons">
-        <button class="menu-btn primary" onclick="startGame()" onmouseover="playMenuHoverSound()">
+        <!-- Wallet Connection Section -->
+        <div class="wallet-connection-section" id="walletConnectionSection">
+          <div class="wallet-requirements-notice" id="walletRequirementsNotice" style="background: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: block;">
+            <p class="requirements-title" style="margin: 0 0 8px 0; font-weight: bold; color: #ffc107; font-size: 14px;">⚠️ Requirements to Play:</p>
+            <ul class="requirements-list" style="margin: 0; padding-left: 20px; list-style: none;">
+              <li id="walletRequirement" style="margin: 4px 0; font-size: 13px;">🔗 Connect your Slush Wallet</li>
+              <li id="mewsRequirement" style="margin: 4px 0; font-size: 13px;">💰 Have at least 500,000 $MEWS tokens</li>
+            </ul>
+          </div>
+          <div class="wallet-status" id="walletStatus">
+            <div class="wallet-status-text" id="walletStatusText">
+              <span class="wallet-icon">🔒</span>
+              <span>Connect Slush Wallet to play</span>
+            </div>
+          </div>
+          <button class="menu-btn wallet-btn" id="connectWalletBtn" onclick="handleConnectWallet()" onmouseover="playMenuHoverSound()">
+            <span class="btn-icon">🔗</span>
+            <span id="connectWalletBtnText">Connect Wallet</span>
+          </button>
+          <div class="wallet-address-display" id="walletAddressDisplay" style="display: none;">
+            <span class="wallet-address-label">Connected:</span>
+            <span class="wallet-address-value" id="walletAddressValue"></span>
+            <button class="wallet-disconnect-btn" onclick="handleDisconnectWallet()" title="Disconnect">✕</button>
+          </div>
+          <div class="wallet-balance-display" id="mewsBalanceDisplay" style="display: none;">
+            <span class="wallet-balance-label">$MEWS Balance:</span>
+            <span class="wallet-balance-value" id="mewsBalance">--</span>
+          </div>
+        </div>
+        
+        <button class="menu-btn primary" id="startGameBtn" onclick="startGame()" onmouseover="playMenuHoverSound()" disabled>
           <span class="btn-icon">▶️</span>
           Start Game
         </button>
@@ -458,8 +490,7 @@
   <!-- Load security FIRST -->
   <script src="game-security.js"></script>
 
-  <!-- Load CSS Loader FIRST -->
-  <script src="src/game/systems/device/css-loader.js"></script>
+  <!-- Note: CSS Loader and Device Detection already loaded in <head> -->
 
   <!-- Load audio system -->
   <!-- Modular Audio System -->
@@ -486,7 +517,7 @@
     <script src="src/game/shared/sprite-metrics.js"></script>
     
     <!-- Mobile Detection Modules (Non-intrusive) -->
-    <script src="src/game/systems/device/device-detection.js"></script>
+    <!-- Note: device-detection.js already loaded in <head> -->
     <script src="src/game/systems/device/device-config.js"></script>
     <script src="src/game/systems/device/device-monitoring.js"></script>
     <script src="src/game/systems/device/landscape-orientation.js"></script>
@@ -574,7 +605,103 @@
   <script src="src/game/systems/ui/settings-management.js"></script>
   <script src="src/game/systems/ui/sound-test-system.js"></script>
   <script src="src/game/systems/ui/leaderboard-system.js"></script>
+  <!-- Wallet API Bundle - Includes React and ReactDOM -->
+  <!-- React is bundled WITH the wallet module to ensure proper initialization -->
+  <script src="wallet-module/dist/wallet-api.umd.cjs" onload="
+    (function() {
+      console.log('✅ Wallet bundle loaded');
+      
+      // React and ReactDOM are exposed by the bundle
+      if (typeof window.WalletAPI !== 'undefined') {
+        console.log('✅ WalletAPI available:', typeof window.WalletAPI);
+        
+        // React and ReactDOM should already be on globalThis from the bundle
+        if (typeof globalThis.React !== 'undefined') {
+          console.log('✅ React available on globalThis:', typeof globalThis.React);
+        }
+        if (typeof globalThis.ReactDOM !== 'undefined') {
+          console.log('✅ ReactDOM available on globalThis:', typeof globalThis.ReactDOM);
+        }
+        
+        // Initialize wallet API
+        if (typeof window.WalletAPI.initialize === 'function') {
+          window.WalletAPI.initialize().then((api) => {
+            console.log('✅ Wallet API initialized:', api);
+            window.walletAPI = api;
+          }).catch((error) => {
+            console.error('❌ Failed to initialize wallet API:', error);
+          });
+        }
+      } else {
+        console.error('❌ WalletAPI not found after bundle load');
+      }
+    })();
+  "></script>
+  <script>
+    // Wallet API is loaded via script tag above
+    // This script just ensures it's initialized
+    (function() {
+      // Wallet API should already be loaded, but check if initialization is needed
+      if (typeof window.WalletAPI !== 'undefined' && typeof window.WalletAPI.initialize === 'function' && !window.walletAPI) {
+        // Initialize if not already done
+        window.WalletAPI.initialize().then((api) => {
+          console.log('✅ Wallet API initialized:', api);
+          window.walletAPI = api;
+        }).catch((error) => {
+          console.error('❌ Failed to initialize wallet API:', error);
+        });
+      }
+    })();
+  </script>
   <script src="src/game/systems/ui/menu-system.js"></script>
   <script src="src/game/systems/ui/ui-initialization.js"></script>
+  
+  <!-- Initialize wallet integration after UI is loaded -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wait for WalletAPI to be available
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      const checkWalletAPI = setInterval(async function() {
+        attempts++;
+        
+        // Check for WalletAPI - it might be empty initially due to React error
+        // But we should check if it gets populated after the error
+        if (typeof WalletAPI !== 'undefined') {
+          // Check if WalletAPI has initialize method (directly or via default)
+          const walletAPI = WalletAPI?.default || WalletAPI;
+          
+          if (typeof walletAPI === 'object' && walletAPI !== null && typeof walletAPI.initialize === 'function') {
+            clearInterval(checkWalletAPI);
+            console.log('✅ WalletAPI loaded');
+            
+            // Store the correct reference
+            window.WalletAPI = walletAPI;
+            
+            if (typeof initializeWalletIntegration === 'function') {
+              await initializeWalletIntegration();
+            }
+            
+            // After initialization, provide manual check instructions
+            console.log('%c🔍 Wallet API Ready', 'color: #4DA2FF; font-size: 16px; font-weight: bold;');
+            console.log('Wallet API initialized. Available wallets:', window.walletAPIInstance?.getWallets() || 'Not loaded yet');
+            return;
+          }
+        }
+        
+        if (attempts >= maxAttempts) {
+          clearInterval(checkWalletAPI);
+          console.error('❌ WalletAPI not loaded after', maxAttempts, 'attempts');
+          console.log('Available on window:', typeof window.WalletAPI);
+          console.log('WalletAPI object:', window.WalletAPI);
+          console.log('WalletAPI.default:', window.WalletAPI?.default);
+          console.log('React available:', typeof React, typeof ReactDOM);
+          console.log('globalThis.React:', typeof globalThis.React);
+          console.log('⚠️ The wallet bundle failed to load due to React error. Check console for details.');
+        }
+      }, 500); // Check every 500ms (slower to give bundle time to recover)
+    });
+  </script>
 </body>
 </html>
