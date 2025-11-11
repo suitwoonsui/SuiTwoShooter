@@ -4,7 +4,7 @@
  * Uses @mysten/dapp-kit directly with React hooks
  */
 
-import { SuiClientProvider, WalletProvider as SuiWalletProvider, useWallets, useConnectWallet, useCurrentWallet, useDisconnectWallet } from '@mysten/dapp-kit';
+import { SuiClientProvider, WalletProvider as SuiWalletProvider, useWallets, useConnectWallet, useCurrentWallet, useDisconnectWallet, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { getFullnodeUrl } from '@mysten/sui/client';
 import { SuiClient } from '@mysten/sui/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -24,7 +24,7 @@ let walletAPIState = {
   listeners: [],
   mewsBalance: null,
   hasMinimumBalance: false,
-  minBalanceRequired: BigInt(500000000) // 500,000 MEWS with 9 decimals
+  minBalanceRequired: BigInt(500000000000000) // 500,000 MEWS with 9 decimals (500,000 * 10^9)
 };
 
 // MEWS Token Configuration
@@ -90,6 +90,8 @@ function WalletHookBridge({ onUpdate }) {
   const connectWallet = useConnectWallet();
   const disconnectWallet = useDisconnectWallet();
   const currentWallet = useCurrentWallet();
+  const signAndExecuteTransaction = useSignAndExecuteTransaction();
+  const suiClient = useSuiClient();
   
   useEffect(() => {
     try {
@@ -125,6 +127,10 @@ function WalletHookBridge({ onUpdate }) {
       // useConnectWallet() returns a mutation object with mutateAsync method
       walletAPIState._connect = connectWallet;
       walletAPIState._disconnect = disconnectWallet;
+      
+      // Store transaction signing functions
+      walletAPIState._signAndExecuteTransaction = signAndExecuteTransaction;
+      walletAPIState._suiClient = suiClient;
       
       // Debug: Log what connectWallet actually is
       if (connectWallet) {
@@ -179,7 +185,7 @@ function WalletHookBridge({ onUpdate }) {
       console.error('  Error stack:', error.stack);
       // Don't throw - let component continue rendering
     }
-  }, [wallets, currentWallet, connectWallet, disconnectWallet, onUpdate]);
+    }, [wallets, currentWallet, connectWallet, disconnectWallet, signAndExecuteTransaction, suiClient, onUpdate]);
   
   return null;
 }
@@ -200,7 +206,18 @@ function WalletProviderWrapper({ children, network, onUpdate }) {
       >
         <SuiWalletProvider 
           autoConnect={false}
-          preferredWallets={['Slush Wallet', 'Sui Wallet', 'Ethos Wallet', 'OKX Wallet', 'Suiet']}
+          preferredWallets={[
+            'Slush Wallet',      // Mysten Labs official wallet
+            'Sui Wallet',        // Mysten Labs official wallet
+            'Surf Wallet',       // Mobile-first wallet with zkLogin
+            'Suiet',             // Open-source browser extension
+            'Ethos Wallet',      // Popular Sui wallet
+            'OKX Wallet',        // Multi-chain wallet with Sui support
+            'Phantom',           // Multi-chain wallet with Sui support
+            'Klever Wallet',     // Multi-chain wallet with Sui support
+            'Trust Wallet',      // Multi-chain wallet with Sui support
+            'Coinbase Wallet'    // Multi-chain wallet with Sui support
+          ]}
           storageKey="shootergame-wallet"
         >
           <WalletErrorBoundary>
@@ -220,7 +237,7 @@ function WalletProviderWrapper({ children, network, onUpdate }) {
  * @param {string} options.containerId - Container ID for React root (default: 'wallet-react-root')
  * @returns {Promise<Object>} Wallet API instance
  */
-export async function initializeWalletAPI(options = {}) {
+async function initializeWalletAPI(options = {}) {
   if (walletAPI) return walletAPI;
   
   const { network = 'mainnet', containerId = 'wallet-react-root' } = options;
@@ -634,6 +651,40 @@ export async function initializeWalletAPI(options = {}) {
         hasMinimumBalance: walletAPIState.hasMinimumBalance,
         minimumRequired: walletAPIState.minBalanceRequired.toString()
       };
+    },
+
+    // Sign and execute transaction
+    async signAndExecuteTransaction(transactionBlock) {
+      if (!walletAPIState._signAndExecuteTransaction) {
+        return {
+          success: false,
+          error: 'Transaction signing not available. Wallet may not be connected.'
+        };
+      }
+
+      try {
+        // Sign and execute transaction in one call
+        const result = await walletAPIState._signAndExecuteTransaction.mutateAsync({
+          transaction: transactionBlock,
+          options: {
+            showEffects: true,
+            showEvents: true
+          }
+        });
+
+        return {
+          success: true,
+          digest: result.digest,
+          effects: result.effects,
+          events: result.events
+        };
+      } catch (error) {
+        console.error('❌ Transaction signing/execution error:', error);
+        return {
+          success: false,
+          error: error.message || 'Transaction failed'
+        };
+      }
     }
   };
   
@@ -663,9 +714,18 @@ export async function initializeWalletAPI(options = {}) {
     'window.slush?.sui': typeof window.slush?.sui !== 'undefined',
     'window.slushWallet': typeof window.slushWallet !== 'undefined',
     'window.suiWallet': typeof window.suiWallet !== 'undefined',
+    'window.surfWallet': typeof window.surfWallet !== 'undefined',
+    'window.surf': typeof window.surf !== 'undefined',
     'window.ethosWallet': typeof window.ethosWallet !== 'undefined',
     'window.okxWallet': typeof window.okxWallet !== 'undefined',
+    'window.okx': typeof window.okx !== 'undefined',
     'window.suiet': typeof window.suiet !== 'undefined',
+    'window.klever': typeof window.klever !== 'undefined',
+    'window.phantom': typeof window.phantom !== 'undefined',
+    'window.phantom?.sui': typeof window.phantom?.sui !== 'undefined',
+    'window.trustwallet': typeof window.trustwallet !== 'undefined',
+    'window.coinbaseWallet': typeof window.coinbaseWallet !== 'undefined',
+    'window.coinbase': typeof window.coinbase !== 'undefined',
     'window.__SUI_WALLET__': typeof window.__SUI_WALLET__ !== 'undefined',
     'navigator.wallets': typeof window.navigator?.wallets !== 'undefined',
     'navigator.wallets.get': typeof window.navigator?.wallets?.get === 'function'
@@ -741,7 +801,11 @@ export async function initializeWalletAPI(options = {}) {
       console.warn('  1. No wallet extension installed');
       console.warn('  2. Wallet extension not compatible with @mysten/dapp-kit');
       console.warn('  3. Wallet extension needs page refresh after installation');
-      console.warn('  Supported wallets: Sui Wallet, Slush Wallet, Ethos Wallet, OKX Wallet, Suiet');
+      console.warn('⚠️ No wallets detected after waiting. Possible reasons:');
+      console.warn('  1. No wallet extension installed');
+      console.warn('  2. Wallet extension not compatible with @mysten/dapp-kit');
+      console.warn('  3. Wallet extension needs page refresh after installation');
+      console.warn('  Supported wallets: Sui Wallet, Slush Wallet, Surf Wallet, Suiet, Ethos Wallet, OKX Wallet, Phantom Wallet, Klever Wallet, Trust Wallet, Coinbase Wallet, or any wallet supporting Sui via Wallet Standard API');
     }
   }
   

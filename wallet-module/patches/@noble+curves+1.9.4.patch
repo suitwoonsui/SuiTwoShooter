@@ -1,0 +1,18 @@
+diff --git a/node_modules/@noble/curves/esm/ed25519.js b/node_modules/@noble/curves/esm/ed25519.js
+index 016b0ba..a9be307 100644
+--- a/node_modules/@noble/curves/esm/ed25519.js
++++ b/node_modules/@noble/curves/esm/ed25519.js
+@@ -412,11 +412,9 @@ _RistrettoPoint.BASE =
+ _RistrettoPoint.ZERO = 
+ /* @__PURE__ */ (() => new _RistrettoPoint(ed25519.Point.ZERO))();
+ // prettier-ignore
+-_RistrettoPoint.Fp = 
+-/* @__PURE__ */ Fp;
++_RistrettoPoint.Fp = Fp;
+ // prettier-ignore
+-_RistrettoPoint.Fn = 
+-/* @__PURE__ */ Fn;
++_RistrettoPoint.Fn = Fn;
+ /** @deprecated use `ristretto255.Point` */
+ export const RistrettoPoint = _RistrettoPoint;
+ export const ristretto255 = { Point: _RistrettoPoint };

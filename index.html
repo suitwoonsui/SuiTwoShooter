@@ -139,25 +139,6 @@
               <span class="stat-label">Coin Streak:</span>
               <span class="stat-value" id="coinStreak">0</span>
             </div>
-            <!-- Gameplay Stats Section (Desktop Only) -->
-            <div class="stat-section-divider"></div>
-            <div class="stat-section-title">Gameplay Stats</div>
-            <div class="stat-item">
-              <span class="stat-label">Enemies Defeated:</span>
-              <span class="stat-value" id="enemiesDefeated">0</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Boss Progress:</span>
-              <span class="stat-value" id="bossProgress">0</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Max Coin Streak:</span>
-              <span class="stat-value" id="maxCoinStreak">0</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Boss Tiers Cleared:</span>
-              <span class="stat-value" id="bossTiersCleared">-</span>
-            </div>
           </div>
         </div>
       </div>
@@ -180,7 +161,7 @@
           <div class="wallet-requirements-notice" id="walletRequirementsNotice" style="background: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: block;">
             <p class="requirements-title" style="margin: 0 0 8px 0; font-weight: bold; color: #ffc107; font-size: 14px;">⚠️ Requirements to Play:</p>
             <ul class="requirements-list" style="margin: 0; padding-left: 20px; list-style: none;">
-              <li id="walletRequirement" style="margin: 4px 0; font-size: 13px;">🔗 Connect your Slush Wallet</li>
+              <li id="walletRequirement" style="margin: 4px 0; font-size: 13px;">🔗 Connect your Sui wallet (Slush, Sui Wallet, Surf, Suiet, Ethos, OKX, Phantom, Klever, Trust, Coinbase, or any Sui-compatible wallet)</li>
               <li id="mewsRequirement" style="margin: 4px 0; font-size: 13px;">💰 Have at least 500,000 $MEWS tokens</li>
             </ul>
           </div>
@@ -208,6 +189,10 @@
         <button class="menu-btn primary" id="startGameBtn" onclick="startGame()" onmouseover="playMenuHoverSound()" disabled>
           <span class="btn-icon">▶️</span>
           Start Game
+        </button>
+        <button class="menu-btn" id="startGameTestBtn" onclick="startGameTest()" onmouseover="playMenuHoverSound()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border-color: #ff4444; opacity: 0.5;" title="Test Mode: Bypass gatekeeping (for development/testing)" disabled>
+          <span class="btn-icon">🧪</span>
+          Start Game (Test Mode)
         </button>
         <button class="menu-btn" onclick="showSettings()" onmouseover="playMenuHoverSound()">
           <span class="btn-icon">⚙️</span>
@@ -605,6 +590,8 @@
   <script src="src/game/systems/ui/settings-management.js"></script>
   <script src="src/game/systems/ui/sound-test-system.js"></script>
   <script src="src/game/systems/ui/leaderboard-system.js"></script>
+  <script src="src/game/systems/ui/toast-notifications.js"></script>
+  <script src="src/game/blockchain/score-submission.js"></script>
   <!-- Wallet API Bundle - Includes React and ReactDOM -->
   <!-- React is bundled WITH the wallet module to ensure proper initialization -->
   <script src="wallet-module/dist/wallet-api.umd.cjs" onload="

@@ -9,6 +9,11 @@ let currentGameScore = 0; // Global variable to store score
 // Display leaderboard
 function displayLeaderboard() {
   const list = document.getElementById('leaderboardList');
+  if (!list) {
+    console.warn('⚠️ [LEADERBOARD] leaderboardList element not found, skipping display');
+    return;
+  }
+  
   list.innerHTML = '';
   
   // Sort by descending score and take top 10
@@ -33,12 +38,7 @@ function displayLeaderboard() {
   });
 }
 
-// Check if score deserves to be saved
-function shouldSaveScore(score) {
-  return leaderboard.length < 10 || score > (leaderboard.sort((a, b) => b.score - a.score)[9]?.score || 0);
-}
-
-// Show name input modal
+// Show name input modal (always shown after game over - all scores are tracked)
 function showNameInput(score) {
   console.log('🔵 [VISIBILITY] showNameInput() called for score:', score);
   currentGameScore = score; // Store score
@@ -106,6 +106,8 @@ function showNameInput(score) {
         }, { passive: false });
         console.log('🔵 [VISIBILITY] Skip button event listeners attached');
       } else if (clonedButton.textContent.trim() === 'Save Score' || clonedButton.getAttribute('onclick')?.includes('saveScore')) {
+        // Remove onclick attribute to prevent double-firing (we use event listener instead)
+        clonedButton.removeAttribute('onclick');
         clonedButton.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -123,29 +125,43 @@ function showNameInput(score) {
     });
   }
   
-  // Play achievement sound for new high score
-  if (typeof playAchievementSound === 'function') {
-    playAchievementSound();
-  }
+    // Play achievement sound
+    if (typeof playAchievementSound === 'function') {
+      playAchievementSound();
+    }
 }
 
-// Save score - CORRECTED VERSION
-function saveScore() {
+// Save score - CORRECTED VERSION with blockchain submission
+async function saveScore() {
   console.log('🟣 [UI FLOW] saveScore() called');
   console.trace('🟣 [UI FLOW] saveScore() stack trace');
   
   const name = document.getElementById('playerNameInput').value.trim();
   console.log('🟣 [UI FLOW] Player name:', name);
   
+  // Prevent double-submission
+  if (saveScore._submitting) {
+    console.log('🟣 [UI FLOW] saveScore() already in progress, ignoring duplicate call');
+    return;
+  }
+  
   if (!name) {
     alert('Please enter your name!');
-    // Don't return - close modal anyway
-  } else {
+    // Don't return - close modal anyway, but don't submit
+    hideNameInput();
+    showMainMenu();
+    return;
+  }
+  
+  // Mark as submitting to prevent duplicate calls
+  saveScore._submitting = true;
+  
+  try {
     // Use currentGameScore directly instead of parsing display
     const score = currentGameScore;
     console.log("Saving score:", score, "for player:", name); // Debug
     
-    // Add new score
+    // Add new score to localStorage first (for immediate UI feedback)
     leaderboard.push({ name, score, date: new Date().toLocaleDateString() });
     
     // Sort and keep only top 10
@@ -155,21 +171,81 @@ function saveScore() {
     // Save to localStorage
     localStorage.setItem('gameLeaderboard', JSON.stringify(leaderboard));
     
-    // Play success sound for high score
+    // Update display immediately (with error handling)
+    try {
+    displayLeaderboard();
+    displayLeaderboardModal(); // Also update modal if it's open
+    } catch (error) {
+      console.warn('⚠️ [LEADERBOARD] Error updating leaderboard display:', error);
+      // Continue anyway - don't block score saving
+    }
+    
+    // Play success sound
     if (typeof playSuccessSound === 'function') {
       playSuccessSound();
     }
     
-    // Update display
-    displayLeaderboard();
-    displayLeaderboardModal(); // Also update modal if it's open
-  }
-  
-  // Close modal (whether name was entered or not)
-  hideNameInput();
-  
-  // Show main menu immediately after saving
+    // Close modal immediately after saving to localStorage
+    // Don't wait for blockchain submission
+    hideNameInput();
     showMainMenu();
+    
+    // Submit to blockchain if wallet is connected and contract is deployed
+    // Do this AFTER closing the modal so user isn't blocked
+    // Use currentGameStats if available, otherwise fallback to reading from window.game
+    const statsToSubmit = currentGameStats || {
+      score: score,
+      distance: window.game?.distance || 0,
+      coins: window.game?.coins || 0,
+      bossesDefeated: window.game?.bossesDefeated || 0,
+      enemiesDefeated: window.game?.enemiesDefeated || 0,
+      longestCoinStreak: window.game?.forceField?.maxStreak || 0,
+      sessionId: window.game?.sessionId || null
+    };
+    
+    if (typeof window.submitScoreToBlockchain === 'function' && 
+        window.walletAPIInstance && 
+        window.walletAPIInstance.isConnected()) {
+      
+      console.log('📝 [BLOCKCHAIN] Submitting game stats to blockchain:', statsToSubmit);
+      
+      // Submit in background (don't block UI)
+      window.submitScoreToBlockchain(statsToSubmit, name || '')
+        .then(result => {
+          if (result.success) {
+            console.log('✅ [BLOCKCHAIN] Score submitted successfully!', result.digest);
+            // Show success toast (optional, can be silent)
+            if (typeof window.showToast === 'function') {
+              window.showToast('Score saved to blockchain!', 'success');
+            }
+          } else {
+            console.warn('⚠️ [BLOCKCHAIN] Score submission failed:', result.error);
+            // Show error toast
+            if (typeof window.showToast === 'function') {
+              window.showToast('Failed to save score to blockchain. Your score was saved locally.', 'error');
+          }
+          }
+        })
+        .catch(error => {
+          console.error('❌ [BLOCKCHAIN] Error submitting score:', error);
+          // Show error toast
+          if (typeof window.showToast === 'function') {
+            window.showToast('Error saving score. Please try again later.', 'error');
+        }
+        });
+    } else {
+      console.log('📝 [BLOCKCHAIN] Skipping blockchain submission:', {
+        hasSubmitFunction: typeof window.submitScoreToBlockchain === 'function',
+        hasWalletAPI: !!window.walletAPIInstance,
+        isConnected: window.walletAPIInstance?.isConnected()
+      });
+    }
+  } finally {
+    // Reset submission flag after a delay to allow for async operations
+    setTimeout(() => {
+      saveScore._submitting = false;
+    }, 1000);
+  }
 }
 
 // Skip save
@@ -180,7 +256,57 @@ function skipSave() {
   hideNameInput();
   
   // Show main menu immediately after skipping
-    showMainMenu();
+  showMainMenu();
+  
+  // Submit to blockchain if wallet is connected (even when skipping name entry)
+  // Use currentGameStats if available, otherwise fallback to reading from window.game
+  const statsToSubmit = currentGameStats || {
+    score: currentGameScore || 0,
+    distance: window.game?.distance || 0,
+    coins: window.game?.coins || 0,
+    bossesDefeated: window.game?.bossesDefeated || 0,
+    enemiesDefeated: window.game?.enemiesDefeated || 0,
+    longestCoinStreak: window.game?.forceField?.maxStreak || 0,
+    sessionId: window.game?.sessionId || null
+  };
+  
+  if (typeof window.submitScoreToBlockchain === 'function' && 
+      window.walletAPIInstance && 
+      window.walletAPIInstance.isConnected()) {
+    
+    console.log('📝 [BLOCKCHAIN] Submitting game stats to blockchain (skipped name):', statsToSubmit);
+    
+    // Submit in background (don't block UI)
+    window.submitScoreToBlockchain(statsToSubmit, '') // Empty name when skipped
+      .then(result => {
+        if (result.success) {
+          console.log('✅ [BLOCKCHAIN] Score submitted successfully!', result.digest);
+          // Show success toast (optional, can be silent)
+          if (typeof window.showToast === 'function') {
+            window.showToast('Score saved to blockchain!', 'success');
+          }
+        } else {
+          console.warn('⚠️ [BLOCKCHAIN] Score submission failed:', result.error);
+          // Show error toast
+          if (typeof window.showToast === 'function') {
+            window.showToast('Failed to save score to blockchain. Your score was saved locally.', 'error');
+          }
+        }
+      })
+      .catch(error => {
+        console.error('❌ [BLOCKCHAIN] Error submitting score:', error);
+        // Show error toast
+        if (typeof window.showToast === 'function') {
+          window.showToast('Error saving score. Please try again later.', 'error');
+        }
+      });
+  } else {
+    console.log('📝 [BLOCKCHAIN] Skipping blockchain submission (skip):', {
+      hasSubmitFunction: typeof window.submitScoreToBlockchain === 'function',
+      hasWalletAPI: !!window.walletAPIInstance,
+      isConnected: window.walletAPIInstance?.isConnected()
+    });
+  }
 }
 
 // Hide modal
@@ -230,9 +356,32 @@ document.getElementById('playerNameInput').addEventListener('keypress', function
   }
 });
 
+// Store game stats from game over (for use in saveScore)
+let currentGameStats = null;
+
 // Function called by game on game over
-function onGameOver(finalScore) {
-  console.log("🎮 [GAME OVER] Game Over - Final Score:", finalScore); // Debug
+function onGameOver(gameStatsOrScore) {
+  // Handle both old format (just score) and new format (stats object)
+  let finalScore;
+  if (typeof gameStatsOrScore === 'object' && gameStatsOrScore !== null) {
+    // New format: stats object
+    currentGameStats = gameStatsOrScore;
+    finalScore = gameStatsOrScore.score;
+    console.log("🎮 [GAME OVER] Game Over - Stats object received:", gameStatsOrScore);
+  } else {
+    // Old format: just score (backward compatibility)
+    finalScore = gameStatsOrScore;
+    currentGameStats = {
+      score: finalScore,
+      distance: window.game?.distance || 0,
+      coins: window.game?.coins || 0,
+      bossesDefeated: window.game?.bossesDefeated || 0,
+      enemiesDefeated: window.game?.enemiesDefeated || 0,
+      longestCoinStreak: window.game?.forceField?.maxStreak || 0,
+      sessionId: window.game?.sessionId || null
+    };
+    console.log("🎮 [GAME OVER] Game Over - Score only (legacy):", finalScore);
+  }
   
   // Update game stats
   if (finalScore > gameStats.bestScore) {
@@ -287,14 +436,9 @@ function onGameOver(finalScore) {
     
     // Small delay to let the click/keypress finish processing
   setTimeout(() => {
-    if (shouldSaveScore(finalScore)) {
-        console.log('🎮 [GAME OVER] High score detected - showing name input modal');
-      showNameInput(finalScore);
-    } else {
-        console.log('🎮 [GAME OVER] No high score - showing main menu');
-        // If no high score, show main menu
-        showMainMenu();
-      }
+    // Always show name input modal - all scores are tracked and submitted
+    console.log('🎮 [GAME OVER] Showing name input modal for score:', finalScore);
+    showNameInput(finalScore);
     }, 100);
   }
   

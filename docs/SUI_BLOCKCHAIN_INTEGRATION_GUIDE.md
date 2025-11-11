@@ -1276,7 +1276,7 @@ cd suitwo_game
 
 #### Step 4.2: Create Game Score Contract
 
-**`suitwo_game/sources/game.move`:**
+**`suitwo_game/sources/score_submission.move`:**
 ```move
 module suitwo_game::game {
     use sui::object::{Self, UID};

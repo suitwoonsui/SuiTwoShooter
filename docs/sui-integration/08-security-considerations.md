@@ -160,7 +160,7 @@ router.post('/submit', scoreSubmissionLimiter, async (req, res) => {
 
 ### Your Contract's Anti-Cheat Validation
 
-**Your smart contract (`game.move`) is the primary security layer** - it validates all game data:
+**Your smart contract (`score_submission.move`) is the primary security layer** - it validates all game data:
 
 ### ✅ Validation Checks in Contract
 

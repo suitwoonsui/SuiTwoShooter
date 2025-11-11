@@ -51,11 +51,35 @@ function updateGameUI() {
   const integratedDistanceElement = document.getElementById('integratedDistance');
   
   // Update score (both desktop and mobile)
+  // Get score from multiple sources to ensure we display the correct value
+  let currentScore = game.score;
+  if (currentScore === 0 && typeof secureGame !== 'undefined' && secureGame) {
+    // Try to get score directly from secureGame if getter returns 0
+    try {
+      const directScore = secureGame.score;
+      if (directScore > 0) {
+        currentScore = directScore;
+        console.log('📊 [UI] Using direct secureGame.score:', currentScore);
+      }
+    } catch (e) {
+      // Ignore errors accessing secureGame.score
+    }
+  }
+  if (currentScore === 0 && game._fallbackScore) {
+    currentScore = game._fallbackScore;
+    console.log('📊 [UI] Using fallback score:', currentScore);
+  }
   if (gameScoreElement) {
-    gameScoreElement.textContent = game.score.toLocaleString();
+    gameScoreElement.textContent = currentScore.toLocaleString();
+    // Debug: Log if score is 0 but shouldn't be
+    if (currentScore === 0 && typeof secureGame !== 'undefined' && secureGame && secureGame.score > 0) {
+      console.warn('⚠️ [UI] Score display is 0 but secureGame.score is', secureGame.score);
+    }
+  } else {
+    console.warn('⚠️ [UI] gameScoreElement not found!');
   }
   if (integratedScoreElement) {
-    integratedScoreElement.textContent = game.score.toLocaleString();
+    integratedScoreElement.textContent = currentScore.toLocaleString();
   }
   
   // Update orb level (both desktop and mobile)
@@ -113,42 +137,7 @@ function updateGameUI() {
     const distanceValue = Math.floor(game.distance / 100);
     integratedDistanceElement.textContent = distanceValue;
   }
-  
-  // Update gameplay stats displays (desktop only)
-  updateGameplayStatsDisplays();
 }
 
-// Calculate and display gameplay stats (desktop only)
-function updateGameplayStatsDisplays() {
-  // Enemies Defeated
-  const enemiesDefeatedElement = document.getElementById('enemiesDefeated');
-  if (enemiesDefeatedElement) {
-    enemiesDefeatedElement.textContent = game.enemiesDefeated || 0;
-  }
-  
-  // Boss Progress (distance until next boss)
-  const bossProgressElement = document.getElementById('bossProgress');
-  if (bossProgressElement) {
-    const progress = Math.floor(game.distanceSinceBoss);
-    const threshold = game.bossThreshold;
-    bossProgressElement.textContent = `${progress}/${threshold}`;
-  }
-  
-  // Max Coin Streak (highest streak achieved this game)
-  const maxCoinStreakElement = document.getElementById('maxCoinStreak');
-  if (maxCoinStreakElement) {
-    maxCoinStreakElement.textContent = game.forceField.maxStreak || 0;
-  }
-  
-  // Boss Tiers Cleared (show unique tiers or count)
-  const bossTiersClearedElement = document.getElementById('bossTiersCleared');
-  if (bossTiersClearedElement && game.bossTiers) {
-    if (game.bossTiers.length === 0) {
-      bossTiersClearedElement.textContent = '-';
-    } else {
-      // Show unique tiers cleared, e.g., "1,2,3" or "4"
-      const uniqueTiers = [...new Set(game.bossTiers)].sort((a, b) => a - b);
-      bossTiersClearedElement.textContent = uniqueTiers.join(',');
-    }
-  }
-}
+// Note: Gameplay stats section removed - stats panel now only shows:
+// Score, Magic Orb Level, Tier, Bosses Defeated, Force Field, Coin Streak

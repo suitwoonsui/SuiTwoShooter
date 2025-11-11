@@ -4,28 +4,8 @@ const nextConfig: NextConfig = {
   // API-only backend, no pages needed
   output: 'standalone',
   
-  // CORS is handled in API routes
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: process.env.CORS_ORIGIN || '*',
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS',
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization',
-          },
-        ],
-      },
-    ];
-  },
+  // CORS is handled dynamically in API routes (see lib/cors.ts)
+  // We don't set static headers here because they can't respond to request origins
   
   // Suppress warnings for transitive dependencies
   onDemandEntries: {

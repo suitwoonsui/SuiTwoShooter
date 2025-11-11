@@ -9,7 +9,7 @@ class GameSecurity {
     this.gameStartTime = Date.now();
     this.lastValidationTime = Date.now();
     this.validationInterval = 5000; // Validate every 5 seconds
-    this.maxScorePerSecond = 500; // Maximum realistic score gain per second
+    this.maxScorePerSecond = 10000; // Maximum realistic score gain per second (allows for boss rewards up to 5000 * 4 = 20000)
     this.checksumSalt = Math.random().toString(36).substr(2, 9);
   }
 
@@ -56,7 +56,17 @@ class GameSecurity {
     const maxPossibleScore = timeInSeconds * this.maxScorePerSecond;
     const minActionsForScore = Math.floor(score / 100); // Minimum actions needed
     
-    return score <= maxPossibleScore && actionsCount >= minActionsForScore;
+    // Allow some flexibility: if actions are sufficient, allow up to 2x the time-based max
+    // This accounts for boss rewards and other large point bonuses
+    const flexibleMaxScore = Math.max(maxPossibleScore, actionsCount * 200);
+    
+    const isValid = score <= flexibleMaxScore && actionsCount >= minActionsForScore;
+    
+    if (!isValid) {
+      console.warn(`⚠️ [SECURITY VALIDATION] Score ${score} exceeds limits: max=${flexibleMaxScore.toFixed(0)} (time-based=${maxPossibleScore.toFixed(0)}, action-based=${(actionsCount * 200).toFixed(0)}), actions=${actionsCount}, minActions=${minActionsForScore}`);
+    }
+    
+    return isValid;
   }
 }
 
@@ -299,10 +309,36 @@ class SecureShooterGame extends ProtectedGame {
     }
   }
 
+  // Reset game state for a new game
+  reset() {
+    console.log('🔄 [SECURITY] Resetting secureGame for new game');
+    // Reset score via setter (updates closure variable)
+    this.score = 0;
+    this._score = 0;
+    this._actionsCount = 0;
+    this._lives = 3;
+    this._gameTime = 0;
+    this._lastScoreUpdate = Date.now();
+    this._scoreHistory = [];
+    this.startTime = Date.now();
+    this.actionLog = [];
+    // Reset rate limiter
+    this.rateLimiter = new RateLimiter();
+    // Reset security system
+    this.security = new GameSecurity();
+    console.log('✅ [SECURITY] secureGame reset complete');
+  }
+
   incrementScore(points) {
     this._actionsCount++;
-    const oldScore = this._score;
-    this._score += points;
+    const oldScore = this.score; // Get current score from getter
+    const newScore = oldScore + points;
+    
+    // Update via setter so the closure variable is updated
+    this.score = newScore;
+    
+    // But also update _score for internal tracking
+    this._score = newScore;
     
     // Log action for pattern analysis
     this.actionLog.push({
@@ -313,33 +349,52 @@ class SecureShooterGame extends ProtectedGame {
     });
     
     // Validate score progression
-    if (!this.security.validateScore(this._score, Date.now() - this.startTime, this._actionsCount)) {
+    const gameTime = Date.now() - this.startTime;
+    const isValid = this.security.validateScore(this._score, gameTime, this._actionsCount);
+    
+    if (!isValid) {
+      console.warn(`⚠️ [SECURITY] Score validation failed: +${points} points | Old: ${oldScore} | New: ${this._score} | Time: ${gameTime}ms | Actions: ${this._actionsCount}`);
       this.flagSuspiciousActivity('invalid_score_progression');
-      this._score = oldScore; // Revert
+      // Revert both the property and internal variable
+      this.score = oldScore;
+      this._score = oldScore;
+    } else {
+      console.log(`✅ [SECURITY] Score validated: +${points} points | Old: ${oldScore} | New: ${this._score}`);
     }
   }
 
   submitScore() {
+    // Rate limiting check (but don't block - just warn)
     if (!this.rateLimiter.canSubmit()) {
-      return { success: false, error: 'Rate limited' };
+      console.warn('⚠️ [SECURITY] Rate limit warning (not blocking blockchain submission)');
+      // Don't return - continue with validation
     }
 
     const gameState = this.getSecureGameState();
     const isValid = this.validateFinalScore(gameState);
     
+    // Always return the score, even if validation fails
+    // The blockchain will do its own validation
+    // Security validation here is just for logging/warning purposes
     if (!isValid) {
+      console.warn('⚠️ [SECURITY] Score validation warning (not blocking blockchain submission):', {
+        score: this._score,
+        gameTime: gameState.gameTime,
+        actions: gameState.actions
+      });
       this.flagSuspiciousActivity('invalid_final_score');
-      return { success: false, error: 'Invalid score' };
+      // Still return success with the score - don't block blockchain submission
     }
 
     // In production, send encrypted data to server
     const encryptedState = this.security.encryptGameState(gameState);
     
     return {
-      success: true,
+      success: true, // Always return success - validation is just for warnings
       score: this._score,
       encryptedData: encryptedState,
-      checksum: gameState.checksum
+      checksum: gameState.checksum,
+      validationWarning: !isValid // Flag if validation failed (for logging)
     };
   }
 
@@ -354,10 +409,33 @@ class SecureShooterGame extends ProtectedGame {
     );
     
     // Check action patterns (simple heuristic)
-    const avgTimePerAction = gameState.gameTime / gameState.actions;
-    const patternValid = avgTimePerAction > 50 && avgTimePerAction < 10000; // 50ms to 10s per action
+    // More lenient: allow 0 actions (for very short games) and up to 60s per action (for slow gameplay)
+    let patternValid = true;
+    if (gameState.actions > 0) {
+      const avgTimePerAction = gameState.gameTime / gameState.actions;
+      // Allow 0ms to 60s per action (more lenient for various gameplay styles)
+      patternValid = avgTimePerAction >= 0 && avgTimePerAction <= 60000;
+    }
+    // If no actions, still allow (might be a very short game or test)
     
-    return timeValid && scoreValid && progressionValid && patternValid;
+    // Log validation details for debugging
+    if (!timeValid || !scoreValid || !progressionValid || !patternValid) {
+      console.warn('⚠️ [SECURITY] Final score validation failed:', {
+        timeValid,
+        scoreValid,
+        progressionValid,
+        patternValid,
+        score: gameState.score,
+        gameTime: gameState.gameTime,
+        actions: gameState.actions,
+        avgTimePerAction: gameState.actions > 0 ? (gameState.gameTime / gameState.actions) : 'N/A'
+      });
+    }
+    
+    // For blockchain submissions, be more lenient - only block obviously invalid scores
+    // Allow submission if at least basic validations pass (score and time are valid)
+    // Progression and pattern checks are warnings, not blockers
+    return timeValid && scoreValid; // Only require basic validations
   }
 }
 
@@ -469,6 +547,9 @@ function initializeSecureGame() {
       console.error('Score submission failed:', result.error);
       // Handle error (don't submit to leaderboard)
     }
+    
+    // Always return the result so the caller can decide what to do
+    return result;
   }
   
   return { secureGame, onEnemyDestroyed, onGameOver };

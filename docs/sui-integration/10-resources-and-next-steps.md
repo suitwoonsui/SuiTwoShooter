@@ -62,7 +62,7 @@
 
 5. **Smart Contracts (Required)**
    - [ ] Set up Move environment
-   - [ ] Create game contracts (`game.move`, `token_burn.move`, `subscription.move`)
+   - [ ] Create game contracts (`score_submission.move`, `token_burn.move`, `subscription.move`)
    - [ ] Deploy to **testnet first**
    - [ ] Test contract functions thoroughly
    - [ ] Deploy to mainnet only after testnet tests pass

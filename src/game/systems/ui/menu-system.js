@@ -26,8 +26,16 @@ async function handleConnectWallet() {
     if (result.success) {
       console.log('✅ Wallet connected:', result.address);
       updateWalletUI(result.address);
-      // Enable start game button (token gatekeeping will check balance)
-      enableStartGameButton();
+      // Check balance first, then enable/disable button based on result
+      // Don't enable button immediately - wait for balance check
+      await checkMEWSBalanceAndUpdateUI(result.address);
+      // Always enable test mode button if wallet is connected (bypasses gatekeeping)
+      const testBtn = document.getElementById('startGameTestBtn');
+      if (testBtn) {
+        testBtn.disabled = false;
+        testBtn.style.opacity = '1';
+        testBtn.style.cursor = 'pointer';
+      }
     } else {
       console.error('❌ Wallet connection failed:', result.error);
       alert(`Failed to connect wallet: ${result.error || 'Unknown error'}`);
@@ -147,8 +155,15 @@ async function initializeWalletIntegration() {
           updateWalletRequirementsUI(false, false);
           const walletStatusText = document.getElementById('walletStatusText');
           if (walletStatusText) {
-            walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect Slush Wallet to play</span>';
+            walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect Sui wallet to play</span>';
           }
+        // Disable test button on disconnect
+        const testBtn = document.getElementById('startGameTestBtn');
+        if (testBtn) {
+          testBtn.disabled = true;
+          testBtn.style.opacity = '0.5';
+          testBtn.style.cursor = 'not-allowed';
+        }
         }
       });
       
@@ -156,18 +171,33 @@ async function initializeWalletIntegration() {
       if (api.isConnected()) {
         const address = api.getAddress();
         updateWalletUI(address);
-        // Check balance for already connected wallet
-        checkMEWSBalanceAndUpdateUI(address);
+        // Check balance for already connected wallet (don't enable button until check completes)
+        await checkMEWSBalanceAndUpdateUI(address);
+        // Always enable test mode button if wallet is connected (bypasses gatekeeping)
+        const testBtn = document.getElementById('startGameTestBtn');
+        if (testBtn) {
+          testBtn.disabled = false;
+          testBtn.style.opacity = '1';
+          testBtn.style.cursor = 'pointer';
+        }
       } else {
         // Show requirements when wallet not connected
         updateWalletRequirementsUI(false, false);
+        disableStartGameButton();
+        // Disable test button too if wallet not connected
+        const testBtn = document.getElementById('startGameTestBtn');
+        if (testBtn) {
+          testBtn.disabled = true;
+          testBtn.style.opacity = '0.5';
+          testBtn.style.cursor = 'not-allowed';
+        }
         // Show available wallets
         const wallets = api.getWallets();
         console.log('Available wallets:', wallets);
         if (wallets.length === 0) {
           const walletStatusText = document.getElementById('walletStatusText');
           if (walletStatusText) {
-            walletStatusText.innerHTML = '<span class="wallet-icon">⚠️</span><span>Install Slush Wallet extension</span>';
+            walletStatusText.innerHTML = '<span class="wallet-icon">⚠️</span><span>Install a Sui wallet extension (Slush, Sui Wallet, Surf, Suiet, Ethos, OKX, Phantom, Klever, Trust, Coinbase, or any Sui-compatible wallet)</span>';
           }
         }
       }
@@ -240,10 +270,10 @@ function updateWalletRequirementsUI(walletConnected, hasMinimumBalance) {
   
   if (walletRequirement) {
     if (walletConnected) {
-      walletRequirement.innerHTML = '✅ <span style="text-decoration: line-through;">Connect your Slush Wallet</span>';
+      walletRequirement.innerHTML = '✅ <span style="text-decoration: line-through;">Connect your Sui wallet</span>';
       walletRequirement.style.color = '#00ff00';
     } else {
-      walletRequirement.innerHTML = '🔗 Connect your Slush Wallet';
+      walletRequirement.innerHTML = '🔗 Connect your Sui wallet (Slush, Sui Wallet, Surf, Suiet, Ethos, OKX, Phantom, Klever, Trust, Coinbase, or any Sui-compatible wallet)';
       walletRequirement.style.color = '#ff4444';
     }
   }
@@ -263,11 +293,24 @@ function updateWalletRequirementsUI(walletConnected, hasMinimumBalance) {
 async function checkMEWSBalanceAndUpdateUI(address) {
   if (!window.walletAPIInstance) {
     console.warn('⚠️ Wallet API not available');
+    // Disable button if API not available
+    disableStartGameButton();
     return;
   }
   
+  // Disable button while checking balance (prevent race condition)
+  disableStartGameButton();
+  
   try {
-    const balanceResult = await window.walletAPIInstance.checkMEWSBalance(address);
+    // Check balance on mainnet (gatekeeping uses mainnet)
+    const balanceResult = await window.walletAPIInstance.checkMEWSBalance(address, 'mainnet');
+    
+    console.log('🔍 Balance check result:', {
+      success: balanceResult.success,
+      balance: balanceResult.formattedBalance,
+      hasMinimum: balanceResult.hasMinimumBalance,
+      minimum: balanceResult.formattedMinimum
+    });
     
     if (balanceResult.success) {
       updateBalanceUI(balanceResult.formattedBalance, balanceResult.hasMinimumBalance);
@@ -276,29 +319,49 @@ async function checkMEWSBalanceAndUpdateUI(address) {
       updateWalletRequirementsUI(true, balanceResult.hasMinimumBalance);
       
       if (balanceResult.hasMinimumBalance) {
+        // Only enable button if balance is sufficient
         enableStartGameButton();
         const walletStatusText = document.getElementById('walletStatusText');
         if (walletStatusText) {
           walletStatusText.innerHTML = '<span class="wallet-icon">✅</span><span>Wallet connected • Ready to play!</span>';
         }
       } else {
+        // Keep button disabled if insufficient balance
         disableStartGameButton();
         const walletStatusText = document.getElementById('walletStatusText');
         if (walletStatusText) {
           walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Insufficient $MEWS. Need ${balanceResult.formattedMinimum} $MEWS (You have ${balanceResult.formattedBalance})</span>`;
         }
       }
+      
+      // Always enable test mode button if wallet is connected (bypasses gatekeeping)
+      const testBtn = document.getElementById('startGameTestBtn');
+      if (testBtn && address) {
+        testBtn.disabled = false;
+        testBtn.style.opacity = '1';
+        testBtn.style.cursor = 'pointer';
+      }
     } else {
       console.error('❌ Failed to check balance:', balanceResult.error);
+      // Keep button disabled on error
       disableStartGameButton();
       updateBalanceUI(null, false);
       updateWalletRequirementsUI(true, false);
+      const walletStatusText = document.getElementById('walletStatusText');
+      if (walletStatusText) {
+        walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Failed to check balance: ${balanceResult.error || 'Unknown error'}</span>`;
+      }
     }
   } catch (error) {
     console.error('❌ Error checking balance:', error);
+    // Keep button disabled on error
     disableStartGameButton();
     updateBalanceUI(null, false);
     updateWalletRequirementsUI(true, false);
+    const walletStatusText = document.getElementById('walletStatusText');
+    if (walletStatusText) {
+      walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Error checking balance: ${error.message || 'Unknown error'}</span>`;
+    }
   }
 }
 
@@ -339,6 +402,20 @@ function disableStartGameButton() {
   }
 }
 
+// Test mode: Start game bypassing gatekeeping (for development/testing)
+function startGameTest() {
+  console.log('🧪 [TEST MODE] startGameTest() called - Bypassing gatekeeping');
+  
+  // Still require wallet connection (for blockchain features)
+  if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) {
+    alert('Please connect your wallet first. (Required for blockchain features)');
+    return;
+  }
+  
+  // Bypass balance check and start game directly
+  startGameInternal();
+}
+
 function startGame() {
   // Check balance before starting game
   if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
@@ -352,6 +429,11 @@ function startGame() {
     alert('Please connect your wallet first.');
     return;
   }
+  
+  startGameInternal();
+}
+
+function startGameInternal() {
   console.log('🎮 startGame() called');
   console.log('📊 Current gameState:', {
     isMenuVisible: gameState.isMenuVisible,

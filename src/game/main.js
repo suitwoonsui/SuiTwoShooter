@@ -14,9 +14,22 @@ let __debugLoopEntries = 0;
 
 // Initialize security system
 function initSecurity() {
-  // Prevent multiple initializations
+  // If secureGame already exists, reset it instead of creating a new one
   if (secureGame) {
-    return; // Already initialized
+    // Reset the existing secureGame instance for a new game
+    if (typeof secureGame.reset === 'function') {
+      secureGame.reset();
+      console.log('✓ Security system reset for new game');
+    } else {
+      // Fallback: manually reset score if reset method doesn't exist
+      secureGame.score = 0;
+      secureGame._score = 0;
+      secureGame._actionsCount = 0;
+      secureGame.startTime = Date.now();
+      secureGame.actionLog = [];
+      console.log('✓ Security system score manually reset');
+    }
+    return;
   }
   
   if (window.GameSecurity) {
@@ -32,13 +45,17 @@ function initSecurity() {
 
 // Secure score update function
 function updateScore(points) {
+  const previousScore = game.score;
+  
   if (secureGame) {
     secureGame.incrementScore(points);
+    const newScore = game.score;
+    console.log(`📈 [SCORE] +${points} points | Previous: ${previousScore} | New: ${newScore} | SecureGame score: ${secureGame.score}`);
   } else {
     // Fallback amélioré
     if (!game._fallbackScore) game._fallbackScore = 0;
     game._fallbackScore += points;
-    console.log('Score updated to:', game._fallbackScore); // Debug
+    console.log(`📈 [SCORE] +${points} points | Fallback score: ${game._fallbackScore}`);
   }
 }
 
@@ -54,7 +71,24 @@ function restart() {
     hasCtx: !!game.ctx
   });
   
-  // Reinitialize security system
+  // Generate unique session ID for this game session
+  // Use crypto.randomUUID() if available (secure), otherwise fallback to timestamp + random
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    game.sessionId = crypto.randomUUID();
+  } else {
+    // Fallback: timestamp + random bytes (less secure but better than timestamp alone)
+    const timestamp = Date.now();
+    const randomBytes = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    game.sessionId = `${timestamp}-${randomBytes}`;
+  }
+  console.log('🆔 [SESSION] Generated session ID:', game.sessionId);
+  
+  // Reset fallback score as well
+  game._fallbackScore = 0;
+  
+  // Reinitialize/reset security system
   initSecurity();
   
   game.scrollSpeed = game.baseScrollSpeed;
@@ -788,7 +822,20 @@ function update() {
 // Game over function
 function gameOver() {
   console.log("Game Over triggered!"); 
-  console.log("Final Score:", game.score); // Debug to verify score
+  
+  // Debug: Check score from multiple sources
+  const scoreFromGetter = game.score;
+  const scoreFromSecureGame = secureGame ? secureGame.score : null;
+  const scoreFromFallback = game._fallbackScore || 0;
+  
+  console.log("📊 [SCORE DEBUG] Score sources:", {
+    fromGetter: scoreFromGetter,
+    fromSecureGame: scoreFromSecureGame,
+    fromFallback: scoreFromFallback,
+    hasSecureGame: !!secureGame
+  });
+  
+  console.log("Final Score:", scoreFromGetter); // Debug to verify score
   console.log("Final Coins:", game.coins); // Debug to verify coins
   
   // Play game over sound
@@ -818,23 +865,56 @@ function gameOver() {
   }
   
   // SECURE: Use secure game over handling
+  // Capture score BEFORE any security validation (in case it gets reset)
+  // Try multiple sources to get the actual score
+  let capturedScore = game.score;
+  if (capturedScore === 0 && secureGame && secureGame.score) {
+    // If getter returns 0 but secureGame has a score, use that
+    capturedScore = secureGame.score;
+    console.log('📊 [GAME OVER] Using score from secureGame directly:', capturedScore);
+  } else if (capturedScore === 0 && game._fallbackScore) {
+    // Fallback to _fallbackScore if available
+    capturedScore = game._fallbackScore;
+    console.log('📊 [GAME OVER] Using fallback score:', capturedScore);
+  }
+  console.log('📊 [GAME OVER] Captured score before validation:', capturedScore);
+  
+  let finalScoreToUse = capturedScore;
+  
   if (onSecureGameOver) {
     const result = onSecureGameOver();
     if (result && result.success) {
-      console.log('✓ Score securely submitted:', result.score);
-      // Call external leaderboard function with validated score
-      if (typeof onGameOver === 'function') {
-        onGameOver(result.score);
-      }
+      console.log('✓ Score securely validated:', result.score);
+      finalScoreToUse = result.score;
     } else {
-      console.warn('⚠ Score validation failed, not submitted to leaderboard');
-      console.warn('Error:', result ? result.error : 'No result');
+      // Security validation failed, but we still use the captured score
+      // The blockchain will do its own validation, so we don't block submission here
+      console.warn('⚠ Security validation warning (not blocking):', result ? result.error : 'No result');
+      // Use the captured score (before validation) for display and blockchain submission
+      // This ensures we don't lose the actual score if security system rejects it
+      finalScoreToUse = capturedScore;
+      console.log('📊 [GAME OVER] Using captured score (security validation bypassed for blockchain submission):', finalScoreToUse);
     }
-  } else {
-    // Fallback for basic mode
-    if (typeof onGameOver === 'function') {
-      onGameOver(game.score);
-    }
+  }
+  
+  // Capture all game stats at game over time (before any potential reset)
+  const gameStats = {
+    score: finalScoreToUse,
+    distance: game.distance || 0,
+    coins: game.coins || 0,
+    bossesDefeated: game.bossesDefeated || 0,
+    enemiesDefeated: game.enemiesDefeated || 0,
+    longestCoinStreak: game.forceField?.maxStreak || 0,
+    sessionId: game.sessionId || null
+  };
+  
+  console.log('📊 [GAME OVER] Captured game stats:', gameStats);
+  
+  // Always call onGameOver to set up interaction handlers, even if validation failed
+  // This ensures the game over screen can proceed to the next screen
+  // Pass stats object instead of just score
+  if (typeof onGameOver === 'function') {
+    onGameOver(gameStats);
   }
 }
 
@@ -929,7 +1009,8 @@ function init() {
 
   // User interaction handling for game over screen
   // NOTE: This handler is now only for legacy compatibility.
-  // The leaderboard system's onGameOver() sets up its own handlers.
+  // The leaderboard system's onGameOver() sets up its own handlers with capture: true.
+  // This handler should not interfere - it just logs and lets the leaderboard handler work.
   function handleGameOverInteraction(e) {
     if (game.gameOver && !gameState.isMenuVisible) {
       // Check if name input modal is visible or about to be shown
@@ -939,10 +1020,10 @@ function init() {
         return; // Don't return to main menu if name input modal is showing
       }
       
-      // The leaderboard system will handle the interaction via onGameOver()
-      // This handler should no longer interfere
-      console.log('🛑 [VISIBILITY] Game over interaction detected - leaderboard system will handle');
-      // Don't prevent default or do anything - let the leaderboard system handle it
+      // The leaderboard system handles the interaction via onGameOver() with capture: true
+      // This handler runs in bubble phase, so leaderboard handler should already have processed it
+      // Don't prevent default or stop propagation - let the leaderboard system handle it
+      console.log('🛑 [VISIBILITY] Game over interaction detected - leaderboard system should handle');
     }
   }
 

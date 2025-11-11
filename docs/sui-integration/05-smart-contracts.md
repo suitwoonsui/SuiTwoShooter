@@ -26,7 +26,7 @@ cd suitwo_game
 
 ## Step 4.2: Create Game Score Contract
 
-**`suitwo_game/sources/game.move`:**
+**`suitwo_game/sources/score_submission.move`:**
 
 ```move
 module suitwo_game::game {
@@ -272,7 +272,7 @@ suitwo_game = "0x0"
 
 ## Step 4.4: Add Tests (Optional but Recommended)
 
-Create `suitwo_game/sources/game.test.move`:
+Create `suitwo_game/sources/score_submission.test.move`:
 
 ```move
 #[test_only]

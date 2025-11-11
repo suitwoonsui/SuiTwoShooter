@@ -158,12 +158,12 @@ const MobileUI = {
     }
     
     // Handle integrated stats for mobile
-    console.log('🔍 Checking integratedStats:', headerConfig.integratedStats);
+    // Note: integratedStats is only used for mobile layouts, not desktop
     if (headerConfig.integratedStats) {
-      console.log('✅ integratedStats is true, calling integrateGameStatsIntoHeader');
+      console.log('✅ [MOBILE] Integrating game stats into header');
       this.integrateGameStatsIntoHeader(header);
     } else {
-      console.log('❌ integratedStats is false or undefined');
+      // This is normal for desktop layouts - no need to log
       this.removeIntegratedStats(header);
     }
     

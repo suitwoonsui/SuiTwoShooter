@@ -35,12 +35,16 @@
 5. ✅ Token balance sufficient → Enable "Start Game" button
 6. ✅ User clicks "Start Game" → Game begins
 
-**Status:** Documented in `04-frontend-integration.md` and `07-token-gatekeeping.md`
+**Status:** ✅ **COMPLETED** - Implemented in `wallet-module/`, `index.html`, and `menu-system.js`
 
-**Action Required:**
-- Implement wallet connection UI in main menu
-- Implement token balance check
-- Implement "Start Game" button enable/disable logic
+**Implementation Details:**
+- ✅ Wallet connection UI integrated into main menu (`index.html`)
+- ✅ React-based wallet API module using `@mysten/dapp-kit` (`wallet-module/src/wallet-api.jsx`)
+- ✅ Supports multiple Sui wallets: Slush, Sui Wallet, Surf, Suiet, Ethos, OKX, Phantom, Klever, Trust, Coinbase
+- ✅ Token balance checking integrated (`checkMEWSBalance()` function)
+- ✅ "Start Game" button enable/disable logic implemented
+- ✅ Requirements notice UI shows connection and balance status dynamically
+- ✅ Balance checked on wallet connection and before game start
 
 ---
 
@@ -52,17 +56,27 @@
 3. ✅ Show payment selection UI (Pay-per-game or Subscription)
 4. ✅ User selects payment method
 5. ✅ Process payment (SUI or $Mews)
-6. ✅ Submit score to blockchain
-7. ✅ Verify transaction
+6. ✅ Submit score to blockchain ✅ **IMPLEMENTED**
+7. ✅ Verify transaction ✅ **IMPLEMENTED**
 8. ✅ Update leaderboard
 
-**Status:** Documented in `05a-gas-fees-and-payments.md`
+**Status:** ✅ **Score Submission Implemented** - Pending contract deployment
+
+**Completed:**
+- ✅ Score submission UI integrated in `leaderboard-system.js`
+- ✅ Transaction building and signing implemented in `score-submission.js`
+- ✅ Wallet API includes `signAndExecuteTransaction()` method
+- ✅ UI feedback: loading states, success/error messages
+- ✅ Collects all game statistics: score, distance, coins, bosses_defeated, enemies_defeated, longest_coin_streak
+- ✅ Error handling: wallet connection checks, transaction failures, user rejection
+- ⏳ **Pending**: Contract deployment to testnet (needs package ID)
 
 **Action Required:**
-- Implement score submission UI
-- Implement payment processing
-- Implement transaction verification
-- Integrate with leaderboard system
+- ⏳ Deploy contract to testnet
+- ⏳ Configure package ID in frontend
+- ⏳ Test end-to-end score submission
+- [ ] Implement payment processing (Phase 5)
+- [ ] Integrate with leaderboard system (Phase 4.3)
 
 ---
 
@@ -88,17 +102,29 @@
 ### **5. Smart Contract Requirements**
 
 **Required Contracts:**
-- ✅ Game Score Contract (`game.move`) - Score submission with anti-cheat
-- ✅ Token Burn Contract (`token_burn.move`) - Performance-based burning
-- ✅ Subscription Contract (`subscription.move`) - Monthly subscriptions
+- ✅ Game Score Contract (`score_submission.move`) - Score submission with anti-cheat ⭐ **COMPLETED**
+- ✅ Token Burn Contract (`token_burn.move`) - Performance-based burning (design complete, implementation pending)
+- ✅ Subscription Contract (`subscription.move`) - Monthly subscriptions (design complete, implementation pending)
 
-**Status:** Documented in `05-smart-contracts.md` and `05a-gas-fees-and-payments.md`
+**Status:** ✅ **Score Submission Contract COMPLETED** - Ready for testnet deployment
+
+**Completed:**
+- ✅ Contract created: `contracts/suitwo_game/sources/score_submission.move`
+- ✅ Module: `suitwo_game::score_submission`
+- ✅ Function: `submit_game_session()` with all required parameters
+- ✅ Anti-cheat validation: distance, score, coins, streak validation
+- ✅ Event emission: `ScoreSubmitted` event for leaderboard queries
+- ✅ Contract compiles successfully
+- ✅ Deployment guide created: `contracts/suitwo_game/DEPLOYMENT.md`
+- ✅ Build warnings fixed
 
 **Action Required:**
-- Deploy contracts to testnet
-- Test all contract functions
-- Verify events emit correctly
-- Get contract addresses for environment variables
+- ⏳ Deploy `score_submission.move` contract to testnet
+- ⏳ Test all contract functions
+- ⏳ Verify events emit correctly
+- ⏳ Get contract package ID for environment variables
+- [ ] Implement token burn contract (Phase 5)
+- [ ] Implement subscription contract (Phase 5)
 
 ---
 
@@ -124,19 +150,29 @@
 ### **7. Frontend Modules**
 
 **Required Modules:**
-- ✅ `wallet-connection.js` - Wallet connection and transaction signing
-- ✅ `api-client.js` - API communication
-- ✅ `burn-calculator.js` - Performance burn calculation
-- ✅ Integration with `leaderboard-system.js`
-- ✅ Integration with `menu-system.js`
+- ✅ `wallet-module/src/wallet-api.jsx` - Wallet connection and balance checking ⭐ **COMPLETED**
+- ✅ `wallet-api.umd.cjs` - Bundled UMD module with React included ⭐ **COMPLETED**
+- ✅ Balance checking integrated (`checkMEWSBalance()`, `getBalanceStatus()`) ⭐ **COMPLETED**
+- ✅ Integration with `menu-system.js` ⭐ **COMPLETED**
+- ✅ `src/game/blockchain/score-submission.js` - Score submission and transaction signing ⭐ **COMPLETED**
+- ✅ Transaction signing integrated (`signAndExecuteTransaction()` method) ⭐ **COMPLETED**
+- [ ] `burn-calculator.js` - Performance burn calculation (for Phase 5)
+- [ ] Integration with `leaderboard-system.js` (for Phase 4.3)
 
-**Status:** Documented in `04-frontend-integration.md`
+**Status:** ✅ **Score Submission Module COMPLETED** - Pending contract deployment
 
-**Action Required:**
-- Create all modules
-- Integrate with existing game code
-- Test wallet connection
-- Test API communication
+**Completed Implementation:**
+- ✅ Wallet connection module created (`wallet-module/`)
+- ✅ React-based using `@mysten/dapp-kit` for wallet detection and connection
+- ✅ UMD bundle created with Vite for vanilla JS integration
+- ✅ Direct Sui blockchain queries for token balance (no backend API needed)
+- ✅ Integrated into main menu with UI components
+- ✅ Error handling, React Error Boundaries, and wallet detection polling implemented
+- ✅ Multi-wallet support via Wallet Standard API
+- ✅ Score submission module (`score-submission.js`) with transaction building and signing
+- ✅ Integrated with wallet API for transaction execution
+- ✅ UI feedback for transaction status (loading, success, error)
+- ⏳ **Pending**: Contract deployment to testnet (needs package ID configuration)
 
 ---
 
@@ -255,7 +291,10 @@
 
 ## ✅ What's Complete
 
-- ✅ Smart contract design (game.move, token_burn.move, subscription.move)
+- ✅ Smart contract implementation (`score_submission.move`) - Ready for deployment
+- ✅ Score submission UI and transaction signing - Fully implemented
+- ✅ Wallet connection module - Complete with multi-wallet support
+- ✅ Token gatekeeping - Implemented with balance checking
 - ✅ Backend architecture (separate backend on Render)
 - ✅ Frontend architecture (vanilla JS, no build step)
 - ✅ Payment system design (pay-per-game + subscription)
@@ -326,6 +365,6 @@
 
 ---
 
-**Last Updated:** 2025-01-03
-**Status:** Ready for implementation
+**Last Updated:** 2025-01-15
+**Status:** Phase 4 (Score Submission) ✅ COMPLETED - Ready for Contract Deployment
 

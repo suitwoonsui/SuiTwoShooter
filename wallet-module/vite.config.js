@@ -22,8 +22,8 @@ export default defineConfig({
       output: {
         // Bundle React and ReactDOM with the wallet module
         inlineDynamicImports: true,
-        // Ensure exports are available
-        exports: 'auto',
+        // Use default export only to avoid warning about mixed exports
+        exports: 'default',
         // Set React on globalThis after bundle loads so other code can use it
         banner: `
           // Wallet module with bundled React

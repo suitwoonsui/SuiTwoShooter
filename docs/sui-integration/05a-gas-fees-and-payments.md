@@ -1724,7 +1724,7 @@ function gameOver() {
 
 **Important:** If backend signs transaction (for $Mews payment), we need to pass user address explicitly.
 
-**Update `suitwo_game/sources/game.move`:**
+**Update `suitwo_game/sources/score_submission.move`:**
 
 ```move
 /// Submit a game session (with explicit player address for sponsored transactions)
