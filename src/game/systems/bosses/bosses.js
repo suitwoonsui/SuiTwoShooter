@@ -66,6 +66,11 @@ function createBoss() {
   console.log('Boss image type selected:', bossImageType, 'for tier:', game.currentTier);
   loadBossImage(bossImageType);
   
+  // Calculate effective fire rate with post-tier-4 scaling
+  const fireRateMultiplier = typeof getFireRateMultiplier === 'function' ? getFireRateMultiplier() : 1.0;
+  const baseFireRate = currentBossStats.fireRate;
+  const effectiveFireRate = Math.floor(baseFireRate / fireRateMultiplier); // Divide to make faster (lower ms = faster)
+  
   game.boss = {
     type: bossImageType,
     tier: game.currentTier,
@@ -87,12 +92,12 @@ function createBoss() {
     patternDuration: 3000, // Change pattern every 3 seconds
     moveDirection: 1, // Vertical movement direction
     baseY: (game.height - size) / 2, // Base Y position
-    fireRate: currentBossStats.fireRate,
+    fireRate: effectiveFireRate, // Apply post-tier-4 fire rate scaling
     maxPatterns: currentBossStats.patterns,
     enrageTime: currentBossStats.enrageTime,
     enrageStart: null, // When enrage timer starts
     enraged: false, // Enrage state
-    baseFireRate: currentBossStats.fireRate // Save base fire rate
+    baseFireRate: effectiveFireRate // Save effective fire rate (already scaled)
   };
   game.bossActive = true;
   game.bossWarning = false;

@@ -13,11 +13,16 @@ function updateEnemyShooting() {
   
   // Helper function to process enemy shooting
   function processEnemyShooting(enemy, enemyX) {
+    // Calculate effective fire rate with post-tier-4 scaling
+    const baseFireRate = enemyStats[enemy.type].fireRate;
+    const fireRateMultiplier = typeof getFireRateMultiplier === 'function' ? getFireRateMultiplier() : 1.0;
+    const effectiveFireRate = baseFireRate / fireRateMultiplier; // Divide to make faster (lower ms = faster)
+    
     if (!enemy.canShoot && enemyX > 0 && enemyX < game.width) {
       enemy.canShoot = true;
-      enemy.lastShot = now - enemyStats[enemy.type].fireRate;
+      enemy.lastShot = now - effectiveFireRate;
     }
-    if (enemy.canShoot && now - enemy.lastShot >= enemyStats[enemy.type].fireRate) {
+    if (enemy.canShoot && now - enemy.lastShot >= effectiveFireRate) {
       enemy.lastShot = now;
       const ex = enemyX;
       const ey = enemy.lane * game.laneHeight + game.laneHeight/2;

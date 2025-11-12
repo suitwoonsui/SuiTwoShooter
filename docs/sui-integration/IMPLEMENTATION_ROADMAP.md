@@ -321,10 +321,12 @@ This document provides a prioritized, step-by-step implementation order for inte
 **Completion Notes:**
 - ✅ Score submission UI exists in `leaderboard-system.js`
 - ✅ "Save Score" button integrated with blockchain submission
-- ✅ UI feedback: loading states, success/error messages
-- ✅ Collects all required stats from game object
-- ✅ Integrated with `submitScoreToBlockchain()` function
-- ⏳ **Pending**: Contract deployment to testnet (needs package ID)
+- ✅ UI feedback: toast notifications, loading states, success/error messages
+- ✅ Collects all required stats from game object at game over
+- ✅ Integrated with `submitScoreToBlockchain()` function (sends to backend)
+- ✅ Player name input modal (optional, can skip)
+- ✅ Session ID generation using `crypto.randomUUID()`
+- ✅ **COMPLETED**: Contract deployed to testnet, Package ID configured
 
 **Why Critical:** Users need to submit scores to blockchain.
 
@@ -360,16 +362,19 @@ This document provides a prioritized, step-by-step implementation order for inte
 - [x] Update UI based on result
 
 **Completion Notes:**
-- ✅ Transaction builder implemented in `score-submission.js`
-- ✅ Uses `TransactionBlock` from `@mysten/sui.js/transactions`
-- ✅ Builds Move call: `{package_id}::score_submission::submit_game_session`
+- ✅ Transaction builder implemented in `admin-wallet-service.ts` (backend)
+- ✅ Uses `Transaction` from `@mysten/sui/transactions`
+- ✅ Builds Move call: `{package_id}::score_submission::submit_game_session_for_player`
 - ✅ Includes all game stats: score, distance, coins, bosses_defeated, enemies_defeated, longest_coin_streak
+- ✅ Includes player_name (vector<u8>) and session_id (vector<u8>)
 - ✅ Uses Sui Clock object (`0x6`) for timestamp
-- ✅ Integrated with wallet API `signAndExecuteTransaction()` method
-- ✅ Error handling: wallet connection checks, transaction failures, user rejection
-- ✅ UI feedback: loading states, success messages with transaction digest, error messages
-- ✅ Gas budget set: 10,000,000 MIST
-- ⏳ **Pending**: Contract deployment to testnet (needs package ID configuration)
+- ✅ Admin wallet signs and pays gas fees (two-wallet system)
+- ✅ Error handling: validation, transaction failures, CORS errors
+- ✅ UI feedback: toast notifications, success messages with transaction digest
+- ✅ Gas budget set: 10,000,000 MIST (0.01 SUI)
+- ✅ **COMPLETED**: Contract deployed, admin wallet configured, working on testnet
+- ✅ All numeric values rounded to integers (Move contract requires u64)
+- ✅ CORS configured for frontend-backend communication
 
 **Why Critical:** Core functionality - submitting scores to blockchain.
 
@@ -381,30 +386,39 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 ---
 
-### 🟡 **4.3 Leaderboard Integration** (MVP Important)
+### 🔴 **4.3 Blockchain Leaderboard Integration** (MVP Critical)
 **Estimated Time:** 2-3 hours  
-**Dependencies:** 2.2, 3.2  
-**Blocks:** None (can add later)
+**Dependencies:** 2.2, 3.2, 4.2  
+**Blocks:** Leaderboard display
 
 **Tasks:**
 - [ ] Query blockchain events for scores:
-  - Call `/api/leaderboard` endpoint
-  - Parse `ScoreSubmitted` events
+  - Call `/api/leaderboard` endpoint (already exists)
+  - Parse `ScoreSubmitted` events from blockchain
   - Sort by score (descending)
   - Limit to top 100
-- [ ] Display leaderboard:
-  - Integrate with existing leaderboard UI
-  - Show wallet address (truncated)
-  - Show score, tier, distance, etc.
+- [ ] Update frontend leaderboard UI:
+  - Replace localStorage with blockchain data
+  - Integrate with existing `leaderboard-system.js`
+  - Show wallet address (truncated, e.g., `0x1234...5678`)
+  - Display score, tier, distance, bosses defeated, etc.
   - Handle loading states
-- [ ] Add refresh functionality
-- [ ] Test leaderboard display
+  - Show error states if blockchain query fails
+- [ ] Add refresh functionality:
+  - Manual refresh button
+  - Auto-refresh option (optional, e.g., every 30 seconds)
+- [ ] Test leaderboard display:
+  - Verify scores load from blockchain
+  - Test with multiple scores
+  - Test error handling
 
-**Why Important:** Leaderboards are a key feature, but not blocking for MVP.
+**Why Critical:** Leaderboard must be tied to blockchain for transparency and competition. This is a core feature for a blockchain game.
 
 **Files to Modify:**
-- `src/game/systems/leaderboard/leaderboard-system.js` (or relevant file)
-- Update API client if needed
+- `src/game/systems/ui/leaderboard-system.js` (replace localStorage with blockchain API)
+- Update to call `GET /api/leaderboard` endpoint
+
+**Reference:** See [11. Blockchain Leaderboard Integration](./11-blockchain-leaderboard.md) for detailed implementation guide
 
 ---
 
@@ -436,9 +450,59 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 ---
 
-### 🟡 **5.2 Smart Contract - Token Burn** (MVP Important)
+### 🟡 **5.2 Premium Store System** (MVP Important) ⭐ **REQUIRED FOR BURN MECHANICS**
+**Estimated Time:** 25-35 hours (total for all store components)  
+**Dependencies:** 4.1, 4.2  
+**Blocks:** Burn mechanics (needs revenue source)
+
+**Why Before Burn:** Burn mechanics require funds to burn tokens. Premium store generates revenue to fund burns.
+
+**Sub-tasks (see Phase 8 for details):**
+- [ ] 5.2.1 Smart Contract - Premium Store (4-6 hours)
+- [ ] 5.2.2 Premium Store Backend API (3-4 hours)
+- [ ] 5.2.3 Premium Store Frontend UI (5-6 hours)
+- [ ] 5.2.4 Inventory System (3-4 hours)
+- [ ] 5.2.5 Premium Item Implementation (12-16 hours) ⚠️ **REQUIRES GAME CODE CHANGES**
+- [ ] 5.2.6 Game Balance Adjustments (4-6 hours)
+- [ ] 5.2.7 Purchase Analytics (2-3 hours)
+
+**⚠️ IMPORTANT - Game Code Implementation Required:**
+All premium items must be **coded into the existing game logic**. This includes:
+
+**New Features (Must Be Built):**
+- Slow Time Power (3 levels) - NEW feature, doesn't exist in game yet
+- Destroy All Enemies Power - NEW feature, doesn't exist in game yet
+- Boss Kill Shot - NEW feature, doesn't exist in game yet
+- Coin Magnet / Pull Beam (3 levels) - NEW feature, doesn't exist in game yet
+
+**Existing Features (Must Be Modified):**
+- Extra Lives - Modify existing life system to support purchased lives (visual distinction, non-replenishable)
+- Force Field Start - Modify existing force field system to support starting at purchased level
+- Orb Level Start - Modify existing orb system to support starting at purchased level (stretch max to 10)
+
+**Game Files to Modify:**
+- `src/game/main.js` - Game initialization, item activation, power systems
+- `src/game/systems/enemies/enemy-system.js` - Destroy All Enemies power
+- `src/game/systems/boss/boss-system.js` - Boss Kill Shot power
+- `src/game/systems/powerups/powerup-system.js` - Coin Magnet power
+- `src/game/systems/ui/ui-rendering.js` - Power buttons, visual effects
+- `src/game/rendering/effects.js` - Visual effects for powers
+- All existing game logic files that handle lives, force fields, orb levels
+
+**Reference:** See [12. Premium Store Design](./12-premium-store-design.md) for complete design and implementation guide
+
+**Files to Create:**
+- `contracts/premium_store/sources/premium_store.move`
+- `backend/app/api/store/*` (4 API routes)
+- `src/game/systems/ui/store-ui.js`
+- `src/game/systems/inventory/inventory-manager.js`
+- All premium item implementations (NEW game code)
+
+---
+
+### 🟡 **5.3 Smart Contract - Token Burn** (MVP Important)
 **Estimated Time:** 3-4 hours  
-**Dependencies:** 1.2  
+**Dependencies:** 5.2 (Premium Store provides revenue)  
 **Blocks:** Performance burn
 
 **Tasks:**
@@ -450,16 +514,16 @@ This document provides a prioritized, step-by-step implementation order for inte
 - [ ] Test burn function
 - [ ] Get contract address
 
-**Why Important:** Performance burn is a key feature, but can be added post-MVP.
+**Why Important:** Performance burn is a key feature, but requires revenue from premium store first.
 
 **Files to Create:**
 - `contracts/token_burn/sources/token_burn.move`
 
 ---
 
-### 🟡 **5.3 Performance Burn Calculator** (MVP Important)
+### 🟡 **5.4 Performance Burn Calculator** (MVP Important)
 **Estimated Time:** 2-3 hours  
-**Dependencies:** 5.2, 1.3  
+**Dependencies:** 5.3, 1.3  
 **Blocks:** Burn functionality
 
 **Tasks:**
@@ -481,9 +545,9 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 ---
 
-### 🟡 **5.4 Payment Processing Backend** (MVP Important)
+### 🟡 **5.5 Payment Processing Backend** (MVP Important)
 **Estimated Time:** 4-5 hours  
-**Dependencies:** 5.1, 5.2  
+**Dependencies:** 5.1, 5.2 (Premium Store needs payment processing)  
 **Blocks:** Payment completion
 
 **Tasks:**
@@ -508,9 +572,9 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 ---
 
-### 🟡 **5.5 Smart Contract - Subscription** (MVP Important)
+### 🟡 **5.6 Smart Contract - Subscription** (MVP Important)
 **Estimated Time:** 3-4 hours  
-**Dependencies:** 5.4  
+**Dependencies:** 5.5  
 **Blocks:** Subscription system
 
 **Tasks:**
@@ -726,6 +790,143 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 ---
 
+## Phase 8: Premium Store System - Detailed Breakdown
+
+**Note:** Premium Store has been moved to Phase 5.2 (before burn mechanics) because it generates revenue needed for burns. This section provides detailed breakdown for reference.
+
+### **8.1 Smart Contract - Premium Store**
+See Phase 5.2.1 for details.
+
+### **8.2 Premium Store Backend API**
+See Phase 5.2.2 for details.
+
+### **8.3 Premium Store Frontend UI**
+See Phase 5.2.3 for details.
+
+### **8.4 Inventory System**
+See Phase 5.2.4 for details.
+
+### **8.5 Premium Item Implementation**
+See Phase 5.2.5 for details.
+
+### **8.6 Game Balance Adjustments**
+See Phase 5.2.6 for details.
+
+### **8.7 Purchase Analytics & Tracking**
+See Phase 5.2.7 for details.
+
+**Reference:** See [13. Leaderboard Rewards System](./13-leaderboard-rewards.md) for detailed implementation guide
+
+---
+
+## Phase 9: Leaderboard Rewards System (Post-MVP)
+
+### 🟢 **9.1 Leaderboard Rewards Smart Contract** (Post-MVP)
+**Estimated Time:** 4-6 hours  
+**Dependencies:** 4.3, 7.2 (mainnet stable)  
+**Blocks:** Rewards distribution
+
+**Tasks:**
+- [ ] Create `leaderboard_rewards.move` contract:
+  - `WeeklyLeaderboard` struct (week ID, start/end timestamp)
+  - `RewardDistribution` struct (rank, reward amount)
+  - `claim_reward()` function
+  - `distribute_rewards()` function (admin only)
+  - `LeaderboardRewardClaimed` event
+- [ ] Support weekly reward cycles:
+  - Weekly leaderboard snapshots
+  - Top N positions (e.g., top 10, top 25, top 100)
+  - Tiered rewards (1st place gets most, etc.)
+- [ ] Deploy to testnet
+- [ ] Test reward distribution
+- [ ] Get contract address
+
+**Why Post-MVP:** Rewards system adds complexity and requires funding. Can add after launch.
+
+**Files to Create:**
+- `contracts/leaderboard_rewards/sources/leaderboard_rewards.move`
+
+---
+
+### 🟢 **9.2 Weekly Leaderboard Snapshot System** (Post-MVP)
+**Estimated Time:** 3-4 hours  
+**Dependencies:** 9.1  
+**Blocks:** Reward calculation
+
+**Tasks:**
+- [ ] Create snapshot service:
+  - Query top scores for current week
+  - Calculate reward tiers
+  - Store snapshot on-chain
+  - Handle week boundaries (e.g., Sunday 00:00 UTC)
+- [ ] Create backend API:
+  - `GET /api/leaderboard/weekly/:weekId` - Get weekly leaderboard
+  - `POST /api/leaderboard/snapshot` - Create weekly snapshot (admin)
+  - `GET /api/leaderboard/rewards/:address` - Get user's claimable rewards
+- [ ] Test snapshot creation
+
+**Why Post-MVP:** Requires rewards contract first.
+
+**Files to Create:**
+- `backend/app/api/leaderboard/weekly/[weekId]/route.ts`
+- `backend/app/api/leaderboard/snapshot/route.ts`
+- `backend/app/api/leaderboard/rewards/[address]/route.ts`
+- `backend/lib/services/weekly-leaderboard-service.ts`
+
+---
+
+### 🟢 **9.3 Rewards Distribution UI** (Post-MVP)
+**Estimated Time:** 3-4 hours  
+**Dependencies:** 9.2  
+**Blocks:** User reward claims
+
+**Tasks:**
+- [ ] Create rewards UI:
+  - Display weekly leaderboard with rewards
+  - Show claimable rewards for user
+  - "Claim Reward" button
+  - Reward history
+- [ ] Integrate with wallet for claiming:
+  - Sign transaction to claim reward
+  - Handle reward distribution
+- [ ] Admin UI for reward distribution:
+  - Trigger weekly snapshot
+  - Distribute rewards to winners
+- [ ] Test reward claiming flow
+
+**Why Post-MVP:** Requires backend and contract.
+
+**Files to Create:**
+- `src/game/systems/ui/rewards-ui.js`
+- `src/game/systems/ui/weekly-leaderboard-ui.js`
+- Update `src/game/systems/ui/leaderboard-system.js` (add rewards display)
+
+---
+
+### 🟢 **9.4 Reward Economics & Funding** (Post-MVP)
+**Estimated Time:** 2-3 hours  
+**Dependencies:** 9.1  
+**Blocks:** Sustainable rewards
+
+**Tasks:**
+- [ ] Design reward structure:
+  - Weekly reward pool size
+  - Distribution tiers (e.g., 1st: 30%, 2nd: 20%, 3rd: 15%, etc.)
+  - Minimum reward amounts
+- [ ] Set up reward funding:
+  - Revenue source (premium store, game entry fees)
+  - Reserve fund for rewards
+  - Sustainability calculations
+- [ ] Document reward economics
+- [ ] Test reward calculations
+
+**Why Post-MVP:** Requires revenue streams to be established first.
+
+**Files to Create:**
+- `docs/LEADERBOARD_REWARDS_DESIGN.md` (reward economics documentation)
+
+---
+
 ## 🎯 MVP Minimum Requirements
 
 **To launch MVP, you MUST complete:**
@@ -743,19 +944,24 @@ This document provides a prioritized, step-by-step implementation order for inte
   - ✅ 3.3 Token Gatekeeping UI ⭐ **COMPLETED**
 ✅ **Phase 4:** 
   - ✅ 4.1 Score Submission UI ⭐ **COMPLETED**
-  - ✅ 4.2 Transaction Signing ⭐ **COMPLETED** (pending contract deployment)  
+  - ✅ 4.2 Transaction Signing ⭐ **COMPLETED** (pending contract deployment)
+  - [ ] 4.3 Blockchain Leaderboard Integration ⏳ **REQUIRED FOR MVP**
 [ ] **Phase 6:** 6.1 (Testnet Testing)  
 [ ] **Phase 7:** All tasks (Deployment)
 
 **Can Skip for MVP (add later):**
-- ⚪ Payment system (Phase 5) - Can launch with free games initially
-- ⚪ Performance burn (Phase 5) - Can add post-launch
-- ⚪ Subscription (Phase 5) - Can add post-launch
-- ⚪ Leaderboard (4.3) - Can use local storage initially
+- ⚪ Payment system (Phase 5.1) - Can launch with free games initially
+- ⚪ Subscription (Phase 5.6) - Can add post-launch
+- ⚪ Premium Store (Phase 5.2) - Can add post-launch
+- ⚪ Performance burn (Phase 5.3, 5.4) - Can add post-launch
+- ⚪ Leaderboard Rewards (Phase 9) - Weekly rewards for top leaders
 
 **However, recommended MVP includes:**
+- 🟡 **Premium Store (Phase 5.2)** - **REQUIRED if implementing burn mechanics** - Generates revenue to fund burns
+- 🟡 **Performance burn (Phase 5.3, 5.4)** - Requires premium store revenue first
 - 🟡 Payment system (pay-per-game minimum)
-- 🟡 Leaderboard (on-chain)
+
+**Important Note:** If you want burn mechanics, you MUST implement Premium Store first to generate revenue. Burn mechanics cannot function without a revenue source.
 
 ---
 
@@ -771,10 +977,11 @@ This document provides a prioritized, step-by-step implementation order for inte
 **Recommended MVP (Essential + Important):**
 - **Week 1:** Foundation + Backend API
 - **Week 2:** Frontend Wallet + Score Submission
-- **Week 3:** Payment System + Performance Burn
-- **Week 4:** Testing + Optimization
-- **Week 5:** Deployment
-- **Total:** ~5 weeks
+- **Week 3:** Premium Store (generates revenue)
+- **Week 4:** Performance Burn (uses store revenue) + Payment System
+- **Week 5:** Testing + Optimization
+- **Week 6:** Deployment
+- **Total:** ~6 weeks (Premium Store adds 1 week)
 
 **Full Feature Set:**
 - **Week 1-2:** Foundation + Backend + Frontend
@@ -809,13 +1016,26 @@ This document provides a prioritized, step-by-step implementation order for inte
 
 1.3 Smart Contracts (can parallel with 3.1, but wallet connection recommended first)
   └─> 4.2 Transaction Signing (needs contracts deployed)
-  └─> 5.2 Token Burn Contract
-      └─> 5.3 Burn Calculator
-  └─> 5.5 Subscription Contract
+  └─> 4.3 Blockchain Leaderboard (queries ScoreSubmitted events)
+      └─> 9.1 Leaderboard Rewards Contract (post-MVP)
+  └─> 5.2 Premium Store Contract (generates revenue)
+      └─> 5.3 Token Burn Contract (needs revenue from store)
+          └─> 5.4 Burn Calculator
+  └─> 5.6 Subscription Contract
 
 4.2 Transaction Signing
+  └─> 4.3 Blockchain Leaderboard (queries ScoreSubmitted events)
   └─> 5.1 Payment UI
-      └─> 5.4 Payment Processing
+      └─> 5.5 Payment Processing
+      
+5.2 Premium Store (generates revenue)
+  └─> 5.5 Payment Processing (needed for store purchases)
+  └─> 5.3 Token Burn Contract (needs revenue from store)
+  
+4.3 Blockchain Leaderboard (MVP Critical)
+  └─> 9.1 Leaderboard Rewards Contract (post-MVP)
+      └─> 9.2 Weekly Snapshot System
+          └─> 9.3 Rewards Distribution UI
 ```
 
 ---

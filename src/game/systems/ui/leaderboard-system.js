@@ -6,6 +6,29 @@
 let leaderboard = JSON.parse(localStorage.getItem('gameLeaderboard')) || [];
 let currentGameScore = 0; // Global variable to store score
 
+// ==========================================
+// BLOCKCHAIN LEADERBOARD CAROUSEL
+// ==========================================
+
+// Category definitions
+const leaderboardCategories = [
+  { id: 'score', name: 'Overall Score', icon: '🏆', primaryField: 'score' },
+  { id: 'distance', name: 'Distance Traveled', icon: '📏', primaryField: 'distance' },
+  { id: 'bosses', name: 'Bosses Defeated', icon: '👹', primaryField: 'bossesDefeated' },
+  { id: 'enemies', name: 'Enemies Defeated', icon: '💀', primaryField: 'enemiesDefeated' },
+  { id: 'coins', name: 'Coins Collected', icon: '💰', primaryField: 'coins' },
+  { id: 'streak', name: 'Longest Coin Streak', icon: '🔥', primaryField: 'longestCoinStreak' }
+];
+
+// Current category index
+let currentCategoryIndex = 0;
+
+// Current leaderboard data (loaded from blockchain)
+let currentLeaderboardData = [];
+
+// Loading state
+let isLoadingLeaderboard = false;
+
 // Display leaderboard
 function displayLeaderboard() {
   const list = document.getElementById('leaderboardList');
@@ -126,9 +149,9 @@ function showNameInput(score) {
   }
   
     // Play achievement sound
-    if (typeof playAchievementSound === 'function') {
-      playAchievementSound();
-    }
+  if (typeof playAchievementSound === 'function') {
+    playAchievementSound();
+  }
 }
 
 // Save score - CORRECTED VERSION with blockchain submission
@@ -256,7 +279,7 @@ function skipSave() {
   hideNameInput();
   
   // Show main menu immediately after skipping
-  showMainMenu();
+    showMainMenu();
   
   // Submit to blockchain if wallet is connected (even when skipping name entry)
   // Use currentGameStats if available, otherwise fallback to reading from window.game
@@ -438,7 +461,7 @@ function onGameOver(gameStatsOrScore) {
   setTimeout(() => {
     // Always show name input modal - all scores are tracked and submitted
     console.log('🎮 [GAME OVER] Showing name input modal for score:', finalScore);
-    showNameInput(finalScore);
+      showNameInput(finalScore);
     }, 100);
   }
   
@@ -475,7 +498,7 @@ function onGameOver(gameStatsOrScore) {
   console.log('🎮 [GAME OVER] Event listeners added - waiting for user input');
 }
 
-function showLeaderboard() {
+async function showLeaderboard() {
   console.log('🏆 showLeaderboard() called');
   // Hide main menu
   const mainMenu = document.getElementById('mainMenuOverlay');
@@ -499,18 +522,49 @@ function showLeaderboard() {
   const leaderboardContent = document.createElement('div');
   leaderboardContent.className = 'leaderboard';
   
+  // Get current category
+  const currentCategory = leaderboardCategories[currentCategoryIndex];
+  
   leaderboardContent.innerHTML = `
-    <h2>🏆 Leaderboard</h2>
-    <ul class="leaderboard-list" id="modalLeaderboardList">
-      <!-- Scores will be added dynamically here -->
-    </ul>
-    <button class="menu-btn primary" onclick="hideLeaderboard()">
-      <span class="btn-icon">←</span> Back to Menu
-    </button>
+    <!-- Category Title -->
+    <div class="leaderboard-header">
+      <h2 id="leaderboardCategoryTitle">${currentCategory.icon} ${currentCategory.name}</h2>
+    </div>
+    
+    <!-- Carousel Navigation -->
+    <div class="leaderboard-carousel">
+      <button class="carousel-arrow carousel-arrow-left" id="leaderboardPrevBtn" onclick="leaderboardPrevCategory()" aria-label="Previous category">
+        <span class="btn-icon">←</span>
+      </button>
+      
+      <!-- Leaderboard List Container -->
+      <div class="leaderboard-list-container">
+        <ul class="leaderboard-list" id="modalLeaderboardList">
+          <!-- Entries will be added dynamically here -->
+        </ul>
+      </div>
+      
+      <button class="carousel-arrow carousel-arrow-right" id="leaderboardNextBtn" onclick="leaderboardNextCategory()" aria-label="Next category">
+        <span class="btn-icon">→</span>
+      </button>
+    </div>
+    
+    <!-- Actions -->
+    <div class="leaderboard-actions">
+      <button class="menu-btn" id="leaderboardRefreshBtn" onclick="refreshLeaderboard()">
+        <span class="btn-icon">🔄</span> Refresh
+      </button>
+      <button class="menu-btn primary" onclick="hideLeaderboard()">
+        <span class="btn-icon">←</span> Back to Menu
+      </button>
+    </div>
   `;
   
   leaderboardModal.appendChild(leaderboardContent);
   viewportContainer.appendChild(leaderboardModal);
+  
+  // Fetch leaderboard data from blockchain
+  await fetchBlockchainLeaderboard();
   
   // Display leaderboard in modal
   displayLeaderboardModal();
@@ -540,47 +594,238 @@ function displayLeaderboardModal() {
   
   list.innerHTML = '';
   
-  // Sort by descending score and take top 10
-  const sortedScores = leaderboard.sort((a, b) => b.score - a.score).slice(0, 10);
+  // Get current category
+  const currentCategory = leaderboardCategories[currentCategoryIndex];
+  const primaryField = currentCategory.primaryField;
   
-  if (sortedScores.length === 0) {
+  // Update category title
+  const titleElement = document.getElementById('leaderboardCategoryTitle');
+  if (titleElement) {
+    titleElement.textContent = `${currentCategory.icon} ${currentCategory.name}`;
+  }
+  
+  // Use blockchain data
+  const dataToDisplay = currentLeaderboardData;
+  
+  if (dataToDisplay.length === 0) {
     const li = document.createElement('li');
     li.className = 'leaderboard-item';
     li.style.textAlign = 'center';
     li.style.color = '#888';
     li.style.padding = '20px';
-    li.innerHTML = 'No scores yet!<br>Be the first to play!';
+    li.innerHTML = '📭 No scores submitted yet!<br><span style="font-size: 0.9em;">Be the first to play and submit a score!</span>';
     list.appendChild(li);
     return;
   }
   
-  sortedScores.forEach((entry, index) => {
+  // Sort by current category's primary field (descending)
+  const sortedData = [...dataToDisplay].sort((a, b) => {
+    const aValue = a[primaryField] || 0;
+    const bValue = b[primaryField] || 0;
+    return bValue - aValue;
+  }).slice(0, 100); // Top 100
+  
+  sortedData.forEach((entry, index) => {
     const li = document.createElement('li');
     li.className = 'leaderboard-item';
     
-    // Create rank div
+    // Rank
     const rankDiv = document.createElement('div');
-    rankDiv.className = 'rank';
+    rankDiv.className = 'leaderboard-rank';
     rankDiv.textContent = index + 1;
     
-    // Create name div
+    // Address (always shown, truncated)
+    const addressDiv = document.createElement('div');
+    addressDiv.className = 'leaderboard-address';
+    addressDiv.textContent = formatAddress(entry.walletAddress || entry.playerAddress || '');
+    
+    // Name (shown if provided, empty if not)
     const nameDiv = document.createElement('div');
-    nameDiv.className = 'player-name';
-    nameDiv.textContent = entry.name;
+    nameDiv.className = 'leaderboard-name';
+    nameDiv.textContent = formatPlayerName(entry);
     
-    // Create score div
-    const scoreDiv = document.createElement('div');
-    scoreDiv.className = 'player-score';
-    scoreDiv.textContent = entry.score.toLocaleString();
+    // Primary stat (score for current category)
+    const statDiv = document.createElement('div');
+    statDiv.className = 'leaderboard-stat';
+    const statValue = entry[primaryField] || 0;
+    statDiv.textContent = formatStatValue(statValue, primaryField);
     
-    // Create flex container
-    const flexContainer = document.createElement('div');
-    flexContainer.className = 'flex-container';
-    flexContainer.appendChild(rankDiv);
-    flexContainer.appendChild(nameDiv);
+    // Main flex container
+    const mainFlex = document.createElement('div');
+    mainFlex.className = 'leaderboard-main-flex';
+    mainFlex.appendChild(rankDiv);
+    mainFlex.appendChild(addressDiv);
+    mainFlex.appendChild(nameDiv);
     
-    li.appendChild(flexContainer);
-    li.appendChild(scoreDiv);
+    li.appendChild(mainFlex);
+    li.appendChild(statDiv);
     list.appendChild(li);
   });
+}
+
+// Format wallet address (truncate)
+function formatAddress(address) {
+  if (!address || address.length < 10) return address || '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+// Format player name (return if provided, empty string if not)
+function formatPlayerName(entry) {
+  if (entry.playerName && entry.playerName.trim() !== '') {
+    return entry.playerName;
+  }
+  return '';
+}
+
+// Format stat value based on category
+function formatStatValue(value, field) {
+  if (value === undefined || value === null) return '0';
+  
+  switch (field) {
+    case 'distance':
+      return `${Math.round(value).toLocaleString()}m`;
+    case 'score':
+    case 'coins':
+    case 'bossesDefeated':
+    case 'enemiesDefeated':
+    case 'longestCoinStreak':
+      return Math.round(value).toLocaleString();
+    default:
+      return value.toLocaleString();
+  }
+}
+
+// Navigate to next category
+function leaderboardNextCategory() {
+  currentCategoryIndex = (currentCategoryIndex + 1) % leaderboardCategories.length;
+  displayLeaderboardModal();
+}
+
+// Navigate to previous category
+function leaderboardPrevCategory() {
+  currentCategoryIndex = (currentCategoryIndex - 1 + leaderboardCategories.length) % leaderboardCategories.length;
+  displayLeaderboardModal();
+}
+
+// Fetch leaderboard data from blockchain API
+async function fetchBlockchainLeaderboard(limit = 1000) {
+  if (isLoadingLeaderboard) {
+    console.log('🔄 [LEADERBOARD] Already loading, skipping duplicate request');
+    return;
+  }
+  
+  isLoadingLeaderboard = true;
+  const list = document.getElementById('modalLeaderboardList');
+  
+  // Show loading state
+  if (list) {
+    list.innerHTML = '<li class="leaderboard-item" style="text-align: center; color: #888; padding: 20px;"><span class="btn-icon">⏳</span> Loading leaderboard...</li>';
+  }
+  
+  try {
+    // Get API base URL (from config or default)
+    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    
+    console.log(`📤 [LEADERBOARD] Fetching leaderboard from: ${API_BASE_URL}/leaderboard?limit=${limit}`);
+    
+    const response = await fetch(`${API_BASE_URL}/leaderboard?limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+      throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    // Log network info for verification
+    if (result.network) {
+      console.log(`🌐 [LEADERBOARD] Backend network: ${result.network}${result.chainId ? ` (Chain ID: ${result.chainId})` : ''}`);
+      if (result.network !== 'testnet') {
+        console.warn(`⚠️ [LEADERBOARD] WARNING: Backend is using ${result.network}, not testnet!`);
+      }
+    }
+    
+    if (result.leaderboard && Array.isArray(result.leaderboard)) {
+      currentLeaderboardData = result.leaderboard;
+      console.log(`✅ [LEADERBOARD] Loaded ${currentLeaderboardData.length} entries from blockchain`);
+      
+      // Update display
+      displayLeaderboardModal();
+    } else {
+      console.warn('⚠️ [LEADERBOARD] Invalid response format:', result);
+      // Clear data and show empty state
+      currentLeaderboardData = [];
+      displayLeaderboardModal();
+    }
+  } catch (error) {
+    console.error('❌ [LEADERBOARD] Error fetching leaderboard:', error);
+    
+    // Determine error type
+    const isConnectionError = error.message.includes('Failed to fetch') || 
+                               error.message.includes('NetworkError') ||
+                               error.message.includes('Network request failed') ||
+                               error.message.includes('fetch');
+    
+    // Show appropriate error message
+    if (list) {
+      if (isConnectionError) {
+        list.innerHTML = `
+          <li class="leaderboard-item" style="text-align: center; color: #ff6b6b; padding: 20px;">
+            <div style="font-size: 1.2em; margin-bottom: 10px;">🔌 Unable to connect to blockchain</div>
+            <div style="font-size: 0.9em; margin-top: 10px; color: #888;">Please check your connection and try again.</div>
+            <div style="font-size: 0.8em; margin-top: 10px; color: #666;">You can click the refresh button to retry.</div>
+          </li>
+        `;
+      } else {
+        list.innerHTML = `
+          <li class="leaderboard-item" style="text-align: center; color: #ff6b6b; padding: 20px;">
+            <div style="font-size: 1.2em; margin-bottom: 10px;">⚠️ Failed to load leaderboard</div>
+            <div style="font-size: 0.9em; margin-top: 10px; color: #888;">${error.message || 'Unknown error'}</div>
+            <div style="font-size: 0.8em; margin-top: 10px; color: #666;">You can click the refresh button to retry.</div>
+          </li>
+        `;
+      }
+    }
+    
+    // Clear data on error
+    currentLeaderboardData = [];
+  } finally {
+    isLoadingLeaderboard = false;
+  }
+}
+
+// Refresh leaderboard (fetch from blockchain)
+async function refreshLeaderboard() {
+  console.log('🔄 [LEADERBOARD] Refreshing leaderboard...');
+  
+  const refreshBtn = document.getElementById('leaderboardRefreshBtn');
+  if (refreshBtn) {
+    const originalText = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<span class="btn-icon">⏳</span> Loading...';
+    refreshBtn.disabled = true;
+    
+    try {
+      await fetchBlockchainLeaderboard();
+    } finally {
+      // Reset button state
+      refreshBtn.innerHTML = originalText;
+      refreshBtn.disabled = false;
+    }
+  } else {
+    // If button not found, just fetch directly
+    await fetchBlockchainLeaderboard();
+  }
+}
+
+// Make functions globally accessible for onclick handlers
+if (typeof window !== 'undefined') {
+  window.leaderboardNextCategory = leaderboardNextCategory;
+  window.leaderboardPrevCategory = leaderboardPrevCategory;
+  window.refreshLeaderboard = refreshLeaderboard;
+  window.fetchBlockchainLeaderboard = fetchBlockchainLeaderboard;
 }

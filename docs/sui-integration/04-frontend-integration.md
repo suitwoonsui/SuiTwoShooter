@@ -343,6 +343,8 @@ window.APIClient = {
 
 ## Step 3.4: Integrate with Existing Leaderboard System
 
+**Note:** For Phase 4.3 (Blockchain Leaderboard Integration - MVP Critical), see [11. Blockchain Leaderboard Integration](./11-blockchain-leaderboard.md) for the complete implementation guide to replace localStorage with blockchain queries.
+
 **Modify `src/game/systems/ui/leaderboard-system.js`:**
 
 Add these modifications (no imports needed - vanilla JS):

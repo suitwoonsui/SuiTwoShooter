@@ -174,6 +174,10 @@ export class AdminWalletService {
       console.log(`📝 Building transaction for player: ${playerAddress}`);
       console.log(`   Score: ${scoreData.score}`);
       console.log(`   Distance: ${scoreData.distance}`);
+      console.log(`   Coins: ${scoreData.coins}`);
+      console.log(`   Bosses Defeated: ${scoreData.bossesDefeated}`);
+      console.log(`   Enemies Defeated: ${scoreData.enemiesDefeated}`);
+      console.log(`   Longest Coin Streak: ${scoreData.longestCoinStreak}`);
       console.log(`   Package ID: ${packageId}`);
       console.log(`   Player Name: ${playerName || '(empty)'}`);
       console.log(`   Session ID: ${sessionId || '(none)'}`);
@@ -198,6 +202,48 @@ export class AdminWalletService {
       const bossesDefeated = Math.round(scoreData.bossesDefeated);
       const enemiesDefeated = Math.round(scoreData.enemiesDefeated);
       const longestCoinStreak = Math.round(scoreData.longestCoinStreak);
+      
+      // Get boss tiers and enemy types arrays (for exact score calculation)
+      const bossTiers = Array.isArray(scoreData.bossTiers) ? scoreData.bossTiers.map(t => Math.round(t)) : [];
+      const enemyTypes = Array.isArray(scoreData.enemyTypes) ? scoreData.enemyTypes.map(t => Math.round(t)) : [];
+      const bossHits = Math.round(scoreData.bossHits || 0);
+      
+      // Calculate exact expected score for validation debugging
+      // NOTE: Coins and distance do NOT give score in the game - they are only tracked for other purposes
+      const enemyScoreComponent = enemyTypes.length === enemiesDefeated
+        ? enemyTypes.reduce((sum, type) => sum + (15 * type), 0) // Exact: 15 * type for each
+        : enemiesDefeated * 15; // Fallback: minimum (all type 1)
+      const bossScoreComponent = bossTiers.length === bossesDefeated
+        ? bossTiers.reduce((sum, tier) => sum + (5000 * tier), 0) // Exact: 5000 * tier for each
+        : bossesDefeated * 5000; // Fallback: minimum (all tier 1)
+      const bossHitScoreComponent = bossHits; // bossHits is now total damage dealt (not count), points = damage
+      const expectedScore = enemyScoreComponent + bossScoreComponent + bossHitScoreComponent;
+      const minAllowedScore = expectedScore > 0 ? Math.floor(expectedScore * 90 / 100) : 0; // Contract uses 90% threshold (tightened from 25% → 75% → 80% → 90% as score system consistently achieves 100% accuracy)
+      const maxAllowedScore = expectedScore * 20; // Contract uses 20x max
+      
+      console.log(`🔍 [VALIDATION DEBUG] Exact score calculation (coins and distance do NOT give score):`);
+      if (enemyTypes.length === enemiesDefeated) {
+        console.log(`   Enemy component (EXACT): ${enemyTypes.length} enemies, types: [${enemyTypes.join(', ')}] = ${enemyScoreComponent}`);
+      } else {
+        console.log(`   Enemy component (FALLBACK): ${enemiesDefeated} * 15 = ${enemyScoreComponent} (array length mismatch: ${enemyTypes.length} vs ${enemiesDefeated})`);
+      }
+      if (bossTiers.length === bossesDefeated) {
+        console.log(`   Boss component (EXACT): ${bossTiers.length} bosses, tiers: [${bossTiers.join(', ')}] = ${bossScoreComponent}`);
+      } else {
+        console.log(`   Boss component (FALLBACK): ${bossesDefeated} * 5000 = ${bossScoreComponent} (array length mismatch: ${bossTiers.length} vs ${bossesDefeated})`);
+      }
+      console.log(`   Boss hits component: ${bossHits} total damage = ${bossHitScoreComponent} (points = damage dealt)`);
+      console.log(`   Expected score: ${expectedScore} (enemies + bosses + boss hits only)`);
+      console.log(`   Min allowed (90%): ${minAllowedScore}`);
+      console.log(`   Max allowed (20x): ${maxAllowedScore}`);
+      console.log(`   Actual score: ${score}`);
+      
+      // Calculate accuracy percentage for analysis
+      const accuracyPercent = expectedScore > 0 ? ((score / expectedScore) * 100).toFixed(2) : 'N/A';
+      const accuracyDiff = expectedScore > 0 ? (score - expectedScore) : 0;
+      console.log(`   📊 ACCURACY: ${accuracyPercent}% (diff: ${accuracyDiff > 0 ? '+' : ''}${accuracyDiff})`);
+      console.log(`   Score >= 90% of expected? ${score >= minAllowedScore}`);
+      console.log(`   Score <= 20x of expected? ${score <= maxAllowedScore}`);
 
       // Build transaction
       const txb = new Transaction();
@@ -217,6 +263,9 @@ export class AdminWalletService {
           txb.pure.u64(longestCoinStreak),          // longest_coin_streak: u64
           txb.pure.vector('u8', Array.from(playerNameBytes)),  // player_name: vector<u8>
           txb.pure.vector('u8', Array.from(sessionIdBytes)),     // session_id: vector<u8>
+          txb.pure.vector('u64', bossTiers),        // boss_tiers: vector<u64> (for exact score calculation)
+          txb.pure.vector('u64', enemyTypes),       // enemy_types: vector<u64> (for exact score calculation)
+          txb.pure.u64(bossHits),                   // boss_hits: u64 (50 points each)
         ],
       });
 

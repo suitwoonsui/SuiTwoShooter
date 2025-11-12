@@ -104,6 +104,8 @@
    - Top players, milestones, special events
 
 2. **Leaderboard Enhancements:**
+   - **Note:** Basic blockchain leaderboard is MVP Critical (Phase 4.3)
+   - **Post-MVP:** Weekly rewards system (Phase 9) - Rewards for top leaders
    - Pagination for larger leaderboards
    - Filtering and sorting options
    - Historical data analysis

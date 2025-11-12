@@ -1,7 +1,21 @@
 # End Game Flow & Smart Contract Integration Review
 
 ## Overview
-This document reviews the complete end game flow from game over to blockchain submission, identifying the current implementation and potential gaps.
+This document reviews the complete end game flow from game over to blockchain submission. **✅ IMPLEMENTATION COMPLETE** - All features working on testnet.
+
+## ✅ Implementation Status: COMPLETE
+
+**Last Updated:** 2025-01-15
+
+**Status:** All core features implemented and deployed:
+- ✅ Score submission to blockchain via admin wallet
+- ✅ Session ID tracking (prevents duplicates)
+- ✅ Player name field (optional)
+- ✅ All game stats captured and submitted
+- ✅ CORS configured
+- ✅ Error handling with toast notifications
+- ✅ Verification API endpoint
+- ✅ Contract deployed to testnet
 
 ---
 
@@ -341,15 +355,16 @@ struct ScoreSubmitted {
 ┌─────────────────────────────────────────────────────────────┐
 │ 5. Blockchain Submission (background)                       │
 │    - Check wallet connected?                                 │
-│    - Collect game stats from window.game                    │
-│    - Call submitScoreToBlockchain(gameStats)                │
+│    - Collect game stats from gameStats object               │
+│    - Call submitScoreToBlockchain(gameStats, playerName)    │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 6. Frontend API Call (score-submission.js)                  │
 │    - POST /api/scores/submit                                │
-│    - Payload: { playerAddress, scoreData }                  │
+│    - Payload: { playerAddress, playerName, sessionId, scoreData } │
+│    - All numeric values rounded to integers                 │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
@@ -357,25 +372,34 @@ struct ScoreSubmitted {
 │ 7. Backend API Route (route.ts)                             │
 │    - Validate input                                         │
 │    - Call adminWallet.submitScoreForPlayer()                │
+│    - Admin wallet signs transaction                         │
+│    - Admin wallet pays gas fees                             │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 8. Admin Wallet Service (admin-wallet-service.ts)           │
-│    - Build Sui transaction                                   │
-│    - Sign with admin wallet                                 │
-│    - Execute on testnet                                     │
-│    - Admin wallet pays gas                                  │
+│    - Build transaction with Move call                        │
+│    - Include Session Registry for duplicate prevention      │
+│    - Round all numeric values to integers                    │
+│    - Sign and execute transaction                           │
+│    - Return transaction digest                              │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 9. Smart Contract (score_submission.move)                   │
-│    - submit_game_session_for_player()                        │
-│    - Validate score data                                    │
-│    - Create GameSession object                              │
-│    - Transfer to player                                      │
-│    - Emit ScoreSubmitted event                              │
+│ 9. Sui Blockchain (testnet)                                 │
+│    - Contract validates score logic (includes enemy kills)   │
+│    - Creates GameSession object (owned by player)           │
+│    - Emits ScoreSubmitted event                             │
+│    - Marks session ID as used (prevents duplicates)         │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 10. Response to Frontend                                    │
+│     - Success: Transaction digest, show toast notification   │
+│     - Error: Error message, show error toast                │
 └─────────────────────────────────────────────────────────────┘
 ```
 

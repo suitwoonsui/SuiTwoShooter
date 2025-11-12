@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { suiService } from '@/lib/sui/suiService';
+import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 
 /**
  * GET /api/leaderboard
@@ -22,13 +23,24 @@ export async function GET(request: NextRequest) {
 
     const leaderboard = await suiService.queryEvents(limit);
 
+    const corsHeaders = getCorsHeaders(request);
+    
+    // Get network info for verification
+    const connectionInfo = await suiService.testConnection();
+    
     return NextResponse.json({
       leaderboard,
       count: leaderboard.length,
       limit,
+      network: connectionInfo.network, // Include network info for verification
+      chainId: connectionInfo.chainId, // Include chain ID for verification
+    }, {
+      headers: corsHeaders,
     });
   } catch (error) {
     console.error('Error in leaderboard endpoint:', error);
+    const corsHeaders = getCorsHeaders(request);
+    
     return NextResponse.json(
       { 
         error: 'Internal server error',
@@ -36,8 +48,18 @@ export async function GET(request: NextRequest) {
         leaderboard: [],
         count: 0
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: corsHeaders,
+      }
     );
   }
+}
+
+/**
+ * Handle CORS preflight (OPTIONS) request
+ */
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsPreflight(request);
 }
 

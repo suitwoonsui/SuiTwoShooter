@@ -115,7 +115,10 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
           coins: Math.round(gameStats.coins || 0),
           bossesDefeated: Math.round(gameStats.bossesDefeated || 0),
           enemiesDefeated: Math.round(gameStats.enemiesDefeated || 0),
-          longestCoinStreak: Math.round(gameStats.longestCoinStreak || 0)
+          longestCoinStreak: Math.round(gameStats.longestCoinStreak || 0),
+          bossTiers: gameStats.bossTiers || [], // Array of boss tiers for exact score calculation
+          enemyTypes: gameStats.enemyTypes || [], // Array of enemy types for exact score calculation
+          bossHits: Math.round(gameStats.bossHits || 0) // Number of boss hits (50 points each)
         }
       }),
     });

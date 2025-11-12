@@ -82,11 +82,36 @@ This guide is organized into focused sections for easier navigation:
 - Questions to consider
 - Implementation roadmap
 
+### **[11. Blockchain Leaderboard Integration](./11-blockchain-leaderboard.md)** ⭐ **MVP CRITICAL**
+- Phase 4.3: Replace localStorage with blockchain queries
+- Frontend integration for on-chain leaderboard
+- Display wallet addresses and scores
+- Error handling and refresh functionality
+
+### **[12. Premium Store Design](./12-premium-store-design.md)** ⭐ **REQUIRED FOR BURN MECHANICS**
+- Phase 5.2: Complete premium store design and implementation guide
+- All premium items specifications
+- Smart contract, backend API, frontend UI
+- Game balance adjustments
+- Purchase analytics
+
+### **[13. Leaderboard Rewards System](./13-leaderboard-rewards.md)** (Post-MVP)
+- Phase 9: Weekly rewards for top players
+- Reward distribution and claiming
+- Weekly snapshot system
+- Reward economics and funding
+
 ### **[Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md)** ⭐ **START HERE**
 - Prioritized task order with dependencies
 - MVP vs. Post-MVP features
 - Estimated timelines
 - Quick start checklist
+
+### **Reference Documents**
+- [EXTRA_LIVES_IMPLEMENTATION.md](./EXTRA_LIVES_IMPLEMENTATION.md) - Extra Lives implementation guide
+- [TIER_SYSTEM.md](./TIER_SYSTEM.md) - Game tier system documentation
+- [RENDER_FREE_TIER_OPTIMIZATION.md](./RENDER_FREE_TIER_OPTIMIZATION.md) - Deployment optimization guide
+- [INTEGRATION_CHECKLIST.md](./INTEGRATION_CHECKLIST.md) - Detailed integration checklist
 
 ---
 
@@ -101,7 +126,8 @@ This guide is organized into focused sections for easier navigation:
 5. **Token Gatekeeping:** **PRIORITY** - [07. Token Gatekeeping](./07-token-gatekeeping.md) - Required to play
 6. **Frontend:** Add [04. Frontend Integration](./04-frontend-integration.md) - Wallet connection using `@mysten/dapp-kit`
 7. **Smart Contracts:** Adapt from [05. Smart Contracts](./05-smart-contracts.md) or your `Sui Smart Contract Examples/`
-8. **Deploy:** Follow [06. Testing & Deployment](./06-testing-deployment.md) - **Testnet first!**
+8. **Blockchain Leaderboard:** **MVP CRITICAL** - [11. Blockchain Leaderboard](./11-blockchain-leaderboard.md) - Replace localStorage with blockchain
+9. **Deploy:** Follow [06. Testing & Deployment](./06-testing-deployment.md) - **Testnet first!**
 
 ---
 

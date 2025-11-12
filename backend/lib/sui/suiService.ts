@@ -161,12 +161,13 @@ export class SuiService {
    */
   async queryEvents(limit: number = 100): Promise<Array<{
     walletAddress: string;
+    playerName?: string;  // Optional player name (if provided)
     score: number;
     distance: number;
     coins: number;
     bossesDefeated: number;
-    tier: number;
     enemiesDefeated?: number;
+    longestCoinStreak?: number;
     transactionHash: string;
     timestamp: string;
   }>> {
@@ -182,32 +183,68 @@ export class SuiService {
       const [packageId] = contractAddress.split('::');
 
       // Query events for score submissions
+      // Note: The module is 'score_submission', not 'game'
       const events = await this.client.queryEvents({
         query: {
           MoveModule: {
             package: packageId,
-            module: 'game',
+            module: 'score_submission',
           },
-          MoveEventType: `${packageId}::game::ScoreSubmitted`,
         },
         limit: 1000, // Get more than needed to sort and filter
         order: 'descending',
       });
+      
+      console.log(`📊 [LEADERBOARD] Queried events from ${packageId}::score_submission, found ${events.data.length} events`);
+      
+      if (events.data.length === 0) {
+        console.warn(`⚠️ [LEADERBOARD] No events found. Check that:`);
+        console.warn(`   - Package ID is correct: ${packageId}`);
+        console.warn(`   - Module name is correct: score_submission`);
+        console.warn(`   - Events have been emitted from the contract`);
+      }
+
+      // Helper function to decode byte arrays (vector<u8> from Move)
+      const decodeBytes = (bytes: any): string => {
+        if (!bytes) return '';
+        if (typeof bytes === 'string') return bytes;
+        if (Array.isArray(bytes)) {
+          // Convert array of numbers to Uint8Array and decode
+          const uint8Array = new Uint8Array(bytes);
+          return new TextDecoder().decode(uint8Array);
+        }
+        return '';
+      };
 
       // Parse and sort events by score
       const scores = events.data
-        .map((event) => {
+        .map((event, index) => {
           try {
             const parsedJson = event.parsedJson as any;
+            
+            // Debug: Log first event structure
+            if (index === 0) {
+              console.log(`🔍 [LEADERBOARD] Sample event structure:`, {
+                type: event.type,
+                parsedJsonKeys: Object.keys(parsedJson || {}),
+                parsedJson: parsedJson,
+              });
+            }
+            
+            const playerName = decodeBytes(parsedJson.player_name);
+            
             return {
               walletAddress: parsedJson.player || parsedJson.wallet_address || '',
+              playerName: playerName || undefined,  // Only include if not empty
               score: Number(parsedJson.score || 0),
               distance: Number(parsedJson.distance || 0),
               coins: Number(parsedJson.coins || 0),
               bossesDefeated: Number(parsedJson.bosses_defeated || parsedJson.bossesDefeated || 0),
-              tier: Number(parsedJson.tier || parsedJson.current_tier || 0),
               enemiesDefeated: parsedJson.enemies_defeated || parsedJson.enemiesDefeated 
                 ? Number(parsedJson.enemies_defeated || parsedJson.enemiesDefeated) 
+                : undefined,
+              longestCoinStreak: parsedJson.longest_coin_streak || parsedJson.longestCoinStreak
+                ? Number(parsedJson.longest_coin_streak || parsedJson.longestCoinStreak)
                 : undefined,
               transactionHash: event.id.txDigest,
               timestamp: event.timestampMs 
@@ -215,7 +252,7 @@ export class SuiService {
                 : new Date().toISOString(),
             };
           } catch (e) {
-            console.error('Error parsing event:', e);
+            console.error(`❌ [LEADERBOARD] Error parsing event ${index}:`, e, event);
             return null;
           }
         })
@@ -223,6 +260,8 @@ export class SuiService {
         .filter((score) => score.walletAddress !== '') // Filter out invalid entries
         .sort((a, b) => b.score - a.score) // Sort by score descending
         .slice(0, limit); // Take top N
+
+      console.log(`✅ [LEADERBOARD] Successfully parsed ${scores.length} scores from ${events.data.length} events`);
 
       return scores;
     } catch (error) {
@@ -243,11 +282,13 @@ export class SuiService {
     limit: number = 50
   ): Promise<Array<{
     walletAddress: string;
+    playerName?: string;  // Optional player name (if provided)
     score: number;
     distance: number;
     coins: number;
     bossesDefeated: number;
-    tier: number;
+    enemiesDefeated?: number;
+    longestCoinStreak?: number;
     transactionHash: string;
     timestamp: string;
   }>> {

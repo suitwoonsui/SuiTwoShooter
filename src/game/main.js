@@ -123,6 +123,8 @@ function restart() {
   game.currentTier = 1; // Reset to tier 1
   game.enemiesDefeated = 0; // Reset enemy defeat counter
   game.bossTiers = []; // Reset boss tiers array
+  game.enemyTypes = []; // Reset enemy types array (for accurate score calculation)
+  game.bossHits = 0; // Reset boss hit damage counter (total damage dealt, not count)
   game.levelStartDelay = game.levelStartDelayDuration; // Start with spawn delay
   // Reset force field system
   game.forceField.level = 0;
@@ -284,6 +286,8 @@ const game = {
   currentTier: 1, // Current tier (1-4)
   enemiesDefeated: 0, // Number of enemies defeated (for blockchain/burn tracking)
   bossTiers: [], // Array tracking tier of each boss defeated (for accurate burn calculation)
+  enemyTypes: [], // Array tracking type of each enemy defeated (for accurate score calculation)
+  bossHits: 0, // Total damage dealt to bosses (points = damage dealt per hit)
   keys: {},
   particles: [],
   bgX: 0, // Background scrolls horizontally
@@ -323,6 +327,18 @@ function getProjectileSpeedMultiplier() {
     return 1.0; // No change for first 4 bosses (tiers 1-4)
   }
   // +5% per boss after tier 4: Boss 5 = 1.05x, Boss 10 = 1.30x, Boss 20 = 1.80x
+  return 1.0 + (game.bossesDefeated - 4) * 0.05;
+}
+
+// Fire rate multiplier for post-tier-4 scaling (inverse of projectile speed)
+// Makes enemies and bosses shoot faster by reducing fire rate
+// +5% per boss after tier 4: Boss 5 = 1.05x (5% faster), Boss 10 = 1.30x (30% faster), Boss 20 = 1.80x (80% faster)
+// No cap - eventually becomes unplayable, encouraging shorter, more frequent sessions
+function getFireRateMultiplier() {
+  if (game.bossesDefeated <= 4) {
+    return 1.0; // No change for first 4 bosses (tiers 1-4)
+  }
+  // Same progression as projectile speed: +5% per boss after tier 4
   return 1.0 + (game.bossesDefeated - 4) * 0.05;
 }
 
@@ -437,6 +453,7 @@ function update() {
       if (enrageElapsed >= game.boss.enrageTime) {
         // ENRAGE MODE ACTIVATED!
         game.boss.enraged = true;
+        // Halve fire rate (double shooting speed) - uses already-scaled fire rate
         game.boss.fireRate = Math.floor(game.boss.fireRate * 0.5); // Double fire rate
         game.boss.speed *= 1.5; // Increase speed
         console.log('🔥 BOSS ENRAGED! Fire rate doubled, speed increased!');
@@ -617,6 +634,8 @@ function update() {
           updateScore(15 * enemy.type); // SECURE: More points for high tier monsters
           // Track enemy defeat for blockchain/burn calculation
           game.enemiesDefeated++;
+          // Track enemy type for accurate score calculation
+          game.enemyTypes.push(enemy.type);
           // Play enemy destroyed sound
           if (typeof playEnemyDestroyedSound === 'function') {
             playEnemyDestroyedSound();
@@ -691,10 +710,24 @@ function update() {
       const collisionRight = bossCenterX + collisionLineWidth / 2;
       
       if (projectileRightEdge > collisionLeft && projectileRightEdge < collisionRight &&
-          projectileY < bossY + bossDims.height && projectileY + projectileHeight > bossY) {
-        game.boss.hp -= b.level; // Decrease HP by orb level (bigger orbs = more damage)
+          projectileY < bossY + bossDims.height && projectileY + projectileHeight > bossY &&
+          game.boss && game.boss.hp > 0) { // Only count hits if boss exists and is still alive
+        const previousHP = game.boss.hp;
+        const damageDealt = b.level; // Damage equals orb level
+        game.boss.hp -= damageDealt; // Decrease HP by orb level (bigger orbs = more damage)
         game.boss.hitTime = 10;
-        updateScore(50); // Points for hitting boss
+        // Only award points and track damage if the hit actually damaged the boss (HP was > 0 before hit)
+        if (previousHP > 0) {
+          updateScore(damageDealt); // Points equal to damage dealt (orb level)
+          game.bossHits += damageDealt; // Track total damage dealt for accurate score calculation
+        }
+        
+        // Check if boss was defeated immediately after HP decrement
+        if (game.boss && game.boss.hp <= 0 && game.bossActive) {
+          // Trigger boss defeat immediately to ensure score is added right away
+          handleBossDefeat();
+          projectileHit = true;
+        }
         
         // Play boss hit sound
         if (typeof playBossHitSound === 'function') {
@@ -769,8 +802,12 @@ function update() {
     spawnBoss();
   }
 
-  // Check if boss is defeated
-  if (game.bossActive && game.boss && game.boss.hp <= 0) {
+  // Function to handle boss defeat (extracted so it can be called immediately when HP reaches 0)
+  function handleBossDefeat() {
+    if (!game.bossActive || !game.boss || game.boss.hp > 0) {
+      return; // Boss not defeated or already handled
+    }
+    
     // Stop boss music immediately when HP reaches zero
     if (typeof stopBackgroundMusic === 'function') {
       stopBackgroundMusic();
@@ -781,11 +818,16 @@ function update() {
     game.bossVictoryTime = 3000; // 3 seconds victory period
     
     game.bossActive = false;
+    // Track boss tier BEFORE incrementing bossesDefeated (use the boss's actual tier)
+    const defeatedBossTier = game.boss ? game.boss.tier : game.currentTier;
+    const bossDefeatBonus = 5000 * defeatedBossTier;
+    const scoreBeforeBossDefeat = game.score;
+    console.log('🎯 [BOSS DEFEAT] Tier:', defeatedBossTier, 'Bonus:', bossDefeatBonus, 'Score before:', scoreBeforeBossDefeat);
+    
+    game.bossTiers.push(defeatedBossTier);
     game.bossesDefeated++;
     game.currentTier = Math.min(4, Math.floor(game.bossesDefeated / 1) + 1); // New tier after each boss
-    // Track boss tier for accurate burn calculation
-    game.bossTiers.push(game.currentTier);
-    console.log('Boss defeated! bossesDefeated:', game.bossesDefeated, 'currentTier:', game.currentTier);
+    console.log('Boss defeated! bossesDefeated:', game.bossesDefeated, 'defeatedBossTier:', defeatedBossTier, 'new currentTier:', game.currentTier);
     
     // When separate enemies system activates (after tier 4 boss), clear enemies array
     // EnemySpeed will be reset when victory timeout ends, ensuring clean start
@@ -800,7 +842,17 @@ function update() {
     // Clear boss projectiles when boss is defeated
     game.bossProjectiles = [];
     
-    updateScore(5000 * game.currentTier); // Much more points to reward effort
+    updateScore(bossDefeatBonus); // Much more points to reward effort (use defeated boss's tier, not new tier)
+    
+    // Verify the bonus was added
+    setTimeout(() => {
+      const scoreAfterBossDefeat = game.score;
+      const actualBonus = scoreAfterBossDefeat - scoreBeforeBossDefeat;
+      console.log('🎯 [BOSS DEFEAT VERIFY] Score after:', scoreAfterBossDefeat, 'Expected bonus:', bossDefeatBonus, 'Actual bonus:', actualBonus, 'Match:', actualBonus === bossDefeatBonus);
+      if (actualBonus !== bossDefeatBonus) {
+        console.error('❌ [BOSS DEFEAT] Bonus NOT added correctly! Expected:', bossDefeatBonus, 'Got:', actualBonus);
+      }
+    }, 100);
     
     // Play boss destroyed sound
     if (typeof playBossDestroyedSound === 'function') {
@@ -815,6 +867,11 @@ function update() {
         '#FFD700'
       ));
     }
+  }
+
+  // Check if boss is defeated
+  if (game.bossActive && game.boss && game.boss.hp <= 0) {
+    handleBossDefeat();
   }
   
 }
@@ -905,7 +962,10 @@ function gameOver() {
     bossesDefeated: game.bossesDefeated || 0,
     enemiesDefeated: game.enemiesDefeated || 0,
     longestCoinStreak: game.forceField?.maxStreak || 0,
-    sessionId: game.sessionId || null
+    sessionId: game.sessionId || null,
+    bossTiers: game.bossTiers || [], // Array of boss tiers for exact score calculation
+    enemyTypes: game.enemyTypes || [], // Array of enemy types for exact score calculation
+    bossHits: game.bossHits || 0 // Total damage dealt to bosses (points = damage dealt)
   };
   
   console.log('📊 [GAME OVER] Captured game stats:', gameStats);
