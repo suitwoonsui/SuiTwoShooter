@@ -25,6 +25,7 @@ interface TokenConfig {
 interface ContractsConfig {
   gameScore: string;
   sessionRegistry: string;  // Session registry object ID (from init function)
+  adminCapability: string;   // Admin capability object ID (from create_admin_capability function)
   tokenBurn: string;
   subscription: string;
 }
@@ -143,6 +144,12 @@ export function getConfig(): Config {
       sessionRegistry: network === 'testnet'
         ? (process.env.SESSION_REGISTRY_OBJECT_ID_TESTNET || process.env.SESSION_REGISTRY_OBJECT_ID || '')
         : (process.env.SESSION_REGISTRY_OBJECT_ID_MAINNET || process.env.SESSION_REGISTRY_OBJECT_ID || ''),
+      // Support network-specific admin capability object IDs
+      // Use ADMIN_CAPABILITY_OBJECT_ID_TESTNET or ADMIN_CAPABILITY_OBJECT_ID_MAINNET if available
+      // Otherwise fall back to ADMIN_CAPABILITY_OBJECT_ID (for backward compatibility)
+      adminCapability: network === 'testnet'
+        ? (process.env.ADMIN_CAPABILITY_OBJECT_ID_TESTNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || '')
+        : (process.env.ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || ''),
       tokenBurn: process.env.TOKEN_BURN_CONTRACT || '',
       subscription: process.env.SUBSCRIPTION_CONTRACT || ''
     },

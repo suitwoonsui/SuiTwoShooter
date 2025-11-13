@@ -451,11 +451,14 @@ This document provides a prioritized, step-by-step implementation order for inte
 ---
 
 ### 🟡 **5.2 Premium Store System** (MVP Important) ⭐ **REQUIRED FOR BURN MECHANICS**
-**Estimated Time:** 25-35 hours (total for all store components)  
+**Estimated Time:** 32-47 hours (total for all store components)  
 **Dependencies:** 4.1, 4.2  
 **Blocks:** Burn mechanics (needs revenue source)
 
 **Why Before Burn:** Burn mechanics require funds to burn tokens. Premium store generates revenue to fund burns.
+
+**⚠️ IMPLEMENTATION ORDER:** See [STORE_IMPLEMENTATION_ORDER.md](./STORE_IMPLEMENTATION_ORDER.md) for the recommended step-by-step sequence:
+1. UI Modal → 2. Item Catalog → 3. Mock Purchase → 4. Game Code → 5. Backend API → 6. Smart Contract → 7. Integration
 
 **Sub-tasks (see Phase 8 for details):**
 - [ ] 5.2.1 Smart Contract - Premium Store (4-6 hours)
@@ -473,7 +476,7 @@ All premium items must be **coded into the existing game logic**. This includes:
 - Slow Time Power (3 levels) - NEW feature, doesn't exist in game yet
 - Destroy All Enemies Power - NEW feature, doesn't exist in game yet
 - Boss Kill Shot - NEW feature, doesn't exist in game yet
-- Coin Magnet / Pull Beam (3 levels) - NEW feature, doesn't exist in game yet
+- Coin Tractor Beam (3 levels) - NEW feature, doesn't exist in game yet
 
 **Existing Features (Must Be Modified):**
 - Extra Lives - Modify existing life system to support purchased lives (visual distinction, non-replenishable)
@@ -484,7 +487,7 @@ All premium items must be **coded into the existing game logic**. This includes:
 - `src/game/main.js` - Game initialization, item activation, power systems
 - `src/game/systems/enemies/enemy-system.js` - Destroy All Enemies power
 - `src/game/systems/boss/boss-system.js` - Boss Kill Shot power
-- `src/game/systems/powerups/powerup-system.js` - Coin Magnet power
+- `src/game/systems/powerups/powerup-system.js` - Coin Tractor Beam power
 - `src/game/systems/ui/ui-rendering.js` - Power buttons, visual effects
 - `src/game/rendering/effects.js` - Visual effects for powers
 - All existing game logic files that handle lives, force fields, orb levels
@@ -945,7 +948,7 @@ See Phase 5.2.7 for details.
 ✅ **Phase 4:** 
   - ✅ 4.1 Score Submission UI ⭐ **COMPLETED**
   - ✅ 4.2 Transaction Signing ⭐ **COMPLETED** (pending contract deployment)
-  - [ ] 4.3 Blockchain Leaderboard Integration ⏳ **REQUIRED FOR MVP**
+  - ✅ 4.3 Blockchain Leaderboard Integration ⭐ **COMPLETED** (includes pagination, wallet highlighting, "Your Rank" section)
 [ ] **Phase 6:** 6.1 (Testnet Testing)  
 [ ] **Phase 7:** All tasks (Deployment)
 

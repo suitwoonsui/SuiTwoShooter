@@ -456,6 +456,35 @@ canvas:hover {
   transform: translateY(-2px);
 }
 
+/* Consumable footer items - available state (bright) */
+.game-footer .consumable-footer-item.available {
+  opacity: 1;
+  background: rgba(77, 162, 255, 0.15);
+  border-color: rgba(77, 162, 255, 0.5);
+  color: #4DA2FF;
+  box-shadow: 0 0 10px rgba(77, 162, 255, 0.3);
+}
+
+.game-footer .consumable-footer-item.available:hover {
+  background: rgba(77, 162, 255, 0.25);
+  box-shadow: 0 0 15px rgba(77, 162, 255, 0.5);
+}
+
+/* Consumable footer items - unavailable state (darkened) */
+.game-footer .consumable-footer-item.unavailable {
+  opacity: 0.3;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #888;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.game-footer .consumable-footer-item.unavailable:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: none;
+}
+
 .control-item {
   display: flex;
   align-items: center;

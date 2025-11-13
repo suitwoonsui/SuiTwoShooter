@@ -206,6 +206,10 @@
           <span class="btn-icon">🏆</span>
           Leaderboard
         </button>
+        <button class="menu-btn" onclick="showStore()" onmouseover="playMenuHoverSound()">
+          <span class="btn-icon">🛒</span>
+          Store
+        </button>
         <button class="menu-btn" onclick="showSoundTest()" onmouseover="playMenuHoverSound()">
           <span class="btn-icon">🔊</span>
           Sound Test
@@ -590,7 +594,16 @@
   <script src="src/game/systems/ui/settings-management.js"></script>
   <script src="src/game/systems/ui/sound-test-system.js"></script>
   <script src="src/game/systems/ui/leaderboard-system.js"></script>
+  <script src="src/game/systems/store/item-catalog.js"></script>
+  <script src="src/game/systems/store/inventory-manager.js"></script>
+  <script src="src/game/systems/store/item-consumption.js"></script>
+  <script src="src/game/systems/ui/store-ui.js"></script>
   <script src="src/game/systems/ui/toast-notifications.js"></script>
+  <script src="src/game/systems/consumables/consumable-system.js"></script>
+  <script src="src/game/systems/consumables/coin-tractor-beam.js"></script>
+  <script src="src/game/systems/consumables/slow-time.js"></script>
+  <script src="src/game/systems/consumables/destroy-all.js"></script>
+  <script src="src/game/systems/consumables/boss-kill-shot.js"></script>
   <script src="src/game/blockchain/score-submission.js"></script>
   <!-- Wallet API Bundle - Includes React and ReactDOM -->
   <!-- React is bundled WITH the wallet module to ensure proper initialization -->

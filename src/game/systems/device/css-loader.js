@@ -20,7 +20,10 @@ const CSSLoader = {
     return new Promise((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = href;
+    // Add cache-busting query parameter for localhost (development)
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const cacheBuster = isLocalhost ? `?v=${Date.now()}` : '';
+    link.href = href + cacheBuster;
       
       link.onload = () => {
         console.log(`✅ Loaded CSS: ${href}`);
@@ -105,6 +108,7 @@ const CSSLoader = {
     
     // Desktop-specific modules (only true differences)
     await this.loadCSS('src/game/rendering/responsive/desktop-modules/desktop-game-ui.css');
+    await this.loadCSS('src/game/rendering/ui/consumable-footer.css');
     console.log('✅ Desktop CSS modules loaded successfully!');
   },
 
@@ -120,6 +124,7 @@ const CSSLoader = {
     await this.loadCSS('src/game/rendering/responsive/mobile-modules/mobile-main-menu.css');
     await this.loadCSS('src/game/rendering/responsive/mobile-modules/mobile-header-stats.css');
     await this.loadCSS('src/game/rendering/responsive/mobile-modules/mobile-landscape-rotation.css');
+    await this.loadCSS('src/game/rendering/ui/consumable-footer.css');
     console.log('✅ Mobile CSS modules loaded successfully!');
   },
 

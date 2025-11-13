@@ -105,6 +105,12 @@ function generateTiles() {
     // Power-ups: separate variables for bonus and powerdown
     let powerupBonus = null;
     let powerdown = null;
+    
+    // Check if player is at or above orb level cap (for power-up bonus spawning)
+    const currentOrbLevel = game.projectileLevel || 1;
+    const orbLevelCap = game.orbLevelCap || (game.startingOrbLevel || 1) + 2;
+    const isAtOrbCap = currentOrbLevel >= orbLevelCap;
+    
     if (Math.random() < 0.1) {
       // Use obstacles array for lane checking (works for both before and after tier 4)
       // After tier 4, obstacles array is populated for lane tracking even though enemies are separate
@@ -113,10 +119,19 @@ function generateTiles() {
       const lane = free.length
         ? free[Math.floor(Math.random()*free.length)]
         : lanes[Math.floor(Math.random()*lanes.length)];
-      if (Math.random() < 0.5) {
-        powerupBonus = { lane };
-      } else {
+      
+      // Power-up cap system: Don't spawn power-up bonuses if at or above cap
+      // But always allow power-downs (so players can drop below cap and resume spawning)
+      if (isAtOrbCap) {
+        // At cap - only spawn power-downs (allows player to drop below cap)
         powerdown = { lane };
+      } else {
+        // Below cap - spawn both power-ups and power-downs normally
+        if (Math.random() < 0.5) {
+          powerupBonus = { lane };
+        } else {
+          powerdown = { lane };
+        }
       }
     }
 

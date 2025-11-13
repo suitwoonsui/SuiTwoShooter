@@ -48,10 +48,11 @@ The SuiTwo Shooter Game is a MewTwo-inspired magic orb shooter - a horizontal sc
 
 5. **Progressive Difficulty System**
    - Tier-based enemy and boss progression (4 tiers)
-   - Dynamic speed scaling post-tier 4
+   - Dynamic speed scaling post-tier 4 (enemy movement, projectile speed)
+   - Fire rate scaling post-tier 4 (enemies and bosses shoot faster)
    - Separate enemy system activation after tier 4 for enhanced challenge
    - Enrage system for bosses with increased difficulty
-   - **Impact**: Keeps gameplay engaging, provides long-term challenge
+   - **Impact**: Keeps gameplay engaging, provides long-term challenge, eventually becomes unplayable (encourages shorter, more frequent sessions)
 
 6. **Comprehensive Features**
    - Force field system with coin streak mechanics

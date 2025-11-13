@@ -6,7 +6,7 @@ This document outlines the complete design and implementation guide for a premiu
 
 **⚠️ CRITICAL: Game Code Implementation Required**
 All premium items must be **coded into the existing game logic**. This is not just a store/payment system - it requires:
-- **NEW game features** to be built (Slow Time, Destroy All Enemies, Boss Kill Shot, Coin Magnet)
+- **NEW game features** to be built (Slow Time, Destroy All Enemies, Boss Kill Shot, Coin Tractor Beam)
 - **Modifications to existing game code** (Extra Lives, Force Field, Orb Level systems)
 - **Game logic changes** in `main.js`, enemy systems, boss systems, UI rendering, etc.
 
@@ -410,8 +410,8 @@ All premium items must be **coded into the existing game logic**. This is not ju
 
 ---
 
-### 2.7 Coin Magnet / Pull Beam
-**Description:** Activate a magnetic field that pulls coins (and power-ups at higher levels) toward the player automatically.
+### 2.7 Coin Tractor Beam
+**Description:** Activate a tractor beam that pulls coins (and power-ups at higher levels) toward the player automatically. Visual particles and beams show coins being attracted to the player, creating a visible tractor beam effect.
 
 **Levels:**
 - **Level 1:** 4 seconds duration, pulls coins from 30% of screen width
@@ -439,10 +439,10 @@ All premium items must be **coded into the existing game logic**. This is not ju
 
 **Activation Flow:**
 1. **Player activates power** (button/key press)
-2. **Magnetic field activates** (instant):
-   - Visual magnetic field effect appears
-   - Pull particles start emitting
-   - Audio: Magnet activation sound
+2. **Tractor beam activates** (instant):
+   - Visual tractor beam effect appears (particles/beams from player)
+   - Pull particles start emitting (showing coins being attracted)
+   - Audio: Tractor beam activation sound
 3. **Coins/power-ups are pulled** (during duration):
    - Coins within range move toward player
    - Fast but smooth movement (not instant teleport)
@@ -458,19 +458,19 @@ All premium items must be **coded into the existing game logic**. This is not ju
    - Audio: Power deactivation sound
 
 **Implementation:**
-- Add `game.coinMagnet` object with:
+- Add `game.coinTractorBeam` object with:
   - `usesRemaining: number` (1)
-  - `active: boolean` (whether magnet is currently active)
+  - `active: boolean` (whether tractor beam is currently active)
   - `duration: number` (4, 6, or 8 seconds based on level)
   - `remainingTime: number` (time remaining in current activation)
   - `level: number` (1, 2, or 3)
   - `range: number` (screen width percentage: 0.3, 0.6, or 0.9)
   - `pullSpeed: number` (pixels per frame, e.g., 8-12 pixels/frame)
 - **Activation:**
-  - Set `game.coinMagnet.active = true`
-  - Set `game.coinMagnet.remainingTime = duration`
+  - Set `game.coinTractorBeam.active = true`
+  - Set `game.coinTractorBeam.remainingTime = duration`
   - Calculate pull range: `pullRange = game.width * range`
-  - Start visual effects (magnetic field particles)
+  - Start visual effects (tractor beam particles/beams)
   - Play activation audio
 - **Update loop (each frame while active):**
   - Decrement `remainingTime`
@@ -483,10 +483,10 @@ All premium items must be **coded into the existing game logic**. This is not ju
       - Emit pull particles along path
   - For Level 3, also pull power-ups (same logic)
   - When coin reaches player collision box, trigger normal collection
-  - If `remainingTime <= 0`, deactivate magnet
+  - If `remainingTime <= 0`, deactivate tractor beam
 - **Deactivation:**
-  - Set `game.coinMagnet.active = false`
-  - Set `game.coinMagnet.usesRemaining = 0`
+  - Set `game.coinTractorBeam.active = false`
+  - Set `game.coinTractorBeam.usesRemaining = 0`
   - Fade visual effects
   - Play deactivation audio
 - Add UI button (on-screen) and keyboard shortcut (e.g., M, C) for activation
@@ -494,22 +494,23 @@ All premium items must be **coded into the existing game logic**. This is not ju
   - **Desktop:** Both button and keyboard shortcut
 
 **Visual Effects:**
-- **Magnetic field effect:**
-  - Circular or radial field around player (visible during active period)
-  - Field color/intensity based on level (brighter at higher levels)
-  - Pulsing/glowing effect
+- **Tractor beam effect:**
+  - Visible beam/particles connecting player to coins being pulled
+  - Beam color/intensity based on level (brighter at higher levels)
+  - Pulsing/glowing effect around player (tractor beam source)
 - **Pull particles:**
-  - Particles emitted along the path of coins being pulled
-  - Trail effect following coins toward player
-  - Magnetic field lines (optional, subtle effect)
+  - Particles emitted along the path of coins being pulled toward player
+  - Trail effect following coins as they move toward player
+  - Beam lines showing the connection between player and coins
+  - Particles attract/flow from coins to player (visual attraction effect)
 - **Coin movement:**
   - Smooth movement toward player (not instant)
   - Slight acceleration as coins get closer
   - Visual feedback when coin is being pulled
 
 **Audio Cues:**
-- **Activation sound:** Magnetic field activation (whoosh, energy sound)
-- **Pull sound:** Continuous sound while coins are being pulled (subtle magnetic hum)
+- **Activation sound:** Tractor beam activation (whoosh, energy sound)
+- **Pull sound:** Continuous sound while coins are being pulled (subtle beam/energy hum)
 - **Collection sound:** Normal coin collection sound (when coins reach player)
 - **Deactivation sound:** Power ending (fade out sound)
 
@@ -613,7 +614,63 @@ const POWER_CURVE = {
 
 ### 4.1 Smart Contract Design
 
+**⚠️ IMPORTANT: On-Chain Inventory Storage**
+
+**Decision:** User item counts will be stored on the blockchain (not just in a database).
+
+**Why:**
+- ✅ **Transparency:** Players can verify their inventory on-chain
+- ✅ **Decentralization:** No reliance on backend database
+- ✅ **Permanence:** Inventory persists even if backend changes
+- ✅ **Verification:** Can query blockchain directly to verify item counts
+- ✅ **Future-proof:** Enables NFT system later without migration
+
+**Implementation:**
+- Smart contract maintains a `PlayerInventory` object per wallet address
+- Each purchase increments the item count in the on-chain inventory
+- Each game start decrements the item count (consumes items)
+- Inventory is queryable directly from blockchain
+- Backend can cache for performance, but blockchain is source of truth
+
+**Contract Structure:**
+```move
+struct PlayerInventory has key, store {
+    id: UID,
+    player: address,
+    extra_lives_level_1: u64,
+    extra_lives_level_2: u64,
+    extra_lives_level_3: u64,
+    force_field_level_1: u64,
+    force_field_level_2: u64,
+    force_field_level_3: u64,
+    orb_level_1: u64,
+    orb_level_2: u64,
+    orb_level_3: u64,
+    slow_time_level_1: u64,
+    slow_time_level_2: u64,
+    slow_time_level_3: u64,
+    destroy_all_enemies: u64,
+    boss_kill_shot: u64,
+    coin_tractor_beam: u64,
+    // ... other items
+}
+```
+
+**Events:**
+- `ItemPurchased` - Emitted when item is purchased (for analytics)
+- `InventoryUpdated` - Emitted when inventory changes (purchase or consumption)
+
+**Functions:**
+- `purchase_item(player, item_type, level)` - Purchase and add to inventory
+- `consume_item(player, item_type, level)` - Consume item when game starts
+- `get_inventory(player)` - Query player's current inventory
+- `transfer_item(player_from, player_to, item_type, level, quantity)` - Future: Enable gifting/transfer
+
+### 4.2 Smart Contract Design (Detailed)
+
 **New Contract:** `premium_store.move`
+
+**Note:** The contract structure above (Section 4.1) defines the on-chain inventory system. The functions below work with that inventory.
 
 **Functions:**
 ```move
@@ -782,8 +839,9 @@ struct ItemUsed has copy, drop {
 
 ### 5.2 Storage Strategy
 
-**On-Chain (Smart Contract Events):**
+**On-Chain (Smart Contract Events & Inventory):**
 - **Primary Source of Truth:** All purchases emit `ItemPurchased` events on-chain
+- **Inventory Storage:** User item counts stored in `PlayerInventory` objects on-chain (see Section 4.1)
 - **Event Structure:**
   ```move
   struct ItemPurchased has copy, drop {
@@ -800,8 +858,9 @@ struct ItemUsed has copy, drop {
 
 **Backend Database (Optional, for Fast Queries):**
 - **Purpose:** Fast analytics queries without scanning blockchain
-- **Structure:** Mirror on-chain events in database
-- **Sync:** Backend listens to on-chain events and updates database
+- **Structure:** Mirror on-chain inventory and events in database
+- **Sync:** Backend listens to on-chain events and queries `PlayerInventory` objects to update database
+- **Note:** Blockchain is source of truth - database is for performance only
 - **Use Cases:** 
   - Real-time dashboards
   - Historical trend analysis
@@ -843,7 +902,8 @@ struct ItemUsed has copy, drop {
 **Query Methods:**
 
 1. **On-Chain Queries (Primary):**
-   - Query `ItemPurchased` events from smart contract
+   - Query `PlayerInventory` objects from smart contract (source of truth for item counts)
+   - Query `ItemPurchased` events from smart contract (for analytics/history)
    - Filter by date range, item type, player address
    - Aggregate results in backend or frontend
 
@@ -959,7 +1019,24 @@ struct ItemUsed has copy, drop {
 
 ## 7. Implementation Phases
 
-**Note:** These are internal design phases. For the actual implementation roadmap, see [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md) Phase 5.2 (Premium Store System).
+**⚠️ IMPORTANT: See [STORE_IMPLEMENTATION_ORDER.md](./STORE_IMPLEMENTATION_ORDER.md) for the recommended step-by-step implementation sequence.**
+
+**Recommended Order:**
+1. **UI Modal First** - Build store interface with mock data
+2. **Item Catalog** - Define data structure for all items
+3. **Mock Purchase Flow** - Test with localStorage
+4. **Game Code Integration** - Make items work in-game
+5. **Backend API** - Create API endpoints
+6. **Smart Contract** - Deploy on-chain inventory
+7. **Blockchain Integration** - Connect everything
+
+**Why This Order:**
+- Test UI/UX immediately (no dependencies)
+- Validate game mechanics before blockchain
+- Incremental testing at each step
+- Minimize rework
+
+**Note:** The phases below are internal design phases. For the actual step-by-step implementation order, see [STORE_IMPLEMENTATION_ORDER.md](./STORE_IMPLEMENTATION_ORDER.md).
 
 ### Phase 1: Foundation (Week 1)
 - [ ] Design smart contract structure
@@ -1039,6 +1116,11 @@ struct ItemUsed has copy, drop {
 - Allows gift/transfer of items (future NFT system)
 - More flexible
 - **Future:** NFT system for inventory items
+- **✅ On-Chain Storage:** User item counts stored on blockchain (not just database)
+  - Smart contract maintains `PlayerInventory` object per wallet
+  - Inventory is queryable directly from blockchain
+  - Backend can cache for performance, but blockchain is source of truth
+  - Enables transparency and verification
 
 ### 9.2 Gas Fee Strategy
 - **Option A:** User pays for purchases (standard)
@@ -1062,11 +1144,20 @@ struct ItemUsed has copy, drop {
 ### 9.4 Max Purchase Limits ✅ **DECIDED**
 
 **Decision:**
-- **Per Game:** Only ONE item of each type can be used per game
-- **Per Item Type:** Cannot stack multiple of same item type in a single game
+- **Per Game:** Only ONE item of each type can be selected per game
+- **Per Item Type:** Cannot select multiple levels of same item type (e.g., can't have both +2 and +3 extra lives)
+- **Per Item Level:** Cannot select same item level twice (e.g., can't have two +3 extra lives)
+- **Selection Rule:** When user selects an item, automatically deselect any other level of that same item type
 - **Total Inventory:** Unlimited inventory (players can accumulate items)
 - **Consumption:** Selected items are consumed from inventory when game starts
 - **Visual Distinction:** Purchased items (like extra lives) display in different color (gold) vs base items (red)
+
+**Frontend Validation:**
+- Store UI must enforce "one item type per game" rule
+- When user clicks an item level, check if another level of same type is selected
+- If yes: Deselect previous level, select new level
+- Visual feedback: Show selected state, disable other levels of same type
+- Example: If "+2 Extra Lives" is selected, disable "+1" and "+3" buttons for Extra Lives
 
 ---
 

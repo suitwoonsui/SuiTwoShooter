@@ -43,6 +43,21 @@ function initSecurity() {
   }
 }
 
+/**
+ * Maps new orb level (1-10) to equivalent old orb level (1-6)
+ * This ensures that level 10 has the same power/size as old level 6
+ * Power curve mapping: 1→1, 2→2, 3→2, 4→3, 5→3, 6→4, 7→4, 8→5, 9→5, 10→6
+ * Note: Level 2 needs power 2 to beat first boss, so we adjust the mapping accordingly
+ */
+function getOldLevelEquivalent(newLevel) {
+  if (newLevel === 1) return 1;
+  if (newLevel <= 3) return 2; // Level 2 and 3 both have power 2
+  if (newLevel <= 5) return 3; // Level 4 and 5 both have power 3
+  if (newLevel <= 7) return 4; // Level 6 and 7 both have power 4
+  if (newLevel <= 9) return 5; // Level 8 and 9 both have power 5
+  return 6; // Level 10 maps to old level 6
+}
+
 // Secure score update function
 function updateScore(points) {
   const previousScore = game.score;
@@ -103,8 +118,56 @@ function restart() {
   game.bossProjectiles = [];
   game.particles = [];
   game.missilesPerShot = 1;
-  game.projectileLevel = 1; // Reset magic orb level
-  game.lives = 3;
+  
+  // Initialize orb level with purchased orb level start
+  game.startingOrbLevel = 1; // Default starting level
+  if (game.selectedItems && game.selectedItems.orbLevel) {
+    const orbLevelPurchase = game.selectedItems.orbLevel;
+    // Level 1 purchase = start at 2, Level 2 = start at 3, Level 3 = start at 4
+    game.startingOrbLevel = orbLevelPurchase + 1;
+    game.projectileLevel = game.startingOrbLevel;
+    console.log(`🔮 [ORB LEVEL] Starting at Orb Level ${game.startingOrbLevel} (purchased Level ${orbLevelPurchase})`);
+    
+    // Consume start item from inventory (applied immediately at game start)
+    if (typeof removeItemFromInventory === 'function') {
+      const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
+      removeItemFromInventory('orbLevel', orbLevelPurchase, 1, walletAddress);
+      console.log(`✅ [CONSUMPTION] Consumed orbLevel level ${orbLevelPurchase} at game start`);
+    }
+  } else {
+    game.projectileLevel = 1; // Default starting level
+  }
+  
+  // Calculate power-up cap (startingLevel + 2)
+  game.orbLevelCap = game.startingOrbLevel + 2;
+  console.log(`🔮 [ORB LEVEL] Power-up cap set to Level ${game.orbLevelCap} (starting at ${game.startingOrbLevel})`);
+  
+  // Set fire rate based on starting orb level (stretched for 10 levels)
+  // Formula: 300ms at level 1, ~22.22ms decrease per level, 100ms at level 10 (matches old max)
+  game.autoFireInterval = Math.max(100, Math.round(300 - (game.projectileLevel - 1) * 22.22));
+  
+  // Initialize lives with purchased extra lives
+  game.baseLives = 3; // Base lives (always 3)
+  game.purchasedLives = 0; // Purchased extra lives
+  
+  // Check for extra lives in selected items
+  if (game.selectedItems && game.selectedItems.extraLives) {
+    const extraLivesLevel = game.selectedItems.extraLives;
+    // Level 1 = +1, Level 2 = +2, Level 3 = +3
+    game.purchasedLives = extraLivesLevel;
+    console.log(`❤️ [EXTRA LIVES] Starting with ${extraLivesLevel} extra lives (Level ${extraLivesLevel})`);
+    
+    // Consume start item from inventory (applied immediately at game start)
+    if (typeof removeItemFromInventory === 'function') {
+      const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
+      removeItemFromInventory('extraLives', extraLivesLevel, 1, walletAddress);
+      console.log(`✅ [CONSUMPTION] Consumed extraLives level ${extraLivesLevel} at game start`);
+    }
+  }
+  
+  // Total lives = base + purchased
+  game.lives = game.baseLives + game.purchasedLives;
+  game.maxLives = game.lives; // Update max lives
   game.chargeStart = null;
   game.flashTime = 0;
   game.invulnerabilityTime = 0;
@@ -115,7 +178,7 @@ function restart() {
   game.bossVictoryTime = 0;
   game.boss = null;
   game.lastAutoFire = 0;
-  game.autoFireInterval = 300; // Reset fire rate
+  // Fire rate will be set based on starting orb level below
   game.gameRunning = true;
   game.gameOver = false; // Reset game over state
   game.paused = false; // Reset pause state
@@ -127,10 +190,25 @@ function restart() {
   game.bossHits = 0; // Reset boss hit damage counter (total damage dealt, not count)
   game.levelStartDelay = game.levelStartDelayDuration; // Start with spawn delay
   // Reset force field system
-  game.forceField.level = 0;
+  // Check for purchased force field in selected items
+  if (game.selectedItems && game.selectedItems.forceField) {
+    const forceFieldLevel = game.selectedItems.forceField;
+    game.forceField.level = forceFieldLevel;
+    game.forceField.active = true;
+    console.log(`🛡️ [FORCE FIELD] Starting with Level ${forceFieldLevel} force field`);
+    
+    // Consume start item from inventory (applied immediately at game start)
+    if (typeof removeItemFromInventory === 'function') {
+      const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
+      removeItemFromInventory('forceField', forceFieldLevel, 1, walletAddress);
+      console.log(`✅ [CONSUMPTION] Consumed forceField level ${forceFieldLevel} at game start`);
+    }
+  } else {
+    game.forceField.level = 0;
+    game.forceField.active = false;
+  }
   resetCoinStreak();
   game.forceField.maxStreak = 0;
-  game.forceField.active = false;
   game.forceField.invulnerabilityTime = 0;
   player.lane = 1;
   player.y = game.height / 2 - player.height / 2;
@@ -277,8 +355,12 @@ const game = {
   bossProjectiles: [],
   missilesPerShot: 1,
   projectileLevel: 1, // Magic orb level (size/power)
+  startingOrbLevel: 1, // Starting orb level (for power-up cap calculation)
+  orbLevelCap: 3, // Power-up cap (startingLevel + 2)
   lives: 3,
-  maxLives: 3, // Maximum number of lives
+  baseLives: 3, // Base lives (always 3)
+  purchasedLives: 0, // Purchased extra lives
+  maxLives: 3, // Maximum number of lives (base + purchased)
   gameRunning: false,
   gameOver: false, // Game over state
   paused: false, // Pause state
@@ -297,6 +379,7 @@ const game = {
   invulnerabilityTime: 0, // Invulnerability timer after being hit
   bossActive: false,
   bossWarning: false,
+  selectedItems: {}, // Items selected for consumption (set by item-consumption.js)
   bossWarningTime: 0,
   boss: null,
   bossFireInterval: 2000,
@@ -309,7 +392,7 @@ const game = {
   now: () => performance.now(),
   // Force field system
   forceField: {
-    level: 0, // 0 = none, 1 = level 1, 2 = level 2
+    level: 0, // 0 = none, 1 = level 1, 2 = level 2, 3 = level 3
     coinStreak: 0, // Consecutive coins collected without being hit
     maxStreak: 0, // Highest streak achieved this game
     active: false, // Whether force field is currently active
@@ -418,8 +501,9 @@ function update() {
   handleInput();
   updatePlayer();
   
-  // Continuous auto fire (disabled during boss entrance and victory)
-  if (!game.bossWarning && !game.bossVictoryTimeout && !(game.bossActive && !game.boss.vulnerable)) {
+  // Continuous auto fire (disabled during boss entrance, victory, and boss kill shot charge)
+  const autoFireDisabled = typeof isAutoFireDisabled === 'function' ? isAutoFireDisabled() : false;
+  if (!game.bossWarning && !game.bossVictoryTimeout && !(game.bossActive && !game.boss.vulnerable) && !autoFireDisabled) {
     handleAutoFire();
   }
   
@@ -460,17 +544,19 @@ function update() {
       }
     }
     
-        // Boss movement to position
+        // Boss movement to position (apply slow time multiplier)
         if (game.boss.x > game.boss.targetX) {
-          game.boss.x -= game.boss.moveSpeed;
+          const bossSpeedMultiplier = typeof getEffectiveBossSpeedMultiplier === 'function' ? getEffectiveBossSpeedMultiplier() : 1.0;
+          game.boss.x -= game.boss.moveSpeed * bossSpeedMultiplier;
         }
         
         // Boss vertical movement once in position (more aggressive by tier and when enraged)
-        // Apply post-tier-4 speed multiplier to vertical movement speed (same as projectile speeds)
+        // Apply post-tier-4 speed multiplier and slow time multiplier to vertical movement speed
         if (game.boss.vulnerable && game.boss.x <= game.boss.targetX) {
           const baseVerticalSpeed = (1 + (game.boss.tier * 0.5));
           const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
-          const moveSpeed = baseVerticalSpeed * speedMultiplier * (game.boss.enraged ? 2 : 1);
+          const bossSpeedMultiplier = typeof getEffectiveBossSpeedMultiplier === 'function' ? getEffectiveBossSpeedMultiplier() : 1.0;
+          const moveSpeed = baseVerticalSpeed * speedMultiplier * bossSpeedMultiplier * (game.boss.enraged ? 2 : 1);
           game.boss.y += game.boss.moveDirection * moveSpeed;
           if (game.boss.y <= 0 || game.boss.y >= game.height - game.boss.height) {
             game.boss.moveDirection *= -1;
@@ -539,8 +625,9 @@ function update() {
     game.distance += game.distanceSpeed;
     game.distanceSinceBoss += game.distanceSpeed;
     
-    // Update visual scrolling (background)
-    game.bgX += game.scrollSpeed;
+    // Update visual scrolling (background) - use effective scroll speed (with slow time multiplier)
+    const effectiveScrollSpeed = typeof getEffectiveScrollSpeed === 'function' ? getEffectiveScrollSpeed() : game.scrollSpeed;
+    game.bgX += effectiveScrollSpeed;
     if (game.bgX >= game.width) game.bgX = 0;
     
     // Debug boss progress
@@ -557,19 +644,23 @@ function update() {
 
   // Only scroll tiles and generate new ones if not in boss fight
   if (!game.bossActive) {
+    // Get effective speeds (with slow time multiplier applied if active)
+    const effectiveScrollSpeed = typeof getEffectiveScrollSpeed === 'function' ? getEffectiveScrollSpeed() : game.scrollSpeed;
+    const effectiveEnemySpeed = typeof getEffectiveEnemySpeed === 'function' ? getEffectiveEnemySpeed() : game.enemySpeed;
+    
     if (shouldUseSeparateEnemies()) {
       // After tier 4: Separate enemies move at enemySpeed (increases beyond scrollSpeed cap), tiles move at scrollSpeed
-      // Move separate enemies at enemySpeed (has its own increasing cap)
-      enemies.forEach(e => e.x -= game.enemySpeed);
+      // Move separate enemies at effectiveEnemySpeed (has its own increasing cap)
+      enemies.forEach(e => e.x -= effectiveEnemySpeed);
       
-      // Move tiles at scrollSpeed (same speed as before tier 4)
-      tiles.forEach(t => t.x -= game.scrollSpeed);
+      // Move tiles at effectiveScrollSpeed (same speed as before tier 4)
+      tiles.forEach(t => t.x -= effectiveScrollSpeed);
       
       // Remove off-screen enemies
       enemies = enemies.filter(e => e.x > -200);
     } else {
-      // Before tier 4: Enemies are in tiles, everything moves together at scrollSpeed
-      tiles.forEach(t => t.x -= game.scrollSpeed);
+      // Before tier 4: Enemies are in tiles, everything moves together at effectiveScrollSpeed
+      tiles.forEach(t => t.x -= effectiveScrollSpeed);
     }
     
     // Generate new tiles ONLY if spawn delay has passed (before filtering out off-screen tiles)
@@ -591,7 +682,9 @@ function update() {
     b.x += b.speed;
     
     // Add current position to trail (center of projectile image)
-    const orbSize = b.level * 8 + 16;
+    // Use old level equivalent for size calculation (level 10 = old level 6 = 64px)
+    const oldLevel = getOldLevelEquivalent(b.level);
+    const orbSize = oldLevel * 8 + 16;
     b.trail.push({ x: b.x + orbSize / 2, y: b.y }); // Center of the projectile image
     
     // Remove old trail points
@@ -623,7 +716,9 @@ function update() {
       // Check collision between projectile and enemy
       if (projectileX < drawX + enemyDims.width && projectileX + projectileWidth > drawX &&
           projectileY < enemyY + enemyDims.height && projectileY + projectileHeight > enemyY) {
-        enemy.hp -= b.level; // Decrease HP by orb level (bigger orbs = more damage)
+        // Use old level equivalent for damage calculation (level 10 = old level 6 = 6 damage)
+        const oldLevel = getOldLevelEquivalent(b.level);
+        enemy.hp -= oldLevel; // Decrease HP by old level equivalent (bigger orbs = more damage)
         
         // Calculate collision point (where projectile intersects with enemy)
         const collisionX = Math.max(projectileX, drawX);
@@ -658,6 +753,11 @@ function update() {
     // Check tile-based enemies (before tier 4)
     tiles.forEach(tile => {
       tile.obstacles = tile.obstacles.filter(obs => {
+        // Remove enemies that were destroyed by missiles or other means (hp <= 0)
+        if (obs.hp <= 0) {
+          return false; // Enemy destroyed
+        }
+        
         const ox = tile.x + 20;
         const result = checkProjectileEnemyCollision(obs, ox);
         if (result === true) {
@@ -674,6 +774,11 @@ function update() {
     // Check separate enemies (after tier 4)
     if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
       enemies = enemies.filter(enemy => {
+        // Remove enemies that were destroyed by missiles or other means (hp <= 0)
+        if (enemy.hp <= 0) {
+          return false; // Enemy destroyed
+        }
+        
         const result = checkProjectileEnemyCollision(enemy, enemy.x);
         if (result === true) {
           projectileHit = true;
@@ -713,7 +818,9 @@ function update() {
           projectileY < bossY + bossDims.height && projectileY + projectileHeight > bossY &&
           game.boss && game.boss.hp > 0) { // Only count hits if boss exists and is still alive
         const previousHP = game.boss.hp;
-        const damageDealt = b.level; // Damage equals orb level
+        // Use old level equivalent for damage calculation (level 10 = old level 6 = 6 damage)
+        const oldLevel = getOldLevelEquivalent(b.level);
+        const damageDealt = oldLevel; // Damage equals old level equivalent
         game.boss.hp -= damageDealt; // Decrease HP by orb level (bigger orbs = more damage)
         game.boss.hitTime = 10;
         // Only award points and track damage if the hit actually damaged the boss (HP was > 0 before hit)
@@ -780,6 +887,37 @@ function update() {
 
   checkCoinCollection();
   checkPowerupCollection();
+  
+  // Initialize consumable system if not already initialized
+  if (typeof ConsumableSystem !== 'undefined' && ConsumableSystem.initialize && !ConsumableSystem._initialized) {
+    ConsumableSystem.initialize();
+    console.log('🔧 [CONSUMABLES] Consumable system initialized');
+  }
+  
+  // Update coin tractor beam
+  if (typeof updateCoinTractorBeam === 'function') {
+    updateCoinTractorBeam();
+  }
+  
+  // Update slow time
+  if (typeof updateSlowTime === 'function') {
+    updateSlowTime();
+  }
+  
+  // Update destroy all missiles
+  if (typeof updateDestroyAll === 'function') {
+    updateDestroyAll();
+  }
+  
+  // Update boss kill shot
+  if (typeof updateBossKillShot === 'function') {
+    updateBossKillShot();
+  }
+  
+  // Update consumable button states
+  if (typeof ConsumableSystem !== 'undefined' && ConsumableSystem.updateButtonStates) {
+    ConsumableSystem.updateButtonStates();
+  }
 
   // Flash effect
   if (game.flashTime > 0) {
@@ -827,6 +965,12 @@ function update() {
     game.bossTiers.push(defeatedBossTier);
     game.bossesDefeated++;
     game.currentTier = Math.min(4, Math.floor(game.bossesDefeated / 1) + 1); // New tier after each boss
+    
+    // Recalculate power-up cap based on current orb level at start of new tier
+    // Cap = current orb level + 2 (allows 2 more power-ups in the new tier)
+    game.orbLevelCap = game.projectileLevel + 2;
+    console.log(`🔮 [ORB LEVEL] Cap recalculated to Level ${game.orbLevelCap} for new tier (current level: ${game.projectileLevel}, tier: ${game.currentTier})`);
+    
     console.log('Boss defeated! bossesDefeated:', game.bossesDefeated, 'defeatedBossTier:', defeatedBossTier, 'new currentTier:', game.currentTier);
     
     // When separate enemies system activates (after tier 4 boss), clear enemies array

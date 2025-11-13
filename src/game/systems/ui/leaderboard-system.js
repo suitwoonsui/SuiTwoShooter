@@ -29,6 +29,13 @@ let currentLeaderboardData = [];
 // Loading state
 let isLoadingLeaderboard = false;
 
+// Pagination state
+let itemsPerPage = 20; // Show 20 items at a time
+let displayedItemsCount = 0; // How many items are currently displayed
+let currentWalletAddress = null; // Current user's wallet address
+let currentWalletRank = null; // Current wallet's rank (if not in top displayed)
+let currentWalletEntry = null; // Current wallet's best entry
+
 // Display leaderboard
 function displayLeaderboard() {
   const list = document.getElementById('leaderboardList');
@@ -549,6 +556,13 @@ async function showLeaderboard() {
       </button>
     </div>
     
+    <!-- Load More Button -->
+    <div class="leaderboard-load-more-container" id="leaderboardLoadMoreContainer" style="display: none;">
+      <button class="menu-btn" id="leaderboardLoadMoreBtn" onclick="loadMoreLeaderboard()">
+        <span class="btn-icon">⬇️</span> Load More
+      </button>
+    </div>
+    
     <!-- Actions -->
     <div class="leaderboard-actions">
       <button class="menu-btn" id="leaderboardRefreshBtn" onclick="refreshLeaderboard()">
@@ -592,7 +606,12 @@ function displayLeaderboardModal() {
   const list = document.getElementById('modalLeaderboardList');
   if (!list) return;
   
-  list.innerHTML = '';
+  // Get current wallet address
+  if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    currentWalletAddress = window.walletAPIInstance.getAddress();
+  } else {
+    currentWalletAddress = null;
+  }
   
   // Get current category
   const currentCategory = leaderboardCategories[currentCategoryIndex];
@@ -608,6 +627,7 @@ function displayLeaderboardModal() {
   const dataToDisplay = currentLeaderboardData;
   
   if (dataToDisplay.length === 0) {
+    list.innerHTML = '';
     const li = document.createElement('li');
     li.className = 'leaderboard-item';
     li.style.textAlign = 'center';
@@ -615,29 +635,152 @@ function displayLeaderboardModal() {
     li.style.padding = '20px';
     li.innerHTML = '📭 No scores submitted yet!<br><span style="font-size: 0.9em;">Be the first to play and submit a score!</span>';
     list.appendChild(li);
+    displayedItemsCount = 0;
+    currentWalletRank = null;
+    currentWalletEntry = null;
+    updateLoadMoreButton();
     return;
   }
   
-  // Sort by current category's primary field (descending)
+  // Sort by current category's primary field (descending) - sort ALL data first
   const sortedData = [...dataToDisplay].sort((a, b) => {
     const aValue = a[primaryField] || 0;
     const bValue = b[primaryField] || 0;
     return bValue - aValue;
-  }).slice(0, 100); // Top 100
+  });
   
-  sortedData.forEach((entry, index) => {
-    const li = document.createElement('li');
-    li.className = 'leaderboard-item';
+  // Find current wallet's rank and entry (from all sorted data)
+  currentWalletRank = null;
+  currentWalletEntry = null;
+  if (currentWalletAddress) {
+    // Find wallet's best entry for current category
+    const walletEntries = sortedData.filter(entry => {
+      const entryAddress = entry.walletAddress || entry.playerAddress || '';
+      return entryAddress.toLowerCase() === currentWalletAddress.toLowerCase();
+    });
     
-    // Rank
+    if (walletEntries.length > 0) {
+      // Get the best entry for this category (first in sorted list is best)
+      currentWalletEntry = walletEntries[0];
+      // Find rank by finding the first entry with this value (handles ties correctly)
+      const bestValue = currentWalletEntry[primaryField] || 0;
+      // Find the rank - count how many entries have a better value, then add 1
+      currentWalletRank = sortedData.findIndex(entry => {
+        const entryValue = entry[primaryField] || 0;
+        return entryValue <= bestValue; // Find first entry <= bestValue (will be the wallet's entry or a tie)
+      }) + 1; // +1 because findIndex is 0-based, rank is 1-based
+      
+      // If multiple entries have the same value, all get the same rank (the first rank)
+      // This is correct behavior for leaderboards
+    }
+  }
+  
+  // Display items up to current displayedItemsCount
+  const itemsToDisplay = sortedData.slice(0, displayedItemsCount || itemsPerPage);
+  
+  // Clear list
+  list.innerHTML = '';
+  
+  // Check if current wallet is in displayed items
+  let walletInDisplayedList = false;
+  if (currentWalletAddress && currentWalletEntry) {
+    walletInDisplayedList = itemsToDisplay.some(entry => {
+      const entryAddress = entry.walletAddress || entry.playerAddress || '';
+      return entryAddress.toLowerCase() === currentWalletAddress.toLowerCase() &&
+             entry[primaryField] === currentWalletEntry[primaryField];
+    });
+  }
+  
+  // Always show "Your Rank" section at the top if wallet has a rank
+  if (currentWalletAddress && currentWalletEntry && currentWalletRank) {
+    const yourRankLi = document.createElement('li');
+    yourRankLi.className = 'leaderboard-item leaderboard-item-your-rank';
+    
+    // Different styling if wallet is already in displayed list vs not
+    if (walletInDisplayedList) {
+      // If already in list, use a more subtle style to avoid redundancy
+      yourRankLi.style.backgroundColor = 'rgba(255, 200, 100, 0.1)';
+      yourRankLi.style.borderTop = '2px solid #ffc864';
+      yourRankLi.style.borderBottom = '2px solid #ffc864';
+      yourRankLi.style.marginBottom = '10px';
+      yourRankLi.style.paddingTop = '15px';
+      yourRankLi.style.paddingBottom = '15px';
+    } else {
+      // If not in list, use more prominent styling
+      yourRankLi.style.backgroundColor = 'rgba(255, 200, 100, 0.15)';
+      yourRankLi.style.borderTop = '2px solid #ffc864';
+      yourRankLi.style.borderBottom = '2px solid #ffc864';
+      yourRankLi.style.marginBottom = '10px';
+      yourRankLi.style.paddingTop = '15px';
+      yourRankLi.style.paddingBottom = '15px';
+    }
+    
     const rankDiv = document.createElement('div');
     rankDiv.className = 'leaderboard-rank';
-    rankDiv.textContent = index + 1;
+    rankDiv.textContent = currentWalletRank;
+    rankDiv.style.fontWeight = 'bold';
+    rankDiv.style.color = '#ffc864';
+    
+    const addressDiv = document.createElement('div');
+    addressDiv.className = 'leaderboard-address';
+    addressDiv.textContent = formatAddress(currentWalletAddress);
+    addressDiv.style.fontWeight = 'bold';
+    
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'leaderboard-name';
+    nameDiv.textContent = formatPlayerName(currentWalletEntry);
+    
+    const statDiv = document.createElement('div');
+    statDiv.className = 'leaderboard-stat';
+    const statValue = currentWalletEntry[primaryField] || 0;
+    statDiv.textContent = formatStatValue(statValue, primaryField);
+    statDiv.style.fontWeight = 'bold';
+    
+    const mainFlex = document.createElement('div');
+    mainFlex.className = 'leaderboard-main-flex';
+    mainFlex.appendChild(rankDiv);
+    mainFlex.appendChild(addressDiv);
+    mainFlex.appendChild(nameDiv);
+    
+    const labelDiv = document.createElement('div');
+    labelDiv.style.fontSize = '0.85em';
+    labelDiv.style.color = '#ffc864';
+    labelDiv.style.marginBottom = '5px';
+    labelDiv.textContent = '👤 Your Rank';
+    
+    yourRankLi.appendChild(labelDiv);
+    yourRankLi.appendChild(mainFlex);
+    yourRankLi.appendChild(statDiv);
+    
+    list.appendChild(yourRankLi);
+  }
+  
+  // Display leaderboard items
+  itemsToDisplay.forEach((entry, displayIndex) => {
+    const li = document.createElement('li');
+    const entryAddress = entry.walletAddress || entry.playerAddress || '';
+    const isCurrentWallet = currentWalletAddress && 
+                            entryAddress.toLowerCase() === currentWalletAddress.toLowerCase();
+    
+    // Highlight current wallet
+    if (isCurrentWallet) {
+      li.className = 'leaderboard-item leaderboard-item-current-wallet';
+      li.style.backgroundColor = 'rgba(100, 200, 255, 0.15)';
+      li.style.borderLeft = '3px solid #64c8ff';
+    } else {
+      li.className = 'leaderboard-item';
+    }
+    
+    // Rank (global rank in sorted data, 1-based)
+    const globalRank = displayIndex + 1;
+    const rankDiv = document.createElement('div');
+    rankDiv.className = 'leaderboard-rank';
+    rankDiv.textContent = globalRank;
     
     // Address (always shown, truncated)
     const addressDiv = document.createElement('div');
     addressDiv.className = 'leaderboard-address';
-    addressDiv.textContent = formatAddress(entry.walletAddress || entry.playerAddress || '');
+    addressDiv.textContent = formatAddress(entryAddress);
     
     // Name (shown if provided, empty if not)
     const nameDiv = document.createElement('div');
@@ -661,6 +804,12 @@ function displayLeaderboardModal() {
     li.appendChild(statDiv);
     list.appendChild(li);
   });
+  
+  // Update displayed count
+  displayedItemsCount = itemsToDisplay.length;
+  
+  // Update load more button
+  updateLoadMoreButton(sortedData.length);
 }
 
 // Format wallet address (truncate)
@@ -698,17 +847,48 @@ function formatStatValue(value, field) {
 // Navigate to next category
 function leaderboardNextCategory() {
   currentCategoryIndex = (currentCategoryIndex + 1) % leaderboardCategories.length;
+  displayedItemsCount = itemsPerPage; // Reset pagination when changing category
   displayLeaderboardModal();
 }
 
 // Navigate to previous category
 function leaderboardPrevCategory() {
   currentCategoryIndex = (currentCategoryIndex - 1 + leaderboardCategories.length) % leaderboardCategories.length;
+  displayedItemsCount = itemsPerPage; // Reset pagination when changing category
   displayLeaderboardModal();
 }
 
+// Load more leaderboard items
+function loadMoreLeaderboard() {
+  displayedItemsCount += itemsPerPage;
+  displayLeaderboardModal();
+}
+
+// Update load more button visibility
+function updateLoadMoreButton(totalItems = 0) {
+  const loadMoreContainer = document.getElementById('leaderboardLoadMoreContainer');
+  const loadMoreBtn = document.getElementById('leaderboardLoadMoreBtn');
+  
+  if (!loadMoreContainer || !loadMoreBtn) return;
+  
+  // Show button if there are more items to display
+  if (displayedItemsCount < totalItems) {
+    loadMoreContainer.style.display = 'flex'; // Use flex to maintain centering
+    loadMoreBtn.disabled = false;
+    loadMoreBtn.innerHTML = `<span class="btn-icon">⬇️</span> Load More (${totalItems - displayedItemsCount} remaining)`;
+  } else {
+    loadMoreContainer.style.display = 'none';
+  }
+}
+
 // Fetch leaderboard data from blockchain API
-async function fetchBlockchainLeaderboard(limit = 1000) {
+async function fetchBlockchainLeaderboard(limit = null) {
+  // Use 200 for mock mode testing, 1000 for production
+  if (limit === null) {
+    const useMock = window.GAME_CONFIG?.USE_MOCK_LEADERBOARD === true || 
+                    new URLSearchParams(window.location.search).get('mock') === 'true';
+    limit = useMock ? 200 : 1000;
+  }
   if (isLoadingLeaderboard) {
     console.log('🔄 [LEADERBOARD] Already loading, skipping duplicate request');
     return;
@@ -726,9 +906,14 @@ async function fetchBlockchainLeaderboard(limit = 1000) {
     // Get API base URL (from config or default)
     const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
     
-    console.log(`📤 [LEADERBOARD] Fetching leaderboard from: ${API_BASE_URL}/leaderboard?limit=${limit}`);
+    // Check for mock mode (for testing)
+    const useMock = window.GAME_CONFIG?.USE_MOCK_LEADERBOARD === true || 
+                    new URLSearchParams(window.location.search).get('mock') === 'true';
+    const mockParam = useMock ? '&mock=true' : '';
     
-    const response = await fetch(`${API_BASE_URL}/leaderboard?limit=${limit}`, {
+    console.log(`📤 [LEADERBOARD] Fetching leaderboard from: ${API_BASE_URL}/leaderboard?limit=${limit}${mockParam ? ' (MOCK MODE)' : ''}`);
+    
+    const response = await fetch(`${API_BASE_URL}/leaderboard?limit=${limit}${mockParam}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -753,6 +938,9 @@ async function fetchBlockchainLeaderboard(limit = 1000) {
     if (result.leaderboard && Array.isArray(result.leaderboard)) {
       currentLeaderboardData = result.leaderboard;
       console.log(`✅ [LEADERBOARD] Loaded ${currentLeaderboardData.length} entries from blockchain`);
+      
+      // Reset pagination when fetching new data
+      displayedItemsCount = itemsPerPage;
       
       // Update display
       displayLeaderboardModal();
@@ -828,4 +1016,5 @@ if (typeof window !== 'undefined') {
   window.leaderboardPrevCategory = leaderboardPrevCategory;
   window.refreshLeaderboard = refreshLeaderboard;
   window.fetchBlockchainLeaderboard = fetchBlockchainLeaderboard;
+  window.loadMoreLeaderboard = loadMoreLeaderboard;
 }

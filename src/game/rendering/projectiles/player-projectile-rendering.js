@@ -26,7 +26,9 @@ function renderPlayerProjectiles(ctx) {
         // Calculate diminishing properties (progress from old to new)
         const progress = (i + 1) / (b.trail.length - 1);
         const alpha = progress * 0.4; // Fade from 40% to 0% (newest point is 40%, oldest is 0%)
-        const orbSize = b.level * 8 + 16; // Same size calculation as the projectile
+        // Use old level equivalent for size calculation (level 10 = old level 6 = 64px)
+        const oldLevel = typeof getOldLevelEquivalent === 'function' ? getOldLevelEquivalent(b.level) : b.level;
+        const orbSize = oldLevel * 8 + 16; // Same size calculation as the projectile
         const lineWidth = progress * Math.max(3, orbSize); // Diminish from full size to 0 (newest point is full, oldest is 0)
         
         // Draw multiple layers for flame-like effect
@@ -49,7 +51,9 @@ function renderPlayerProjectiles(ctx) {
     }
     
     // Draw the projectile itself
-    const orbSize=b.level*8+16, bx=b.x, by=b.y-orbSize/2; // Smaller but proportional orbs
+    // Use old level equivalent for size calculation (level 10 = old level 6 = 64px)
+    const oldLevel = typeof getOldLevelEquivalent === 'function' ? getOldLevelEquivalent(b.level) : b.level;
+    const orbSize=oldLevel*8+16, bx=b.x, by=b.y-orbSize/2; // Smaller but proportional orbs
     ctx.save();
     ctx.globalAlpha=0.7+0.3*(b.level/3);
     ctx.shadowColor='cyan'; ctx.shadowBlur=10+b.level*5;

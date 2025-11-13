@@ -65,12 +65,17 @@ function renderForceField(ctx) {
     ctx.save();
     
     // Force field properties based on level
-    const fieldRadius = 50 + (game.forceField.level * 15); // Level 1: 65px, Level 2: 80px
-    const fieldColor = game.forceField.level === 1 ? '#4DA2FF' : '#39ff14'; // Sui blue for level 1, Highlighter green for level 2
-    const fieldAlpha = 0.3 + (game.forceField.level * 0.1); // Level 1: 0.4, Level 2: 0.5
+    // Level 1: 60px radius, Level 2: 70px, Level 3: 75px
+    const fieldRadius = 50 + (game.forceField.level * 10) - (game.forceField.level === 3 ? 5 : 0);
+    // Level 1: Sui blue, Level 2+: Highlighter green, Level 3: Gold tint
+    const fieldColor = game.forceField.level === 1 ? '#4DA2FF' : 
+                       game.forceField.level === 3 ? '#FFD700' : '#39ff14';
+    // Level 1: 0.4, Level 2: 0.5, Level 3: 0.6
+    const fieldAlpha = 0.3 + (game.forceField.level * 0.1);
     
-    // Animated pulsing effect
-    const pulseScale = 1 + 0.1 * Math.sin(Date.now() * 0.01);
+    // Animated pulsing effect (stronger pulse for higher levels)
+    const pulseIntensity = game.forceField.level === 3 ? 0.15 : 0.1;
+    const pulseScale = 1 + pulseIntensity * Math.sin(Date.now() * 0.01);
     const pulseRadius = fieldRadius * pulseScale;
     
     const pcx = player.x + player.width/2;
@@ -88,26 +93,61 @@ function renderForceField(ctx) {
     ctx.arc(pcx, pcy, pulseRadius, 0, Math.PI * 2);
     ctx.fill();
     
-    // Draw force field outline
+    // Draw force field outline (thicker for level 3)
     ctx.strokeStyle = fieldColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = game.forceField.level === 3 ? 3 : 2;
     ctx.globalAlpha = fieldAlpha;
     ctx.beginPath();
     ctx.arc(pcx, pcy, pulseRadius, 0, Math.PI * 2);
     ctx.stroke();
     
-    // Add sparkle effects for level 2
-    if (game.forceField.level === 2) {
-      ctx.globalAlpha = 0.6;
-      for (let i = 0; i < 8; i++) {
-        const angle = (Date.now() * 0.002 + i * Math.PI / 4) % (Math.PI * 2);
-        const sparkleX = pcx + Math.cos(angle) * (pulseRadius * 0.8);
-        const sparkleY = pcy + Math.sin(angle) * (pulseRadius * 0.8);
+    // Add sparkle effects for level 2 and 3
+    if (game.forceField.level >= 2) {
+      if (game.forceField.level === 3) {
+        // Level 3: Atomic model - orbiting particles around player
+        const orbitRadius = pulseRadius * 0.7; // Orbit slightly inside the force field
+        const orbitSpeed = Date.now() * 0.003; // Rotation speed
+        const particleCount = 12;
+        const particleSize = 3;
+        ctx.globalAlpha = 0.9;
         
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
-        ctx.fill();
+        // Create multiple orbital rings for atomic model effect
+        const rings = [
+          { radius: orbitRadius * 0.6, speed: orbitSpeed, offset: 0, count: 6 },
+          { radius: orbitRadius, speed: -orbitSpeed * 0.7, offset: Math.PI / 3, count: 6 }
+        ];
+        
+        rings.forEach(ring => {
+          for (let i = 0; i < ring.count; i++) {
+            const angle = ring.offset + (i * (Math.PI * 2 / ring.count)) + ring.speed;
+            const sparkleX = pcx + Math.cos(angle) * ring.radius;
+            const sparkleY = pcy + Math.sin(angle) * ring.radius;
+            
+            // Gold particles with glow effect
+            ctx.fillStyle = '#FFD700';
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(sparkleX, sparkleY, particleSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Reset shadow
+            ctx.shadowBlur = 0;
+          }
+        });
+      } else {
+        // Level 2: Static sparkles
+        ctx.globalAlpha = 0.6;
+        for (let i = 0; i < 8; i++) {
+          const angle = (Date.now() * 0.002 + i * Math.PI / 4) % (Math.PI * 2);
+          const sparkleX = pcx + Math.cos(angle) * (pulseRadius * 0.8);
+          const sparkleY = pcy + Math.sin(angle) * (pulseRadius * 0.8);
+          
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
     

@@ -66,6 +66,17 @@ function draw() {
       // Render game elements
       renderTiles(ctx);
       renderCollectibles(ctx);
+      
+      // Render tractor beam effects (before collectibles so beams appear behind)
+      if (typeof renderTractorBeamEffects === 'function') {
+        renderTractorBeamEffects(ctx);
+      }
+      
+      // Render destroy all missiles (before player projectiles so missiles appear behind)
+      if (typeof renderDestroyAllMissiles === 'function') {
+        renderDestroyAllMissiles(ctx);
+      }
+      
       renderLives(ctx);
       renderPlayerProjectiles(ctx);
       renderEnemyProjectiles(ctx);
@@ -92,4 +103,19 @@ function draw() {
   renderParticles(ctx);
   renderFlashEffect(ctx);
   renderChargeEffect(ctx);
+  
+  // Render slow time effects (screen tint and particles)
+  if (typeof renderSlowTimeEffects === 'function') {
+    renderSlowTimeEffects(ctx);
+  }
+  
+  // Render boss kill shot charging effects (but NOT the flash yet)
+  if (typeof renderBossKillShotChargingEffects === 'function') {
+    renderBossKillShotChargingEffects(ctx);
+  }
+  
+  // Render boss kill shot screen flash LAST (on top of everything)
+  if (typeof renderBossKillShotFlash === 'function') {
+    renderBossKillShotFlash(ctx);
+  }
 }

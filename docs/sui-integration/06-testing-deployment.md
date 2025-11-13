@@ -54,9 +54,12 @@ Before deploying, ensure all components work correctly:
 ### **Smart Contract Testing:**
 - [ ] Smart contracts compile correctly
 - [ ] Contracts deploy to testnet
-- [ ] Score submission function works
+- [ ] Admin capability created (`create_admin_capability` called)
+- [ ] Admin capability object ID stored in backend environment variables
+- [ ] Score submission function works (requires admin capability)
 - [ ] Game session validation works (anti-cheat checks)
 - [ ] Events emit correctly (ScoreSubmitted)
+- [ ] Unauthorized users cannot submit scores directly (admin-only access verified)
 - [ ] Token burning function works (if implemented)
 - [ ] Subscription contract works (if implemented)
 - [ ] All assertions/validations work as expected

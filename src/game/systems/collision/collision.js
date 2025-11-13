@@ -206,8 +206,19 @@ function checkCoinCollection() {
   
   tiles.forEach(tile => {
     if (tile.coinLane!==null && tile.x > bodyX-50 && tile.x < bodyX+bodyWidth+50) {
-      const coinX = tile.x + COLLECTIBLE_X_OFFSET;
-      const coinY = tile.coinLane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2;
+      // Check if coin is being pulled by tractor beam (account for offset)
+      let offsetX = 0;
+      let offsetY = 0;
+      if (typeof window.pulledCoins !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active) {
+        const pulled = window.pulledCoins.find(p => p.tile === tile);
+        if (pulled) {
+          offsetX = pulled.offsetX;
+          offsetY = pulled.offsetY;
+        }
+      }
+      
+      const coinX = tile.x + COLLECTIBLE_X_OFFSET + offsetX;
+      const coinY = tile.coinLane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2 + offsetY;
       const coinDims = getCollectibleDimensions(collectibleImage);
       const coinXAdj = coinX + coinDims.centerOffset;
       
@@ -232,8 +243,19 @@ function checkPowerupCollection() {
   tiles.forEach(tile => {
     // Check bonus power-up
     if (tile.powerupBonus && tile.x > bodyX-50 && tile.x < bodyX+bodyWidth+50) {
-      const px = tile.x + COLLECTIBLE_X_OFFSET;
-      const py = tile.powerupBonus.lane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2;
+      // Check if power-up is being pulled by tractor beam (Level 3 only)
+      let offsetX = 0;
+      let offsetY = 0;
+      if (typeof window.pulledPowerups !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active && game.coinTractorBeam.level >= 3) {
+        const pulled = window.pulledPowerups.find(p => p.tile === tile && p.isBonus);
+        if (pulled) {
+          offsetX = pulled.offsetX;
+          offsetY = pulled.offsetY;
+        }
+      }
+      
+      const px = tile.x + COLLECTIBLE_X_OFFSET + offsetX;
+      const py = tile.powerupBonus.lane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2 + offsetY;
       const powerupDims = getCollectibleDimensions(powerupBonusImage);
       const pxAdj = px + powerupDims.centerOffset;
       if (bodyX < pxAdj + powerupDims.width && bodyX + bodyWidth > pxAdj && bodyY < py + powerupDims.height && bodyY + bodyHeight > py) {
@@ -244,6 +266,7 @@ function checkPowerupCollection() {
 
     // Check power-down (malus)
     if (tile.powerdown && tile.x > bodyX-50 && tile.x < bodyX+bodyWidth+50) {
+      // Note: Power-downs are NOT pulled by tractor beam (only bonus power-ups at Level 3)
       const px = tile.x + COLLECTIBLE_X_OFFSET;
       const py = tile.powerdown.lane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2;
       const powerdownDims = getCollectibleDimensions(powerupMalusImage);

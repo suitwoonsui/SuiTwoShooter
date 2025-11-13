@@ -23,9 +23,21 @@ const FooterLoader = {
           <span class="control-icon">⏸️</span>
           P: Pause/Resume
         </span>
-        <span class="control-item">
-          <span class="control-icon">🔫</span>
-          Auto-Fire: Enabled
+        <span class="control-item consumable-footer-item" data-item-id="coinTractorBeam">
+          <span class="control-icon">🧲</span>
+          M: Coin Tractor Beam
+        </span>
+        <span class="control-item consumable-footer-item" data-item-id="slowTime">
+          <span class="control-icon">⏱️</span>
+          S: Slow Time
+        </span>
+        <span class="control-item consumable-footer-item" data-item-id="destroyAll">
+          <span class="control-icon">💥</span>
+          D: Destroy All
+        </span>
+        <span class="control-item consumable-footer-item" data-item-id="bossKillShot">
+          <span class="control-icon">🎯</span>
+          B: Boss Kill Shot
         </span>
       </div>
       <div class="version-info">

@@ -13,10 +13,13 @@ function updateEnemyShooting() {
   
   // Helper function to process enemy shooting
   function processEnemyShooting(enemy, enemyX) {
-    // Calculate effective fire rate with post-tier-4 scaling
+    // Calculate effective fire rate with post-tier-4 scaling and slow time
     const baseFireRate = enemyStats[enemy.type].fireRate;
     const fireRateMultiplier = typeof getFireRateMultiplier === 'function' ? getFireRateMultiplier() : 1.0;
-    const effectiveFireRate = baseFireRate / fireRateMultiplier; // Divide to make faster (lower ms = faster)
+    const slowTimeMultiplier = typeof getEffectiveFireRateMultiplier === 'function' ? getEffectiveFireRateMultiplier() : 1.0;
+    // Divide by fireRateMultiplier to make faster (post-tier-4 scaling)
+    // Multiply by slowTimeMultiplier to make slower (slow time doubles the delay)
+    const effectiveFireRate = (baseFireRate / fireRateMultiplier) * slowTimeMultiplier;
     
     if (!enemy.canShoot && enemyX > 0 && enemyX < game.width) {
       enemy.canShoot = true;
@@ -43,7 +46,9 @@ function updateEnemyShooting() {
         const baseSpeed = 4 * enemyStats[enemy.type].speed; // Speed based on tier
         // Apply post-tier-4 scaling multiplier (+5% per boss after tier 4)
         const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
-        const s = baseSpeed * speedMultiplier;
+        // Apply slow time multiplier to projectile speed
+        const slowTimeMultiplier = typeof getEffectiveProjectileSpeedMultiplier === 'function' ? getEffectiveProjectileSpeedMultiplier() : 1.0;
+        const s = baseSpeed * speedMultiplier * slowTimeMultiplier;
         createEnemyProjectile(ex, ey, dx0/dist*s, dy0/dist*s);
       }
     }

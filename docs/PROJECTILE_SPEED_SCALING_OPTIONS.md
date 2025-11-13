@@ -162,3 +162,44 @@ Then apply to:
 - Enemy projectiles: `speed * getProjectileSpeedMultiplier()`
 - Boss projectiles: `projectileSpeed * getProjectileSpeedMultiplier()`
 
+---
+
+## ✅ **IMPLEMENTED: Fire Rate Scaling (Post-Tier 4)**
+
+**Status:** ✅ **IMPLEMENTED** - Fire rate scaling is now active for both enemies and bosses.
+
+### Implementation Details
+
+**Formula:** Same as projectile speed - `1.0 + (bossesDefeated - 4) * 0.05` (+5% per boss after tier 4)
+
+**Applied To:**
+- ✅ **Enemy Fire Rate:** Enemies shoot faster (fire rate divided by multiplier)
+- ✅ **Boss Fire Rate:** Bosses shoot faster (fire rate divided by multiplier)
+- ✅ **Boss Enrage:** Enrage system uses already-scaled fire rate (then halves it for double speed)
+
+**How It Works:**
+- Fire rate is measured in milliseconds (lower = faster)
+- To make shooting faster, we **divide** the base fire rate by the multiplier
+- Example: Base fire rate 2000ms with 1.05x multiplier = 1905ms (5% faster)
+
+**Progression:**
+| Bosses Defeated | Fire Rate Multiplier | Shooting Speed Increase |
+|----------------|---------------------|------------------------|
+| 4 (no change) | 1.00x | 0% (base speed) |
+| 5 | 1.05x | 5% faster |
+| 10 | 1.30x | 30% faster |
+| 20 | 1.80x | 80% faster |
+| 30+ | 2.30x+ | 130%+ faster (eventually unplayable) |
+
+**Design Philosophy:**
+- ✅ **No Cap:** Eventually becomes unplayable (encourages shorter, more frequent sessions)
+- ✅ **Same Rate as Projectile Speed:** Consistent 5% scaling for balanced difficulty
+- ✅ **Gradual Progression:** Gentle increase prevents frustration while maintaining challenge
+
+**Code Location:**
+- `src/game/main.js` - `getFireRateMultiplier()` function
+- `src/game/systems/enemies/enemy-behavior.js` - Enemy fire rate application
+- `src/game/systems/bosses/bosses.js` - Boss fire rate application
+
+**Note:** Fire rate scaling works in conjunction with projectile speed scaling to create a comprehensive difficulty increase after tier 4.
+

@@ -433,7 +433,7 @@ function startGame() {
   startGameInternal();
 }
 
-function startGameInternal() {
+async function startGameInternal() {
   console.log('🎮 startGame() called');
   console.log('📊 Current gameState:', {
     isMenuVisible: gameState.isMenuVisible,
@@ -441,6 +441,19 @@ function startGameInternal() {
     isPaused: gameState.isPaused,
     isGameOver: gameState.isGameOver
   });
+  
+  // Show item consumption modal if available
+  if (typeof showItemConsumptionModal === 'function') {
+    console.log('🎯 Showing item consumption modal');
+    const result = await showItemConsumptionModal();
+    
+    if (!result.confirmed) {
+      console.log('❌ Item consumption cancelled, not starting game');
+      return; // User cancelled
+    }
+    
+    console.log('✅ Item consumption confirmed:', result.items);
+  }
   
   // Initialize game if not already initialized
   if (typeof window.initializeGame === 'function') {

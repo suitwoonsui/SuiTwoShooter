@@ -21,14 +21,19 @@ The leaderboard must be tied to the blockchain for transparency and competition.
 **Current State:**
 - ✅ Backend API route exists: `GET /api/leaderboard`
 - ✅ Backend queries `ScoreSubmitted` events from blockchain
-- ❌ Frontend still uses localStorage
-- ❌ Frontend not connected to blockchain API
+- ✅ Frontend connected to blockchain API
+- ✅ Pagination with "Load More" button (20 items per page)
+- ✅ Current wallet highlighting
+- ✅ "Your Rank" section always displayed
+- ✅ Mock data support for testing
 
 **Goal:**
-- Replace localStorage leaderboard with blockchain data
-- Display on-chain scores with wallet addresses
-- Show score, tier, distance, bosses defeated
-- Handle loading and error states
+- ✅ Replace localStorage leaderboard with blockchain data
+- ✅ Display on-chain scores with wallet addresses
+- ✅ Show score, distance, bosses defeated, enemies defeated, coins, longest coin streak
+- ✅ Handle loading and error states
+- ✅ Pagination for large leaderboards
+- ✅ Wallet highlighting and rank display
 
 ---
 
@@ -44,6 +49,7 @@ The backend API route already exists at `backend/app/api/leaderboard/route.ts`:
 
 **Query Parameters:**
 - `limit`: Number of scores to return (default: 100, max: 1000)
+- `mock`: Set to `'true'` to return mock data for testing (generates 200 entries)
 
 **Response Format:**
 ```json
@@ -361,11 +367,63 @@ if (leaderboard.length === 0) {
 
 ---
 
+## Step 7: Enhanced Features (Completed ✅)
+
+### 7.1 Pagination with "Load More"
+
+**Implementation:**
+- Shows 20 items at a time (configurable via `itemsPerPage`)
+- "Load More" button appears when more entries are available
+- Button shows remaining count: "Load More (X remaining)"
+- Pagination resets when changing categories or refreshing
+
+**Code Location:**
+- `src/game/systems/ui/leaderboard-system.js` - `loadMoreLeaderboard()` function
+- `updateLoadMoreButton()` - Manages button visibility
+
+### 7.2 Current Wallet Highlighting
+
+**Implementation:**
+- Detects current connected wallet address
+- Highlights wallet entry in blue when it appears in the displayed list
+- Visual styling: `rgba(100, 200, 255, 0.15)` background, `3px solid #64c8ff` left border
+- CSS class: `leaderboard-item-current-wallet`
+
+### 7.3 "Your Rank" Section
+
+**Implementation:**
+- Always displayed at the top of the leaderboard (when wallet is connected)
+- Shows your best rank for the current category
+- Displays: rank number, address, name, and stat value
+- Styled with orange/gold theme to distinguish from main list
+- Works even if your wallet is already in the displayed list
+
+**Features:**
+- Calculates rank from all sorted data (up to 1000 entries)
+- Category-specific (your rank may differ per category)
+- Handles ties correctly (same value = same rank)
+
+### 7.4 Mock Data for Testing
+
+**Implementation:**
+- Backend supports `?mock=true` query parameter
+- Generates 200 mock entries with realistic data
+- Frontend automatically requests 200 entries in mock mode
+- Useful for testing pagination and UI with large datasets
+
+**Usage:**
+- Add `?mock=true` to game URL: `http://localhost:8000/?mock=true`
+- Or set `USE_MOCK_LEADERBOARD=true` in backend environment
+
+---
+
 ## Next Steps
 
 After completing this phase:
 - ✅ Leaderboard is blockchain-based
 - ✅ Scores are transparent and verifiable
+- ✅ Pagination supports large leaderboards
+- ✅ Wallet highlighting and rank display enhance UX
 - ✅ Ready for Phase 9: Leaderboard Rewards (Post-MVP)
 
 **Note:** Leaderboard rewards (weekly prizes) will be implemented in Phase 9 after launch.

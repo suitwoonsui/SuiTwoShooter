@@ -278,21 +278,27 @@
 
 **Required Security Measures:**
 - ✅ Wallet signature verification (transaction-based)
+- ✅ Admin-only access control (AdminCapability pattern prevents unauthorized submissions)
 - ✅ Score validation (smart contract handles this - primary layer)
 - ✅ Client-side security system with boss defeat bonus handling
 - ✅ Exact score calculation (enemy types, boss tiers, boss hits tracked)
+- ✅ Duplicate session ID prevention
 - ✅ Rate limiting (optional for MVP)
 - ✅ CORS configuration
 - ✅ Environment variable security
 - ✅ Private key security (backend wallet)
 
-**Status:** ✅ **COMPLETED** - Score validation fully implemented and tested
+**Status:** ✅ **COMPLETED** - Score validation and access control fully implemented and tested
+- ✅ Admin-only access: `submit_game_session_for_player()` requires `AdminCapability` - only admin wallet can submit scores
+- ✅ Prevents direct contract calls: Users cannot bypass backend validation by calling contract directly
 - ✅ Smart contract validates exact score calculations using enemy types, boss tiers, and boss hits
 - ✅ Client-side security system allows boss defeat bonuses (5000, 10000, 15000, 20000) without rate limiting
 - ✅ Score validation accuracy: 98.8% (within acceptable variance)
 - ✅ All boss defeat bonuses correctly added to score
+- ✅ Admin capability created and configured after contract deployment
 
 **Action Required:**
+- ✅ Admin capability object ID stored in backend environment variables
 - Review security measures
 - Implement rate limiting if needed
 - Secure private keys
@@ -446,8 +452,12 @@
 - [x] Handle loading and error states
 - [x] Carousel navigation with 6 categories
 - [x] Network verification (testnet/mainnet detection)
+- [x] Pagination with "Load More" button (20 items per page)
+- [x] Current wallet highlighting (blue highlight when wallet is in list)
+- [x] "Your Rank" section (always shown at top, displays best rank for current category)
+- [x] Mock data support for testing (200 entries via `?mock=true`)
 
-**Status:** ✅ **COMPLETED** - Working with testnet blockchain
+**Status:** ✅ **COMPLETED** - Working with testnet blockchain, includes pagination and wallet features
 
 **Why MVP Critical:** Leaderboard must be tied to blockchain for transparency and competition. This is a core feature for a blockchain game.
 
@@ -459,9 +469,14 @@
 - [x] Fixed module name (score_submission instead of game)
 - [x] Added carousel UI with category navigation
 - [x] Added network verification and logging
+- [x] Implemented pagination (20 items per page, "Load More" button)
+- [x] Added current wallet detection and highlighting
+- [x] Added "Your Rank" section that always shows at top
+- [x] Added mock data generation for testing (backend supports `?mock=true`)
+- [x] Fixed server.js to handle query strings properly
 
 **Reference:** 
-- Backend API: `backend/app/api/leaderboard/route.ts` ✅
+- Backend API: `backend/app/api/leaderboard/route.ts` ✅ (supports mock mode)
 - Frontend: `src/game/systems/ui/leaderboard-system.js` ✅
 - See [11. Blockchain Leaderboard Integration](./11-blockchain-leaderboard.md) for detailed implementation guide
 - See [LEADERBOARD_VERIFICATION_CHECKLIST.md](./LEADERBOARD_VERIFICATION_CHECKLIST.md) for verification tests
@@ -480,7 +495,7 @@
     - [ ] Slow Time Power (3 levels) - 4s/6s/8s duration, 50% speed reduction - **NEW GAME CODE**
     - [ ] Destroy All Enemies Power (single level) - Seeking missiles - **NEW GAME CODE**
     - [ ] Boss Kill Shot (single level) - Instant kill with charge animation - **NEW GAME CODE**
-    - [ ] Coin Magnet / Pull Beam (3 levels) - 30%/60%/90% screen range - **NEW GAME CODE**
+    - [ ] Coin Tractor Beam (3 levels) - 30%/60%/90% screen range - **NEW GAME CODE** (visual: particles/beams attracting coins to player)
   - [ ] **Existing Features (Modify game code):**
     - [ ] Extra Lives (3 levels) - Modify existing life system for purchased lives (visual distinction, non-replenishable)
     - [ ] Force Field Start (3 levels) - Modify existing force field to support starting at purchased level
@@ -565,13 +580,15 @@
 ---
 
 **Last Updated:** 2025-01-15
-**Status:** Phase 4 (Score Submission) ✅ **FULLY COMPLETED AND DEPLOYED** - Working on Testnet  
+**Status:** Phase 4 (Score Submission & Leaderboard) ✅ **FULLY COMPLETED AND DEPLOYED** - Working on Testnet  
 **Next Phase:** Phase 5.2 (Premium Store System) - **REQUIRED FOR BURN MECHANICS** - Must generate revenue before token burn
+**Note:** Premium Store will store user item counts on blockchain (on-chain inventory system)
 
 ## 🎉 Recent Accomplishments (2025-01-15)
 
 ### Score Submission System - COMPLETE ✅
 - ✅ Contract deployed to Sui testnet
+- ✅ Admin-only access control (AdminCapability pattern prevents unauthorized submissions)
 - ✅ Admin wallet paying gas fees (two-wallet system)
 - ✅ Session ID tracking prevents duplicate submissions
 - ✅ Player name field (optional) stored on-chain

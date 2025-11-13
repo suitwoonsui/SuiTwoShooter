@@ -1,13 +1,81 @@
 # Post-Deployment Setup Guide
 
-## Step 1: Update Backend Environment Variables
+## Step 1: Create Admin Capability (Security Setup)
 
-After contract deployment, you need to add **TWO** new environment variables to your backend `.env.local` file:
+**IMPORTANT:** This step is required to prevent unauthorized score submissions. Only the admin wallet can submit scores.
+
+After contract deployment, you need to call `create_admin_capability` to create the admin capability object. This object proves that the caller is the authorized admin.
+
+### Get Your Admin Wallet Address
+
+First, get your admin wallet address from the backend:
+
+```bash
+# Start the backend (if not already running)
+cd backend
+npm run dev
+```
+
+In another terminal, check admin wallet address:
+
+```bash
+curl http://localhost:3000/api/admin/health
+```
+
+Look for the `address` field in the response. This is your admin wallet address.
+
+### Call create_admin_capability
+
+Using the Sui CLI, call the function with your admin wallet address:
+
+```bash
+# Replace PACKAGE_ID with your actual package ID from deployment
+# Replace ADMIN_ADDRESS with your admin wallet address from the health check
+sui client call \
+  --package <PACKAGE_ID> \
+  --module score_submission \
+  --function create_admin_capability \
+  --args <ADMIN_ADDRESS> \
+  --gas-budget 10000000
+```
+
+**Example:**
+```bash
+sui client call \
+  --package 0xb52cdbb9e448aac73ada6355b10f9e320acfc76eec6d2ae506c96714ac9cda29 \
+  --module score_submission \
+  --function create_admin_capability \
+  --args 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
+  --gas-budget 10000000
+```
+
+**Expected Output:** You'll get a transaction digest. Look for the `AdminCapability` object ID in the transaction effects.
+
+### Find the Admin Capability Object ID
+
+After the transaction completes, find the AdminCapability object ID:
+
+```bash
+# View the transaction details
+sui client transaction <TRANSACTION_DIGEST>
+
+# Or check your objects
+sui client objects
+```
+
+Look for an object of type `AdminCapability`. Copy its object ID.
+
+---
+
+## Step 2: Update Backend Environment Variables
+
+After contract deployment and admin capability creation, you need to add **THREE** new environment variables to your backend `.env.local` file:
 
 ### Required Variables
 
 1. **`GAME_SCORE_CONTRACT_TESTNET`** - Package ID from deployment
-2. **`SESSION_REGISTRY_OBJECT_ID`** - Session Registry Object ID from deployment
+2. **`SESSION_REGISTRY_OBJECT_ID`** - Session Registry Object ID from deployment (created by `init()`)
+3. **`ADMIN_CAPABILITY_OBJECT_ID`** - Admin Capability Object ID from `create_admin_capability` call
 
 ### Update `.env.local`
 
@@ -17,6 +85,7 @@ Open `backend/.env.local` and add/update these lines:
 # Contract Configuration (REQUIRED after deployment)
 GAME_SCORE_CONTRACT_TESTNET=0x<YOUR_PACKAGE_ID>
 SESSION_REGISTRY_OBJECT_ID=0x<YOUR_REGISTRY_OBJECT_ID>
+ADMIN_CAPABILITY_OBJECT_ID=0x<YOUR_ADMIN_CAPABILITY_OBJECT_ID>
 
 # Network Configuration
 SUI_TESTNET_NETWORK=testnet
@@ -28,12 +97,15 @@ SUI_NETWORK=testnet
 ```bash
 GAME_SCORE_CONTRACT_TESTNET=0xb52cdbb9e448aac73ada6355b10f9e320acfc76eec6d2ae506c96714ac9cda29
 SESSION_REGISTRY_OBJECT_ID=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+ADMIN_CAPABILITY_OBJECT_ID=0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890
 SUI_TESTNET_NETWORK=testnet
 ```
 
+**Note:** For mainnet, use `ADMIN_CAPABILITY_OBJECT_ID_MAINNET` instead.
+
 ---
 
-## Step 2: Verify Admin Wallet is Funded
+## Step 3: Verify Admin Wallet is Funded
 
 The admin wallet needs testnet SUI to pay for gas fees. Check the balance:
 
@@ -70,7 +142,7 @@ curl http://localhost:3000/api/admin/health
 
 ---
 
-## Step 3: Test Score Submission
+## Step 4: Test Score Submission
 
 ### Option A: Test via API (Recommended)
 

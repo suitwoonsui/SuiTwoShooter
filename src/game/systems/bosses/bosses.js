@@ -125,7 +125,11 @@ function handleBossFire() {
     game.boss.lastShot = now; // Reset fire timer
   }
   
-  if (now - game.boss.lastShot > game.boss.fireRate) {
+  // Get effective fire rate (with slow time multiplier applied)
+  const slowTimeFireRateMultiplier = typeof getEffectiveFireRateMultiplier === 'function' ? getEffectiveFireRateMultiplier() : 1.0;
+  const effectiveBossFireRate = game.boss.fireRate * slowTimeFireRateMultiplier;
+  
+  if (now - game.boss.lastShot > effectiveBossFireRate) {
     game.boss.lastShot = now;
     const bx = game.boss.x;
     const by = game.boss.y + game.boss.height/2;
@@ -134,7 +138,9 @@ function handleBossFire() {
     const baseProjectileSpeed = (5 + game.boss.tier) * (game.boss.enraged ? 1.5 : 1); // Faster when enraged
     // Apply post-tier-4 scaling multiplier (+5% per boss after tier 4)
     const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
-    const projectileSpeed = baseProjectileSpeed * speedMultiplier;
+    // Apply slow time multiplier to projectile speed
+    const slowTimeSpeedMultiplier = typeof getEffectiveProjectileSpeedMultiplier === 'function' ? getEffectiveProjectileSpeedMultiplier() : 1.0;
+    const projectileSpeed = baseProjectileSpeed * speedMultiplier * slowTimeSpeedMultiplier;
     const enrageMultiplier = game.boss.enraged ? 2 : 1; // Double projectiles when enraged
     
     switch(game.boss.attackPattern) {

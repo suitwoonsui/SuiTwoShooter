@@ -191,6 +191,15 @@ export class AdminWalletService {
         throw new Error(`Session registry object ID not configured for ${network}. Please set SESSION_REGISTRY_OBJECT_ID_${network.toUpperCase()} environment variable after contract deployment.`);
       }
 
+      // Get admin capability object ID from config
+      // This proves the caller is the admin and prevents unauthorized score submissions
+      // This will be set after calling create_admin_capability function
+      const adminCapabilityObjectId = this.config.contracts.adminCapability;
+      if (!adminCapabilityObjectId || adminCapabilityObjectId === '' || adminCapabilityObjectId === '0x...') {
+        const network = this.config.sui.network;
+        throw new Error(`Admin capability object ID not configured for ${network}. Please call create_admin_capability function after contract deployment and set ADMIN_CAPABILITY_OBJECT_ID_${network.toUpperCase()} environment variable.`);
+      }
+
       // Convert player name and session ID to bytes (UTF-8)
       const playerNameBytes = new TextEncoder().encode(playerName || '');
       const sessionIdBytes = sessionId ? new TextEncoder().encode(sessionId) : new TextEncoder().encode('');
@@ -249,9 +258,11 @@ export class AdminWalletService {
       const txb = new Transaction();
 
       // Call submit_game_session_for_player function
+      // Requires AdminCapability to prove caller is admin (prevents unauthorized submissions)
       txb.moveCall({
         target: `${packageId}::score_submission::submit_game_session_for_player`,
         arguments: [
+          txb.object(adminCapabilityObjectId),        // _admin_cap: &AdminCapability (proves caller is admin)
           txb.object(registryObjectId),              // registry: &mut SessionRegistry
           txb.pure.address(playerAddress),           // player: address
           txb.object('0x6'),                        // clock: &Clock (standard Sui Clock)

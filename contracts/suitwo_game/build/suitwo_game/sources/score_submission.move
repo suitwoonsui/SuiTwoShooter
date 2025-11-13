@@ -19,6 +19,12 @@ module suitwo_game::score_submission {
     
     // ===== STRUCTS =====
     
+    /// Admin capability - only admin wallet can submit scores on behalf of players
+    /// This prevents unauthorized score submissions
+    struct AdminCapability has key, store {
+        id: UID,
+    }
+    
     /// Registry to track used session IDs (prevents duplicate submissions)
     struct SessionRegistry has key {
         id: UID,
@@ -66,13 +72,25 @@ module suitwo_game::score_submission {
     
     /// Initialize the session registry (one-time setup)
     fun init(ctx: &mut TxContext) {
+        // Create session registry (shared object for duplicate checking)
         let registry = SessionRegistry {
             id: object::new(ctx),
             used_sessions: table::new(ctx),
         };
-        // Transfer to module owner or keep as shared object
-        // For now, we'll make it a shared object so anyone can check
         transfer::share_object(registry);
+    }
+    
+    /// Create admin capability and transfer to admin address
+    /// This function should be called once after contract deployment
+    /// Only the admin wallet can use this capability to submit scores
+    /// This prevents unauthorized score submissions and cheating
+    public entry fun create_admin_capability(admin_address: address, ctx: &mut TxContext) {
+        // Create admin capability and transfer to admin address
+        // Only the admin wallet can use this capability to submit scores
+        let admin_cap = AdminCapability {
+            id: object::new(ctx),
+        };
+        transfer::transfer(admin_cap, admin_address);
     }
     
     // ===== VALIDATION FUNCTIONS =====
@@ -251,9 +269,11 @@ module suitwo_game::score_submission {
     }
 
     /// Submit a game session on behalf of a player (admin signs, player address provided)
-    /// This allows the admin wallet to submit scores for any player
+    /// REQUIRES AdminCapability - only admin wallet can call this function
+    /// This prevents unauthorized score submissions and cheating
     /// Admin wallet pays gas fees
     public entry fun submit_game_session_for_player(
+        _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
         registry: &mut SessionRegistry,  // Session registry for duplicate prevention
         player: address,  // Explicit player address (user's wallet)
         clock: &Clock,

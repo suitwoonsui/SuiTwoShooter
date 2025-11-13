@@ -9,6 +9,9 @@
 const lifeFullImage = new Image();
 lifeFullImage.src = 'assets/Life_Full.webp';
 
+const lifeFullGoldImage = new Image();
+lifeFullGoldImage.src = 'assets/Life_Full_Gold.webp';
+
 const lifeEmptyImage = new Image();
 lifeEmptyImage.src = 'assets/Life_Empty.webp';
 

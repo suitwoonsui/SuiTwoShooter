@@ -367,6 +367,71 @@ GAME_SCORE_CONTRACT=0x[YOUR_PACKAGE_ID]::game
 
 ---
 
+## Step 4.5.1: Create Admin Capability (Security Setup)
+
+**IMPORTANT:** After contract deployment, you must create the admin capability to prevent unauthorized score submissions.
+
+### Why Admin Capability?
+
+The `submit_game_session_for_player()` function requires an `AdminCapability` object. This ensures:
+- ✅ Only the admin wallet can submit scores on behalf of players
+- ✅ Prevents unauthorized users from calling the contract directly
+- ✅ All submissions must go through your validated backend API
+
+### Create Admin Capability
+
+After deployment, call the `create_admin_capability` function:
+
+```bash
+# Get your admin wallet address first (from backend health check)
+# Then call the function with your admin address
+sui client call \
+  --package <PACKAGE_ID> \
+  --module score_submission \
+  --function create_admin_capability \
+  --args <ADMIN_WALLET_ADDRESS> \
+  --gas-budget 10000000
+```
+
+**Example:**
+```bash
+sui client call \
+  --package 0xb52cdbb9e448aac73ada6355b10f9e320acfc76eec6d2ae506c96714ac9cda29 \
+  --module score_submission \
+  --function create_admin_capability \
+  --args 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
+  --gas-budget 10000000
+```
+
+### Get Admin Capability Object ID
+
+After the transaction completes, find the `AdminCapability` object ID:
+
+```bash
+# View transaction details
+sui client transaction <TRANSACTION_DIGEST>
+
+# Or check your objects
+sui client objects
+```
+
+### Update Backend Environment Variables
+
+Add the admin capability object ID to your backend `.env`:
+
+```env
+# Admin Capability (REQUIRED for score submission)
+ADMIN_CAPABILITY_OBJECT_ID=0x[YOUR_ADMIN_CAPABILITY_OBJECT_ID]
+
+# For network-specific configs:
+ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x[YOUR_ADMIN_CAPABILITY_OBJECT_ID]
+ADMIN_CAPABILITY_OBJECT_ID_MAINNET=0x[YOUR_ADMIN_CAPABILITY_OBJECT_ID]
+```
+
+**See:** `backend/POST_DEPLOYMENT_SETUP.md` for detailed setup instructions.
+
+---
+
 ## Step 4.6: Understanding the Contract Design
 
 ### **Statistics Captured:**
@@ -389,10 +454,12 @@ GAME_SCORE_CONTRACT=0x[YOUR_PACKAGE_ID]::game
 7. **Ownership Validation**: Sui automatically ensures `tx_context::sender()` matches player (can't fake ownership)
 
 ### **Security Features:**
+- **Admin-Only Access Control**: `submit_game_session_for_player()` requires `AdminCapability` - only admin wallet can submit scores
 - **Ownership-Based**: Each `GameSession` is owned by the player (stored in their wallet)
 - **Event-Driven Leaderboard**: Query `ScoreSubmitted` events for leaderboard (no centralized state)
 - **Validation Before Storage**: Invalid scores rejected at contract level
 - **Immutable Records**: Once submitted, scores cannot be modified
+- **Prevents Direct Contract Calls**: Users cannot bypass backend validation by calling contract directly
 
 ---
 

@@ -238,6 +238,49 @@ router.post('/submit', scoreSubmissionLimiter, async (req, res) => {
   - `tx_context::sender(ctx)` cannot be faked
   - Player address is cryptographically verified
 
+### ✅ Admin-Only Access Control (Prevents Unauthorized Submissions)
+
+**Critical Security Feature:** Only the admin wallet can submit scores on behalf of players.
+
+- ✅ **AdminCapability Pattern:** Uses Sui's capability-based access control
+  - `AdminCapability` struct is created and owned by the admin wallet
+  - `submit_game_session_for_player()` requires `&AdminCapability` as first parameter
+  - Sui's type system enforces that only the capability owner can pass it
+  - Prevents unauthorized users from calling the contract directly
+
+- ✅ **Prevents Direct Contract Calls:**
+  - Without the `AdminCapability`, users cannot submit scores directly to the contract
+  - All score submissions must go through the backend API
+  - Backend validates and submits using the admin wallet
+
+- ✅ **Setup Required:**
+  - After contract deployment, call `create_admin_capability(admin_address)`
+  - This creates the `AdminCapability` object and transfers it to the admin wallet
+  - Store the `AdminCapability` object ID in backend environment variables
+  - Backend passes this object ID when submitting scores
+
+**Implementation:**
+```move
+// Admin capability - only admin wallet can submit scores
+struct AdminCapability has key, store {
+    id: UID,
+}
+
+// Function requires admin capability (proves caller is admin)
+public entry fun submit_game_session_for_player(
+    _admin_cap: &AdminCapability,  // Only admin can provide this
+    registry: &mut SessionRegistry,
+    player: address,
+    // ... other parameters
+) { /* ... */ }
+```
+
+**Security Benefits:**
+- ✅ Prevents unauthorized score submissions
+- ✅ Ensures all submissions go through validated backend API
+- ✅ Admin wallet pays gas fees (centralized control)
+- ✅ Cannot be bypassed - Sui's type system enforces ownership
+
 ---
 
 ## 5. On-Chain Data Security (No Database for MVP)

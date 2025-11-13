@@ -119,7 +119,7 @@ const x = lastX + game.width / 10;
 
 ---
 
-## ⚠️ **ISSUE #4: Enemy Projectile Speed**
+## ✅ **CORRECT: Enemy Projectile Speed**
 
 ### Before Level 4:
 ```javascript
@@ -134,13 +134,13 @@ const baseSpeed = 4 * enemyStats[enemy.type].speed;
 const speedMultiplier = getProjectileSpeedMultiplier(); // 1.0 + (bossesDefeated - 4) * 0.05
 const s = baseSpeed * speedMultiplier;
 ```
-- ⚠️ **DIFFERENT**: Projectile speed increases after tier 4
-- ⚠️ Multiplier increases by 5% per boss after tier 4
-- ⚠️ **IMPACT**: Enemy projectiles get faster, not just enemy movement
+- ✅ **INTENDED**: Projectile speed increases after tier 4
+- ✅ Multiplier increases by 5% per boss after tier 4
+- ✅ **IMPACT**: Enemy projectiles get faster (intentional difficulty scaling)
 
 **Code Location:** `src/game/systems/enemies/enemy-behavior.js` lines 38-41
 
-**Status:** If only enemy movement speed should increase, this needs to be removed.
+**Status:** ✅ **CORRECT** - This is intentional difficulty scaling. Projectile speed scaling works alongside fire rate scaling to create comprehensive difficulty increase.
 
 ---
 
@@ -160,15 +160,21 @@ const s = baseSpeed * speedMultiplier;
 
 ---
 
-## ✅ **CORRECT: Enemy Shooting Behavior**
+## ✅ **CORRECT: Enemy Shooting Behavior (Updated with Fire Rate Scaling)**
 
-### Before and After Level 4:
+### Before Level 4:
 - ✅ Same shooting logic (`processEnemyShooting()`)
-- ✅ Same fire rate (`enemyStats[enemy.type].fireRate`)
+- ✅ Base fire rate (`enemyStats[enemy.type].fireRate`)
 - ✅ Same "no-shoot zone" (stops within 2 columns of player)
 - ✅ Same activation logic (canShoot when on screen)
 
-**Status:** ✅ **IDENTICAL**
+### After Level 4:
+- ✅ Same shooting logic (`processEnemyShooting()`)
+- ✅ **Scaled fire rate:** `baseFireRate / getFireRateMultiplier()` (5% faster per boss after tier 4)
+- ✅ Same "no-shoot zone" (stops within 2 columns of player)
+- ✅ Same activation logic (canShoot when on screen)
+
+**Status:** ✅ **INTENTIONAL DIFFERENCE** - Fire rate scaling is now implemented to increase difficulty after tier 4. Enemies shoot faster (fire rate divided by multiplier), making the game progressively more challenging.
 
 ---
 
