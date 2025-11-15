@@ -1,10 +1,10 @@
-// Extract Session Registry Object ID from transaction
+// Extract Session Registry and Premium Store Object IDs from transaction
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
 const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-const txDigest = '4yrRQtZc3LPUkpvwPBVJpTWoTyyc9KVtewALtn4fpxot';
+const txDigest = 'xjwuzM5xy1NZjYfzHfH2CkR9dc9Ub6xVowiFMUmvj6z';
 
-async function extractRegistry() {
+async function extractObjects() {
   try {
     console.log('🔍 Querying transaction:', txDigest);
     const tx = await client.getTransactionBlock({
@@ -16,50 +16,48 @@ async function extractRegistry() {
       },
     });
 
+    let sessionRegistryObjectId = null;
+    let premiumStoreObjectId = null;
+
     console.log('\n📋 Checking objectChanges...');
     if (tx.objectChanges) {
       for (const change of tx.objectChanges) {
         if (change.type === 'created' && change.objectType) {
           console.log(`  - ${change.type}: ${change.objectType}`);
           if (change.objectType.includes('SessionRegistry')) {
+            sessionRegistryObjectId = change.objectId;
             console.log('\n✅ Found Session Registry!');
             console.log('   Object ID:', change.objectId);
             console.log('   Object Type:', change.objectType);
-            return change.objectId;
+          }
+          if (change.objectType.includes('PremiumStore')) {
+            premiumStoreObjectId = change.objectId;
+            console.log('\n✅ Found Premium Store!');
+            console.log('   Object ID:', change.objectId);
+            console.log('   Object Type:', change.objectType);
           }
         }
       }
     }
 
-    console.log('\n📋 Checking effects.created...');
-    if (tx.effects?.created) {
-      for (const obj of tx.effects.created) {
-        const objectType = obj.reference?.objectType || '';
-        console.log(`  - Created object: ${objectType.substring(0, 80)}...`);
-        if (objectType.includes('SessionRegistry')) {
-          console.log('\n✅ Found Session Registry!');
-          console.log('   Object ID:', obj.reference.objectId);
-          console.log('   Owner:', JSON.stringify(obj.owner, null, 2));
-          return obj.reference.objectId;
-        }
-      }
+    console.log('\n📋 Summary:');
+    if (sessionRegistryObjectId) {
+      console.log(`   ✅ Session Registry: ${sessionRegistryObjectId}`);
+    } else {
+      console.log('   ⚠️  Session Registry: Not found');
+    }
+    if (premiumStoreObjectId) {
+      console.log(`   ✅ Premium Store: ${premiumStoreObjectId}`);
+    } else {
+      console.log('   ⚠️  Premium Store: Not found');
     }
 
-    console.log('\n📋 Checking events...');
-    if (tx.events) {
-      for (const event of tx.events) {
-        console.log(`  - Event type: ${event.type}`);
-      }
-    }
-
-    console.log('\n⚠️  Session Registry not found in transaction data');
-    console.log('   Full transaction data:');
-    console.log(JSON.stringify(tx, null, 2));
+    return { sessionRegistryObjectId, premiumStoreObjectId };
   } catch (error) {
     console.error('❌ Error:', error.message);
     console.error(error.stack);
   }
 }
 
-extractRegistry();
+extractObjects();
 

@@ -20,24 +20,73 @@ let gameItemSelection = {
  * Show item consumption/selection modal before game start
  * Returns a promise that resolves when user confirms or cancels
  */
-function showItemConsumptionModal() {
-  return new Promise((resolve) => {
+async function showItemConsumptionModal() {
+  return new Promise(async (resolve) => {
     console.log('🎮 [CONSUMPTION] Showing item consumption modal');
+    
+    // Reset item selection state for new game
+    // This ensures selections from previous games don't carry over
+    gameItemSelection = {
+      extraLives: null,
+      forceField: null,
+      orbLevel: null,
+      slowTime: null,
+      destroyAll: false,
+      bossKillShot: false,
+      coinTractorBeam: null
+    };
+    console.log('🧹 [CONSUMPTION] Reset item selection state for new game');
+    
+    // Also clear game.selectedItems if it exists (from previous game)
+    if (typeof game !== 'undefined' && game.selectedItems) {
+      console.log('🧹 [CONSUMPTION] Clearing game.selectedItems from previous game:', game.selectedItems);
+      game.selectedItems = null;
+    }
+    if (typeof game !== 'undefined' && game.checkedOutItems) {
+      console.log('🧹 [CONSUMPTION] Clearing game.checkedOutItems from previous game:', game.checkedOutItems);
+      game.checkedOutItems = null;
+    }
     
     // Get wallet address (if available)
     let walletAddress = null;
     if (typeof getWalletAddress === 'function') {
       walletAddress = getWalletAddress();
+    } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+      walletAddress = window.walletAPIInstance.getAddress();
     }
     
-    // Get inventory
-    if (typeof getAllInventoryItems === 'undefined') {
-      console.log('⚠️ [CONSUMPTION] Inventory manager not available, skipping item selection');
+    if (!walletAddress) {
+      console.log('⚠️ [CONSUMPTION] No wallet connected, skipping item selection');
       resolve({ confirmed: true, items: {} });
       return;
     }
     
-    const inventory = getAllInventoryItems(walletAddress);
+    // Get inventory from blockchain API (not localStorage)
+    let inventory = {};
+    try {
+      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.inventory) {
+          inventory = data.inventory;
+          console.log('✅ [CONSUMPTION] Loaded inventory from blockchain:', inventory);
+        } else {
+          console.warn('⚠️ [CONSUMPTION] Failed to load inventory from blockchain:', data.error);
+        }
+      } else {
+        console.warn('⚠️ [CONSUMPTION] Inventory API error:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ [CONSUMPTION] Error loading inventory from blockchain:', error);
+      // Fall back to localStorage if blockchain query fails
+      if (typeof getAllInventoryItems !== 'undefined') {
+        inventory = getAllInventoryItems(walletAddress);
+        console.log('⚠️ [CONSUMPTION] Using localStorage inventory as fallback');
+      }
+    }
+    
     const hasItems = Object.keys(inventory).some(key => inventory[key] > 0);
     
     // If no items in inventory, skip modal
@@ -243,26 +292,64 @@ async function confirmItemConsumption() {
   let walletAddress = null;
   if (typeof getWalletAddress === 'function') {
     walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+  
+  // Fetch inventory from blockchain for validation
+  let blockchainInventory = {};
+  if (walletAddress) {
+    try {
+      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.inventory) {
+          blockchainInventory = data.inventory;
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ [CONSUMPTION] Error fetching inventory for validation:', error);
+    }
   }
   
   // Validate and consume items
   const itemsToConsume = {};
   const errors = [];
   
+  console.log('🔍 [CONSUMPTION] Validating items from gameItemSelection:', gameItemSelection);
+  console.log('🔍 [CONSUMPTION] Current blockchain inventory:', blockchainInventory);
+  
   for (const [itemId, level] of Object.entries(gameItemSelection)) {
+    // Only validate items that are actually selected (not null, not false)
     if (level !== null && level !== false) {
       const actualLevel = level === true ? 1 : level;
+      const itemKey = `${itemId}_${actualLevel}`;
       
-      // Check if item exists in inventory
-      if (typeof getItemCount === 'function') {
-        const count = getItemCount(itemId, actualLevel, walletAddress);
-        if (count <= 0) {
-          errors.push(`${getItemName(itemId)} Level ${actualLevel} not in inventory`);
-          continue;
-        }
+      console.log(`🔍 [CONSUMPTION] Validating ${itemId} level ${actualLevel} (key: ${itemKey})`);
+      
+      // Check if item exists in blockchain inventory
+      let count = blockchainInventory[itemKey] || 0;
+      
+      // Fallback to localStorage if blockchain check failed
+      if (count === 0 && typeof getItemCount === 'function') {
+        count = getItemCount(itemId, actualLevel, walletAddress);
+        console.log(`🔍 [CONSUMPTION] Fallback to localStorage: ${itemId} level ${actualLevel} = ${count}`);
+      }
+      
+      console.log(`🔍 [CONSUMPTION] ${itemId} level ${actualLevel}: Found ${count} in inventory`);
+      
+      if (count <= 0) {
+        const errorMsg = `${getItemName(itemId)} Level ${actualLevel} not in inventory`;
+        console.error(`❌ [CONSUMPTION] ${errorMsg}`);
+        errors.push(errorMsg);
+        continue;
       }
       
       itemsToConsume[itemId] = actualLevel;
+      console.log(`✅ [CONSUMPTION] ${itemId} level ${actualLevel} validated and added to consume list`);
+    } else {
+      console.log(`⏭️ [CONSUMPTION] Skipping ${itemId} (not selected: ${level})`);
     }
   }
   

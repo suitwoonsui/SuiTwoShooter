@@ -103,6 +103,13 @@ export class AdminWalletService {
   }
 
   /**
+   * Get admin wallet keypair (for signing transactions)
+   */
+  getKeypair(): Ed25519Keypair {
+    return this.keypair;
+  }
+
+  /**
    * Get testnet client (for contract operations)
    */
   getTestnetClient(): SuiClient {

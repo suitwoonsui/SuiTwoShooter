@@ -119,6 +119,9 @@ function restart() {
   game.particles = [];
   game.missilesPerShot = 1;
   
+  // Collect all start items that need to be consumed
+  const itemsToConsume = [];
+  
   // Initialize orb level with purchased orb level start
   game.startingOrbLevel = 1; // Default starting level
   if (game.selectedItems && game.selectedItems.orbLevel) {
@@ -128,12 +131,12 @@ function restart() {
     game.projectileLevel = game.startingOrbLevel;
     console.log(`🔮 [ORB LEVEL] Starting at Orb Level ${game.startingOrbLevel} (purchased Level ${orbLevelPurchase})`);
     
-    // Consume start item from inventory (applied immediately at game start)
-    if (typeof removeItemFromInventory === 'function') {
-      const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-      removeItemFromInventory('orbLevel', orbLevelPurchase, 1, walletAddress);
-      console.log(`✅ [CONSUMPTION] Consumed orbLevel level ${orbLevelPurchase} at game start`);
-    }
+    // Add to batch consumption list
+    itemsToConsume.push({
+      itemId: 'orbLevel',
+      level: orbLevelPurchase,
+      quantity: 1,
+    });
   } else {
     game.projectileLevel = 1; // Default starting level
   }
@@ -157,12 +160,12 @@ function restart() {
     game.purchasedLives = extraLivesLevel;
     console.log(`❤️ [EXTRA LIVES] Starting with ${extraLivesLevel} extra lives (Level ${extraLivesLevel})`);
     
-    // Consume start item from inventory (applied immediately at game start)
-    if (typeof removeItemFromInventory === 'function') {
-      const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-      removeItemFromInventory('extraLives', extraLivesLevel, 1, walletAddress);
-      console.log(`✅ [CONSUMPTION] Consumed extraLives level ${extraLivesLevel} at game start`);
-    }
+    // Add to batch consumption list
+    itemsToConsume.push({
+      itemId: 'extraLives',
+      level: extraLivesLevel,
+      quantity: 1,
+    });
   }
   
   // Total lives = base + purchased
@@ -197,15 +200,46 @@ function restart() {
     game.forceField.active = true;
     console.log(`🛡️ [FORCE FIELD] Starting with Level ${forceFieldLevel} force field`);
     
-    // Consume start item from inventory (applied immediately at game start)
-    if (typeof removeItemFromInventory === 'function') {
-      const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-      removeItemFromInventory('forceField', forceFieldLevel, 1, walletAddress);
-      console.log(`✅ [CONSUMPTION] Consumed forceField level ${forceFieldLevel} at game start`);
-    }
+    // Add to batch consumption list
+    itemsToConsume.push({
+      itemId: 'forceField',
+      level: forceFieldLevel,
+      quantity: 1,
+    });
   } else {
     game.forceField.level = 0;
     game.forceField.active = false;
+  }
+  
+  // Batch consume all start items in a single transaction
+  if (itemsToConsume.length > 0) {
+    console.log(`🍽️ [CONSUMPTION] Batch consuming ${itemsToConsume.length} start items in single transaction:`, itemsToConsume);
+    
+    // Use batch consumption function if available
+    if (typeof consumeItemsFromBlockchain === 'function') {
+      consumeItemsFromBlockchain(itemsToConsume).catch(error => {
+        console.error('❌ [CONSUMPTION] Failed to batch consume start items from blockchain:', error);
+        // Continue game even if blockchain consumption fails
+      });
+      console.log(`✅ [CONSUMPTION] Batch consumed ${itemsToConsume.length} start items (blockchain)`);
+    } else if (typeof consumeItemFromBlockchain === 'function') {
+      // Fallback: consume items one by one if batch function not available
+      console.warn('⚠️ [CONSUMPTION] Batch function not available, consuming items individually');
+      for (const item of itemsToConsume) {
+        consumeItemFromBlockchain(item.itemId, item.level, item.quantity).catch(error => {
+          console.error(`❌ [CONSUMPTION] Failed to consume ${item.itemId} from blockchain:`, error);
+        });
+      }
+    } else {
+      // Fallback to localStorage if blockchain functions not available
+      if (typeof removeItemFromInventory === 'function') {
+        const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
+        for (const item of itemsToConsume) {
+          removeItemFromInventory(item.itemId, item.level, item.quantity, walletAddress);
+          console.log(`✅ [CONSUMPTION] Consumed ${item.itemId} level ${item.level} at game start (localStorage fallback)`);
+        }
+      }
+    }
   }
   resetCoinStreak();
   game.forceField.maxStreak = 0;
@@ -309,6 +343,17 @@ function returnToMainMenu() {
   }
   if (typeof stopGameplayMusic === 'function') {
     stopGameplayMusic();
+  }
+  
+  // Clear selected items from previous game
+  // This ensures items from the previous game don't carry over to the next game
+  if (game.selectedItems) {
+    console.log('🧹 [CONSUMPTION] Clearing selected items from previous game:', game.selectedItems);
+    game.selectedItems = null;
+  }
+  if (game.checkedOutItems) {
+    console.log('🧹 [CONSUMPTION] Clearing checked out items from previous game:', game.checkedOutItems);
+    game.checkedOutItems = null;
   }
   
   console.log('🟢 [VISIBILITY] ✅ Game closed and memory freed');

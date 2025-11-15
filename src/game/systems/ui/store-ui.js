@@ -42,8 +42,11 @@ async function showStore() {
     // Modal already exists, just show it and refresh inventory
     storeModal.classList.add('store-modal-visible');
     storeModal.classList.remove('store-modal-hidden');
-    loadInventoryDisplay();
-    updateStoreUI();
+    // Wait for cards to exist, then load inventory
+    setTimeout(async () => {
+      await loadInventoryDisplay();
+      updateStoreUI();
+    }, 100);
     return;
   }
   
@@ -116,8 +119,8 @@ async function showStore() {
   // Load store items
   await loadStoreItems();
   
-  // Load and display inventory
-  loadInventoryDisplay();
+  // Load and display inventory (after cards are created)
+  await loadInventoryDisplay();
   
   // Update UI
   updateStoreUI();
@@ -147,14 +150,35 @@ function hideStore() {
 
 /**
  * Convert USD price to token amount
- * TODO: Phase 5 - Integrate with CoinGecko API for real-time rates
- * For now, using placeholder conversion rates
+ * Uses prices from backend API
  */
 function convertUsdToToken(usdPrice, tokenType) {
-  // Placeholder conversion rates (will be replaced with real API in Phase 5)
+  // Use prices from backend API if available
+  if (storeState.tokenPrices) {
+    const prices = storeState.tokenPrices;
+    let rate;
+    
+    if (tokenType === 'sui') {
+      rate = prices.sui || 2.0; // Fallback to $2.0
+    } else if (tokenType === 'mews') {
+      rate = prices.mews || 0.000002; // Fallback
+    } else {
+      rate = prices.usdc || 1.0; // USDC is always $1.0
+    }
+    
+    const tokenAmount = usdPrice / rate;
+    
+    return {
+      amount: tokenAmount,
+      formatted: formatTokenAmount(tokenAmount, tokenType)
+    };
+  }
+  
+  // Fallback to placeholder rates if backend prices not loaded
   const conversionRates = {
-    mews: 0.000002,  // $0.000002 per MEWS (placeholder)
-    sui: 2.17        // $2.17 per SUI (placeholder)
+    mews: 0.000002,
+    sui: 2.17,
+    usdc: 1.0
   };
   
   const rate = conversionRates[tokenType] || conversionRates.mews;
@@ -199,30 +223,15 @@ function formatUsdPrice(usdPrice) {
 }
 
 /**
- * Load store items from catalog
+ * Load store items from backend API
  */
 async function loadStoreItems() {
-  console.log('📦 [STORE] Loading store items...');
+  console.log('📦 [STORE] Loading store items from backend...');
   
   const container = document.getElementById('storeItemsContainer');
   const loading = document.getElementById('storeLoading');
   
   if (!container || !loading) return;
-  
-  // Check if catalog is available
-  if (typeof getAllItems === 'undefined' || typeof ITEM_CATALOG === 'undefined') {
-    console.error('❌ [STORE] Item catalog not loaded!');
-    loading.style.display = 'none';
-    container.innerHTML = `
-      <div class="store-placeholder">
-        <p>⚠️ Item catalog not found</p>
-        <p style="font-size: 0.9em; color: #888; margin-top: 10px;">
-          Please ensure item-catalog.js is loaded
-        </p>
-      </div>
-    `;
-    return;
-  }
   
   // Show loading state
   storeState.isLoading = true;
@@ -230,25 +239,40 @@ async function loadStoreItems() {
   container.innerHTML = '';
   container.appendChild(loading);
   
-  // Simulate loading delay (remove in production)
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
   try {
-    // Get all items from catalog
-    const items = getAllItems();
+    // Get API base URL
+    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    
+    // Fetch items from backend
+    const response = await fetch(`${API_BASE_URL}/store/items`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to load store items: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success || !data.items) {
+      throw new Error(data.error || 'Invalid response from server');
+    }
+    
+    // Store prices for conversion
+    if (data.prices) {
+      storeState.tokenPrices = data.prices;
+    }
     
     // Clear loading
     loading.style.display = 'none';
     container.innerHTML = '';
     
     // Render each item
-    items.forEach(item => {
+    data.items.forEach(item => {
       const itemCard = createItemCard(item);
       container.appendChild(itemCard);
     });
     
     storeState.isLoading = false;
-    console.log(`✅ [STORE] Loaded ${items.length} items`);
+    console.log(`✅ [STORE] Loaded ${data.items.length} items from backend`);
   } catch (error) {
     console.error('❌ [STORE] Error loading items:', error);
     loading.style.display = 'none';
@@ -258,6 +282,9 @@ async function loadStoreItems() {
         <p style="font-size: 0.9em; color: #888; margin-top: 10px;">
           ${error.message || 'Unknown error'}
         </p>
+        <button class="menu-btn" onclick="loadStoreItems()" style="margin-top: 10px;">
+          <span class="btn-icon">🔄</span> Retry
+        </button>
       </div>
     `;
     storeState.isLoading = false;
@@ -283,8 +310,19 @@ function createItemCard(item) {
     const hasQuantity = quantity > 0;
     
     const usdPrice = formatUsdPrice(levelData.usdPrice);
-    const tokenConversion = convertUsdToToken(levelData.usdPrice, storeState.paymentToken);
-    const tokenSymbol = storeState.paymentToken === 'sui' ? 'SUI' : '$MEWS';
+    
+    // Use prices from backend API if available, otherwise calculate
+    let tokenPriceDisplay = '';
+    const tokenSymbol = storeState.paymentToken === 'sui' ? 'SUI' : (storeState.paymentToken === 'usdc' ? 'USDC' : '$MEWS');
+    
+    if (levelData.prices && levelData.prices[storeState.paymentToken]) {
+      // Use backend-provided price
+      tokenPriceDisplay = levelData.prices[storeState.paymentToken].display || '';
+    } else {
+      // Fallback to calculated price
+      const tokenConversion = convertUsdToToken(levelData.usdPrice, storeState.paymentToken);
+      tokenPriceDisplay = tokenConversion.formatted;
+    }
     
     const levelClass = hasMultipleLevels ? 'item-level-btn' : 'item-single-btn';
     const selectedClass = hasQuantity ? 'selected' : '';
@@ -302,7 +340,7 @@ function createItemCard(item) {
             </div>
             <div class="level-price">
               <div class="price-usd">${usdPrice}</div>
-              <div class="price-token">${tokenConversion.formatted} ${tokenSymbol}</div>
+              <div class="price-token">${tokenPriceDisplay} ${tokenSymbol}</div>
             </div>
           </button>
           ${hasQuantity ? `
@@ -698,24 +736,11 @@ function updateItemCardStates() {
 }
 
 /**
- * Proceed to purchase confirmation
- * Phase 3: Mock purchase flow using localStorage
- * Phase 5: Will be replaced with backend API + blockchain
+ * Proceed to purchase - Backend API + Blockchain Integration
  */
 async function proceedToPurchase() {
   console.log('💳 [STORE] Proceeding to purchase...');
   console.log('Selected items:', storeState.selectedItems);
-  
-  // Check if inventory manager is available
-  if (typeof addItemToInventory === 'undefined') {
-    console.error('❌ [STORE] Inventory manager not loaded!');
-    if (typeof showToast === 'function') {
-      showToast('Error: Inventory system not available', 'error');
-    } else {
-      alert('Error: Inventory system not available');
-    }
-    return;
-  }
   
   // Validate selections
   const selectedCount = Object.keys(storeState.selectedItems).filter(
@@ -731,10 +756,22 @@ async function proceedToPurchase() {
     return;
   }
   
-  // Get wallet address (if available)
+  // Get wallet address - required for purchase
   let walletAddress = null;
   if (typeof getWalletAddress === 'function') {
     walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+  
+  if (!walletAddress) {
+    const errorMsg = 'Wallet not connected. Please connect your wallet to make a purchase.';
+    if (typeof showToast === 'function') {
+      showToast(errorMsg, 'error');
+    } else {
+      alert(errorMsg);
+    }
+    return;
   }
   
   // Show loading state
@@ -742,75 +779,160 @@ async function proceedToPurchase() {
   const proceedBtn = document.getElementById('proceedToPurchaseBtn');
   if (proceedBtn) {
     proceedBtn.disabled = true;
-    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Processing...';
+    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Building transaction...';
   }
   
   try {
-    // Process each selected item
-    const purchasedItems = [];
+    // Get API base URL
+    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    
+    // Prepare items array for backend
+    const items = [];
     let totalUsd = 0;
     
     for (const [key, quantity] of Object.entries(storeState.selectedItems)) {
       if (quantity > 0) {
-        // Parse key (format: "itemId_level")
         const [itemId, levelStr] = key.split('_');
         const level = parseInt(levelStr) || 1;
         
-        // Get item info for display
-        const item = getItemById(itemId);
+        items.push({
+          itemId: itemId,
+          level: level,
+          quantity: quantity
+        });
+        
+        // Calculate total for display
+        // Try to get price from backend data, otherwise use fallback
+        const item = getItemById && typeof getItemById === 'function' ? getItemById(itemId) : null;
         if (item) {
-          const levelData = getItemLevelData(itemId, level);
+          const levelData = getItemLevelData && typeof getItemLevelData === 'function' 
+            ? getItemLevelData(itemId, level) 
+            : null;
           if (levelData) {
-            // Add to inventory
-            addItemToInventory(itemId, level, quantity, walletAddress);
-            
-            const itemName = item.levels.length > 1 
-              ? `${item.name} Level ${level}` 
-              : item.name;
-            const itemTotal = levelData.usdPrice * quantity;
-            
-            purchasedItems.push({
-              name: itemName,
-              quantity: quantity,
-              totalPrice: itemTotal
-            });
-            
-            totalUsd += itemTotal;
+            totalUsd += levelData.usdPrice * quantity;
           }
         }
       }
     }
     
-    // Clear selection after successful purchase
+    // Convert payment token to backend format (uppercase)
+    const paymentToken = storeState.paymentToken.toUpperCase();
+    
+    // Step 1: Call backend to build transaction
+    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Building transaction...';
+    
+    const purchaseResponse = await fetch(`${API_BASE_URL}/store/purchase`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        playerAddress: walletAddress,
+        items: items,
+        paymentToken: paymentToken
+      })
+    });
+    
+    if (!purchaseResponse.ok) {
+      const errorData = await purchaseResponse.json().catch(() => ({}));
+      throw new Error(errorData.error || `Purchase failed: ${purchaseResponse.status} ${purchaseResponse.statusText}`);
+    }
+    
+    const purchaseData = await purchaseResponse.json();
+    
+    if (!purchaseData.success || !purchaseData.transaction) {
+      throw new Error(purchaseData.error || 'Failed to build purchase transaction');
+    }
+    
+    console.log('✅ [STORE] Transaction built:', {
+      totalUSD: purchaseData.totalUSD,
+      totalToken: purchaseData.totalToken,
+      paymentToken: purchaseData.paymentToken,
+      gasEstimate: purchaseData.gasEstimate
+    });
+    
+    // Step 2: Sign and execute transaction
+    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Signing transaction...';
+    
+    // Check if wallet API is available
+    if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) {
+      throw new Error('Wallet not connected. Please connect your wallet.');
+    }
+    
+    // Pass the base64 string directly to wallet API
+    // dapp-kit accepts base64 strings directly (as seen in Insomnia's implementation)
+    // The wallet API will handle conversion if needed
+    const signResult = await window.walletAPIInstance.signAndExecuteTransaction(purchaseData.transaction);
+    
+    if (!signResult.success) {
+      throw new Error(signResult.error || 'Transaction signing failed');
+    }
+    
+    console.log('✅ [STORE] Transaction signed and submitted:', signResult.digest);
+    
+    // Step 3: Poll for confirmation
+    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Waiting for confirmation...';
+    
+    const transactionDigest = signResult.digest;
+    let confirmed = false;
+    let attempts = 0;
+    const maxAttempts = 30; // 30 seconds max
+    
+    while (!confirmed && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      attempts++;
+      
+      try {
+        const statusResponse = await fetch(`${API_BASE_URL}/store/transaction/${transactionDigest}`);
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          if (statusData.confirmed) {
+            confirmed = true;
+            break;
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ [STORE] Error checking transaction status:', error);
+      }
+    }
+    
+    if (!confirmed) {
+      console.warn('⚠️ [STORE] Transaction submitted but confirmation timeout. It may still be processing.');
+    }
+    
+    // Step 4: Clear selection and refresh inventory
     storeState.selectedItems = {};
     
-    // Reload items to update inventory display
+    // Reload items and inventory
     await loadStoreItems();
-    loadInventoryDisplay();
+    await loadInventoryDisplay();
     updateStoreUI();
     
     // Show success message
-    const itemsList = purchasedItems.map(item => 
-      `  • ${item.name}${item.quantity > 1 ? ` × ${item.quantity}` : ''}`
-    ).join('\n');
-    
-    const successMessage = `Purchase Successful!\n\nItems added to inventory:\n${itemsList}\n\nTotal: ${formatUsdPrice(totalUsd)}`;
+    const successMsg = confirmed 
+      ? `Purchase confirmed! Transaction: ${transactionDigest.slice(0, 8)}...`
+      : `Purchase submitted! Transaction: ${transactionDigest.slice(0, 8)}... (confirming...)`;
     
     if (typeof showToast === 'function') {
-      showToast('Purchase completed! Items added to inventory.', 'success');
+      showToast(successMsg, 'success');
     } else {
-      alert(successMessage);
+      alert(`Purchase Successful!\n\n${successMsg}\n\nTotal: ${purchaseData.totalUSD} ${purchaseData.paymentToken}`);
     }
     
-    console.log('✅ [STORE] Purchase completed:', purchasedItems);
+    console.log('✅ [STORE] Purchase completed:', {
+      digest: transactionDigest,
+      confirmed: confirmed,
+      items: items
+    });
     
   } catch (error) {
     console.error('❌ [STORE] Purchase error:', error);
     
+    const errorMsg = error.message || 'Unknown error occurred';
     if (typeof showToast === 'function') {
-      showToast('Purchase failed: ' + (error.message || 'Unknown error'), 'error');
+      showToast(`Purchase failed: ${errorMsg}`, 'error');
     } else {
-      alert('Purchase failed: ' + (error.message || 'Unknown error'));
+      alert(`Purchase failed: ${errorMsg}`);
     }
   } finally {
     // Reset loading state
@@ -823,45 +945,88 @@ async function proceedToPurchase() {
 }
 
 /**
- * Load and display inventory in store modal
+ * Load and display inventory from backend API
  */
-function loadInventoryDisplay() {
-  // Check if inventory manager is available
-  if (typeof getAllInventoryItems === 'undefined' || typeof getItemCount === 'undefined') {
-    return;
-  }
-  
+async function loadInventoryDisplay() {
   // Get wallet address (if available)
   let walletAddress = null;
   if (typeof getWalletAddress === 'function') {
     walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
   }
   
-  // Get all items in inventory
-  const inventory = getAllInventoryItems(walletAddress);
+  if (!walletAddress) {
+    // No wallet connected, inventory will be empty
+    updateItemCardsInventory({});
+    return;
+  }
   
-  // Update item cards to show inventory counts (badges)
-  updateItemCardsInventory(inventory);
+  try {
+    // Get API base URL
+    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    
+    // Fetch inventory from backend
+    const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
+    
+    if (!response.ok) {
+      console.warn('⚠️ [STORE] Failed to load inventory:', response.status);
+      updateItemCardsInventory({});
+      return;
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      console.warn('⚠️ [STORE] Inventory response error:', data.error);
+      updateItemCardsInventory({});
+      return;
+    }
+    
+    // Update item cards to show inventory counts (badges)
+    // Backend returns format: { "extraLives_1": 2, "forceField_2": 1, ... }
+    const inventory = data.inventory || {};
+    updateItemCardsInventory(inventory);
+    
+    console.log('✅ [STORE] Inventory loaded:', inventory);
+  } catch (error) {
+    console.error('❌ [STORE] Error loading inventory:', error);
+    updateItemCardsInventory({});
+  }
 }
 
 /**
  * Update item cards to show inventory counts
  */
 function updateItemCardsInventory(inventory) {
+  console.log('🔍 [INVENTORY] Updating item cards with inventory:', inventory);
+  
   const cards = document.querySelectorAll('.store-item-card');
+  console.log(`🔍 [INVENTORY] Found ${cards.length} item cards`);
+  
+  if (cards.length === 0) {
+    console.warn('⚠️ [INVENTORY] No item cards found. Cards may not be created yet.');
+    return;
+  }
   
   cards.forEach(card => {
     const itemId = card.getAttribute('data-item-id');
     const item = getItemById(itemId);
-    if (!item) return;
+    if (!item) {
+      console.warn(`⚠️ [INVENTORY] Item not found for card: ${itemId}`);
+      return;
+    }
     
     // Get all level containers
     const levelContainers = card.querySelectorAll('.item-level-container');
+    console.log(`🔍 [INVENTORY] Item ${itemId} has ${levelContainers.length} level containers`);
     
     levelContainers.forEach(container => {
       const level = parseInt(container.getAttribute('data-level')) || 1;
       const key = `${itemId}_${level}`;
       const quantity = inventory[key] || 0;
+      
+      console.log(`🔍 [INVENTORY] Checking ${key}: quantity=${quantity}`);
       
       // Find or create inventory badge
       let inventoryBadge = container.querySelector('.inventory-badge');
@@ -875,15 +1040,21 @@ function updateItemCardsInventory(inventory) {
             // Position badge relative to the wrapper
             levelButtonWrapper.style.position = 'relative';
             levelButtonWrapper.appendChild(inventoryBadge);
+            console.log(`✅ [INVENTORY] Created badge for ${key}`);
+          } else {
+            console.warn(`⚠️ [INVENTORY] No level-button-wrapper found for ${key}`);
           }
         }
         inventoryBadge.textContent = `Owned: ${quantity}`;
         inventoryBadge.style.display = 'block';
+        console.log(`✅ [INVENTORY] Updated badge for ${key}: Owned: ${quantity}`);
       } else if (inventoryBadge) {
         inventoryBadge.style.display = 'none';
       }
     });
   });
+  
+  console.log('✅ [INVENTORY] Finished updating item cards');
 }
 
 // Make functions globally accessible for onclick handlers
@@ -902,5 +1073,7 @@ if (typeof window !== 'undefined') {
   window.formatTokenAmount = formatTokenAmount;
   window.formatUsdPrice = formatUsdPrice;
   window.getItemQuantity = getItemQuantity;
+  window.loadStoreItems = loadStoreItems;
+  window.loadInventoryDisplay = loadInventoryDisplay;
 }
 

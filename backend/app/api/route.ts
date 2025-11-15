@@ -13,7 +13,14 @@ export async function GET(request: NextRequest) {
       health: '/api/health',
       tokens: '/api/tokens/balance/[address]',
       scores: '/api/scores/verify',
-      leaderboard: '/api/leaderboard'
+      leaderboard: '/api/leaderboard',
+      store: {
+        items: '/api/store/items',
+        inventory: '/api/store/inventory/[address]',
+        purchase: '/api/store/purchase',
+        transaction: '/api/store/transaction/[digest]',
+        consume: '/api/store/consume'
+      }
     }
   });
 }

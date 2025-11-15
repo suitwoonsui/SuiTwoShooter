@@ -4,6 +4,92 @@
 // Manages consumable items that can be activated during gameplay
 // Supports both keyboard shortcuts (desktop) and touch buttons (mobile)
 
+/**
+ * Consume item from blockchain inventory via backend API
+ * This is called when a player actually uses an item during gameplay
+ * Admin wallet signs the transaction and pays gas fees
+ */
+/**
+ * Batch consume multiple items from blockchain inventory in a single transaction
+ * @param {Array<{itemId: string, level: number, quantity: number}>} items - Array of items to consume
+ * @returns {Promise<{success: boolean, digest?: string, error?: string}>}
+ */
+async function consumeItemsFromBlockchain(items) {
+  console.log(`🍽️ [CONSUMPTION] Starting batch consumption for ${items.length} items:`, items);
+  
+  // Get wallet address
+  let walletAddress = null;
+  if (typeof getWalletAddress === 'function') {
+    walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+
+  if (!walletAddress) {
+    console.warn('⚠️ [CONSUMPTION] No wallet connected, cannot consume items from blockchain');
+    return { success: false, error: 'No wallet connected' };
+  }
+
+  console.log(`🍽️ [CONSUMPTION] Wallet address: ${walletAddress}`);
+
+  try {
+    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const requestBody = {
+      playerAddress: walletAddress,
+      items: items,
+    };
+    
+    console.log(`🍽️ [CONSUMPTION] Calling ${API_BASE_URL}/store/consume with:`, requestBody);
+    
+    const response = await fetch(`${API_BASE_URL}/store/consume`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log(`🍽️ [CONSUMPTION] Response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('❌ [CONSUMPTION] Failed to consume items:', errorData.error);
+      return { success: false, error: errorData.error || 'Failed to consume items' };
+    }
+
+    const data = await response.json();
+    
+    if (data.success) {
+      console.log(`✅ [CONSUMPTION] Consumed ${items.length} items from blockchain in single transaction`);
+      console.log(`   Transaction: ${data.digest}`);
+      return { success: true, digest: data.digest };
+    } else {
+      console.error('❌ [CONSUMPTION] Consume API returned error:', data.error);
+      return { success: false, error: data.error || 'Unknown error' };
+    }
+  } catch (error) {
+    console.error('❌ [CONSUMPTION] Error calling consume API:', error);
+    // Don't block gameplay if consumption fails - items were already used
+    return { success: false, error: error.message || 'Network error' };
+  }
+}
+
+/**
+ * Consume a single item from blockchain inventory
+ * @param {string} itemId - Item ID
+ * @param {number} level - Item level
+ * @param {number} quantity - Quantity to consume (default: 1)
+ * @returns {Promise<{success: boolean, digest?: string, error?: string}>}
+ */
+async function consumeItemFromBlockchain(itemId, level, quantity = 1) {
+  // Use batch function for single item
+  return consumeItemsFromBlockchain([{
+    itemId: itemId,
+    level: level,
+    quantity: quantity,
+  }]);
+}
+
 const ConsumableSystem = {
   // Consumable item definitions
   items: {
@@ -23,12 +109,13 @@ const ConsumableSystem = {
           this.consumeItem('coinTractorBeam', game.coinTractorBeam.level);
         }
       },
-      consumeItem: function(itemId, level) {
-        if (typeof removeItemFromInventory === 'function') {
-          const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-          removeItemFromInventory(itemId, level, 1, walletAddress);
-          console.log(`✅ [CONSUMPTION] Consumed ${itemId} level ${level} when activated`);
-        }
+      consumeItem: async function(itemId, level) {
+        console.log(`🍽️ [CONSUMABLES] consumeItem called for ${itemId} level ${level}`);
+        // Consume from blockchain (async, doesn't block gameplay)
+        consumeItemFromBlockchain(itemId, level, 1).catch(error => {
+          console.error('❌ [CONSUMPTION] Failed to consume item from blockchain:', error);
+          // Item was already used in game, so we continue even if blockchain consumption fails
+        });
       }
     },
     slowTime: {
@@ -55,12 +142,13 @@ const ConsumableSystem = {
           this.consumeItem('slowTime', game.slowTimePower.level);
         }
       },
-      consumeItem: function(itemId, level) {
-        if (typeof removeItemFromInventory === 'function') {
-          const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-          removeItemFromInventory(itemId, level, 1, walletAddress);
-          console.log(`✅ [CONSUMPTION] Consumed ${itemId} level ${level} when activated`);
-        }
+      consumeItem: async function(itemId, level) {
+        console.log(`🍽️ [CONSUMABLES] consumeItem called for ${itemId} level ${level}`);
+        // Consume from blockchain (async, doesn't block gameplay)
+        consumeItemFromBlockchain(itemId, level, 1).catch(error => {
+          console.error('❌ [CONSUMPTION] Failed to consume item from blockchain:', error);
+          // Item was already used in game, so we continue even if blockchain consumption fails
+        });
       }
     },
     destroyAll: {
@@ -82,12 +170,13 @@ const ConsumableSystem = {
           this.consumeItem('destroyAll', 1);
         }
       },
-      consumeItem: function(itemId, level) {
-        if (typeof removeItemFromInventory === 'function') {
-          const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-          removeItemFromInventory(itemId, level, 1, walletAddress);
-          console.log(`✅ [CONSUMPTION] Consumed ${itemId} level ${level} when activated`);
-        }
+      consumeItem: async function(itemId, level) {
+        console.log(`🍽️ [CONSUMABLES] consumeItem called for ${itemId} level ${level}`);
+        // Consume from blockchain (async, doesn't block gameplay)
+        consumeItemFromBlockchain(itemId, level, 1).catch(error => {
+          console.error('❌ [CONSUMPTION] Failed to consume item from blockchain:', error);
+          // Item was already used in game, so we continue even if blockchain consumption fails
+        });
       }
     },
     bossKillShot: {
@@ -110,12 +199,13 @@ const ConsumableSystem = {
           this.consumeItem('bossKillShot', 1);
         }
       },
-      consumeItem: function(itemId, level) {
-        if (typeof removeItemFromInventory === 'function') {
-          const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-          removeItemFromInventory(itemId, level, 1, walletAddress);
-          console.log(`✅ [CONSUMPTION] Consumed ${itemId} level ${level} when activated`);
-        }
+      consumeItem: async function(itemId, level) {
+        console.log(`🍽️ [CONSUMABLES] consumeItem called for ${itemId} level ${level}`);
+        // Consume from blockchain (async, doesn't block gameplay)
+        consumeItemFromBlockchain(itemId, level, 1).catch(error => {
+          console.error('❌ [CONSUMPTION] Failed to consume item from blockchain:', error);
+          // Item was already used in game, so we continue even if blockchain consumption fails
+        });
       }
     }
   },
@@ -367,7 +457,9 @@ const ConsumableSystem = {
 };
 
 // Make globally accessible
-if (typeof window !== 'undefined') {
-  window.ConsumableSystem = ConsumableSystem;
-}
+  if (typeof window !== 'undefined') {
+    window.ConsumableSystem = ConsumableSystem;
+    window.consumeItemFromBlockchain = consumeItemFromBlockchain;
+    window.consumeItemsFromBlockchain = consumeItemsFromBlockchain;
+  }
 

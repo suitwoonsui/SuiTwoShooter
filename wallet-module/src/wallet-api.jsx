@@ -7,6 +7,7 @@
 import { SuiClientProvider, WalletProvider as SuiWalletProvider, useWallets, useConnectWallet, useCurrentWallet, useDisconnectWallet, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { getFullnodeUrl } from '@mysten/sui/client';
 import { SuiClient } from '@mysten/sui/client';
+import { Transaction } from '@mysten/sui/transactions';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -14,6 +15,39 @@ import * as ReactDOM from 'react-dom';
 
 // QueryClient instance
 const queryClient = new QueryClient();
+
+// MEWS Token Configuration - Network-aware
+const MEWS_TOKEN_TYPE_IDS = {
+  mainnet: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS',
+  testnet: '0xcc01924c571e20ad9e7151e83cf43238c5b74c7836d54b39390ad071d74f477a::mews::MEWS',
+  devnet: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS', // Fallback
+  localnet: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS' // Fallback
+};
+
+// MEWS Decimal Precision - Network-aware
+// Mainnet MEWS uses 6 decimals, testnet uses 9 decimals
+const MEWS_DECIMALS = {
+  mainnet: 6,
+  testnet: 9,
+  devnet: 9, // Fallback
+  localnet: 9 // Fallback
+};
+
+function getMEWSTokenTypeId(network = 'mainnet') {
+  return MEWS_TOKEN_TYPE_IDS[network] || MEWS_TOKEN_TYPE_IDS.mainnet;
+}
+
+function getMEWSDecimals(network = 'mainnet') {
+  return MEWS_DECIMALS[network] || MEWS_DECIMALS.mainnet;
+}
+
+// Minimum balance requirement (in human-readable MEWS)
+const MIN_BALANCE_MEWS = 500000; // 500,000 MEWS
+
+function getMinBalanceRequired(network = 'mainnet') {
+  const decimals = getMEWSDecimals(network);
+  return BigInt(MIN_BALANCE_MEWS * Math.pow(10, decimals));
+}
 
 // Wallet API state
 let walletAPIState = {
@@ -24,11 +58,9 @@ let walletAPIState = {
   listeners: [],
   mewsBalance: null,
   hasMinimumBalance: false,
-  minBalanceRequired: BigInt(500000000000000) // 500,000 MEWS with 9 decimals (500,000 * 10^9)
+  minBalanceRequired: null, // Will be set based on network decimals
+  network: 'testnet' // Default to testnet, will be set during initialization
 };
-
-// MEWS Token Configuration
-const MEWS_TOKEN_TYPE_ID = '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS'; // Default, can be overridden
 
 // Wallet API instance
 let walletAPI = null;
@@ -240,7 +272,10 @@ function WalletProviderWrapper({ children, network, onUpdate }) {
 async function initializeWalletAPI(options = {}) {
   if (walletAPI) return walletAPI;
   
-  const { network = 'mainnet', containerId = 'wallet-react-root' } = options;
+  const { network = 'testnet', containerId = 'wallet-react-root' } = options;
+  
+  // Store network in state
+  walletAPIState.network = network;
   
   // Create container if it doesn't exist
   let container = document.getElementById(containerId);
@@ -596,10 +631,16 @@ async function initializeWalletAPI(options = {}) {
         
         const client = new SuiClient({ url: getFullnodeUrl(network) });
         
+        // Get the correct token type ID and decimal precision for this network
+        const tokenTypeId = getMEWSTokenTypeId(network);
+        const decimals = getMEWSDecimals(network);
+        const divisor = Math.pow(10, decimals);
+        const minBalanceRequired = getMinBalanceRequired(network);
+        
         // Get coins for MEWS token
         const coins = await client.getCoins({
           owner: address,
-          coinType: MEWS_TOKEN_TYPE_ID,
+          coinType: tokenTypeId,
         });
         
         // Calculate total balance
@@ -608,21 +649,52 @@ async function initializeWalletAPI(options = {}) {
           totalBalance += BigInt(coin.balance);
         });
         
-        const hasMinimumBalance = totalBalance >= walletAPIState.minBalanceRequired;
+        const hasMinimumBalance = totalBalance >= minBalanceRequired;
         
         // Update state
         walletAPIState.mewsBalance = totalBalance.toString();
         walletAPIState.hasMinimumBalance = hasMinimumBalance;
+        walletAPIState.minBalanceRequired = minBalanceRequired;
         
-        // Format balance for display (divide by 10^9 for human-readable)
-        const formattedBalance = (Number(totalBalance) / 1_000_000_000).toLocaleString();
-        const formattedMinBalance = (Number(walletAPIState.minBalanceRequired) / 1_000_000_000).toLocaleString();
+        // Format balance for display (divide by 10^decimals for human-readable)
+        // Convert BigInt to number for calculation (safe for balances up to ~9 quadrillion)
+        const balanceInMEWS = Number(totalBalance) / divisor;
+        const minBalanceInMEWS = Number(minBalanceRequired) / divisor;
         
-        console.log('🔍 MEWS Balance Check:', {
+        // Format with proper thousands separators
+        // Always show full number with commas (e.g., 5,085,000 not 5,085)
+        const formattedBalance = balanceInMEWS.toLocaleString('en-US', { 
+          maximumFractionDigits: 2,
+          useGrouping: true  // Ensure thousands separators are shown
+        });
+        const formattedMinBalance = minBalanceInMEWS.toLocaleString('en-US', { 
+          maximumFractionDigits: 0,
+          useGrouping: true
+        });
+        
+        // Detailed logging for debugging
+        console.log('🔍 MEWS Balance Check (Detailed):', {
           address,
-          balance: formattedBalance,
-          minimum: formattedMinBalance,
-          hasMinimumBalance
+          network,
+          tokenTypeId: tokenTypeId,
+          decimals: decimals,
+          divisor: divisor,
+          coinCount: coins.data.length,
+          rawBalance: totalBalance.toString(),
+          rawBalanceFormatted: totalBalance.toLocaleString('en-US'),
+          balanceInMEWS: balanceInMEWS,
+          balanceInMEWSFormatted: balanceInMEWS.toLocaleString('en-US', { maximumFractionDigits: 6 }),
+          formattedBalance,
+          minimumRequired: minBalanceRequired.toString(),
+          minBalanceInMEWS,
+          formattedMinBalance,
+          hasMinimumBalance,
+          calculation: `${totalBalance.toString()} / ${divisor.toLocaleString('en-US')} = ${balanceInMEWS}`,
+          // Show individual coin balances if multiple
+          coinBalances: coins.data.length > 1 ? coins.data.map(c => ({
+            balance: c.balance,
+            balanceInMEWS: (Number(c.balance) / divisor).toLocaleString('en-US', { maximumFractionDigits: 6 })
+          })) : undefined
         });
         
         return {
@@ -654,7 +726,8 @@ async function initializeWalletAPI(options = {}) {
     },
 
     // Sign and execute transaction
-    async signAndExecuteTransaction(transactionBlock) {
+    // Accepts either a Transaction object or Uint8Array bytes (will deserialize)
+    async signAndExecuteTransaction(transactionInput) {
       if (!walletAPIState._signAndExecuteTransaction) {
         return {
           success: false,
@@ -663,9 +736,47 @@ async function initializeWalletAPI(options = {}) {
       }
 
       try {
-        // Sign and execute transaction in one call
+        let transactionToSign;
+        
+        // dapp-kit accepts: Transaction object, base64 string, or Uint8Array
+        // Based on Insomnia's implementation, it accepts string | Transaction
+        if (transactionInput && typeof transactionInput === 'object') {
+          // Check if it's already a Transaction object
+          if ('kind' in transactionInput || 'blockData' in transactionInput || transactionInput instanceof Transaction) {
+            // Already a Transaction object - pass directly
+            transactionToSign = transactionInput;
+            console.log('✅ [WALLET] Using provided Transaction object');
+          } else if (transactionInput instanceof Uint8Array) {
+            // Convert Uint8Array to base64 string (dapp-kit accepts base64 strings)
+            transactionToSign = btoa(String.fromCharCode(...transactionInput));
+            console.log('✅ [WALLET] Converted Uint8Array to base64 string');
+          } else {
+            // Try to convert array-like to Uint8Array then base64
+            try {
+              const bytes = new Uint8Array(transactionInput);
+              transactionToSign = btoa(String.fromCharCode(...bytes));
+              console.log('✅ [WALLET] Converted array-like input to base64 string');
+            } catch (conversionError) {
+              throw new Error(`Invalid transaction input. Expected Transaction object, base64 string, or bytes, got: ${typeof transactionInput}`);
+            }
+          }
+        } else if (typeof transactionInput === 'string') {
+          // Assume it's base64-encoded string - pass directly (dapp-kit accepts this)
+          transactionToSign = transactionInput;
+          console.log('✅ [WALLET] Using base64 string directly (dapp-kit accepts this format)');
+        } else {
+          throw new Error(`Invalid transaction input type: ${typeof transactionInput}`);
+        }
+
+        // Get the current network from wallet API state
+        const currentNetwork = walletAPIState.network || 'testnet';
+        const chainId = `sui:${currentNetwork}`;
+        
+        console.log(`🌐 [WALLET] Signing transaction on network: ${currentNetwork} (chain: ${chainId})`);
+        
         const result = await walletAPIState._signAndExecuteTransaction.mutateAsync({
-          transaction: transactionBlock,
+          transaction: transactionToSign,
+          chain: chainId, // Explicitly set the chain to match wallet network
           options: {
             showEffects: true,
             showEvents: true

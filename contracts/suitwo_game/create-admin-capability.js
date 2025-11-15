@@ -6,7 +6,12 @@ const { bech32 } = require('bech32');
 const { Transaction } = require('@mysten/sui/transactions');
 
 const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m';
-const packageId = '0x87f741fdb04e34701ec039d5c7f897cae52b5631f2f83e2f4b82b283f618af3d';
+
+// Get package ID from environment variable or use the one from your backend .env
+// Update this to match PREMIUM_STORE_CONTRACT_TESTNET from your backend .env file
+const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
+                  process.env.PREMIUM_STORE_CONTRACT || 
+                  '0xdd8edfb60b7973fd9827eeddb96389aa191f9a3ddd5b5e3d6e1b03cfb387878f'; // Fallback - UPDATE THIS
 
 function decodePrivateKey(privateKey) {
   if (privateKey.startsWith('suiprivkey1')) {
@@ -41,30 +46,27 @@ async function createAdminCapability() {
     // Initialize Sui client
     const client = new SuiClient({ url: getFullnodeUrl('testnet') });
     
-    console.log('\n📦 Creating admin capability...');
+    console.log('\n📦 Creating admin capabilities for both modules...');
     console.log('   Package ID:', packageId);
     console.log('   Admin Address:', address);
     
-    // Build transaction
-    const txb = new Transaction();
+    let scoreSubmissionAdminCap = null;
+    let premiumStoreAdminCap = null;
     
-    // Call create_admin_capability function
-    txb.moveCall({
+    // Create admin capability for score_submission
+    console.log('\n1️⃣ Creating admin capability for score_submission...');
+    const txb1 = new Transaction();
+    txb1.moveCall({
       target: `${packageId}::score_submission::create_admin_capability`,
       arguments: [
-        txb.pure.address(address),  // admin_address: address
+        txb1.pure.address(address),
       ],
     });
+    txb1.setGasBudget(50_000_000);
     
-    // Set gas budget
-    txb.setGasBudget(50_000_000);
-    
-    console.log('🔐 Signing and executing transaction...');
-    
-    // Sign and execute
-    const result = await client.signAndExecuteTransaction({
+    const result1 = await client.signAndExecuteTransaction({
       signer: keypair,
-      transaction: txb,
+      transaction: txb1,
       options: {
         showEffects: true,
         showEvents: true,
@@ -72,50 +74,123 @@ async function createAdminCapability() {
       },
     });
     
-    console.log('\n✅ Transaction executed successfully!');
-    console.log('   Transaction Digest:', result.digest);
+    console.log('   ✅ Transaction executed!');
+    console.log('   Transaction Digest:', result1.digest);
     
-    // Extract Admin Capability Object ID
-    let adminCapabilityObjectId = null;
-    
-    if (result.objectChanges) {
-      for (const change of result.objectChanges) {
+    // Extract score_submission AdminCapability
+    if (result1.objectChanges) {
+      for (const change of result1.objectChanges) {
         if (change.type === 'created' && change.objectType) {
-          if (change.objectType.includes('AdminCapability')) {
-            adminCapabilityObjectId = change.objectId;
+          if (change.objectType.includes('score_submission::AdminCapability')) {
+            scoreSubmissionAdminCap = change.objectId;
+            console.log('   ✅ Found score_submission AdminCapability:', scoreSubmissionAdminCap);
             break;
           }
         }
       }
     }
     
-    // Also check effects.objectChanges as fallback
-    if (!adminCapabilityObjectId && result.effects?.objectChanges) {
-      for (const change of result.effects.objectChanges) {
+    // Create admin capability for premium_store
+    console.log('\n2️⃣ Creating admin capability for premium_store...');
+    
+    // Add a small delay to avoid version conflicts
+    console.log('   ⏳ Waiting 2 seconds to avoid object version conflicts...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const txb2 = new Transaction();
+    txb2.moveCall({
+      target: `${packageId}::premium_store::create_admin_capability`,
+      arguments: [
+        txb2.pure.address(address),
+      ],
+    });
+    txb2.setGasBudget(50_000_000);
+    
+    // Retry logic for version conflicts
+    let result2;
+    let retries = 3;
+    let lastError;
+    
+    while (retries > 0) {
+      try {
+        result2 = await client.signAndExecuteTransaction({
+          signer: keypair,
+          transaction: txb2,
+          options: {
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        });
+        break; // Success, exit retry loop
+      } catch (error) {
+        lastError = error;
+        if (error.message && error.message.includes('not available for consumption')) {
+          retries--;
+          if (retries > 0) {
+            console.log(`   ⚠️  Version conflict detected, retrying... (${retries} attempts remaining)`);
+            // Wait a bit longer before retrying
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Rebuild transaction to get fresh object versions
+            txb2 = new Transaction();
+            txb2.moveCall({
+              target: `${packageId}::premium_store::create_admin_capability`,
+              arguments: [
+                txb2.pure.address(address),
+              ],
+            });
+            txb2.setGasBudget(50_000_000);
+          }
+        } else {
+          throw error; // Not a version conflict, throw immediately
+        }
+      }
+    }
+    
+    if (!result2) {
+      throw lastError;
+    }
+    
+    console.log('   ✅ Transaction executed!');
+    console.log('   Transaction Digest:', result2.digest);
+    
+    // Extract premium_store AdminCapability
+    if (result2.objectChanges) {
+      for (const change of result2.objectChanges) {
         if (change.type === 'created' && change.objectType) {
-          if (change.objectType.includes('AdminCapability')) {
-            adminCapabilityObjectId = change.objectId;
+          if (change.objectType.includes('premium_store::AdminCapability')) {
+            premiumStoreAdminCap = change.objectId;
+            console.log('   ✅ Found premium_store AdminCapability:', premiumStoreAdminCap);
             break;
           }
         }
       }
     }
     
-    if (adminCapabilityObjectId) {
-      console.log('\n✅ Found Admin Capability!');
-      console.log('   Object ID:', adminCapabilityObjectId);
-      console.log('\n📝 Add this to your backend/.env.local:');
-      console.log(`   ADMIN_CAPABILITY_OBJECT_ID_TESTNET=${adminCapabilityObjectId}`);
+    // Summary
+    console.log('\n📋 Summary:');
+    if (scoreSubmissionAdminCap) {
+      console.log(`   ✅ Score Submission Admin Capability: ${scoreSubmissionAdminCap}`);
     } else {
-      console.log('\n⚠️  Admin Capability Object ID not found automatically');
-      console.log('   Transaction Digest:', result.digest);
-      console.log('   You may need to query for it manually:');
-      console.log(`   sui client tx-block ${result.digest}`);
-      console.log('   Look for an object of type AdminCapability');
+      console.log('   ⚠️  Score Submission Admin Capability: Not found');
+    }
+    if (premiumStoreAdminCap) {
+      console.log(`   ✅ Premium Store Admin Capability: ${premiumStoreAdminCap}`);
+    } else {
+      console.log('   ⚠️  Premium Store Admin Capability: Not found');
+    }
+    
+    console.log('\n📝 Add these to your backend/.env.local:');
+    if (scoreSubmissionAdminCap) {
+      console.log(`   ADMIN_CAPABILITY_OBJECT_ID_TESTNET=${scoreSubmissionAdminCap}`);
+    }
+    if (premiumStoreAdminCap) {
+      console.log(`   PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=${premiumStoreAdminCap}`);
     }
     
     console.log('\n🔗 View on Sui Explorer:');
-    console.log(`   https://suiexplorer.com/txblock/${result.digest}?network=testnet`);
+    console.log(`   Score Submission: https://suiexplorer.com/txblock/${result1.digest}?network=testnet`);
+    console.log(`   Premium Store: https://suiexplorer.com/txblock/${result2.digest}?network=testnet`);
     
   } catch (error) {
     console.error('❌ Error creating admin capability:', error);

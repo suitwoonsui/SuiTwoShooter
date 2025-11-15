@@ -278,34 +278,68 @@ This document outlines the **optimal order** for implementing the premium store 
 **Dependencies:** Phase 4 (game code working)
 
 **Tasks:**
-- [ ] Create `backend/app/api/store/items/route.ts`:
+- [x] Create `backend/app/api/store/items/route.ts`:
   - Returns item catalog with prices
-  - Can use item-catalog.js data or database
-- [ ] Create `backend/app/api/store/inventory/:address/route.ts`:
-  - Returns player's inventory
-  - For now, can query localStorage or mock data
-  - Later: Query blockchain
-- [ ] Create `backend/app/api/store/purchase/route.ts`:
+  - Uses CoinGecko API for price conversion (SUI, MEWS, USDC)
+  - Implements 5-minute price caching
+  - Returns all items with current token prices
+- [x] Create `backend/app/api/store/inventory/[address]/route.ts`:
+  - Returns player's inventory from blockchain
+  - Queries `PlayerInventory` object using dynamic object fields
+  - Handles Next.js 15+ async params
+  - Returns formatted inventory data
+- [x] Create `backend/app/api/store/purchase/route.ts`:
   - Validates purchase request
-  - For now, updates mock inventory
-  - Later: Calls smart contract
-- [ ] Update frontend to call API instead of localStorage
+  - Builds unsigned Sui transaction for player to sign
+  - Supports multi-item purchases in single transaction
+  - Calculates gas estimates with 15% buffer
+- [x] Create `backend/app/api/store/consume/route.ts`:
+  - Admin-signed transaction for item consumption
+  - Supports batch consumption (multiple items in one transaction)
+  - Includes retry logic for object lock conflicts
+  - Pre-checks inventory before consumption
+- [x] Create `backend/app/api/store/transaction/[digest]/route.ts`:
+  - Optional endpoint to check transaction status
+  - Verifies transaction on blockchain
+- [x] Create `backend/app/api/store/migrate/route.ts`:
+  - Migrates player inventories from old contract to new contract
+- [x] Create `backend/app/api/config/route.ts`:
+  - Returns backend network configuration for frontend sync
+- [x] Update frontend to call API instead of localStorage
 
-**Why Fifth:**
-- Separates frontend from data storage
-- Prepares for blockchain integration
-- Can test API independently
-- Makes it easy to swap localStorage for blockchain later
+**Status:** ✅ **COMPLETED**
 
-**Files to Create:**
+**Implementation Details:**
+- **Price Conversion Service:** `backend/lib/services/price-converter.ts`
+  - Fetches SUI price from CoinGecko
+  - Fetches MEWS price from CoinGecko → GeckoTerminal → env fallback
+  - USDC price fixed at $1.00
+  - 5-minute in-memory cache with graceful fallback
+- **Store Service:** `backend/lib/sui/store-service.ts`
+  - `getInventory()` - Queries blockchain for player inventory
+  - `buildPurchaseTransaction()` - Creates unsigned purchase transaction
+  - `consumeItems()` - Admin-signed consumption with retry logic
+  - Handles package ID mismatches and object version conflicts
+- **Network Configuration:** Frontend dynamically fetches network from `/api/config` to ensure consistency
+
+**Files Created:**
 - `backend/app/api/store/items/route.ts`
 - `backend/app/api/store/inventory/[address]/route.ts`
 - `backend/app/api/store/purchase/route.ts`
+- `backend/app/api/store/consume/route.ts`
+- `backend/app/api/store/transaction/[digest]/route.ts`
+- `backend/app/api/store/migrate/route.ts`
+- `backend/app/api/config/route.ts`
+- `backend/lib/services/price-converter.ts`
+- `backend/lib/sui/store-service.ts`
+- `backend/lib/sui/migration-service.ts`
 
 **Testing:**
-- Test API endpoints with Postman/curl
-- Verify frontend can fetch items
-- Verify purchase flow works via API
+- ✅ API endpoints tested with PowerShell/curl
+- ✅ Frontend successfully fetches items and prices
+- ✅ Purchase flow works end-to-end
+- ✅ Batch consumption working (multiple items in one transaction)
+- ✅ Retry logic handles object lock conflicts
 
 ---
 
@@ -317,33 +351,43 @@ This document outlines the **optimal order** for implementing the premium store 
 **Dependencies:** Phase 5 (API structure)
 
 **Tasks:**
-- [ ] Design `PlayerInventory` struct (see Section 4.1 in store design doc)
-- [ ] Create `contracts/premium_store/sources/premium_store.move`
-- [ ] Implement functions:
-  - `purchase_item()` - Purchase and add to inventory
-  - `get_inventory()` - Query player inventory
-  - `consume_item()` - Consume item when game starts
-- [ ] Add events:
-  - `ItemPurchased`
-  - `InventoryUpdated`
-- [ ] Deploy to testnet
-- [ ] Test with Sui CLI
+- [x] Design `PlayerInventory` struct (see Section 4.1 in store design doc)
+- [x] Create `contracts/suitwo_game/sources/premium_store.move`
+- [x] Implement functions:
+  - `purchase_item()` - Player-signed purchase and add to inventory
+  - `get_inventory_item_count()` - Query specific item count
+  - `get_all_inventory()` - Query all player inventory
+  - `consume_item()` - Admin-signed consumption (admin pays gas)
+  - `migrate_player_inventory()` - Migrate items from old contract
+- [x] Add events:
+  - `ItemPurchased` - Emitted on purchase
+  - `InventoryUpdated` - Emitted on inventory changes
+  - `ItemConsumed` - Emitted on consumption
+- [x] Deploy to testnet
+- [x] Test with Sui CLI and backend integration
 
-**Why Sixth:**
-- All game logic is working
-- API structure is ready
-- Can test contract independently
-- Easy to integrate once working
+**Status:** ✅ **COMPLETED**
 
-**Files to Create:**
-- `contracts/premium_store/sources/premium_store.move`
-- `contracts/premium_store/Move.toml`
+**Implementation Details:**
+- **Contract Location:** `contracts/suitwo_game/sources/premium_store.move`
+- **Storage:** Uses dynamic object fields for player inventories
+- **Payment:** Direct on-chain payment (player signs transaction, player pays)
+- **Consumption:** Admin wallet signs and pays gas for consumption
+- **Admin Capability:** Separate `premium_store::AdminCapability` (different from score submission)
+- **Item Types:** Supports all 7 item types with 3 levels each (except single-level items)
+- **Migration:** Includes `migrate_player_inventory()` for contract upgrades
+
+**Files Created:**
+- `contracts/suitwo_game/sources/premium_store.move`
+- `contracts/suitwo_game/create-admin-capability.js` (admin capability creation script)
 
 **Testing:**
-- Deploy contract
-- Test purchase function
-- Test inventory query
-- Verify events emitted
+- ✅ Contract deployed to testnet
+- ✅ Purchase function tested and working
+- ✅ Inventory query tested and working
+- ✅ Consumption function tested and working
+- ✅ Events verified on blockchain
+- ✅ Migration function tested
 
 ---
 
@@ -355,34 +399,48 @@ This document outlines the **optimal order** for implementing the premium store 
 **Dependencies:** Phase 6 (contract deployed)
 
 **Tasks:**
-- [ ] Update `backend/app/api/store/purchase/route.ts`:
-  - Call smart contract `purchase_item()` function
-  - Handle transaction signing
-  - Wait for transaction confirmation
-  - Return purchase receipt
-- [ ] Update `backend/app/api/store/inventory/:address/route.ts`:
-  - Query `PlayerInventory` object from blockchain
-  - Return inventory data
-- [ ] Add error handling:
-  - Insufficient balance
-  - Transaction failures
-  - Network errors
+- [x] Update `backend/app/api/store/purchase/route.ts`:
+  - Builds unsigned Sui transaction for `purchase_item()` function
+  - Player signs transaction in frontend wallet
+  - Returns base64-encoded transaction bytes
+  - Supports multi-item purchases in single transaction
+- [x] Update `backend/app/api/store/inventory/[address]/route.ts`:
+  - Queries `PlayerInventory` object from blockchain using dynamic object fields
+  - Handles Next.js 15+ async params
+  - Returns formatted inventory data
+- [x] Update `backend/app/api/store/consume/route.ts`:
+  - Admin wallet signs and executes `consume_item()` transaction
+  - Admin pays gas fees
+  - Includes retry logic for object lock conflicts
+  - Pre-checks inventory before consumption
+- [x] Add error handling:
+  - Insufficient balance (frontend validation)
+  - Transaction failures (detailed error messages)
+  - Network errors (graceful fallback)
+  - Package ID mismatches (auto-detection and correction)
+  - Object version conflicts (retry with exponential backoff)
 
-**Why Seventh:**
-- Contract is tested and working
-- API structure is ready
-- Can test end-to-end flow
+**Status:** ✅ **COMPLETED**
 
-**Files to Modify:**
+**Implementation Details:**
+- **Transaction Building:** Uses Sui SDK `Transaction` builder
+- **Gas Estimation:** 15% buffer on SDK estimates
+- **Error Recovery:** Retry logic with exponential backoff (500ms, 1000ms, 2000ms)
+- **Package ID Management:** Auto-detects and uses correct package ID from objects
+- **Network Sync:** Backend `/api/config` endpoint ensures frontend/backend network consistency
+
+**Files Modified:**
 - `backend/app/api/store/purchase/route.ts`
 - `backend/app/api/store/inventory/[address]/route.ts`
-- `backend/lib/sui/store-service.ts` (new - contract interaction)
+- `backend/app/api/store/consume/route.ts`
+- `backend/lib/sui/store-service.ts`
 
 **Testing:**
-- Make real purchase via API
-- Verify transaction on blockchain
-- Check inventory updates
-- Test error cases
+- ✅ Real purchases via API working
+- ✅ Transactions verified on blockchain
+- ✅ Inventory updates correctly
+- ✅ Error cases handled gracefully
+- ✅ Batch consumption working (multiple items in one transaction)
 
 ---
 
@@ -394,35 +452,60 @@ This document outlines the **optimal order** for implementing the premium store 
 **Dependencies:** Phase 7 (backend connected)
 
 **Tasks:**
-- [ ] Update `src/game/systems/ui/store-ui.js`:
-  - Replace localStorage calls with API calls
-  - Handle wallet connection for purchases
-  - Show transaction status
-  - Handle errors gracefully
-- [ ] Update `src/game/systems/store/inventory-manager.js`:
-  - Fetch inventory from API (which queries blockchain)
-  - Cache for performance
-  - Refresh on purchase
-- [ ] Update game start flow:
-  - Fetch inventory from API
-  - Apply items to game initialization
-  - Consume items via API (calls smart contract)
+- [x] Update `src/game/systems/ui/store-ui.js`:
+  - Replaced localStorage calls with API calls
+  - Fetches item catalog and prices from `/api/store/items`
+  - Fetches inventory from `/api/store/inventory/:address`
+  - Handles wallet connection for purchases
+  - Signs and executes purchase transactions via wallet API
+  - Polls transaction status until confirmed
+  - Shows transaction status and updates inventory display
+  - Handles errors gracefully
+  - Network configuration sync with backend
+- [x] Update `src/game/systems/store/item-consumption.js`:
+  - Fetches inventory from blockchain API for validation
+  - Validates item availability before game start
+  - Clears selected items between games
+- [x] Update `src/game/systems/consumables/consumable-system.js`:
+  - Implements `consumeItemFromBlockchain()` for single items
+  - Implements `consumeItemsFromBlockchain()` for batch consumption
+  - Calls `/api/store/consume` endpoint
+  - Handles async consumption without blocking gameplay
+- [x] Update `wallet-module/src/wallet-api.jsx`:
+  - Handles transaction deserialization (base64 → Transaction object)
+  - Fixed MEWS balance display (network-aware decimals: 6 for mainnet, 9 for testnet)
+  - Network configuration sync with backend
+  - Explicit chain parameter for transaction signing
+- [x] Update game start flow (`src/game/main.js`):
+  - Batch consumes all start items in single transaction
+  - Collects `orbLevel`, `extraLives`, and `forceField` items
+  - Calls `consumeItemsFromBlockchain()` with all items at once
+  - Prevents object lock conflicts
 
-**Why Eighth:**
-- Everything else is working
-- Just connecting the dots
-- Can test full flow end-to-end
+**Status:** ✅ **COMPLETED**
 
-**Files to Modify:**
+**Implementation Details:**
+- **Transaction Handling:** Frontend receives base64-encoded transaction bytes, deserializes and signs via wallet
+- **Network Sync:** Frontend fetches network from `/api/config` to ensure consistency
+- **Balance Display:** Network-aware decimal handling for MEWS (6 decimals mainnet, 9 decimals testnet)
+- **Batch Consumption:** All start items consumed in single transaction to prevent conflicts
+- **Item Selection:** Properly clears between games to prevent stale selections
+
+**Files Modified:**
 - `src/game/systems/ui/store-ui.js`
-- `src/game/systems/store/inventory-manager.js`
-- `src/game/main.js` (game start flow)
+- `src/game/systems/store/item-consumption.js`
+- `src/game/systems/consumables/consumable-system.js`
+- `src/game/main.js`
+- `wallet-module/src/wallet-api.jsx`
 
 **Testing:**
-- Full purchase flow (wallet → contract → inventory)
-- Start game with purchased items
-- Verify items consumed on-chain
-- Test error handling
+- ✅ Full purchase flow working (wallet → contract → inventory)
+- ✅ Start game with purchased items working
+- ✅ Items consumed on-chain verified
+- ✅ Batch consumption working (multiple items in one transaction)
+- ✅ Error handling tested
+- ✅ Network consistency verified
+- ✅ Item selection clearing between games working
 
 ---
 
@@ -465,19 +548,20 @@ This document outlines the **optimal order** for implementing the premium store 
 
 ---
 
-## 📊 Summary: Recommended Order
+## 📊 Summary: Implementation Status
 
-1. **UI Modal** (3-4h) - See it, test UX
-2. **Item Catalog** (1-2h) - Define structure
-3. **Mock Purchase** (2-3h) - Test flow
-4. **Game Code** (12-16h) - Make items work
-5. **Backend API** (3-4h) - Prepare for blockchain
-6. **Smart Contract** (4-6h) - On-chain inventory
-7. **Backend Integration** (2-3h) - Connect API to contract
-8. **Frontend Integration** (2-3h) - Connect UI to API
-9. **Polish** (4-6h) - Final testing
+1. **UI Modal** ✅ **COMPLETED** (3-4h) - Store UI with item selection
+2. **Item Catalog** ✅ **COMPLETED** (1-2h) - All 7 items defined
+3. **Mock Purchase** ✅ **COMPLETED** (2-3h) - localStorage-based testing
+4. **Game Code** ✅ **COMPLETED** (12-16h) - All items functional in-game
+5. **Backend API** ✅ **COMPLETED** (3-4h) - All endpoints implemented
+6. **Smart Contract** ✅ **COMPLETED** (4-6h) - Deployed and tested
+7. **Backend Integration** ✅ **COMPLETED** (2-3h) - Connected to contract
+8. **Frontend Integration** ✅ **COMPLETED** (2-3h) - Full blockchain flow
+9. **Polish & Testing** ⏳ **IN PROGRESS** (4-6h) - Final refinement
 
-**Total Estimated Time:** 32-47 hours
+**Total Time Spent:** ~35-45 hours  
+**Current Status:** Phases 1-8 complete, Phase 9 in progress
 
 ---
 

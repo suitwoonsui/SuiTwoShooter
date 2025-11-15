@@ -72,12 +72,12 @@ async function deploy() {
     const buildPath = path.join(__dirname, 'build', 'suitwo_game');
     const modulesDir = path.join(buildPath, 'bytecode_modules');
     
-    // Get our module (not in dependencies folder)
+    // Get our modules (not in dependencies folder, exclude mews)
     const modules = fs.readdirSync(modulesDir)
-      .filter(f => f.endsWith('.mv') && !f.includes('dependencies'))
+      .filter(f => f.endsWith('.mv') && !f.includes('dependencies') && !f.includes('mews'))
       .map(f => fs.readFileSync(path.join(modulesDir, f)));
     
-    console.log(`\n📦 Found ${modules.length} module(s) to publish`);
+    console.log(`\n📦 Found ${modules.length} module(s) to publish (excluding mews)`);
     
     // Get dependencies from the build info
     // The SDK will automatically resolve framework dependencies, but we need to pass empty array
@@ -113,7 +113,8 @@ async function deploy() {
     txb.transferObjects([upgradeCap], address);
     
     // Set higher gas budget for contract deployment (publishing requires more gas)
-    txb.setGasBudget(50_000_000); // 0.05 SUI - deployment needs more gas than regular transactions
+    // With 2 modules (score_submission + premium_store, excluding mews), we need more gas
+    txb.setGasBudget(100_000_000); // 0.1 SUI - deployment needs more gas than regular transactions
     
     // Sign and execute
     const result = await client.signAndExecuteTransaction({
@@ -125,9 +126,10 @@ async function deploy() {
       },
     });
     
-    // Extract package ID and Session Registry object ID from transaction effects
+    // Extract package ID, Session Registry, and Premium Store object IDs from transaction effects
     let packageId = null;
     let sessionRegistryObjectId = null;
+    let premiumStoreObjectId = null;
     
     // Check objectChanges (most reliable method)
     if (result.effects?.objectChanges) {
@@ -140,6 +142,9 @@ async function deploy() {
         if (change.type === 'created' && change.objectType) {
           if (change.objectType.includes('SessionRegistry')) {
             sessionRegistryObjectId = change.objectId;
+          }
+          if (change.objectType.includes('PremiumStore')) {
+            premiumStoreObjectId = change.objectId;
           }
         }
       }
@@ -183,6 +188,10 @@ async function deploy() {
         console.log('   You may need to query for it manually');
       }
       
+      if (premiumStoreObjectId) {
+        console.log('   🛒 Premium Store Object ID:', premiumStoreObjectId);
+      }
+      
       console.log('   📝 Transaction Digest:', result.digest);
       console.log('\n🔗 View on Sui Explorer:');
       if (packageId) {
@@ -197,10 +206,13 @@ async function deploy() {
         console.log('   GAME_SCORE_CONTRACT_TESTNET=<EXTRACT_FROM_TRANSACTION>');
       }
       if (sessionRegistryObjectId) {
-        console.log(`   SESSION_REGISTRY_OBJECT_ID=${sessionRegistryObjectId}`);
+        console.log(`   SESSION_REGISTRY_OBJECT_ID_TESTNET=${sessionRegistryObjectId}`);
       } else {
-        console.log('   SESSION_REGISTRY_OBJECT_ID=<EXTRACT_FROM_TRANSACTION>');
+        console.log('   SESSION_REGISTRY_OBJECT_ID_TESTNET=<EXTRACT_FROM_TRANSACTION>');
         console.log('   Check transaction effects for created SessionRegistry object');
+      }
+      if (premiumStoreObjectId) {
+        console.log(`   PREMIUM_STORE_OBJECT_ID_TESTNET=${premiumStoreObjectId}`);
       }
     } else {
       throw new Error(`Deployment failed: ${result.effects?.status?.error || 'Unknown error'}`);

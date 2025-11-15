@@ -25,9 +25,12 @@ interface TokenConfig {
 interface ContractsConfig {
   gameScore: string;
   sessionRegistry: string;  // Session registry object ID (from init function)
-  adminCapability: string;   // Admin capability object ID (from create_admin_capability function)
+  adminCapability: string;   // Admin capability object ID (from create_admin_capability function) - for score submission
   tokenBurn: string;
   subscription: string;
+  premiumStore: string;      // Premium store package ID
+  premiumStoreObject: string; // Premium store object ID (from init function)
+  premiumStoreAdminCapability: string; // Premium store admin capability object ID (separate from score submission)
 }
 
 interface SecurityConfig {
@@ -128,7 +131,9 @@ export function getConfig(): Config {
       gasBudget: parseInt(process.env.SUI_GAS_BUDGET || '10000000', 10)
     },
     token: {
-      mewsTokenTypeId: process.env.MEWS_TOKEN_TYPE_ID || '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS',
+      mewsTokenTypeId: network === 'testnet'
+        ? (process.env.MEWS_TOKEN_TYPE_ID_TESTNET || process.env.MEWS_TOKEN_TYPE_ID || '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS')
+        : (process.env.MEWS_TOKEN_TYPE_ID_MAINNET || process.env.MEWS_TOKEN_TYPE_ID || '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS'),
       minTokenBalance: parseInt(process.env.MIN_TOKEN_BALANCE || '500000000', 10) // 500,000 with 9 decimals
     },
     contracts: {
@@ -151,7 +156,17 @@ export function getConfig(): Config {
         ? (process.env.ADMIN_CAPABILITY_OBJECT_ID_TESTNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || '')
         : (process.env.ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || ''),
       tokenBurn: process.env.TOKEN_BURN_CONTRACT || '',
-      subscription: process.env.SUBSCRIPTION_CONTRACT || ''
+      subscription: process.env.SUBSCRIPTION_CONTRACT || '',
+      // Support network-specific premium store addresses
+      premiumStore: network === 'testnet'
+        ? (process.env.PREMIUM_STORE_CONTRACT_TESTNET || process.env.PREMIUM_STORE_CONTRACT || '')
+        : (process.env.PREMIUM_STORE_CONTRACT_MAINNET || process.env.PREMIUM_STORE_CONTRACT || ''),
+      premiumStoreObject: network === 'testnet'
+        ? (process.env.PREMIUM_STORE_OBJECT_ID_TESTNET || process.env.PREMIUM_STORE_OBJECT_ID || '')
+        : (process.env.PREMIUM_STORE_OBJECT_ID_MAINNET || process.env.PREMIUM_STORE_OBJECT_ID || ''),
+      premiumStoreAdminCapability: network === 'testnet'
+        ? (process.env.PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET || process.env.ADMIN_CAPABILITY_OBJECT_ID_TESTNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || '')
+        : (process.env.PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || '')
     },
     security: {
       apiKey: process.env.API_KEY || '',

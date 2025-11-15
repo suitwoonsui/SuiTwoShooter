@@ -132,8 +132,24 @@ async function initializeWalletIntegration() {
   
   if (typeof WalletAPI !== 'undefined') {
     try {
-      // Initialize wallet API (determine network from backend config or default to mainnet)
-      const network = 'mainnet'; // TODO: Get from backend config
+      // Get network from backend config (should match backend network)
+      // Default to testnet for development, but fetch from backend if available
+      let network = 'testnet'; // Default to testnet
+      
+      try {
+        // Try to fetch network from backend API
+        const response = await fetch('http://localhost:3000/api/config');
+        if (response.ok) {
+          const config = await response.json();
+          if (config.network) {
+            network = config.network;
+            console.log(`🌐 Using network from backend: ${network}`);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not fetch network from backend, using default:', network);
+      }
+      
       const api = await WalletAPI.initialize({ network });
       
       // Store globally for easy access
