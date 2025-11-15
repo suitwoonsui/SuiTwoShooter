@@ -530,6 +530,48 @@ module suitwo_game::premium_store {
         });
     }
     
+    // ===== ADMIN FUNCTIONS =====
+    
+    /// Admin function to add items to a player's inventory
+    /// Used for: testing, promotions, refunds, corrections
+    /// Requires AdminCapability to prevent unauthorized access
+    public entry fun admin_add_items(
+        _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
+        store: &mut PremiumStore,
+        clock: &Clock,
+        player: address,
+        item_type: u8,
+        item_level: u8,
+        quantity: u64,
+        ctx: &mut TxContext
+    ) {
+        let current_time = clock::timestamp_ms(clock);
+        
+        // Validate inputs
+        assert!(item_type <= ITEM_TYPE_COIN_TRACTOR_BEAM, 1); // Error code 1: Invalid item type
+        assert!(item_level >= 1 && item_level <= 3, 2); // Error code 2: Invalid item level
+        assert!(quantity > 0, 3); // Error code 3: Quantity must be positive
+        
+        // Get or create inventory
+        let inventory = get_or_create_inventory(store, player, ctx);
+        
+        // Increment inventory
+        increment_inventory(inventory, item_type, item_level, quantity);
+        
+        // Get new quantity for event
+        let new_quantity = get_inventory_count(inventory, item_type, item_level);
+        
+        // Emit events for audit trail
+        event::emit(InventoryUpdated {
+            player,
+            item_type,
+            item_level,
+            quantity_change: quantity,  // Amount added
+            new_quantity,
+            timestamp: current_time,
+        });
+    }
+    
     // ===== MIGRATION FUNCTIONS =====
     
     /// Migrate player inventory from old store to new store

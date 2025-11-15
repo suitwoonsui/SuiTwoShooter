@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin: Add Items to Inventory</title>
+    <!-- Load and initialize wallet module independently -->
+    <script src="wallet-module/dist/wallet-api.umd.cjs" onload="
+      (function() {
+        console.log('✅ Wallet bundle loaded for admin page');
+        
+        if (typeof window.WalletAPI !== 'undefined') {
+          console.log('✅ WalletAPI available:', typeof window.WalletAPI);
+          
+          // Get network from backend and initialize
+          fetch('http://localhost:3000/api/config')
+            .then(res => res.json())
+            .then(config => {
+              const network = config.network || 'testnet';
+              console.log('🌐 Initializing wallet API with network:', network);
+              
+              // Initialize wallet API (expects options object: { network })
+              if (typeof window.WalletAPI.initialize === 'function') {
+                window.WalletAPI.initialize({ network }).then((api) => {
+                  console.log('✅ Wallet API initialized:', api);
+                  window.walletAPIInstance = api;
+                  // Trigger wallet check if page is already loaded
+                  if (typeof checkWalletOnLoad === 'function') {
+                    checkWalletOnLoad();
+                  }
+                }).catch((error) => {
+                  console.error('❌ Failed to initialize wallet API:', error);
+                });
+              }
+            })
+            .catch(error => {
+              console.error('❌ Failed to get network config:', error);
+              // Fallback to testnet
+              const network = 'testnet';
+              if (typeof window.WalletAPI.initialize === 'function') {
+                window.WalletAPI.initialize({ network }).then((api) => {
+                  console.log('✅ Wallet API initialized (fallback):', api);
+                  window.walletAPIInstance = api;
+                  if (typeof checkWalletOnLoad === 'function') {
+                    checkWalletOnLoad();
+                  }
+                }).catch((error) => {
+                  console.error('❌ Failed to initialize wallet API:', error);
+                });
+              }
+            });
+        } else {
+          console.error('❌ WalletAPI not found after bundle load');
+        }
+      })();
+    "></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-bottom: 2rem;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .items-container {
+            margin-bottom: 1.5rem;
+        }
+        .item-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            padding: 1rem;
+            background: #f9f9f9;
+            border-radius: 4px;
+            align-items: center;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #1976D2;
+        }
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+        .btn-danger {
+            background: #f44336;
+            color: white;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .btn-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1.5rem;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert-info {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            font-size: 0.9rem;
+        }
+        code {
+            background: rgba(0,0,0,0.1);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎁 Admin: Add Items to Inventory</h1>
+
+        <!-- Wallet Connection Section -->
+        <div id="walletSection" class="form-group">
+            <label>Admin Wallet:</label>
+            <div id="walletStatus" style="padding: 1rem; background: #f9f9f9; border-radius: 4px; margin-bottom: 1rem;">
+                <div id="walletNotConnected">
+                    <p style="margin-bottom: 0.5rem;">🔒 Connect your admin wallet to continue</p>
+                    <button type="button" class="btn btn-primary" onclick="connectWallet()">Connect Wallet</button>
+                </div>
+                <div id="walletConnected" style="display: none;">
+                    <p style="margin-bottom: 0.5rem;"><strong>✅ Wallet Connected:</strong> <span id="walletAddress"></span></p>
+                    <button type="button" class="btn btn-danger" onclick="disconnectWallet()" style="padding: 0.5rem 1rem; font-size: 0.9rem;">Disconnect</button>
+                </div>
+                <div id="walletError" style="display: none; color: #721c24; margin-top: 0.5rem;">
+                    <strong>❌ Error:</strong> <span id="walletErrorText"></span>
+                </div>
+            </div>
+        </div>
+
+        <form id="addItemsForm" style="display: none;">
+            <div class="form-group">
+                <label for="playerAddress">Player Address:</label>
+                <input
+                    type="text"
+                    id="playerAddress"
+                    placeholder="0x..."
+                    required
+                />
+            </div>
+
+            <div class="form-group">
+                <div class="btn-header">
+                    <label>Items to Add:</label>
+                    <button type="button" class="btn btn-success" onclick="addItem()">+ Add Item</button>
+                </div>
+                <div id="itemsContainer" class="items-container">
+                    <!-- Items will be added here -->
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                Add Items to Inventory
+            </button>
+        </form>
+
+        <div id="result"></div>
+
+        <div class="alert alert-info" style="margin-top: 2rem;">
+            <strong>🔒 Security:</strong> This page requires:
+            <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                <li>Admin wallet connection (verified on frontend and backend)</li>
+                <li>Server-side API key authentication</li>
+                <li>Wallet address verification before allowing operations</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Backend API URL (port 3000)
+        const BACKEND_URL = 'http://localhost:3000';
+        
+        let adminAddress = null;
+        let connectedAddress = null;
+
+        async function loadAdminAddress() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/admin/verify-wallet`);
+                const data = await response.json();
+                if (data.success) {
+                    adminAddress = data.adminAddress.toLowerCase();
+                    console.log('Admin address:', adminAddress);
+                }
+            } catch (error) {
+                console.error('Failed to load admin address:', error);
+            }
+        }
+
+        // Make functions globally accessible for onclick handlers
+        window.connectWallet = async function connectWallet() {
+            const errorDiv = document.getElementById('walletError');
+            const errorText = document.getElementById('walletErrorText');
+            errorDiv.style.display = 'none';
+
+            // Check if wallet API is available (initialized by script tag)
+            let walletAPI = window.walletAPIInstance;
+            
+            // If not available, try to initialize WalletAPI
+            if (!walletAPI && window.WalletAPI && typeof window.WalletAPI.initialize === 'function') {
+                try {
+                    const configResponse = await fetch(`${BACKEND_URL}/api/config`);
+                    const config = await configResponse.json();
+                    const network = config.network || 'testnet';
+                    console.log('🔄 Initializing wallet API...');
+                    walletAPI = await window.WalletAPI.initialize({ network });
+                    window.walletAPIInstance = walletAPI;
+                } catch (error) {
+                    console.error('Failed to initialize wallet:', error);
+                    errorText.textContent = 'Failed to initialize wallet API. Please check the console for errors.';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+
+            if (!walletAPI) {
+                errorText.textContent = 'Wallet API not loaded. Please refresh the page and ensure the wallet module bundle is accessible.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                const result = await walletAPI.connect();
+                
+                if (result.success) {
+                    connectedAddress = result.address.toLowerCase();
+                    console.log('Connected wallet:', connectedAddress);
+                    console.log('Admin wallet:', adminAddress);
+
+                    // Verify it's the admin wallet
+                    if (connectedAddress === adminAddress) {
+                        updateWalletUI(true);
+                        document.getElementById('addItemsForm').style.display = 'block';
+                    } else {
+                        errorText.textContent = `Wrong wallet! Connected: ${result.address.substring(0, 10)}... Expected admin wallet: ${adminAddress ? adminAddress.substring(0, 10) + '...' : 'unknown'}.`;
+                        errorDiv.style.display = 'block';
+                        await walletAPI.disconnect();
+                        connectedAddress = null;
+                        updateWalletUI(false);
+                    }
+                } else {
+                    errorText.textContent = result.error || 'Failed to connect wallet';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorText.textContent = error.message || 'Error connecting wallet';
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        window.disconnectWallet = async function disconnectWallet() {
+            const walletAPI = window.walletAPIInstance;
+            if (walletAPI) {
+                try {
+                    if (walletAPI.isConnected()) {
+                        const result = await walletAPI.disconnect();
+                        console.log('🔓 Disconnect result:', result);
+                    }
+                } catch (error) {
+                    console.error('Error disconnecting wallet:', error);
+                }
+            }
+            connectedAddress = null;
+            updateWalletUI(false);
+            document.getElementById('addItemsForm').style.display = 'none';
+            
+            // Clear any error messages
+            const errorDiv = document.getElementById('walletError');
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
+        }
+
+        function updateWalletUI(isConnected) {
+            const notConnected = document.getElementById('walletNotConnected');
+            const connectedDiv = document.getElementById('walletConnected');
+            const addressSpan = document.getElementById('walletAddress');
+
+            if (isConnected && connectedAddress) {
+                notConnected.style.display = 'none';
+                connectedDiv.style.display = 'block';
+                addressSpan.textContent = connectedAddress.substring(0, 10) + '...' + connectedAddress.substring(connectedAddress.length - 8);
+            } else {
+                notConnected.style.display = 'block';
+                connectedDiv.style.display = 'none';
+            }
+        }
+
+        // Check if wallet is already connected on page load
+        async function checkWalletOnLoad() {
+            await loadAdminAddress();
+
+            // Wait for wallet API to be available (initialized by script tag)
+            let attempts = 0;
+            const checkWallet = setInterval(() => {
+                attempts++;
+                
+                // Check for wallet API instance
+                const walletAPI = window.walletAPIInstance;
+                
+                if (walletAPI) {
+                    clearInterval(checkWallet);
+                    console.log('✅ Wallet API instance found, checking connection');
+                    checkWalletConnection();
+                } else if (attempts > 40) {
+                    clearInterval(checkWallet);
+                    console.warn('⚠️ Wallet API not available after 20 seconds');
+                    const errorDiv = document.getElementById('walletError');
+                    const errorText = document.getElementById('walletErrorText');
+                    if (errorDiv && errorText) {
+                        errorText.textContent = 'Wallet API failed to initialize. Please check the console for errors.';
+                        errorDiv.style.display = 'block';
+                    }
+                }
+            }, 500);
+        }
+
+        function checkWalletConnection() {
+            const walletAPI = window.walletAPIInstance;
+            if (walletAPI && walletAPI.isConnected()) {
+                const address = walletAPI.getAddress();
+                if (address) {
+                    connectedAddress = address.toLowerCase();
+                    if (connectedAddress === adminAddress) {
+                        updateWalletUI(true);
+                        document.getElementById('addItemsForm').style.display = 'block';
+                    } else {
+                        updateWalletUI(false);
+                        const errorDiv = document.getElementById('walletError');
+                        const errorText = document.getElementById('walletErrorText');
+                        if (errorDiv && errorText) {
+                            errorText.textContent = 'Wrong wallet connected. Please disconnect and connect the admin wallet.';
+                            errorDiv.style.display = 'block';
+                        }
+                    }
+                }
+            }
+        }
+
+        const itemTypes = [
+            { id: 'extraLives', name: 'Extra Lives', levels: [1, 2, 3] },
+            { id: 'forceField', name: 'Force Field', levels: [1, 2, 3] },
+            { id: 'orbLevel', name: 'Orb Level', levels: [1, 2, 3] },
+            { id: 'slowTime', name: 'Slow Time', levels: [1, 2, 3] },
+            { id: 'destroyAll', name: 'Destroy All Enemies', levels: [1] },
+            { id: 'bossKillShot', name: 'Boss Kill Shot', levels: [1] },
+            { id: 'coinTractorBeam', name: 'Coin Tractor Beam', levels: [1, 2, 3] },
+        ];
+
+        let items = [{ itemId: 'extraLives', level: 1, quantity: 1 }];
+
+        function renderItems() {
+            const container = document.getElementById('itemsContainer');
+            container.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const itemType = itemTypes.find(t => t.id === item.itemId);
+                const row = document.createElement('div');
+                row.className = 'item-row';
+
+                const itemSelect = document.createElement('select');
+                itemTypes.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.id;
+                    option.textContent = type.name;
+                    if (type.id === item.itemId) option.selected = true;
+                    itemSelect.appendChild(option);
+                });
+                itemSelect.onchange = (e) => {
+                    items[index].itemId = e.target.value;
+                    items[index].level = 1; // Reset level when item changes
+                    renderItems();
+                };
+
+                const levelSelect = document.createElement('select');
+                (itemType?.levels || [1, 2, 3]).forEach(level => {
+                    const option = document.createElement('option');
+                    option.value = level;
+                    option.textContent = `Level ${level}`;
+                    if (level === item.level) option.selected = true;
+                    levelSelect.appendChild(option);
+                });
+                levelSelect.onchange = (e) => {
+                    items[index].level = parseInt(e.target.value);
+                };
+
+                const quantityInput = document.createElement('input');
+                quantityInput.type = 'number';
+                quantityInput.min = '1';
+                quantityInput.value = item.quantity;
+                quantityInput.onchange = (e) => {
+                    items[index].quantity = parseInt(e.target.value) || 1;
+                };
+
+                const removeBtn = items.length > 1 ? document.createElement('button') : null;
+                if (removeBtn) {
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'btn btn-danger';
+                    removeBtn.textContent = '✕';
+                    removeBtn.onclick = () => {
+                        items.splice(index, 1);
+                        renderItems();
+                    };
+                }
+
+                row.appendChild(itemSelect);
+                row.appendChild(levelSelect);
+                row.appendChild(quantityInput);
+                if (removeBtn) row.appendChild(removeBtn);
+                container.appendChild(row);
+            });
+        }
+
+        function addItem() {
+            items.push({ itemId: 'extraLives', level: 1, quantity: 1 });
+            renderItems();
+        }
+
+        document.getElementById('addItemsForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            const playerAddress = document.getElementById('playerAddress').value;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding Items...';
+            resultDiv.innerHTML = '';
+
+            try {
+                // Verify wallet is still connected and is admin
+                if (!connectedAddress || connectedAddress !== adminAddress) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ Error:</strong>
+                            <p>Admin wallet not connected. Please connect the admin wallet.</p>
+                        </div>
+                    `;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Items to Inventory';
+                    return;
+                }
+
+                const response = await fetch(`${BACKEND_URL}/api/admin/add-items`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        playerAddress,
+                        items,
+                        adminWalletAddress: connectedAddress, // Send for server verification
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ Success!</strong>
+                            <p>${data.message}</p>
+                            ${data.digest ? `<p style="margin-top: 0.5rem; font-size: 0.9rem;">Transaction: <code>${data.digest}</code></p>` : ''}
+                        </div>
+                    `;
+                    // Reset form
+                    document.getElementById('playerAddress').value = '';
+                    items = [{ itemId: 'extraLives', level: 1, quantity: 1 }];
+                    renderItems();
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ Error:</strong>
+                            <p>${data.error || 'Failed to add items'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Network Error:</strong>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Items to Inventory';
+            }
+        };
+
+        // Initialize
+        renderItems();
+        checkWalletOnLoad();
+    </script>
+</body>
+</html>
+

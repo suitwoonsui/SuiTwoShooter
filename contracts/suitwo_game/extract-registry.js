@@ -2,7 +2,7 @@
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
 const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-const txDigest = 'xjwuzM5xy1NZjYfzHfH2CkR9dc9Ub6xVowiFMUmvj6z';
+const txDigest = 'HfTgofSR5ovvaotcKhzp1T4ffy21Ycnv4XdnYrpAdJ5X';
 
 async function extractObjects() {
   try {

@@ -1,29 +1,34 @@
-⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-consumable-system.js:43  POST http://localhost:3000/api/store/consume 500 (Internal Server Error)
-consumeItemFromBlockchain @ consumable-system.js:43
-restart @ main.js:173
-startGameInternal @ menu-system.js:524
-await in startGameInternal
-startGame @ menu-system.js:449
-onclick @ index.html:189Understand this error
-game-security.js:271 🍽️ [CONSUMPTION] Response status: 500
-consumable-system.js:55 ❌ [CONSUMPTION] Failed to consume item: Transaction failed: MovePrimitiveRuntimeError(MoveLocationOpt(Some(MoveLocation { module: ModuleId { address: 6e2cb689422cb1a2d4d3ed3817242e2f298ee6e5ab7afbcbb548475118834faa, name: Identifier("premium_store") }, function: 9, instruction: 87, function_name: Some("consume_item") }))) in command 0
-consumeItemFromBlockchain @ consumable-system.js:55
-await in consumeItemFromBlockchain
-restart @ main.js:173
-startGameInternal @ menu-system.js:524
-await in startGameInternal
-startGame @ menu-system.js:449
-onclick @ index.html:189Understand this error
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 🎮 Drawing game content
-game-security.js:271 ⏱️ [SLOW TIME] checkAvailable() returned false: {exists: false, usesRemaining: undefined, active: undefined}
-game-security.js:271 🎯 [DEBUG] FPS≈ 58 | speed: 4.059999999999967 base: 2.5 inc: 0.01 max: 6
+wallet-api.umd.cjs:365 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+admin-add-items.html:58 ✅ Wallet bundle loaded for admin page
+admin-add-items.html:61 ✅ WalletAPI available: object
+admin-add-items.html:244  GET http://localhost:3000/api/admin/verify-wallet 500 (Internal Server Error)
+loadAdminAddress @ admin-add-items.html:244
+checkWalletOnLoad @ admin-add-items.html:356
+(anonymous) @ admin-add-items.html:557
+admin-add-items.html:68 🌐 Initializing wallet API with network: testnet
+wallet-api.umd.cjs:369 🔍 Protocol check: {protocol: 'http:', isFileProtocol: false, url: 'http://localhost:8000/admin-add-items.html'}
+wallet-api.umd.cjs:369 🔍 Checking for wallet extensions directly...
+wallet-api.umd.cjs:369 🔍 Direct wallet checks: {window.slush?.sui: false, window.slushWallet: false, window.suiWallet: false, window.surfWallet: false, window.surf: false, …}
+wallet-api.umd.cjs:369 ⚠️ Wallet Standard API (navigator.wallets.get) not available
+wallet-api.umd.cjs:369 🔍 Window properties that might be wallets: (17) ['trustwallet', 'trustwalletTon', 'trustWallet', 'ethereum', 'CoinbaseWalletSDK', 'CoinbaseWalletProvider', 'WalletLink', 'WalletLinkProvider', 'coinbaseWalletRequestProvider', 'coinbaseWalletExtension', 'walletLinkExtension', 'WalletAPI', 'updateWalletUI', 'checkWalletOnLoad', 'checkWalletConnection', 'connectWallet', 'disconnectWallet']
+wallet-api.umd.cjs:369 ⏳ Waiting for wallet detection...
+wallet-api.umd.cjs:369 🔍 WalletHookBridge: wallets detected {wallets: Array(1), walletsType: 'object', isArray: true, walletsLength: 1, walletsKeys: Array(1)}
+wallet-api.umd.cjs:369 🔍 WalletHookBridge: State updated {walletsCount: 1, walletNames: Array(1), connected: false, address: null}
+wallet-api.umd.cjs:369 🔍 connectWallet object: {type: 'object', keys: Array(16), hasMutateAsync: true, hasMutate: true, isFunction: false}
+wallet-api.umd.cjs:369 🔍 WalletHookBridge: wallets detected {wallets: Array(1), walletsType: 'object', isArray: true, walletsLength: 1, walletsKeys: Array(1)}
+wallet-api.umd.cjs:369 🔍 WalletHookBridge: State updated {walletsCount: 1, walletNames: Array(1), connected: false, address: null}
+wallet-api.umd.cjs:369 🔍 connectWallet object: {type: 'object', keys: Array(16), hasMutateAsync: true, hasMutate: true, isFunction: false}
+favicon.ico:1  GET http://localhost:8000/favicon.ico 404 (Not Found)
+wallet-api.umd.cjs:369 🔍 After wait, wallets detected: {walletsCount: 1, walletNames: Array(1), hasConnect: true}
+admin-add-items.html:73 ✅ Wallet API initialized: {network: 'testnet', getAddress: ƒ, isConnected: ƒ, getWallets: ƒ, connect: ƒ, …}
+admin-add-items.html:368 ✅ Wallet API instance found, checking connection
+admin-add-items.html:244  GET http://localhost:3000/api/admin/verify-wallet 500 (Internal Server Error)
+loadAdminAddress @ admin-add-items.html:244
+checkWalletOnLoad @ admin-add-items.html:356
+(anonymous) @ admin-add-items.html:77
+Promise.then
+(anonymous) @ admin-add-items.html:72
+Promise.then
+(anonymous) @ admin-add-items.html:66
+onload @ admin-add-items.html:103
+admin-add-items.html:368 ✅ Wallet API instance found, checking connection

@@ -113,6 +113,11 @@ This guide is organized into focused sections for easier navigation:
 - [RENDER_FREE_TIER_OPTIMIZATION.md](./RENDER_FREE_TIER_OPTIMIZATION.md) - Deployment optimization guide
 - [INTEGRATION_CHECKLIST.md](./INTEGRATION_CHECKLIST.md) - Detailed integration checklist
 
+### **Premium Store Admin Features**
+- [STORE_ADMIN_ADD_ITEMS.md](./STORE_ADMIN_ADD_ITEMS.md) - Admin add items feature (security, usage, examples)
+- [STORE_ADMIN_WEB_UI.md](./STORE_ADMIN_WEB_UI.md) - Web UI quick start guide (recommended for manual operations)
+- [STORE_ADMIN_AUTH_USAGE.md](./STORE_ADMIN_AUTH_USAGE.md) - API authentication setup and usage (for scripts/automation)
+
 ---
 
 ## 🚀 Quick Start (For Your MVP)

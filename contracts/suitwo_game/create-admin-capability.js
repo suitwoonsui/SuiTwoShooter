@@ -11,7 +11,7 @@ const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4
 // Update this to match PREMIUM_STORE_CONTRACT_TESTNET from your backend .env file
 const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0xdd8edfb60b7973fd9827eeddb96389aa191f9a3ddd5b5e3d6e1b03cfb387878f'; // Fallback - UPDATE THIS
+                  '0x2ecb8d9a29816e1d8359b17adb62b4bffb9a34c8d0540f81c54729a8d6c14e4e'; // Fallback - UPDATE THIS
 
 function decodePrivateKey(privateKey) {
   if (privateKey.startsWith('suiprivkey1')) {

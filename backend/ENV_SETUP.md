@@ -121,6 +121,23 @@ This document describes all environment variables required for the SuiTwo game b
 - **Required**: No (defaults to `*` for development, which allows any localhost origin)
 - **Note**: If your frontend runs on a different port (e.g., `localhost:8000`), either set this to that URL or leave it as `*` for development
 
+### Security Configuration
+
+**`API_KEY`** (Required for admin endpoints)
+- **Description**: API key for authenticating admin operations (e.g., adding items to player inventories)
+- **Format**: Any secure random string (recommended: 32+ characters)
+- **Example**: `your-secure-random-api-key-here-1234567890abcdef`
+- **Security**: ⚠️ **NEVER commit this to version control!** Store in `.env.local` or secure secret manager
+- **Required**: Yes (for admin endpoints like `/api/store/admin/add-items`)
+- **Usage**: Include in request headers as `Authorization: Bearer <API_KEY>` or `X-API-Key: <API_KEY>`
+- **Note**: Generate a strong random key. You can use: `openssl rand -hex 32` or `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+**`JWT_SECRET`** (Optional, for future JWT-based auth)
+- **Description**: Secret key for JWT token signing (if using JWT authentication)
+- **Format**: Any secure random string
+- **Example**: `your-jwt-secret-key-here`
+- **Required**: No (only if implementing JWT authentication)
+
 ## Environment File Setup
 
 ### 1. Create `.env.local` file

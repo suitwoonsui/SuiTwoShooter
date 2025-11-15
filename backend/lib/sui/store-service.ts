@@ -832,6 +832,161 @@ export class StoreService {
   }
 
   /**
+   * Admin function to add items to a player's inventory
+   * Used for: testing, promotions, refunds, corrections
+   * 
+   * @param playerAddress - Player wallet address
+   * @param items - Array of items to add
+   * @returns Transaction result
+   */
+  async adminAddItems(
+    playerAddress: string,
+    items: Array<{ itemId: string; level: number; quantity: number }>
+  ): Promise<{
+    success: boolean;
+    digest?: string;
+    error?: string;
+  }> {
+    try {
+      console.log('🎁 [ADMIN ADD] Adding items to inventory');
+      console.log(`   Player: ${playerAddress}`);
+      console.log(`   Items: ${JSON.stringify(items)}`);
+
+      // Get contract configuration
+      const packageId = this.config.contracts.premiumStore;
+      const storeObjectId = this.config.contracts.premiumStoreObject;
+      const premiumStoreAdminCapability = this.config.contracts.premiumStoreAdminCapability;
+
+      if (!packageId || !storeObjectId) {
+        return {
+          success: false,
+          error: 'Premium store contract not configured',
+        };
+      }
+
+      const adminCapabilityObjectId = premiumStoreAdminCapability;
+
+      if (!adminCapabilityObjectId || adminCapabilityObjectId === '' || adminCapabilityObjectId === '0x...') {
+        return {
+          success: false,
+          error: 'Premium store admin capability not configured',
+        };
+      }
+
+      // Validate items
+      const itemTypeMap: Record<string, number> = {
+        extraLives: 0,
+        forceField: 1,
+        orbLevel: 2,
+        slowTime: 3,
+        destroyAll: 4,
+        bossKillShot: 5,
+        coinTractorBeam: 6,
+      };
+
+      // Build transaction
+      const txb = new Transaction();
+
+      // Add each item
+      for (const item of items) {
+        const itemType = itemTypeMap[item.itemId];
+        if (itemType === undefined) {
+          return {
+            success: false,
+            error: `Unknown item ID: ${item.itemId}`,
+          };
+        }
+
+        // Validate item levels
+        if ((item.itemId === 'destroyAll' || item.itemId === 'bossKillShot') && item.level !== 1) {
+          return {
+            success: false,
+            error: `${item.itemId} is a single-level item and must have level 1, got level ${item.level}`,
+          };
+        }
+        if (item.itemId !== 'destroyAll' && item.itemId !== 'bossKillShot') {
+          if (item.level < 1 || item.level > 3) {
+            return {
+              success: false,
+              error: `Invalid level for ${item.itemId}: ${item.level}. Must be between 1 and 3.`,
+            };
+          }
+        }
+
+        console.log(`🔧 [ADMIN ADD] Adding ${item.itemId} level ${item.level} quantity ${item.quantity}`);
+
+        txb.moveCall({
+          target: `${packageId}::premium_store::admin_add_items`,
+          arguments: [
+            txb.object(adminCapabilityObjectId), // Admin capability
+            txb.object(storeObjectId),            // PremiumStore
+            txb.object('0x6'),                    // Clock object
+            txb.pure.address(playerAddress),      // player address
+            txb.pure.u8(itemType),               // item_type
+            txb.pure.u8(item.level),              // item_level
+            txb.pure.u64(item.quantity),         // quantity
+          ],
+        });
+      }
+
+      // Set gas budget
+      txb.setGasBudget(this.config.sui.gasBudget);
+
+      // Sign and execute with admin wallet
+      console.log('🔐 [ADMIN ADD] Signing transaction with admin wallet...');
+      
+      const network = this.config.sui.network;
+      const client = network === 'testnet' 
+        ? this.adminWallet.getTestnetClient()
+        : this.adminWallet.getMainnetClient();
+
+      const result = await client.signAndExecuteTransaction({
+        signer: this.adminWallet.getKeypair(),
+        transaction: txb,
+        options: {
+          showEffects: true,
+          showEvents: true,
+        },
+      });
+
+      // Check if transaction succeeded
+      if (result.effects?.status?.status === 'success') {
+        console.log('✅ [ADMIN ADD] Items added successfully!');
+        console.log(`   Transaction Digest: ${result.digest}`);
+        console.log(`   Gas paid by: Admin wallet (${this.adminWallet.getAddress()})`);
+
+        return {
+          success: true,
+          digest: result.digest,
+        };
+      } else {
+        const errorDetails = result.effects?.status?.error;
+        console.error('❌ [ADMIN ADD] Transaction failed:', JSON.stringify(errorDetails, null, 2));
+        
+        let errorMessage = 'Unknown error';
+        if (errorDetails) {
+          if (typeof errorDetails === 'string') {
+            errorMessage = errorDetails;
+          } else {
+            errorMessage = JSON.stringify(errorDetails);
+          }
+        }
+        
+        return {
+          success: false,
+          error: `Transaction failed: ${errorMessage}`,
+        };
+      }
+    } catch (error) {
+      console.error('❌ [ADMIN ADD] Error adding items:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Verify transaction status
    * 
    * @param transactionDigest - Transaction digest to verify
