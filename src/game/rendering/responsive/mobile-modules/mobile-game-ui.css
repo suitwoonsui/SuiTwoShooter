@@ -26,8 +26,9 @@
   /* Constrain to viewport dimensions */
   max-width: 100vw;
   /* Prefer dynamic viewport on modern browsers, fallback to JS-set --app-vh */
-  max-height: calc(100dvh - 12vh); /* Viewport minus header height (max 12vh) */
-  max-height: calc((var(--app-vh, 1vh) * 100) - 12vh);
+  /* Account for both header (max 12vh) and consumable footer (max 12vh) */
+  max-height: calc(100dvh - 12vh - 12vh); /* Viewport minus header and footer */
+  max-height: calc((var(--app-vh, 1vh) * 100) - 12vh - 12vh);
   
   /* Scale game content to fit while maintaining 5:3 aspect ratio */
   object-fit: contain;

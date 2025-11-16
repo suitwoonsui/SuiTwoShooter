@@ -70,9 +70,13 @@ const MobileUI = {
         stats: []
       },
       footer: {
-        show: false, // Hide footer on mobile to save space
+        show: false, // Hide regular footer on mobile (consumable footer is separate)
         compact: true,
         controls: []
+      },
+      consumableFooter: {
+        show: true, // Show consumable footer on mobile
+        compact: true
       },
       menu: {
         buttonSize: 'extra-large',
@@ -127,6 +131,11 @@ const MobileUI = {
     
     // Apply footer layout
     this.applyFooterLayout(layout.footer);
+    
+    // Apply consumable footer layout (mobile only)
+    if (layout.consumableFooter) {
+      this.applyConsumableFooterLayout(layout.consumableFooter);
+    }
     
     // Apply menu layout
     this.applyMenuLayout(layout.menu);
@@ -292,6 +301,35 @@ const MobileUI = {
         control.classList.remove('control-item-visible');
       }
     });
+  },
+
+  applyConsumableFooterLayout(consumableFooterConfig) {
+    const footer = document.getElementById('consumable-footer');
+    if (!footer) {
+      // Footer will be created by ConsumableSystem.setupMobileFooter()
+      console.log('📱 [MOBILE UI] Consumable footer not found, will be created by ConsumableSystem');
+      return;
+    }
+    
+    if (!consumableFooterConfig.show) {
+      footer.classList.add('consumable-footer-hidden');
+      footer.classList.remove('consumable-footer-visible');
+      footer.style.display = 'none';
+      return;
+    }
+    
+    footer.classList.add('consumable-footer-visible');
+    footer.classList.remove('consumable-footer-hidden');
+    footer.style.display = 'flex';
+    
+    // Apply compact styling
+    if (consumableFooterConfig.compact) {
+      footer.classList.add('mobile-compact');
+    } else {
+      footer.classList.remove('mobile-compact');
+    }
+    
+    console.log('📱 [MOBILE UI] Consumable footer layout applied');
   },
 
   applyMenuLayout(menuConfig) {

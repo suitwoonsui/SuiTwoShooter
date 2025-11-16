@@ -82,29 +82,38 @@ function updateWalletUI(address) {
   const connectBtnText = document.getElementById('connectWalletBtnText');
   const walletAddressDisplay = document.getElementById('walletAddressDisplay');
   const walletAddressValue = document.getElementById('walletAddressValue');
+  const walletConnectedState = document.getElementById('walletConnectedState');
+  const walletAddressCompact = document.getElementById('walletAddressCompact');
+  const walletBalanceCompact = document.getElementById('walletBalanceCompact');
   
   if (address) {
-    // Wallet connected
-    if (walletStatusText) {
-      walletStatusText.innerHTML = '<span class="wallet-icon">✅</span><span>Wallet connected</span>';
-    }
+    // Wallet connected - show compact connected state
     if (connectBtn) {
       connectBtn.style.display = 'none';
     }
-    if (walletAddressDisplay) {
-      walletAddressDisplay.style.display = 'flex';
+    if (walletConnectedState) {
+      walletConnectedState.style.display = 'flex';
     }
-    if (walletAddressValue && window.walletAPIInstance) {
-      walletAddressValue.textContent = window.walletAPIInstance.formatAddress(address);
+    if (walletAddressCompact && window.walletAPIInstance) {
+      walletAddressCompact.textContent = window.walletAPIInstance.formatAddress(address);
+    }
+    // Hide balance - only show address
+    if (walletBalanceCompact) {
+      walletBalanceCompact.style.display = 'none';
+    }
+    // Hide old display elements (for backward compatibility)
+    if (walletAddressDisplay) {
+      walletAddressDisplay.style.display = 'none';
     }
   } else {
-    // Wallet not connected
-    if (walletStatusText) {
-      walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect wallet to play</span>';
-    }
+    // Wallet not connected - show connect button
     if (connectBtn) {
       connectBtn.style.display = 'flex';
     }
+    if (walletConnectedState) {
+      walletConnectedState.style.display = 'none';
+    }
+    // Hide old display elements (for backward compatibility)
     if (walletAddressDisplay) {
       walletAddressDisplay.style.display = 'none';
     }
@@ -274,35 +283,10 @@ function closeGame() {
 }
 
 // Main menu functions
-// Update wallet requirements UI
+// Update wallet requirements UI (simplified - no tooltip)
 function updateWalletRequirementsUI(walletConnected, hasMinimumBalance) {
-  const walletRequirement = document.getElementById('walletRequirement');
-  const mewsRequirement = document.getElementById('mewsRequirement');
-  const requirementsNotice = document.getElementById('walletRequirementsNotice');
-  
-  if (requirementsNotice) {
-    requirementsNotice.style.display = (!walletConnected || !hasMinimumBalance) ? 'block' : 'none';
-  }
-  
-  if (walletRequirement) {
-    if (walletConnected) {
-      walletRequirement.innerHTML = '✅ <span style="text-decoration: line-through;">Connect your Sui wallet</span>';
-      walletRequirement.style.color = '#00ff00';
-    } else {
-      walletRequirement.innerHTML = '🔗 Connect your Sui wallet (Slush, Sui Wallet, Surf, Suiet, Ethos, OKX, Phantom, Klever, Trust, Coinbase, or any Sui-compatible wallet)';
-      walletRequirement.style.color = '#ff4444';
-    }
-  }
-  
-  if (mewsRequirement) {
-    if (hasMinimumBalance) {
-      mewsRequirement.innerHTML = '✅ <span style="text-decoration: line-through;">Have at least 500,000 $MEWS tokens</span>';
-      mewsRequirement.style.color = '#00ff00';
-    } else {
-      mewsRequirement.innerHTML = '💰 Have at least 500,000 $MEWS tokens';
-      mewsRequirement.style.color = '#ff4444';
-    }
-  }
+  // Minimum notice visibility is handled by updateBalanceUI
+  // This function is kept for backward compatibility
 }
 
 // Check MEWS balance and update UI
@@ -383,17 +367,36 @@ async function checkMEWSBalanceAndUpdateUI(address) {
 
 // Update balance UI display
 function updateBalanceUI(balance, hasMinimum) {
-  // Update balance display if element exists
+  // Balance is not shown in compact wallet UI - only address is displayed
+  // Keep balance display hidden in compact view
+  const walletBalanceCompact = document.getElementById('walletBalanceCompact');
+  if (walletBalanceCompact) {
+    walletBalanceCompact.style.display = 'none';
+  }
+  
+  // Update balance display below the button (in game-title)
   const balanceDisplay = document.getElementById('mewsBalanceDisplay');
   const balanceElement = document.getElementById('mewsBalance');
   
   if (balanceDisplay && balanceElement) {
     if (balance) {
-      balanceDisplay.style.display = 'block';
+      balanceDisplay.style.display = 'flex'; /* Use flex to align properly */
       balanceElement.textContent = `${balance} $MEWS`;
-      balanceElement.style.color = hasMinimum ? '#00ff00' : '#ff4444';
+      balanceElement.style.color = hasMinimum ? '#39ff14' : '#ff4444';
     } else {
       balanceDisplay.style.display = 'none';
+    }
+  }
+  
+  // Show/hide minimum requirement notice based on balance
+  const minimumNotice = document.getElementById('walletMinimumNotice');
+  if (minimumNotice) {
+    if (hasMinimum && balance) {
+      // Hide notice if wallet has enough MEWS
+      minimumNotice.style.display = 'none';
+    } else {
+      // Show notice if wallet doesn't have enough or balance is unknown
+      minimumNotice.style.display = 'flex';
     }
   }
 }
@@ -412,9 +415,9 @@ function disableStartGameButton() {
   const startGameBtn = document.getElementById('startGameBtn');
   if (startGameBtn) {
     startGameBtn.disabled = true;
-    startGameBtn.title = 'Requirements: Connect wallet and have at least 500,000 $MEWS tokens';
     startGameBtn.style.opacity = '0.5';
     startGameBtn.style.cursor = 'not-allowed';
+    // Tooltip will be updated by updateWalletRequirementsUI
   }
 }
 
@@ -510,6 +513,14 @@ async function startGameInternal() {
       visible: gameContainer.classList.contains('game-container-visible'),
       hidden: gameContainer.classList.contains('game-container-hidden')
     });
+    
+    // Re-apply mobile UI layout to ensure consumable footer is shown
+    if (typeof MobileUI !== 'undefined' && MobileUI.isInitialized) {
+      const layout = MobileUI.layouts[MobileUI.currentLayout];
+      if (layout && layout.consumableFooter) {
+        MobileUI.applyConsumableFooterLayout(layout.consumableFooter);
+      }
+    }
   }
   
   // Reinitialize responsive canvas system for current screen size

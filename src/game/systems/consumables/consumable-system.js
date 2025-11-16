@@ -403,11 +403,21 @@ const ConsumableSystem = {
       
       footer.appendChild(buttonContainer);
       
-      // Append to viewport container
+      // Append to viewport container (as flex child, like header)
       const viewportContainer = document.querySelector('.viewport-container');
       if (viewportContainer) {
         viewportContainer.appendChild(footer);
-        console.log('📱 [CONSUMABLES] Mobile footer created');
+        console.log('📱 [CONSUMABLES] Mobile footer created and added to viewport-container');
+        
+        // Apply mobile UI layout if available
+        if (typeof MobileUI !== 'undefined' && MobileUI.isInitialized) {
+          const layout = MobileUI.layouts[MobileUI.currentLayout];
+          if (layout && layout.consumableFooter) {
+            MobileUI.applyConsumableFooterLayout(layout.consumableFooter);
+          }
+        }
+      } else {
+        console.warn('⚠️ [CONSUMABLES] Viewport container not found, cannot add mobile footer');
       }
     }
   },

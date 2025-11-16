@@ -2,7 +2,10 @@
 /* CONSUMABLE FOOTER - MOBILE & DESKTOP */
 /* ========================================== */
 
-.consumable-footer {
+/* Desktop: Fixed position footer (overlay) - when NOT inside viewport-container */
+/* This applies to footers that are siblings of game-container (desktop) */
+body > .consumable-footer,
+.game-container ~ .consumable-footer {
   position: fixed;
   bottom: 0;
   left: 0;
@@ -18,6 +21,31 @@
   padding: min(1vh, 1.5vw) 0;
 }
 
+/* Mobile: Flex layout footer (shrinks canvas, like header) */
+.viewport-container .consumable-footer {
+  flex: 0 0 auto;
+  width: 100%;
+  position: relative; /* Not fixed on mobile */
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 20, 25, 0.9) 100%);
+  border-top: 3px solid #4DA2FF;
+  box-shadow: 0 -4px 20px rgba(77, 162, 255, 0.3);
+  backdrop-filter: blur(15px);
+  min-height: max(6vh, fit-content);
+  max-height: none;
+  padding: 1vh 1.5vw;
+  z-index: 10; /* Same as header */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Mobile compact footer (matches header mobile-compact) */
+.consumable-footer.mobile-compact {
+  padding: 0.8vh 1.2vw;
+  min-height: max(5vh, fit-content);
+  max-height: none;
+}
+
 .consumable-buttons {
   display: flex;
   justify-content: center;
@@ -28,14 +56,14 @@
 }
 
 .consumable-button {
-  width: min(12vw, 15vh, 56px);
-  height: min(12vw, 15vh, 56px);
-  min-width: 48px;
-  min-height: 48px;
-  max-width: 56px;
-  max-height: 56px;
+  width: min(4vw, 5vh, 40px);
+  height: min(4vw, 5vh, 40px);
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 40px;
+  max-height: 40px;
   border-radius: 50%;
-  border: min(0.3vh, 0.4vw) solid rgba(77, 162, 255, 0.5);
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.5);
   background: rgba(15, 20, 25, 0.9);
   display: flex;
   justify-content: center;
@@ -47,9 +75,7 @@
 }
 
 .consumable-button .consumable-icon {
-  font-size: min(6vw, 8vh, 28px);
-  min-font-size: 24px;
-  max-font-size: 28px;
+  font-size: min(3vw, 2.5vh, 20px);
   line-height: 1;
   user-select: none;
   pointer-events: none;
@@ -76,32 +102,33 @@
   }
 }
 
-/* Available state - bright and active */
+/* Available state - bright and active (matches desktop footer items) */
 .consumable-button.available {
-  background: rgba(77, 162, 255, 0.3);
-  border-color: rgba(77, 162, 255, 0.8);
-  box-shadow: 0 0 min(1.5vh, 2vw) rgba(77, 162, 255, 0.5);
   opacity: 1;
+  background: rgba(77, 162, 255, 0.15);
+  border-color: rgba(77, 162, 255, 0.5);
+  box-shadow: 0 0 10px rgba(77, 162, 255, 0.3);
 }
 
 .consumable-button.available:active {
   transform: scale(0.9);
-  box-shadow: 0 0 min(2vh, 2.5vw) rgba(77, 162, 255, 0.8);
+  background: rgba(77, 162, 255, 0.25);
+  box-shadow: 0 0 15px rgba(77, 162, 255, 0.5);
 }
 
-/* Unavailable state - darkened */
+/* Unavailable state - darkened (matches desktop footer items) */
 .consumable-button.unavailable,
 .consumable-button:disabled {
   opacity: 0.3;
-  background: rgba(15, 20, 25, 0.5);
-  border-color: rgba(77, 162, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
   cursor: not-allowed;
   box-shadow: none;
 }
 
-/* Footer visible on both mobile and desktop */
-
+/* Footer visibility - Desktop (fixed position, sibling of game-container) */
 /* Ensure footer is only visible during game */
+body > .consumable-footer,
 .game-container-hidden ~ .consumable-footer {
   display: none;
 }
@@ -109,5 +136,16 @@
 /* Show footer only when game is running */
 .game-container-visible ~ .consumable-footer {
   display: flex;
+}
+
+/* Footer visibility - Mobile (flex layout in viewport-container) */
+/* Visibility is controlled by mobile UI system via applyConsumableFooterLayout */
+/* Footer should be hidden by default, shown only when game is running and layout says to show it */
+.viewport-container .consumable-footer {
+  display: none; /* Hidden by default */
+}
+
+.viewport-container .consumable-footer.consumable-footer-visible {
+  display: flex; /* Shown when mobile UI system says so */
 }
 

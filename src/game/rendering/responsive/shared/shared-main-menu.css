@@ -87,10 +87,21 @@
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: min(2vw, 2vh);
   flex-shrink: 0; /* Don't shrink the title */
+  flex-wrap: wrap; /* Allow wrapping on small screens */
+  width: 100%;
+}
+
+/* Game title left section (title + badge) */
+.game-title-left {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: min(2vw, 2vh);
   flex-wrap: nowrap;
+  flex: 1;
+  min-width: 0; /* Allow shrinking */
 }
 
 /* Ensure badge has breathing room next to title */
@@ -191,18 +202,99 @@
   grid-auto-rows: minmax(auto, 1fr); /* Allow rows to grow based on button content */
 }
 
-/* Wallet Connection Section - Full Width */
-.wallet-connection-section {
-  grid-column: 1 / -1; /* Span full width */
+/* Wallet Connection Section - Compact, Upper Right (like Insomnia) */
+.game-title .wallet-connection-section {
   display: flex;
   flex-direction: column;
-  gap: min(1vw, 1.5vh);
-  margin-bottom: min(1vw, 1.5vh);
-  padding: min(1.5vw, 2vh);
-  background: rgba(77, 162, 255, 0.05);
-  border: 2px solid rgba(77, 162, 255, 0.2);
-  border-radius: 15px;
-  backdrop-filter: blur(10px);
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: min(0.5vh, 0.8vw);
+  flex-shrink: 0;
+  margin-left: auto; /* Push wallet to the right */
+  /* Remove grid-column - no longer in grid */
+  grid-column: unset;
+  margin-bottom: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+
+/* Button container - keeps button and connected state in same position */
+.wallet-button-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  position: relative; /* For absolute positioning of children */
+}
+
+/* Ensure button and connected state are absolutely positioned in same spot */
+.wallet-button-container .wallet-connect-btn,
+.wallet-button-container .wallet-connected-state {
+  position: relative;
+}
+
+/* Balance display - below the button */
+.game-title .wallet-balance-display {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: min(0.5vw, 0.8vh);
+  font-size: clamp(9px, min(1.3vh, 1.6vw), 11px);
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  margin-top: min(0.3vh, 0.5vw);
+  text-align: right;
+}
+
+.game-title .wallet-balance-label {
+  font-size: inherit;
+  color: inherit;
+}
+
+.game-title .wallet-balance-value {
+  font-size: inherit;
+  font-weight: 600;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
+}
+
+/* Minimum requirement notice - below balance */
+.wallet-connection-section .wallet-minimum-notice {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: min(0.3vw, 0.4vh);
+  margin-top: min(0.2vh, 0.3vw);
+  font-size: clamp(8px, min(1.1vh, 1.3vw), 10px);
+  color: #ffa500;
+  white-space: nowrap;
+  text-align: right;
+  -webkit-text-fill-color: #ffa500;
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+
+.wallet-connection-section .wallet-minimum-notice .minimum-notice-icon {
+  font-size: clamp(9px, min(1.2vh, 1.4vw), 11px);
+  flex-shrink: 0;
+  color: #ffa500;
+  -webkit-text-fill-color: #ffa500;
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+
+.wallet-connection-section .wallet-minimum-notice .minimum-notice-text {
+  font-size: inherit;
+  color: #ffa500;
+  -webkit-text-fill-color: #ffa500;
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
 }
 
 .wallet-status {
@@ -224,9 +316,134 @@
   font-size: clamp(14px, min(2.2vh, 2.6vw), 20px);
 }
 
-.wallet-connection-section .menu-btn.wallet-btn {
-  width: 100%;
-  min-height: clamp(50px, min(8vh, 9vw), 70px);
+/* Compact Wallet Connect Button (like Insomnia) */
+.wallet-connect-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: min(0.8vw, 1vh);
+  padding: min(1.2vh, 1.5vw) min(2vw, 2.5vh);
+  background: #4DA2FF; /* Single color - Sui blue */
+  color: #ffffff;
+  font-weight: 600;
+  font-size: clamp(11px, min(1.8vh, 2vw), 14px);
+  border: 2px solid #4DA2FF;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(77, 162, 255, 0.3);
+  white-space: nowrap;
+  min-width: fit-content;
+  line-height: 1.2;
+  /* Reset any inherited gradient text effects from .game-title h1 */
+  -webkit-text-fill-color: #ffffff;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+
+.wallet-connect-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(77, 162, 255, 0.5);
+  background: #3A7BD5; /* Darker blue on hover */
+  border-color: #3A7BD5;
+}
+
+.wallet-connect-btn:active {
+  transform: scale(0.95);
+  background: #2E5FA3; /* Even darker on active */
+}
+
+/* Button content - ensure text and icons are visible */
+.wallet-connect-btn span {
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  display: inline-block;
+  font-size: inherit;
+  line-height: inherit;
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+
+.wallet-connect-btn .btn-icon {
+  font-size: clamp(12px, min(2vh, 2.2vw), 16px);
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  line-height: 1;
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+
+.wallet-connect-btn #connectWalletBtnText {
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+
+/* Wallet Connected State - Compact (like Insomnia) */
+/* Uses same base styles as .wallet-connect-btn to stay in same position */
+.wallet-connected-state.wallet-connect-btn {
+  /* Inherits all styles from .wallet-connect-btn */
+  /* Only override what's different */
+  cursor: default; /* Not clickable like the connect button */
+}
+
+.wallet-connected-info {
+  display: flex;
+  align-items: center;
+  gap: min(0.8vw, 1vh);
+  min-width: 0;
+  flex: 1;
+}
+
+.wallet-address-compact {
+  font-size: clamp(11px, min(1.8vh, 2vw), 14px);
+  font-family: 'Courier New', monospace;
+  color: #ffffff;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  /* Reset any inherited gradient text effects */
+  -webkit-text-fill-color: #ffffff;
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+}
+
+/* Hide balance - only show address */
+.wallet-balance-compact {
+  display: none;
+}
+
+.wallet-disconnect-btn-compact {
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  color: #ff4444;
+  width: clamp(20px, min(3vh, 3.5vw), 24px);
+  height: clamp(20px, min(3vh, 3.5vw), 24px);
+  border-radius: 50%;
+  font-size: clamp(12px, min(2vh, 2.2vw), 14px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.wallet-disconnect-btn-compact:hover {
+  background: rgba(255, 0, 0, 0.2);
+  border-color: #ff4444;
+  transform: scale(1.1);
 }
 
 .wallet-address-display {
@@ -382,3 +599,9 @@
   font-weight: bold;
   text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
 }
+
+/* ========================================== */
+/* START GAME BUTTON TOOLTIP - REMOVED */
+/* Tooltip functionality has been removed.
+/* Minimum requirement is now shown as a notice below the balance display.
+/* ========================================== */

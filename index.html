@@ -151,40 +151,50 @@
   <div class="main-menu-overlay main-menu-overlay-hidden" id="mainMenuOverlay">
     <div class="main-menu-content">
       <div class="game-title">
-        <h1><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
-        <div class="version-badge">Alpha v0.1</div>
-      </div>
-      
-      <div class="menu-buttons">
-        <!-- Wallet Connection Section -->
+        <div class="game-title-left">
+          <h1><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+          <div class="version-badge">Alpha v0.1</div>
+        </div>
+        <!-- Wallet Connection Section - Upper Right (like Insomnia) -->
         <div class="wallet-connection-section" id="walletConnectionSection">
-          <div class="wallet-requirements-notice" id="walletRequirementsNotice" style="background: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.5); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: block;">
-            <p class="requirements-title" style="margin: 0 0 8px 0; font-weight: bold; color: #ffc107; font-size: 14px;">⚠️ Requirements to Play:</p>
-            <ul class="requirements-list" style="margin: 0; padding-left: 20px; list-style: none;">
-              <li id="walletRequirement" style="margin: 4px 0; font-size: 13px;">🔗 Connect your Sui wallet (Slush, Sui Wallet, Surf, Suiet, Ethos, OKX, Phantom, Klever, Trust, Coinbase, or any Sui-compatible wallet)</li>
-              <li id="mewsRequirement" style="margin: 4px 0; font-size: 13px;">💰 Have at least 500,000 $MEWS tokens</li>
-            </ul>
-          </div>
           <div class="wallet-status" id="walletStatus">
-            <div class="wallet-status-text" id="walletStatusText">
+            <div class="wallet-status-text" id="walletStatusText" style="display: none;">
               <span class="wallet-icon">🔒</span>
-              <span>Connect Slush Wallet to play</span>
+              <span>Connect Wallet</span>
             </div>
           </div>
-          <button class="menu-btn wallet-btn" id="connectWalletBtn" onclick="handleConnectWallet()" onmouseover="playMenuHoverSound()">
-            <span class="btn-icon">🔗</span>
-            <span id="connectWalletBtnText">Connect Wallet</span>
-          </button>
+          <!-- Button container - button and connected state share the same space -->
+          <div class="wallet-button-container">
+            <button class="wallet-connect-btn" id="connectWalletBtn" onclick="handleConnectWallet()" onmouseover="playMenuHoverSound()">
+              <span class="btn-icon">🔗</span>
+              <span id="connectWalletBtnText">Connect</span>
+            </button>
+            <div class="wallet-connected-state wallet-connect-btn" id="walletConnectedState" style="display: none;">
+              <div class="wallet-connected-info">
+                <div class="wallet-address-compact" id="walletAddressCompact"></div>
+              </div>
+              <button class="wallet-disconnect-btn-compact" onclick="handleDisconnectWallet()" title="Disconnect">✕</button>
+            </div>
+          </div>
+          <!-- Balance display - below the button -->
+          <div class="wallet-balance-display" id="mewsBalanceDisplay" style="display: none;">
+            <span class="wallet-balance-value" id="mewsBalance">--</span>
+          </div>
+          <!-- Minimum requirement notice -->
+          <div class="wallet-minimum-notice" id="walletMinimumNotice">
+            <span class="minimum-notice-icon">⚠️</span>
+            <span class="minimum-notice-text">Min: 500K Mews Required</span>
+          </div>
+          <!-- Legacy display elements (for backward compatibility) -->
           <div class="wallet-address-display" id="walletAddressDisplay" style="display: none;">
             <span class="wallet-address-label">Connected:</span>
             <span class="wallet-address-value" id="walletAddressValue"></span>
             <button class="wallet-disconnect-btn" onclick="handleDisconnectWallet()" title="Disconnect">✕</button>
           </div>
-          <div class="wallet-balance-display" id="mewsBalanceDisplay" style="display: none;">
-            <span class="wallet-balance-label">$MEWS Balance:</span>
-            <span class="wallet-balance-value" id="mewsBalance">--</span>
-          </div>
         </div>
+      </div>
+      
+      <div class="menu-buttons">
         
         <button class="menu-btn primary" id="startGameBtn" onclick="startGame()" onmouseover="playMenuHoverSound()" disabled>
           <span class="btn-icon">▶️</span>
