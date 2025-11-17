@@ -232,7 +232,7 @@ export default function AdminAddItemsPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', display: isAdminWalletConnected ? 'flex' : 'none' }}>
+        <form onSubmit={handleSubmit} style={{ display: isAdminWalletConnected ? 'flex' : 'none', flexDirection: 'column', gap: '1.5rem' }}>
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
             Player Address:
