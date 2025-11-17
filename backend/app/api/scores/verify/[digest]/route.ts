@@ -35,6 +35,21 @@ function getCreatedObjectChange(change: unknown): { objectId: string; objectType
   };
 }
 
+// Type for score submitted event data
+type ScoreSubmittedEventData = {
+  player: string;
+  score: number;
+  distance: number;
+  coins: number;
+  bosses_defeated: number;
+  enemies_defeated: number;
+  longest_coin_streak: number;
+  player_name: string | number[];
+  session_id: string | number[];
+  timestamp: number;
+  [key: string]: unknown;
+};
+
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
@@ -98,9 +113,9 @@ export async function GET(
     }
 
     // Parse event data if available
-    let eventData = null;
+    let eventData: ScoreSubmittedEventData | null = null;
     if (scoreEvent && scoreEvent.parsedJson) {
-      eventData = scoreEvent.parsedJson;
+      eventData = scoreEvent.parsedJson as ScoreSubmittedEventData;
     }
 
     // Helper function to decode byte arrays (vector<u8> from Move)
