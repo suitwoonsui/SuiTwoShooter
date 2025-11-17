@@ -100,10 +100,14 @@ export default function AdminAddItemsPage() {
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...items];
+    const item = newItems[index];
+    
     if (field === 'level' || field === 'quantity') {
-      newItems[index][field] = parseInt(value) || 1;
+      (item as any)[field] = parseInt(value) || 1;
+    } else if (field === 'itemId') {
+      item.itemId = value;
     } else {
-      newItems[index][field] = value;
+      (item as any)[field] = value;
     }
     setItems(newItems);
   };
