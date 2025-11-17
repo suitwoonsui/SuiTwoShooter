@@ -6,6 +6,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 
+// Type guard for created object changes
+type CreatedObjectChange = {
+  type: 'created';
+  objectId: string;
+  objectType: string;
+  [key: string]: unknown;
+};
+
+function isCreatedObjectChange(change: unknown): change is CreatedObjectChange {
+  if (typeof change !== 'object' || change === null) {
+    return false;
+  }
+  
+  const obj = change as Record<string, unknown>;
+  
+  return (
+    obj.type === 'created' &&
+    typeof obj.objectId === 'string' &&
+    typeof obj.objectType === 'string'
+  );
+}
+
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
@@ -46,15 +68,16 @@ export async function GET(
     });
 
     // Extract GameSession object and ScoreSubmitted event
-    const gameSession = tx.objectChanges?.find(
-      (change: any) => change.type === 'created' && change.objectType?.includes('GameSession')
+    const gameSessionChange = tx.objectChanges?.find(
+      (change): change is CreatedObjectChange => 
+        isCreatedObjectChange(change) && change.objectType.includes('GameSession')
     );
 
     const scoreEvent = tx.events?.find(
       (event: any) => event.type?.includes('ScoreSubmitted')
     );
 
-    if (!gameSession && !scoreEvent) {
+    if (!gameSessionChange && !scoreEvent) {
       return NextResponse.json(
         { 
           error: 'No game session data found in transaction',
@@ -89,9 +112,9 @@ export async function GET(
         status: tx.effects?.status?.status,
         timestamp: tx.timestampMs,
       },
-      gameSession: gameSession ? {
-        objectId: gameSession.objectId,
-        objectType: gameSession.objectType,
+      gameSession: gameSessionChange ? {
+        objectId: gameSessionChange.objectId,
+        objectType: gameSessionChange.objectType,
       } : null,
       event: eventData ? {
         player: eventData.player,
