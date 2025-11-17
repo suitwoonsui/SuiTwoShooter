@@ -7,14 +7,8 @@ import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 
 // Type guard for created object changes
-type CreatedObjectChange = {
-  type: 'created';
-  objectId: string;
-  objectType: string;
-  [key: string]: unknown;
-};
-
-function isCreatedObjectChange(change: unknown): change is CreatedObjectChange {
+// SuiObjectChange is a union type, we need to check for the 'created' variant
+function isCreatedObjectChange(change: unknown): boolean {
   if (typeof change !== 'object' || change === null) {
     return false;
   }
@@ -26,6 +20,19 @@ function isCreatedObjectChange(change: unknown): change is CreatedObjectChange {
     typeof obj.objectId === 'string' &&
     typeof obj.objectType === 'string'
   );
+}
+
+// Helper to safely access created object change properties
+function getCreatedObjectChange(change: unknown): { objectId: string; objectType: string } | null {
+  if (!isCreatedObjectChange(change)) {
+    return null;
+  }
+  
+  const obj = change as { objectId: string; objectType: string };
+  return {
+    objectId: obj.objectId,
+    objectType: obj.objectType,
+  };
 }
 
 // Handle CORS preflight
@@ -68,10 +75,13 @@ export async function GET(
     });
 
     // Extract GameSession object and ScoreSubmitted event
-    const gameSessionChange = tx.objectChanges?.find(
-      (change): change is CreatedObjectChange => 
-        isCreatedObjectChange(change) && change.objectType.includes('GameSession')
+    const gameSessionChangeRaw = tx.objectChanges?.find(
+      (change) => 
+        isCreatedObjectChange(change) && 
+        (change as { objectType: string }).objectType.includes('GameSession')
     );
+    
+    const gameSessionChange = gameSessionChangeRaw ? getCreatedObjectChange(gameSessionChangeRaw) : null;
 
     const scoreEvent = tx.events?.find(
       (event: any) => event.type?.includes('ScoreSubmitted')
