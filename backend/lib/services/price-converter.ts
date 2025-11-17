@@ -273,8 +273,8 @@ export class PriceConverter {
           console.log(`📊 [PRICE] Using MEWS price from environment: $${mewsPrice}`);
         } else {
           // Final fallback: use default placeholder
-          mewsPrice = 0.001; // Default placeholder
-          console.warn('⚠️ [PRICE] MEWS price not found on CoinGecko/GeckoTerminal and MEWS_PRICE_USD not set. Using default placeholder ($0.001). Set MEWS_PRICE_USD environment variable to override.');
+          mewsPrice = 0.00001885; // Default placeholder matching .env value
+          console.warn('⚠️ [PRICE] MEWS price not found on CoinGecko/GeckoTerminal and MEWS_PRICE_USD not set. Using default placeholder ($0.00001885). Set MEWS_PRICE_USD environment variable to override.');
         }
       }
 
