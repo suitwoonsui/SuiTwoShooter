@@ -3,15 +3,15 @@
 // Converts USD prices to SUI, MEWS, and USDC using CoinGecko API
 // ==========================================
 
-interface PriceCache {
-  price: number;
-  timestamp: number;
-}
-
 interface TokenPrices {
   sui: number;
   mews: number;
   usdc: number; // USDC is always $1.00, but we'll include it for consistency
+}
+
+interface PriceCache {
+  price: TokenPrices;
+  timestamp: number;
 }
 
 /**
@@ -50,7 +50,7 @@ export class PriceConverter {
         console.log('📊 [PRICE] Using cached prices');
         return {
           success: true,
-          prices: cached.price as TokenPrices,
+          prices: cached.price,
           timestamp: cached.timestamp,
         };
       }
@@ -84,7 +84,7 @@ export class PriceConverter {
           console.warn(`⚠️ [PRICE] Network error, using expired cache`);
           return {
             success: true,
-            prices: cached.price as TokenPrices,
+            prices: cached.price,
             timestamp: cached.timestamp,
           };
         }
@@ -123,7 +123,7 @@ export class PriceConverter {
             console.warn(`⚠️ [PRICE] Using expired cache as fallback`);
             return {
               success: true,
-              prices: cached.price as TokenPrices,
+              prices: cached.price,
               timestamp: cached.timestamp,
             };
           }
@@ -164,7 +164,7 @@ export class PriceConverter {
           console.warn(`⚠️ [PRICE] CoinGecko API error (${suiResponse.status}), using expired cache`);
           return {
             success: true,
-            prices: cached.price as TokenPrices,
+            prices: cached.price,
             timestamp: cached.timestamp,
           };
         }
