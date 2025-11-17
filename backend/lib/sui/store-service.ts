@@ -134,7 +134,7 @@ export class StoreService {
         // getObject returns { data: { content: {...} } }
         // Both should have the same structure
         const fieldData = dynamicField.data || dynamicField;
-        if (!fieldData || !fieldData.content) {
+        if (!fieldData || !('content' in fieldData) || !fieldData.content) {
           console.log('📦 [INVENTORY] No inventory found for player (first time player)');
           return {
             success: true,
@@ -640,7 +640,7 @@ export class StoreService {
           };
         }
 
-        const currentQuantity = inventoryCheck.inventory[inventoryKey] || 0;
+        const currentQuantity = inventoryCheck.inventory?.[inventoryKey] || 0;
         console.log(`   📦 ${item.itemId} level ${item.level}: Have ${currentQuantity}, Need ${item.quantity}`);
         
         if (currentQuantity < item.quantity) {
@@ -666,7 +666,13 @@ export class StoreService {
                               item.itemId === 'bossKillShot' ? 'bossKillShot_1' :
                               item.itemId === 'coinTractorBeam' ? `coinTractorBeam_${item.level}` : null;
           
-          const finalQuantity = finalInventoryCheck.inventory[inventoryKey] || 0;
+          if (!inventoryKey) {
+            return {
+              success: false,
+              error: `Invalid item ID: ${item.itemId}`,
+            };
+          }
+          const finalQuantity = finalInventoryCheck.inventory?.[inventoryKey] || 0;
           console.log(`   📦 Final check: ${inventoryKey} = ${finalQuantity}`);
           
           if (finalQuantity < item.quantity) {
@@ -813,8 +819,9 @@ export class StoreService {
               };
               errorMessage = `Move abort code ${abortCode}: ${errorDescriptions[abortCode] || 'Unknown error'}`;
             }
-          } else if (errorDetails.code) {
-            errorMessage = `Error code ${errorDetails.code}: ${errorDetails.message || 'See contract for details'}`;
+          } else if (typeof errorDetails === 'object' && errorDetails !== null && 'code' in errorDetails) {
+            const errorObj = errorDetails as { code?: unknown; message?: unknown };
+            errorMessage = `Error code ${errorObj.code}: ${errorObj.message || 'See contract for details'}`;
           } else {
             errorMessage = JSON.stringify(errorDetails);
           }

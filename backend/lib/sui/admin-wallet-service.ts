@@ -141,6 +141,9 @@ export class AdminWalletService {
       bossesDefeated: number;
       enemiesDefeated: number;
       longestCoinStreak: number;
+      bossTiers?: number[];      // Optional: for exact score calculation
+      enemyTypes?: number[];      // Optional: for exact score calculation
+      bossHits?: number;          // Optional: total damage dealt to bosses
     },
     playerName: string = '',
     sessionId: string | null = null
