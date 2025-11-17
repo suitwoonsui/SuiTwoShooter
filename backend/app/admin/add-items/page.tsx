@@ -61,7 +61,7 @@ export default function AdminAddItemsPage() {
     try {
       const result = await window.walletAPIInstance.connect();
       
-      if (result.success) {
+      if (result.success && result.address) {
         const address = result.address.toLowerCase();
         setConnectedAddress(address);
         
