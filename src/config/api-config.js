@@ -90,8 +90,6 @@ const getConfig = () => {
   }
 })();
 
-export default {
-  API_BASE_URL: typeof window !== 'undefined' ? window.GAME_CONFIG?.API_BASE_URL : 'http://localhost:3000/api',
-  WALLET_MODULE_URL: typeof window !== 'undefined' ? window.GAME_CONFIG?.WALLET_MODULE_URL : 'wallet-module/dist/wallet-api.umd.cjs'
-};
+// Note: This file is loaded as a regular script (not ES module), so we don't use export
+// The config is available via window.GAME_CONFIG
 
