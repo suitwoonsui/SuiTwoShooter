@@ -21,6 +21,28 @@ let storeState = {
 async function showStore() {
   console.log('🛒 showStore() called');
   
+  // Check if wallet is connected
+  let walletAddress = null;
+  if (typeof getWalletAddress === 'function') {
+    walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+  
+  if (!walletAddress) {
+    // Show wallet connection modal
+    showStoreWalletConnectModal();
+    return;
+  }
+  
+  // Wallet is connected, proceed to show store
+  await showStoreInternal();
+}
+
+/**
+ * Internal function to show the store (after wallet is confirmed connected)
+ */
+async function showStoreInternal() {
   // Hide main menu
   const mainMenu = document.getElementById('mainMenuOverlay');
   if (mainMenu) {
@@ -42,9 +64,10 @@ async function showStore() {
     // Modal already exists, just show it and refresh inventory
     storeModal.classList.add('store-modal-visible');
     storeModal.classList.remove('store-modal-hidden');
-    // Wait for cards to exist, then load inventory
+    // Wait for cards to exist, then load inventory and balance
     setTimeout(async () => {
       await loadInventoryDisplay();
+      await updateStoreBalance();
       updateStoreUI();
     }, 100);
     return;
@@ -66,20 +89,27 @@ async function showStore() {
     
     <!-- Payment Token Selector -->
     <div class="store-payment-selector">
-      <label>Payment Method:</label>
-      <div class="payment-token-buttons">
-        <button class="payment-token-btn ${storeState.paymentToken === 'mews' ? 'active' : ''}" 
-                onclick="setPaymentToken('mews')" id="paymentTokenMews">
-          <img src="assets/tokens/mews.webp" alt="$MEWS" class="token-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
-          <span class="token-fallback" style="display: none;">💰</span>
-          <span>$MEWS</span>
-        </button>
-        <button class="payment-token-btn ${storeState.paymentToken === 'sui' ? 'active' : ''}" 
-                onclick="setPaymentToken('sui')" id="paymentTokenSui">
-          <img src="assets/tokens/sui.webp" alt="SUI" class="token-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
-          <span class="token-fallback" style="display: none;">💎</span>
-          <span>SUI</span>
-        </button>
+      <div>
+        <label>Payment Method:</label>
+        <div class="payment-token-buttons">
+          <button class="payment-token-btn ${storeState.paymentToken === 'mews' ? 'active' : ''}" 
+                  onclick="setPaymentToken('mews')" id="paymentTokenMews">
+            <img src="assets/SuiTwo_Profile.webp" alt="$MEWS" class="token-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+            <span class="token-fallback" style="display: none;">💰</span>
+            <span>$MEWS</span>
+          </button>
+          <button class="payment-token-btn ${storeState.paymentToken === 'sui' ? 'active' : ''}" 
+                  onclick="setPaymentToken('sui')" id="paymentTokenSui">
+            <img src="assets/sui.svg" alt="SUI" class="token-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+            <span class="token-fallback" style="display: none;">💎</span>
+            <span>SUI</span>
+          </button>
+        </div>
+      </div>
+      <!-- Balance display -->
+      <div class="store-wallet-balance-display" id="storeBalanceDisplay" style="display: none;">
+        <span class="store-balance-label">Balance: </span>
+        <span class="store-balance-value" id="storeBalanceValue">--</span>
       </div>
     </div>
     
@@ -122,8 +152,140 @@ async function showStore() {
   // Load and display inventory (after cards are created)
   await loadInventoryDisplay();
   
+  // Update balance display
+  await updateStoreBalance();
+  
   // Update UI
   updateStoreUI();
+}
+
+/**
+ * Show wallet connection modal for store access
+ */
+function showStoreWalletConnectModal() {
+  const viewportContainer = document.querySelector('.viewport-container');
+  if (!viewportContainer) {
+    console.error('❌ [STORE] Viewport container not found for wallet connect modal');
+    return;
+  }
+  
+  // Remove existing modal if any
+  const existingModal = document.getElementById('storeWalletConnectModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  // Create modal
+  const modal = document.createElement('div');
+  modal.className = 'store-wallet-connect-modal store-wallet-connect-modal-visible';
+  modal.setAttribute('id', 'storeWalletConnectModal');
+  
+  modal.innerHTML = `
+    <div class="store-wallet-connect-content">
+      <div class="store-wallet-connect-header">
+        <h2>🔗 Wallet Required</h2>
+      </div>
+      <div class="store-wallet-connect-body">
+        <p>You need to connect your wallet to access the store.</p>
+        <p class="store-wallet-connect-hint">Connect your Sui wallet to purchase items and manage your inventory.</p>
+      </div>
+      <div class="store-wallet-connect-actions">
+        <button class="menu-btn primary" id="storeWalletConnectBtn" onclick="handleStoreWalletConnect()">
+          <span class="btn-icon">🔗</span> Connect Wallet
+        </button>
+        <button class="menu-btn" onclick="cancelStoreWalletConnect()">
+          <span class="btn-icon">←</span> Back to Menu
+        </button>
+      </div>
+    </div>
+  `;
+  
+  viewportContainer.appendChild(modal);
+  
+  // Add backdrop click handler
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      cancelStoreWalletConnect();
+    }
+  });
+}
+
+/**
+ * Handle wallet connection from store modal
+ */
+async function handleStoreWalletConnect() {
+  const connectBtn = document.getElementById('storeWalletConnectBtn');
+  
+  if (!window.walletAPIInstance) {
+    alert('Wallet API not initialized. Please refresh the page.');
+    return;
+  }
+  
+  // Disable button during connection
+  if (connectBtn) {
+    connectBtn.disabled = true;
+    connectBtn.innerHTML = '<span class="btn-icon">⏳</span> Connecting...';
+  }
+  
+  try {
+    const result = await window.walletAPIInstance.connect();
+    
+    if (result.success) {
+      console.log('✅ [STORE] Wallet connected:', result.address);
+      
+      // Close the wallet connect modal
+      closeStoreWalletConnectModal();
+      
+      // Show the store
+      await showStoreInternal();
+    } else {
+      console.error('❌ [STORE] Wallet connection failed:', result.error);
+      alert(`Failed to connect wallet: ${result.error || 'Unknown error'}`);
+      
+      // Re-enable button
+      if (connectBtn) {
+        connectBtn.disabled = false;
+        connectBtn.innerHTML = '<span class="btn-icon">🔗</span> Connect Wallet';
+      }
+    }
+  } catch (error) {
+    console.error('❌ [STORE] Error connecting wallet:', error);
+    alert(`Error connecting wallet: ${error.message}`);
+    
+    // Re-enable button
+    if (connectBtn) {
+      connectBtn.disabled = false;
+      connectBtn.innerHTML = '<span class="btn-icon">🔗</span> Connect Wallet';
+    }
+  }
+}
+
+/**
+ * Cancel wallet connection and return to main menu
+ */
+function cancelStoreWalletConnect() {
+  closeStoreWalletConnectModal();
+  
+  // Show main menu
+  const mainMenu = document.getElementById('mainMenuOverlay');
+  if (mainMenu) {
+    mainMenu.classList.remove('main-menu-overlay-hidden');
+    mainMenu.classList.add('main-menu-overlay-visible');
+  }
+}
+
+/**
+ * Close wallet connection modal
+ */
+function closeStoreWalletConnectModal() {
+  const modal = document.getElementById('storeWalletConnectModal');
+  if (modal) {
+    modal.classList.remove('store-wallet-connect-modal-visible');
+    modal.classList.add('store-wallet-connect-modal-hidden');
+    setTimeout(() => {
+      modal.remove();
+    }, 300);
+  }
 }
 
 /**
@@ -408,6 +570,9 @@ function setPaymentToken(token) {
   
   // Also update the selected items summary
   updateStoreUI();
+  
+  // Update balance display for selected token
+  updateStoreBalance();
 }
 
 /**
@@ -590,6 +755,9 @@ function updateStoreUI() {
           
           totalUsd += itemTotal;
           selectedItems.push({
+            key: key,
+            itemId: itemId,
+            level: level,
             name: itemName,
             quantity: quantity,
             unitPrice: levelData.usdPrice,
@@ -605,9 +773,9 @@ function updateStoreUI() {
   if (selectedCount > 0) {
     summary.style.display = 'block';
     
-    // Update selected items list
+    // Update selected items list with click handlers
     selectedList.innerHTML = selectedItems.map(item => 
-      `<div class="selected-item">
+      `<div class="selected-item" data-item-key="${item.key}" onclick="removeItemFromSelection('${item.itemId}', ${item.level})" title="Click to remove one">
         <span class="selected-item-name">${item.name}${item.quantity > 1 ? ` × ${item.quantity}` : ''}</span>
         <span class="selected-item-price">${formatUsdPrice(item.totalPrice)}${item.quantity > 1 ? ` (${formatUsdPrice(item.unitPrice)} each)` : ''}</span>
       </div>`
@@ -775,9 +943,146 @@ async function proceedToPurchase() {
     return;
   }
   
+  // Calculate total USD and token amount needed
+  let totalUsd = 0;
+  const items = [];
+  
+  for (const [key, quantity] of Object.entries(storeState.selectedItems)) {
+    if (quantity > 0) {
+      const [itemId, levelStr] = key.split('_');
+      const level = parseInt(levelStr) || 1;
+      
+      items.push({
+        itemId: itemId,
+        level: level,
+        quantity: quantity
+      });
+      
+      // Calculate total for display
+      // Try to get price from backend data, otherwise use fallback
+      const item = getItemById && typeof getItemById === 'function' ? getItemById(itemId) : null;
+      if (item) {
+        const levelData = getItemLevelData && typeof getItemLevelData === 'function' 
+          ? getItemLevelData(itemId, level) 
+          : null;
+        if (levelData) {
+          totalUsd += levelData.usdPrice * quantity;
+        }
+      }
+    }
+  }
+  
+  // Check balance before proceeding
+  const proceedBtn = document.getElementById('proceedToPurchaseBtn');
+  if (proceedBtn) {
+    proceedBtn.disabled = true;
+    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Checking balance...';
+  }
+  
+  try {
+    // Calculate required token amount
+    const tokenConversion = convertUsdToToken(totalUsd, storeState.paymentToken);
+    const requiredTokenAmount = tokenConversion.amount;
+    const tokenSymbol = storeState.paymentToken === 'sui' ? 'SUI' : '$MEWS';
+    
+    // Check user's balance
+    let userBalance = 0;
+    const network = 'testnet'; // Store uses testnet
+    
+    if (storeState.paymentToken === 'mews') {
+      if (window.walletAPIInstance && typeof window.walletAPIInstance.checkMEWSBalance === 'function') {
+        const balanceResult = await window.walletAPIInstance.checkMEWSBalance(walletAddress, network);
+        if (balanceResult.success) {
+          // Parse formatted balance - handle commas and K/M suffixes
+          let balanceStr = balanceResult.formattedBalance.replace(/,/g, '');
+          
+          // Handle K (thousands) and M (millions) suffixes
+          let multiplier = 1;
+          if (balanceStr.endsWith('K')) {
+            multiplier = 1000;
+            balanceStr = balanceStr.replace('K', '');
+          } else if (balanceStr.endsWith('M')) {
+            multiplier = 1000000;
+            balanceStr = balanceStr.replace('M', '');
+          }
+          
+          userBalance = parseFloat(balanceStr) * multiplier;
+        } else {
+          throw new Error('Failed to check MEWS balance');
+        }
+      } else {
+        throw new Error('MEWS balance check not available');
+      }
+    } else if (storeState.paymentToken === 'sui') {
+      if (window.walletAPIInstance && typeof window.walletAPIInstance.checkSUIBalance === 'function') {
+        const balanceResult = await window.walletAPIInstance.checkSUIBalance(walletAddress, network);
+        if (balanceResult.success) {
+          // Use balanceInSUI if available, otherwise parse formatted balance
+          if (balanceResult.balanceInSUI !== undefined) {
+            userBalance = balanceResult.balanceInSUI;
+          } else {
+            // Parse formatted balance (remove commas)
+            userBalance = parseFloat(balanceResult.formattedBalance.replace(/,/g, ''));
+          }
+        } else {
+          throw new Error('Failed to check SUI balance');
+        }
+      } else {
+        throw new Error('SUI balance check not available');
+      }
+    }
+    
+    // Check if user has sufficient balance (add 10% buffer for gas fees)
+    const requiredWithGas = requiredTokenAmount * 1.1;
+    if (userBalance < requiredWithGas) {
+      const shortfall = requiredWithGas - userBalance;
+      const shortfallFormatted = formatTokenAmount(shortfall, storeState.paymentToken);
+      const requiredFormatted = formatTokenAmount(requiredWithGas, storeState.paymentToken);
+      const balanceFormatted = formatTokenAmount(userBalance, storeState.paymentToken);
+      
+      // Show modal popup instead of toast
+      showInsufficientBalanceModal({
+        required: requiredFormatted,
+        balance: balanceFormatted,
+        shortfall: shortfallFormatted,
+        tokenSymbol: tokenSymbol
+      });
+      
+      if (proceedBtn) {
+        proceedBtn.disabled = false;
+        proceedBtn.innerHTML = '<span class="btn-icon">💳</span> Proceed to Purchase';
+      }
+      return;
+    }
+    
+    console.log('✅ [STORE] Balance check passed:', {
+      required: requiredTokenAmount,
+      requiredWithGas,
+      userBalance,
+      token: storeState.paymentToken
+    });
+  } catch (balanceError) {
+    console.error('❌ [STORE] Balance check error:', balanceError);
+    const errorMsg = `Failed to check balance: ${balanceError.message || 'Unknown error'}`;
+    
+    // Show error modal
+    showInsufficientBalanceModal({
+      required: '--',
+      balance: '--',
+      shortfall: '--',
+      tokenSymbol: storeState.paymentToken === 'sui' ? 'SUI' : '$MEWS',
+      customMessage: errorMsg
+    });
+    
+    if (proceedBtn) {
+      proceedBtn.disabled = false;
+      proceedBtn.innerHTML = '<span class="btn-icon">💳</span> Proceed to Purchase';
+    }
+    return;
+  }
+  
   // Show loading state
   storeState.isLoading = true;
-  const proceedBtn = document.getElementById('proceedToPurchaseBtn');
   if (proceedBtn) {
     proceedBtn.disabled = true;
     proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Building transaction...';
@@ -787,35 +1092,6 @@ async function proceedToPurchase() {
     // Get API base URL from config (set by api-config.js)
     const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
     console.log('🔧 [STORE] Purchase using API Base URL:', API_BASE_URL);
-    
-    // Prepare items array for backend
-    const items = [];
-    let totalUsd = 0;
-    
-    for (const [key, quantity] of Object.entries(storeState.selectedItems)) {
-      if (quantity > 0) {
-        const [itemId, levelStr] = key.split('_');
-        const level = parseInt(levelStr) || 1;
-        
-        items.push({
-          itemId: itemId,
-          level: level,
-          quantity: quantity
-        });
-        
-        // Calculate total for display
-        // Try to get price from backend data, otherwise use fallback
-        const item = getItemById && typeof getItemById === 'function' ? getItemById(itemId) : null;
-        if (item) {
-          const levelData = getItemLevelData && typeof getItemLevelData === 'function' 
-            ? getItemLevelData(itemId, level) 
-            : null;
-          if (levelData) {
-            totalUsd += levelData.usdPrice * quantity;
-          }
-        }
-      }
-    }
     
     // Convert payment token to backend format (uppercase)
     const paymentToken = storeState.paymentToken.toUpperCase();
@@ -1060,6 +1336,212 @@ function updateItemCardsInventory(inventory) {
   console.log('✅ [INVENTORY] Finished updating item cards');
 }
 
+/**
+ * Show insufficient balance modal popup
+ */
+function showInsufficientBalanceModal({ required, balance, shortfall, tokenSymbol, customMessage }) {
+  const viewportContainer = document.querySelector('.viewport-container');
+  if (!viewportContainer) {
+    console.error('❌ [STORE] Viewport container not found for balance modal');
+    // Fallback to alert
+    if (customMessage) {
+      alert(customMessage);
+    } else {
+      alert(`Insufficient balance!\n\nRequired: ${required} ${tokenSymbol}\nYou have: ${balance} ${tokenSymbol}\nShortfall: ${shortfall} ${tokenSymbol}\n\nPlease add more ${tokenSymbol} to your wallet or reduce your purchase.`);
+    }
+    return;
+  }
+  
+  // Remove existing modal if any
+  const existingModal = document.getElementById('insufficientBalanceModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  // Create modal
+  const modal = document.createElement('div');
+  modal.className = 'store-balance-error-modal store-balance-error-modal-visible';
+  modal.setAttribute('id', 'insufficientBalanceModal');
+  
+  // Build content based on whether it's a custom message or balance error
+  let bodyContent = '';
+  if (customMessage) {
+    bodyContent = `
+      <p>${customMessage}</p>
+    `;
+  } else {
+    bodyContent = `
+      <p>You don't have enough ${tokenSymbol} to complete this purchase.</p>
+      <div class="store-balance-error-details">
+        <div class="balance-detail-row">
+          <span class="balance-label">Required:</span>
+          <span class="balance-value required">${required} ${tokenSymbol}</span>
+        </div>
+        <div class="balance-detail-row">
+          <span class="balance-label">You have:</span>
+          <span class="balance-value">${balance} ${tokenSymbol}</span>
+        </div>
+        <div class="balance-detail-row">
+          <span class="balance-label">Shortfall:</span>
+          <span class="balance-value shortfall">${shortfall} ${tokenSymbol}</span>
+        </div>
+      </div>
+      <p class="balance-error-hint">Please add more ${tokenSymbol} to your wallet or reduce your purchase.</p>
+    `;
+  }
+  
+  modal.innerHTML = `
+    <div class="store-balance-error-content">
+      <div class="store-balance-error-header">
+        <h2>⚠️ ${customMessage ? 'Error' : 'Insufficient Balance'}</h2>
+      </div>
+      <div class="store-balance-error-body">
+        ${bodyContent}
+      </div>
+      <div class="store-balance-error-actions">
+        <button class="menu-btn primary" onclick="closeInsufficientBalanceModal()">
+          <span class="btn-icon">✓</span> OK
+        </button>
+      </div>
+    </div>
+  `;
+  
+  viewportContainer.appendChild(modal);
+  
+  // Add backdrop click handler
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeInsufficientBalanceModal();
+    }
+  });
+}
+
+/**
+ * Close insufficient balance modal
+ */
+function closeInsufficientBalanceModal() {
+  const modal = document.getElementById('insufficientBalanceModal');
+  if (modal) {
+    modal.classList.remove('store-balance-error-modal-visible');
+    modal.classList.add('store-balance-error-modal-hidden');
+    setTimeout(() => {
+      modal.remove();
+    }, 300);
+  }
+}
+
+/**
+ * Update store balance display based on selected payment token
+ */
+async function updateStoreBalance() {
+  const balanceDisplay = document.getElementById('storeBalanceDisplay');
+  const balanceValue = document.getElementById('storeBalanceValue');
+  
+  if (!balanceDisplay || !balanceValue) {
+    return;
+  }
+  
+  // Get wallet address
+  let walletAddress = null;
+  if (typeof getWalletAddress === 'function') {
+    walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+  
+  if (!walletAddress) {
+    balanceDisplay.style.display = 'none';
+    return;
+  }
+  
+  // Show balance display
+  balanceDisplay.style.display = 'flex';
+  balanceValue.textContent = 'Loading...';
+  
+  try {
+    const token = storeState.paymentToken;
+    console.log('💰 [STORE] Updating balance for token:', token, 'address:', walletAddress);
+    
+    if (token === 'mews') {
+      // Fetch MEWS balance - use testnet for store
+      if (window.walletAPIInstance && typeof window.walletAPIInstance.checkMEWSBalance === 'function') {
+        console.log('💰 [STORE] Fetching MEWS balance...');
+        const balanceResult = await window.walletAPIInstance.checkMEWSBalance(walletAddress, 'testnet');
+        console.log('💰 [STORE] MEWS balance result:', balanceResult);
+        if (balanceResult.success) {
+          balanceValue.textContent = `${balanceResult.formattedBalance} $MEWS`;
+        } else {
+          balanceValue.textContent = 'Error';
+        }
+      } else {
+        console.warn('⚠️ [STORE] checkMEWSBalance not available');
+        balanceValue.textContent = '--';
+      }
+    } else if (token === 'sui') {
+      // Fetch SUI balance using wallet API method
+      console.log('💰 [STORE] Checking for checkSUIBalance method...', {
+        hasInstance: !!window.walletAPIInstance,
+        hasMethod: !!(window.walletAPIInstance && typeof window.walletAPIInstance.checkSUIBalance === 'function'),
+        methods: window.walletAPIInstance ? Object.keys(window.walletAPIInstance) : []
+      });
+      
+      if (window.walletAPIInstance && typeof window.walletAPIInstance.checkSUIBalance === 'function') {
+        console.log('💰 [STORE] Fetching SUI balance using checkSUIBalance...');
+        const balanceResult = await window.walletAPIInstance.checkSUIBalance(walletAddress, 'testnet');
+        console.log('💰 [STORE] SUI balance result:', balanceResult);
+        if (balanceResult.success) {
+          balanceValue.textContent = `${balanceResult.formattedBalance} SUI`;
+        } else {
+          console.error('❌ [STORE] SUI balance check failed:', balanceResult.error);
+          balanceValue.textContent = 'Error';
+        }
+      } else {
+        // Fallback: Use the same pattern as checkMEWSBalance (create client directly)
+        console.log('💰 [STORE] checkSUIBalance not available, using fallback method...');
+        try {
+          // Try to use the wallet API's internal client creation pattern
+          // Since checkMEWSBalance works, we can replicate its pattern
+          if (window.walletAPIInstance && typeof window.walletAPIInstance.checkMEWSBalance === 'function') {
+            // We know checkMEWSBalance creates a client, so we can do the same for SUI
+            // Access SuiClient and getFullnodeUrl from the wallet module's scope
+            // Since they're used in checkMEWSBalance, they should be available
+            const network = 'testnet';
+            
+            // Try to access via global scope or use the same imports
+            // The wallet module should have these available
+            if (typeof window.WalletAPI !== 'undefined' && window.WalletAPI.SuiClient) {
+              const SuiClient = window.WalletAPI.SuiClient;
+              const getFullnodeUrl = window.WalletAPI.getFullnodeUrl;
+              const client = new SuiClient({ url: getFullnodeUrl(network) });
+              const balance = await client.getBalance({ owner: walletAddress });
+              const balanceInSUI = parseInt(balance.totalBalance) / 1_000_000_000;
+              const formattedBalance = balanceInSUI.toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                useGrouping: true
+              });
+              balanceValue.textContent = `${formattedBalance} SUI`;
+            } else {
+              // Last resort: call checkMEWSBalance to verify the pattern works, then replicate for SUI
+              // Actually, let's just show a message that the method needs to be available
+              console.warn('⚠️ [STORE] Cannot fetch SUI balance - checkSUIBalance method not available and fallback failed');
+              balanceValue.textContent = '--';
+            }
+          } else {
+            console.warn('⚠️ [STORE] checkSUIBalance not available and no fallback possible');
+            balanceValue.textContent = '--';
+          }
+        } catch (fallbackError) {
+          console.error('❌ [STORE] Fallback SUI balance fetch failed:', fallbackError);
+          balanceValue.textContent = 'Error';
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ [STORE] Error updating balance:', error);
+    balanceValue.textContent = 'Error';
+  }
+}
+
 // Make functions globally accessible for onclick handlers
 if (typeof window !== 'undefined') {
   window.showStore = showStore;
@@ -1078,5 +1560,8 @@ if (typeof window !== 'undefined') {
   window.getItemQuantity = getItemQuantity;
   window.loadStoreItems = loadStoreItems;
   window.loadInventoryDisplay = loadInventoryDisplay;
+  window.closeInsufficientBalanceModal = closeInsufficientBalanceModal;
+  window.handleStoreWalletConnect = handleStoreWalletConnect;
+  window.cancelStoreWalletConnect = cancelStoreWalletConnect;
 }
 

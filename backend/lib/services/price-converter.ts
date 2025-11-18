@@ -169,6 +169,34 @@ export class PriceConverter {
           };
         }
         
+        // If no cache, try environment variable fallback
+        const suiPriceEnv = process.env.SUI_PRICE_USD;
+        const mewsPriceEnv = process.env.MEWS_PRICE_USD;
+        
+        if (suiPriceEnv || mewsPriceEnv) {
+          console.warn(`⚠️ [PRICE] CoinGecko API error (${suiResponse.status}), using environment variable prices as fallback`);
+          
+          const fallbackPrices: TokenPrices = {
+            sui: suiPriceEnv ? parseFloat(suiPriceEnv) : 1.5,
+            mews: mewsPriceEnv ? parseFloat(mewsPriceEnv) : 0.00001885,
+            usdc: 1.0
+          };
+          
+          // Cache the fallback prices
+          this.cache.set(cacheKey, {
+            price: fallbackPrices,
+            timestamp: Date.now(),
+          });
+          
+          console.log(`✅ [PRICE] Fallback prices set: SUI=$${fallbackPrices.sui}, MEWS=$${fallbackPrices.mews}`);
+          
+          return {
+            success: true,
+            prices: fallbackPrices,
+            timestamp: Date.now(),
+          };
+        }
+        
         throw new Error(`CoinGecko API error: ${suiResponse.status} ${suiResponse.statusText}`);
       }
 

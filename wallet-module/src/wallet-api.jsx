@@ -716,6 +716,48 @@ async function initializeWalletAPI(options = {}) {
       }
     },
     
+    // Check SUI balance
+    async checkSUIBalance(address, network = 'testnet') {
+      try {
+        if (!address) {
+          return {
+            success: false,
+            balance: '0',
+            formattedBalance: '0',
+            error: 'No wallet address provided'
+          };
+        }
+        
+        const client = new SuiClient({ url: getFullnodeUrl(network) });
+        
+        // Get SUI balance (default coin type)
+        const balance = await client.getBalance({
+          owner: address
+        });
+        
+        const balanceInSUI = parseInt(balance.totalBalance) / 1_000_000_000; // Convert MIST to SUI
+        const formattedBalance = balanceInSUI.toLocaleString('en-US', {
+          maximumFractionDigits: 4,
+          useGrouping: true
+        });
+        
+        return {
+          success: true,
+          balance: balance.totalBalance,
+          formattedBalance,
+          balanceInSUI
+        };
+      } catch (error) {
+        console.error('❌ Error checking SUI balance:', error);
+        return {
+          success: false,
+          balance: '0',
+          formattedBalance: '0',
+          error: error.message || 'Failed to check balance'
+        };
+      }
+    },
+    
     // Get current balance status
     getBalanceStatus() {
       return {
