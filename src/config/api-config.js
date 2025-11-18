@@ -31,14 +31,14 @@ const getConfig = () => {
       // For Vercel: Set your actual backend URL here or via meta tag
       // You can also set this via Vercel environment variable and inject it at build time
       config.backendUrl = isProduction 
-        ? 'https://suitwo-backend.vercel.app/api'  // UPDATE THIS to your actual backend URL
+        ? 'https://sui-two-shooter-backend-sui-integra.vercel.app/api'  // Production backend URL
         : 'http://localhost:3000/api';
     }
     
     if (!config.walletModuleUrl) {
       // For Vercel: Set your actual wallet module URL here or via meta tag
       config.walletModuleUrl = isProduction
-        ? 'https://suitwo-wallet-module.vercel.app/wallet-api.umd.cjs'  // UPDATE THIS to your actual wallet module URL
+        ? 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs'  // Production wallet module URL
         : 'wallet-module/dist/wallet-api.umd.cjs';  // Local path
     }
   } else {
