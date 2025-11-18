@@ -240,8 +240,9 @@ async function loadStoreItems() {
   container.appendChild(loading);
   
   try {
-    // Get API base URL
+    // Get API base URL from config (set by api-config.js)
     const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    console.log('🔧 [STORE] Using API Base URL:', API_BASE_URL);
     
     // Fetch items from backend
     const response = await fetch(`${API_BASE_URL}/store/items`);
@@ -783,8 +784,9 @@ async function proceedToPurchase() {
   }
   
   try {
-    // Get API base URL
+    // Get API base URL from config (set by api-config.js)
     const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    console.log('🔧 [STORE] Purchase using API Base URL:', API_BASE_URL);
     
     // Prepare items array for backend
     const items = [];
@@ -963,8 +965,9 @@ async function loadInventoryDisplay() {
   }
   
   try {
-    // Get API base URL
+    // Get API base URL from config (set by api-config.js)
     const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    console.log('🔧 [STORE] Inventory using API Base URL:', API_BASE_URL);
     
     // Fetch inventory from backend
     const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
