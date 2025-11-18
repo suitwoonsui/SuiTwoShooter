@@ -147,7 +147,8 @@ async function initializeWalletIntegration() {
       
       try {
         // Try to fetch network from backend API
-        const response = await fetch('http://localhost:3000/api/config');
+        const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+        const response = await fetch(`${API_BASE_URL}/config`);
         if (response.ok) {
           const config = await response.json();
           if (config.network) {
