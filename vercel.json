@@ -3,15 +3,7 @@
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/static",
-      "config": {
-        "ignore": [
-          "wallet-module/src/**",
-          "wallet-module/node_modules/**",
-          "wallet-module/package.json",
-          "wallet-module/vite.config.js"
-        ]
-      }
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -32,10 +24,6 @@
     }
   ],
   "ignore": [
-    "wallet-module/src/**",
-    "wallet-module/node_modules/**",
-    "wallet-module/package.json",
-    "wallet-module/vite.config.js",
     "backend/**"
   ]
 }
