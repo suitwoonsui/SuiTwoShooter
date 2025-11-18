@@ -1,0 +1,10 @@
+# Ignore wallet-module source files - only use the pre-built dist file
+wallet-module/src/
+wallet-module/node_modules/
+wallet-module/package.json
+wallet-module/package-lock.json
+wallet-module/vite.config.js
+wallet-module/patches/
+
+# Keep wallet-module/dist/ - this is the pre-built bundle we need
+
