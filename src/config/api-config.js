@@ -24,7 +24,13 @@ const getConfig = () => {
     
     // 2. Check if we're in production (Vercel)
     const hostname = window.location.hostname;
-    const isProduction = hostname.includes('vercel.app') || (hostname !== 'localhost' && hostname !== '127.0.0.1');
+    // Production if: vercel.app domain OR not localhost/127.0.0.1
+    const isProduction = hostname.includes('vercel.app') || 
+                        (hostname !== 'localhost' && 
+                         hostname !== '127.0.0.1' && 
+                         !hostname.startsWith('192.168.') && 
+                         !hostname.startsWith('10.') &&
+                         hostname !== '0.0.0.0');
     
     // 3. Set defaults based on environment
     if (!config.backendUrl) {
@@ -50,16 +56,21 @@ const getConfig = () => {
   return config;
 };
 
-// Initialize global config
-if (typeof window !== 'undefined') {
+// Initialize global config immediately when script loads
+(function() {
+  if (typeof window === 'undefined') return;
+  
   const config = getConfig();
   window.GAME_CONFIG = window.GAME_CONFIG || {};
   window.GAME_CONFIG.API_BASE_URL = config.backendUrl;
   window.GAME_CONFIG.WALLET_MODULE_URL = config.walletModuleUrl;
   
-  console.log('🔧 API Base URL:', window.GAME_CONFIG.API_BASE_URL);
-  console.log('🔧 Wallet Module URL:', window.GAME_CONFIG.WALLET_MODULE_URL);
-}
+  // Log configuration for debugging
+  console.log('🔧 [CONFIG] API Base URL:', window.GAME_CONFIG.API_BASE_URL);
+  console.log('🔧 [CONFIG] Wallet Module URL:', window.GAME_CONFIG.WALLET_MODULE_URL);
+  console.log('🔧 [CONFIG] Hostname:', window.location.hostname);
+  console.log('🔧 [CONFIG] Is Production:', window.location.hostname.includes('vercel.app') || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'));
+})();
 
 export default {
   API_BASE_URL: typeof window !== 'undefined' ? window.GAME_CONFIG?.API_BASE_URL : 'http://localhost:3000/api',
