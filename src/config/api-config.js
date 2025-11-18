@@ -24,8 +24,14 @@ const getConfig = () => {
     
     // 2. Check if we're in production (Vercel)
     const hostname = window.location.hostname;
-    // Production if: vercel.app domain OR not localhost/127.0.0.1
+    const protocol = window.location.protocol;
+    
+    // Production if: 
+    // - vercel.app domain, OR
+    // - https protocol (Vercel uses HTTPS), OR  
+    // - not localhost/127.0.0.1 and not local network IPs
     const isProduction = hostname.includes('vercel.app') || 
+                        protocol === 'https:' ||
                         (hostname !== 'localhost' && 
                          hostname !== '127.0.0.1' && 
                          !hostname.startsWith('192.168.') && 
@@ -66,10 +72,22 @@ const getConfig = () => {
   window.GAME_CONFIG.WALLET_MODULE_URL = config.walletModuleUrl;
   
   // Log configuration for debugging
+  const isProd = window.location.hostname.includes('vercel.app') || 
+                 window.location.protocol === 'https:' ||
+                 (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
   console.log('🔧 [CONFIG] API Base URL:', window.GAME_CONFIG.API_BASE_URL);
   console.log('🔧 [CONFIG] Wallet Module URL:', window.GAME_CONFIG.WALLET_MODULE_URL);
   console.log('🔧 [CONFIG] Hostname:', window.location.hostname);
-  console.log('🔧 [CONFIG] Is Production:', window.location.hostname.includes('vercel.app') || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'));
+  console.log('🔧 [CONFIG] Protocol:', window.location.protocol);
+  console.log('🔧 [CONFIG] Is Production:', isProd);
+  
+  // Verify config is set correctly
+  if (!window.GAME_CONFIG.API_BASE_URL || window.GAME_CONFIG.API_BASE_URL.includes('localhost')) {
+    if (isProd) {
+      console.error('❌ [CONFIG] ERROR: Production detected but using localhost URL!');
+      console.error('❌ [CONFIG] This should not happen. Config:', window.GAME_CONFIG);
+    }
+  }
 })();
 
 export default {
