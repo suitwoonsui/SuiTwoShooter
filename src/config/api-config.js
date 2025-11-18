@@ -1,42 +1,68 @@
 /**
  * API Configuration
- * Sets the backend API URL based on environment
+ * Sets the backend API URL and wallet module URL based on environment
  */
 
-// Get backend URL from environment variable or use default
-// For Vercel deployment, set VITE_BACKEND_URL in environment variables
-// For local development, uses localhost
-const getBackendUrl = () => {
-  // Check if running in browser with environment variable (Vite style)
+// Get configuration from meta tags, environment, or defaults
+const getConfig = () => {
+  const config = {
+    backendUrl: null,
+    walletModuleUrl: null
+  };
+
   if (typeof window !== 'undefined' && window.location) {
-    // Try to get from meta tag or environment
-    const metaTag = document.querySelector('meta[name="backend-url"]');
-    if (metaTag) {
-      return metaTag.getAttribute('content');
+    // 1. Try meta tags first (for static HTML configuration)
+    const backendMeta = document.querySelector('meta[name="backend-url"]');
+    const walletMeta = document.querySelector('meta[name="wallet-module-url"]');
+    
+    if (backendMeta) {
+      config.backendUrl = backendMeta.getAttribute('content');
+    }
+    if (walletMeta) {
+      config.walletModuleUrl = walletMeta.getAttribute('content');
     }
     
-    // Check if we're on Vercel production
+    // 2. Check if we're in production (Vercel)
     const hostname = window.location.hostname;
-    if (hostname.includes('vercel.app') || hostname !== 'localhost') {
-      // In production, backend should be on a subdomain or different path
-      // Update this to match your actual backend URL
-      return 'https://suitwo-backend.vercel.app/api';
+    const isProduction = hostname.includes('vercel.app') || (hostname !== 'localhost' && hostname !== '127.0.0.1');
+    
+    // 3. Set defaults based on environment
+    if (!config.backendUrl) {
+      // For Vercel: Set your actual backend URL here or via meta tag
+      // You can also set this via Vercel environment variable and inject it at build time
+      config.backendUrl = isProduction 
+        ? 'https://suitwo-backend.vercel.app/api'  // UPDATE THIS to your actual backend URL
+        : 'http://localhost:3000/api';
     }
+    
+    if (!config.walletModuleUrl) {
+      // For Vercel: Set your actual wallet module URL here or via meta tag
+      config.walletModuleUrl = isProduction
+        ? 'https://suitwo-wallet-module.vercel.app/wallet-api.umd.cjs'  // UPDATE THIS to your actual wallet module URL
+        : 'wallet-module/dist/wallet-api.umd.cjs';  // Local path
+    }
+  } else {
+    // Fallback for non-browser environments
+    config.backendUrl = 'http://localhost:3000/api';
+    config.walletModuleUrl = 'wallet-module/dist/wallet-api.umd.cjs';
   }
   
-  // Default to localhost for development
-  return 'http://localhost:3000/api';
+  return config;
 };
 
-// Set global config for the game
+// Initialize global config
 if (typeof window !== 'undefined') {
+  const config = getConfig();
   window.GAME_CONFIG = window.GAME_CONFIG || {};
-  window.GAME_CONFIG.API_BASE_URL = getBackendUrl();
+  window.GAME_CONFIG.API_BASE_URL = config.backendUrl;
+  window.GAME_CONFIG.WALLET_MODULE_URL = config.walletModuleUrl;
   
   console.log('🔧 API Base URL:', window.GAME_CONFIG.API_BASE_URL);
+  console.log('🔧 Wallet Module URL:', window.GAME_CONFIG.WALLET_MODULE_URL);
 }
 
 export default {
-  API_BASE_URL: typeof window !== 'undefined' ? window.GAME_CONFIG?.API_BASE_URL : getBackendUrl()
+  API_BASE_URL: typeof window !== 'undefined' ? window.GAME_CONFIG?.API_BASE_URL : 'http://localhost:3000/api',
+  WALLET_MODULE_URL: typeof window !== 'undefined' ? window.GAME_CONFIG?.WALLET_MODULE_URL : 'wallet-module/dist/wallet-api.umd.cjs'
 };
 

@@ -620,8 +620,16 @@
   <script src="src/game/blockchain/score-submission.js"></script>
   <!-- Wallet API Bundle - Includes React and ReactDOM -->
   <!-- React is bundled WITH the wallet module to ensure proper initialization -->
-  <script src="wallet-module/dist/wallet-api.umd.cjs" onload="
-    (function() {
+  <!-- Wallet module URL is configured in api-config.js -->
+  <script>
+    // Get wallet module URL from config (set by api-config.js)
+    const walletModuleUrl = window.GAME_CONFIG?.WALLET_MODULE_URL || 'wallet-module/dist/wallet-api.umd.cjs';
+    console.log('📦 Loading wallet module from:', walletModuleUrl);
+    
+    // Create and load the script dynamically
+    const walletScript = document.createElement('script');
+    walletScript.src = walletModuleUrl;
+    walletScript.onload = function() {
       console.log('✅ Wallet bundle loaded');
       
       // React and ReactDOM are exposed by the bundle
@@ -648,8 +656,13 @@
       } else {
         console.error('❌ WalletAPI not found after bundle load');
       }
-    })();
-  "></script>
+    };
+    walletScript.onerror = function() {
+      console.error('❌ Failed to load wallet module from:', walletModuleUrl);
+      console.error('Please check that the wallet module URL is correct and accessible.');
+    };
+    document.head.appendChild(walletScript);
+  </script>
   <script>
     // Wallet API is loaded via script tag above
     // This script just ensures it's initialized
