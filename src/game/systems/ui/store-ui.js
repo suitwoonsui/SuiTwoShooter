@@ -584,7 +584,7 @@ async function createItemCard(item) {
 /**
  * Set payment token (MEWS or SUI)
  */
-function setPaymentToken(token) {
+async function setPaymentToken(token) {
   if (token !== 'mews' && token !== 'sui') {
     console.warn('⚠️ [STORE] Invalid payment token:', token);
     return;
@@ -614,7 +614,7 @@ function setPaymentToken(token) {
   await updateStoreUI();
   
   // Update balance display for selected token
-  updateStoreBalance();
+  await updateStoreBalance();
 }
 
 /**
