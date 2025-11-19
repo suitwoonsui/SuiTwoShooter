@@ -134,8 +134,10 @@ export class BadgeService {
         const returnValue = result.results[0].returnValues?.[0];
         if (returnValue) {
           // Parse return value (boolean as u8: 0 = false, 1 = true)
-          const hasBadge = returnValue[1] === '1' || returnValue[1] === 1;
-          return hasBadge;
+          // returnValue[1] is a string, so we check for string '1' or convert to number
+          const value = returnValue[1];
+          const hasBadge = String(value) === '1' || Number(value) === 1;
+          return Boolean(hasBadge);
         }
       }
 
@@ -156,7 +158,7 @@ export class BadgeService {
     mintDate: number;
     lastUpdated: number;
   } | null> {
-    if (!this.badgeRegistryId) {
+    if (!this.config.contracts.badgeRegistry) {
       throw new Error('BadgeRegistry object ID not configured');
     }
 
@@ -378,7 +380,8 @@ export class BadgeService {
       }
 
       const returnValues = result1.results[0].returnValues;
-      const hasStats = returnValues[0][1] === '1' || returnValues[0][1] === 1;
+      const hasStatsValue = returnValues[0][1];
+      const hasStats = String(hasStatsValue) === '1' || Number(hasStatsValue) === 1;
       const totalGames = hasStats ? Number(returnValues[1][1]) : 0;
 
       // Calculate new tier
