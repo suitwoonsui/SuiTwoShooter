@@ -705,7 +705,7 @@ function getItemQuantity(itemId, level) {
 /**
  * Add item to selection (increment quantity)
  */
-function addItemToSelection(itemId, level) {
+async function addItemToSelection(itemId, level) {
   const key = getItemKey(itemId, level);
   const currentQty = getItemQuantity(itemId, level);
   storeState.selectedItems[key] = currentQty + 1;
@@ -716,7 +716,7 @@ function addItemToSelection(itemId, level) {
 /**
  * Remove item from selection (decrement quantity)
  */
-function removeItemFromSelection(itemId, level) {
+async function removeItemFromSelection(itemId, level) {
   const key = getItemKey(itemId, level);
   const currentQty = getItemQuantity(itemId, level);
   if (currentQty > 0) {
@@ -732,7 +732,7 @@ function removeItemFromSelection(itemId, level) {
 /**
  * Set item quantity directly
  */
-function setItemQuantity(itemId, level, quantity) {
+async function setItemQuantity(itemId, level, quantity) {
   const key = getItemKey(itemId, level);
   if (quantity <= 0) {
     delete storeState.selectedItems[key];
