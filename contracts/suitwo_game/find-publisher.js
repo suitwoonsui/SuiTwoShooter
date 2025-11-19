@@ -3,7 +3,7 @@ const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
 const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0x584da464e9e5fabb5989a4abc1afa6e8eeef866cddc9db7ca97988e1d9624449';
+                  '0xf4ebdb147f861f925a2129f39f983867b34fa64575b7e9245189407a78f475ed'; // New package with Publisher
 
 const publisherAddress = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
 

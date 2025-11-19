@@ -515,7 +515,6 @@ export class BadgeService {
       console.log(`🔧 [ADMIN BADGE] Minting badge for ${playerAddress}, tier: ${tier}`);
 
       // Sign and execute with admin wallet
-      const client = this.getClient();
       const keypair = this.adminWallet.getKeypair();
       
       const result = await client.signAndExecuteTransaction({
@@ -591,7 +590,6 @@ export class BadgeService {
       console.log(`🔧 [ADMIN BADGE] Burning badge: ${badgeId}`);
 
       // Sign and execute with admin wallet
-      const client = this.getClient();
       const keypair = this.adminWallet.getKeypair();
       
       const result = await client.signAndExecuteTransaction({

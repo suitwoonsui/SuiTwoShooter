@@ -10,7 +10,7 @@ const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4
 // Get package ID from environment variable or use the one from deployment
 const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0x584da464e9e5fabb5989a4abc1afa6e8eeef866cddc9db7ca97988e1d9624449';
+                  '0xf4ebdb147f861f925a2129f39f983867b34fa64575b7e9245189407a78f475ed'; // New package with Publisher
 
 // Fee recipient address (admin wallet address)
 const feeRecipient = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
