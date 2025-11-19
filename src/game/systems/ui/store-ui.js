@@ -166,6 +166,102 @@ async function showStoreInternal() {
 }
 
 /**
+ * Load and display badge in store (if player has one)
+ */
+async function loadStoreBadgeDisplay() {
+  const badgeDisplayContainer = document.getElementById('storeBadgeDisplay');
+  if (!badgeDisplayContainer) {
+    console.warn('⚠️ [STORE] Badge display container not found');
+    return;
+  }
+  
+  // Get wallet address
+  let walletAddress = null;
+  if (typeof getWalletAddress === 'function') {
+    walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+  
+  if (!walletAddress) {
+    // No wallet connected, hide badge display
+    badgeDisplayContainer.style.display = 'none';
+    return;
+  }
+  
+  try {
+    // Get badge data from BadgeService
+    if (!window.BadgeService || !window.BadgeService.getBadge) {
+      console.warn('⚠️ [STORE] BadgeService not available');
+      badgeDisplayContainer.style.display = 'none';
+      return;
+    }
+    
+    const badgeData = await window.BadgeService.getBadge(walletAddress);
+    
+    if (!badgeData || !badgeData.success || !badgeData.hasBadge || !badgeData.badge) {
+      // Player doesn't have a badge, hide display
+      badgeDisplayContainer.style.display = 'none';
+      return;
+    }
+    
+    // Player has a badge, display it
+    // Use BadgeUI.displayBadgeInUI if available, otherwise create custom display
+    if (window.BadgeUI && typeof window.BadgeUI.displayBadgeInUI === 'function') {
+      // Use the existing BadgeUI function for consistency
+      window.BadgeUI.displayBadgeInUI(badgeDisplayContainer, badgeData);
+      badgeDisplayContainer.style.display = 'block';
+    } else {
+      // Fallback: create custom display
+      const { badge } = badgeData;
+      const tierName = window.BadgeService.getTierName(badge.tier);
+      const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
+      
+      // Convert image data to base64 if available
+      let imageSrc = '';
+      if (badge.imageData && badge.imageData.length > 0) {
+        // Manual conversion
+        let base64;
+        if (Array.isArray(badge.imageData)) {
+          const bytes = new Uint8Array(badge.imageData);
+          const binary = String.fromCharCode.apply(null, bytes);
+          base64 = btoa(binary);
+        } else {
+          const binary = String.fromCharCode.apply(null, badge.imageData);
+          base64 = btoa(binary);
+        }
+        imageSrc = `data:image/webp;base64,${base64}`;
+      }
+      
+      const badgeHTML = `
+        <div class="store-badge-info">
+          <h3>🎖️ Your ${tierName} Badge</h3>
+          <div style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
+            ${imageSrc 
+              ? `<img src="${imageSrc}" alt="Badge" style="width: 60px; height: 60px; border-radius: 8px; border: 2px solid #4DA2FF;" />`
+              : `<div style="width: 60px; height: 60px; border-radius: 8px; border: 2px solid #4DA2FF; background: rgba(77, 162, 255, 0.1); display: flex; align-items: center; justify-content: center; font-size: 30px;">🎖️</div>`
+            }
+            <div>
+              <p style="margin: 5px 0; color: #ffffff;">Games Played: ${badge.gamesPlayed || 0}</p>
+              ${discounts.store > 0 ? `<p style="margin: 5px 0; color: #39ff14; font-weight: bold;">Store Discount: ${discounts.store}% off</p>` : ''}
+              ${discounts.gameplay > 0 ? `<p style="margin: 5px 0; color: #39ff14; font-weight: bold;">Gameplay Discount: ${discounts.gameplay}% off</p>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+      
+      badgeDisplayContainer.innerHTML = badgeHTML;
+      badgeDisplayContainer.style.display = 'block';
+    }
+    
+    console.log('✅ [STORE] Badge displayed in store');
+  } catch (error) {
+    console.error('❌ [STORE] Error loading badge display:', error);
+    badgeDisplayContainer.style.display = 'none';
+  }
+}
+
+/**
  * Show wallet connection modal for store access
  */
 function showStoreWalletConnectModal() {
