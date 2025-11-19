@@ -68,7 +68,7 @@ async function showStoreInternal() {
     setTimeout(async () => {
       await loadInventoryDisplay();
       await updateStoreBalance();
-      updateStoreUI();
+      await updateStoreUI();
     }, 100);
     return;
   }
@@ -86,6 +86,9 @@ async function showStoreInternal() {
     <div class="store-header">
       <h2 id="storeTitle">🛒 Premium Store</h2>
     </div>
+    
+    <!-- Badge Display (if player has badge) -->
+    <div id="storeBadgeDisplay" class="store-badge-display" style="display: none;"></div>
     
     <!-- Payment Token Selector -->
     <div class="store-payment-selector">
@@ -155,8 +158,11 @@ async function showStoreInternal() {
   // Update balance display
   await updateStoreBalance();
   
-  // Update UI
-  updateStoreUI();
+  // Load and display badge (if player has one)
+  await loadStoreBadgeDisplay();
+  
+  // Update UI (including prices with badge discount)
+  await updateStoreUI();
 }
 
 /**
@@ -428,11 +434,11 @@ async function loadStoreItems() {
     loading.style.display = 'none';
     container.innerHTML = '';
     
-    // Render each item
-    data.items.forEach(item => {
-      const itemCard = createItemCard(item);
+    // Render each item (with badge discount applied)
+    for (const item of data.items) {
+      const itemCard = await createItemCard(item);
       container.appendChild(itemCard);
-    });
+    }
     
     storeState.isLoading = false;
     console.log(`✅ [STORE] Loaded ${data.items.length} items from backend`);
@@ -457,10 +463,28 @@ async function loadStoreItems() {
 /**
  * Create item card element
  */
-function createItemCard(item) {
+async function createItemCard(item) {
   const card = document.createElement('div');
   card.className = 'store-item-card';
   card.setAttribute('data-item-id', item.id);
+  
+  // Get badge discount if available
+  let badgeDiscount = 0;
+  try {
+    const walletAddress = window.walletAPIInstance && window.walletAPIInstance.isConnected()
+      ? window.walletAPIInstance.getAddress()
+      : null;
+    
+    if (walletAddress && window.BadgeService && window.BadgeService.getBadge) {
+      const badgeData = await window.BadgeService.getBadge(walletAddress);
+      if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
+        const discounts = window.BadgeService.getDiscountsForTier(badgeData.badge.tier);
+        badgeDiscount = discounts.store;
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [STORE] Failed to get badge discount for item card:', error);
+  }
   
   // Check if item has multiple levels
   const hasMultipleLevels = item.levels.length > 1;
@@ -472,7 +496,24 @@ function createItemCard(item) {
     const quantity = getItemQuantity(item.id, level);
     const hasQuantity = quantity > 0;
     
-    const usdPrice = formatUsdPrice(levelData.usdPrice);
+    // Apply badge discount to price
+    const originalPrice = levelData.usdPrice;
+    const discountedPrice = badgeDiscount > 0 
+      ? originalPrice * (1 - badgeDiscount / 100)
+      : originalPrice;
+    
+    // Format USD price (show original and discounted if discount applies)
+    let usdPriceHTML = '';
+    if (badgeDiscount > 0) {
+      const originalUsd = formatUsdPrice(originalPrice);
+      const discountedUsd = formatUsdPrice(discountedPrice);
+      usdPriceHTML = `<span style="text-decoration: line-through; opacity: 0.6;">${originalUsd}</span> <span style="color: #39ff14;">${discountedUsd}</span>`;
+    } else {
+      usdPriceHTML = formatUsdPrice(originalPrice);
+    }
+    
+    // Use discounted price for token conversion
+    const usdPrice = discountedPrice;
     
     // Use prices from backend API if available, otherwise calculate
     let tokenPriceDisplay = '';
@@ -502,8 +543,9 @@ function createItemCard(item) {
               <div class="level-effect">${levelData.effect}</div>
             </div>
             <div class="level-price">
-              <div class="price-usd">${usdPrice}</div>
+              <div class="price-usd">${usdPriceHTML}</div>
               <div class="price-token">${tokenPriceDisplay} ${tokenSymbol}</div>
+              ${badgeDiscount > 0 ? `<div class="badge-discount-badge" style="font-size: 0.75rem; color: #39ff14; margin-top: 0.25rem;">🎖️ ${badgeDiscount}% off</div>` : ''}
             </div>
           </button>
           ${hasQuantity ? `
@@ -566,20 +608,38 @@ function setPaymentToken(token) {
   }
   
   // Update prices in existing item cards without reloading
-  updateItemPrices();
+  await updateItemPrices();
   
   // Also update the selected items summary
-  updateStoreUI();
+  await updateStoreUI();
   
   // Update balance display for selected token
   updateStoreBalance();
 }
 
 /**
- * Update prices in all item cards for current payment token
+ * Update prices in all item cards for current payment token (with badge discount)
  */
-function updateItemPrices() {
+async function updateItemPrices() {
   const cards = document.querySelectorAll('.store-item-card');
+  
+  // Get badge discount if available
+  let badgeDiscount = 0;
+  try {
+    const walletAddress = window.walletAPIInstance && window.walletAPIInstance.isConnected()
+      ? window.walletAPIInstance.getAddress()
+      : null;
+    
+    if (walletAddress && window.BadgeService && window.BadgeService.getBadge) {
+      const badgeData = await window.BadgeService.getBadge(walletAddress);
+      if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
+        const discounts = window.BadgeService.getDiscountsForTier(badgeData.badge.tier);
+        badgeDiscount = discounts.store;
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [STORE] Failed to get badge discount for price update:', error);
+  }
   
   cards.forEach(card => {
     const itemId = card.getAttribute('data-item-id');
@@ -594,15 +654,32 @@ function updateItemPrices() {
       const levelData = getItemLevelData(itemId, level);
       
       if (levelData) {
-        const tokenConversion = convertUsdToToken(levelData.usdPrice, storeState.paymentToken);
+        // Apply badge discount to price
+        const originalPrice = levelData.usdPrice;
+        const discountedPrice = badgeDiscount > 0 
+          ? originalPrice * (1 - badgeDiscount / 100)
+          : originalPrice;
+        
+        const tokenConversion = convertUsdToToken(discountedPrice, storeState.paymentToken);
         const tokenSymbol = storeState.paymentToken === 'sui' ? 'SUI' : '$MEWS';
         
         // Update price display
         const priceContainer = button.querySelector('.level-price');
         if (priceContainer) {
           const priceToken = priceContainer.querySelector('.price-token');
+          const priceUsd = priceContainer.querySelector('.price-usd');
+          
           if (priceToken) {
             priceToken.textContent = `${tokenConversion.formatted} ${tokenSymbol}`;
+          }
+          
+          // Update USD price to show discount
+          if (priceUsd && badgeDiscount > 0) {
+            const originalUsd = formatUsdPrice(originalPrice);
+            const discountedUsd = formatUsdPrice(discountedPrice);
+            priceUsd.innerHTML = `<span style="text-decoration: line-through; opacity: 0.6;">${originalUsd}</span> <span style="color: #39ff14;">${discountedUsd}</span>`;
+          } else if (priceUsd) {
+            priceUsd.textContent = formatUsdPrice(originalPrice);
           }
         }
       }
@@ -633,7 +710,7 @@ function addItemToSelection(itemId, level) {
   const currentQty = getItemQuantity(itemId, level);
   storeState.selectedItems[key] = currentQty + 1;
   console.log('➕ [STORE] Added item:', key, 'quantity:', storeState.selectedItems[key]);
-  updateStoreUI();
+  await updateStoreUI();
 }
 
 /**
@@ -648,7 +725,7 @@ function removeItemFromSelection(itemId, level) {
       delete storeState.selectedItems[key];
     }
     console.log('➖ [STORE] Removed item:', key, 'quantity:', storeState.selectedItems[key] || 0);
-    updateStoreUI();
+    await updateStoreUI();
   }
 }
 
@@ -663,7 +740,7 @@ function setItemQuantity(itemId, level, quantity) {
     storeState.selectedItems[key] = quantity;
   }
   console.log('🔢 [STORE] Set quantity:', key, '=', quantity);
-  updateStoreUI();
+  await updateStoreUI();
 }
 
 /**
@@ -704,8 +781,8 @@ function clearLevelSelection(itemId, level) {
   delete storeState.selectedItems[key];
   
   // Reload items to update UI
-  loadStoreItems().then(() => {
-    updateStoreUI();
+  loadStoreItems().then(async () => {
+    await updateStoreUI();
   });
 }
 
@@ -718,15 +795,15 @@ function clearStoreSelection() {
   storeState.selectedItems = {};
   
   // Reload items to update UI
-  loadStoreItems().then(() => {
-    updateStoreUI();
+  loadStoreItems().then(async () => {
+    await updateStoreUI();
   });
 }
 
 /**
- * Update store UI based on current state
+ * Update store UI based on current state (with badge discount)
  */
-function updateStoreUI() {
+async function updateStoreUI() {
   const summary = document.getElementById('storeSelectedSummary');
   const selectedList = document.getElementById('selectedItemsList');
   const totalElement = document.getElementById('storeTotal');
@@ -734,10 +811,29 @@ function updateStoreUI() {
   
   if (!summary || !selectedList) return;
   
-  // Count selected items and calculate total
+  // Get badge discount if available
+  let badgeDiscount = 0;
+  try {
+    const walletAddress = window.walletAPIInstance && window.walletAPIInstance.isConnected()
+      ? window.walletAPIInstance.getAddress()
+      : null;
+    
+    if (walletAddress && window.BadgeService && window.BadgeService.getBadge) {
+      const badgeData = await window.BadgeService.getBadge(walletAddress);
+      if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
+        const discounts = window.BadgeService.getDiscountsForTier(badgeData.badge.tier);
+        badgeDiscount = discounts.store;
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [STORE] Failed to get badge discount for UI update:', error);
+  }
+  
+  // Count selected items and calculate total (with discount)
   let selectedCount = 0;
   const selectedItems = [];
   let totalUsd = 0;
+  let totalUsdBeforeDiscount = 0;
   
   // Process all selected items (format: itemId_level: quantity)
   for (const [key, quantity] of Object.entries(storeState.selectedItems)) {
@@ -751,17 +847,27 @@ function updateStoreUI() {
         const levelData = getItemLevelData(itemId, level);
         if (levelData) {
           const itemName = item.levels.length > 1 ? `${item.name} Level ${level}` : item.name;
-          const itemTotal = levelData.usdPrice * quantity;
+          const originalPrice = levelData.usdPrice;
+          const discountedPrice = badgeDiscount > 0 
+            ? originalPrice * (1 - badgeDiscount / 100)
+            : originalPrice;
           
+          const itemTotalBeforeDiscount = originalPrice * quantity;
+          const itemTotal = discountedPrice * quantity;
+          
+          totalUsdBeforeDiscount += itemTotalBeforeDiscount;
           totalUsd += itemTotal;
+          
           selectedItems.push({
             key: key,
             itemId: itemId,
             level: level,
             name: itemName,
             quantity: quantity,
-            unitPrice: levelData.usdPrice,
-            totalPrice: itemTotal
+            unitPrice: originalPrice,
+            unitPriceDiscounted: discountedPrice,
+            totalPrice: itemTotal,
+            totalPriceBeforeDiscount: itemTotalBeforeDiscount
           });
           selectedCount += quantity;
         }
@@ -773,22 +879,40 @@ function updateStoreUI() {
   if (selectedCount > 0) {
     summary.style.display = 'block';
     
-    // Update selected items list with click handlers
-    selectedList.innerHTML = selectedItems.map(item => 
-      `<div class="selected-item" data-item-key="${item.key}" onclick="removeItemFromSelection('${item.itemId}', ${item.level})" title="Click to remove one">
+    // Update selected items list with click handlers (show discounted prices)
+    selectedList.innerHTML = selectedItems.map(item => {
+      let priceHTML = '';
+      if (badgeDiscount > 0 && item.totalPrice < item.totalPriceBeforeDiscount) {
+        priceHTML = `<span style="text-decoration: line-through; opacity: 0.6;">${formatUsdPrice(item.totalPriceBeforeDiscount)}</span> <span style="color: #39ff14;">${formatUsdPrice(item.totalPrice)}</span>`;
+      } else {
+        priceHTML = formatUsdPrice(item.totalPrice);
+      }
+      
+      const unitPriceHTML = item.quantity > 1 
+        ? ` (${badgeDiscount > 0 && item.unitPriceDiscounted < item.unitPrice
+            ? `<span style="text-decoration: line-through; opacity: 0.6;">${formatUsdPrice(item.unitPrice)}</span> <span style="color: #39ff14;">${formatUsdPrice(item.unitPriceDiscounted)}</span>`
+            : formatUsdPrice(item.unitPrice)} each)`
+        : '';
+      
+      return `<div class="selected-item" data-item-key="${item.key}" onclick="removeItemFromSelection('${item.itemId}', ${item.level})" title="Click to remove one">
         <span class="selected-item-name">${item.name}${item.quantity > 1 ? ` × ${item.quantity}` : ''}</span>
-        <span class="selected-item-price">${formatUsdPrice(item.totalPrice)}${item.quantity > 1 ? ` (${formatUsdPrice(item.unitPrice)} each)` : ''}</span>
-      </div>`
-    ).join('');
+        <span class="selected-item-price">${priceHTML}${unitPriceHTML}</span>
+      </div>`;
+    }).join('');
     
-    // Update total
+    // Update total (with discount display)
     const tokenConversion = convertUsdToToken(totalUsd, storeState.paymentToken);
     const tokenSymbol = storeState.paymentToken === 'sui' ? 'SUI' : '$MEWS';
     
     if (totalElement) {
-      totalElement.innerHTML = `
-        <span>Total: ${formatUsdPrice(totalUsd)} (${tokenConversion.formatted} ${tokenSymbol})</span>
-      `;
+      let totalHTML = '';
+      if (badgeDiscount > 0 && totalUsd < totalUsdBeforeDiscount) {
+        const discountAmount = totalUsdBeforeDiscount - totalUsd;
+        totalHTML = `<span>Total: <span style="text-decoration: line-through; opacity: 0.6;">${formatUsdPrice(totalUsdBeforeDiscount)}</span> <span style="color: #39ff14;">${formatUsdPrice(totalUsd)}</span> (${tokenConversion.formatted} ${tokenSymbol}) <span style="color: #39ff14; font-size: 0.9em;">🎖️ ${badgeDiscount}% off (Save ${formatUsdPrice(discountAmount)})</span></span>`;
+      } else {
+        totalHTML = `<span>Total: ${formatUsdPrice(totalUsd)} (${tokenConversion.formatted} ${tokenSymbol})</span>`;
+      }
+      totalElement.innerHTML = totalHTML;
     }
     
     // Enable proceed button
@@ -943,8 +1067,25 @@ async function proceedToPurchase() {
     return;
   }
   
-  // Calculate total USD and token amount needed
+  // Get badge discount (if player has badge)
+  let badgeDiscount = 0;
+  try {
+    if (window.BadgeService && window.BadgeService.getBadge) {
+      const badgeData = await window.BadgeService.getBadge(walletAddress);
+      if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
+        const discounts = window.BadgeService.getDiscountsForTier(badgeData.badge.tier);
+        badgeDiscount = discounts.store; // Store discount percentage
+        console.log(`🎖️ [STORE] Badge discount applied: ${badgeDiscount}%`);
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [STORE] Failed to get badge discount:', error);
+    // Continue without discount if badge check fails
+  }
+
+  // Calculate total USD and token amount needed (with discount applied)
   let totalUsd = 0;
+  let totalUsdBeforeDiscount = 0;
   const items = [];
   
   for (const [key, quantity] of Object.entries(storeState.selectedItems)) {
@@ -966,10 +1107,23 @@ async function proceedToPurchase() {
           ? getItemLevelData(itemId, level) 
           : null;
         if (levelData) {
-          totalUsd += levelData.usdPrice * quantity;
+          const itemPrice = levelData.usdPrice;
+          totalUsdBeforeDiscount += itemPrice * quantity;
+          
+          // Apply badge discount
+          const discountedPrice = badgeDiscount > 0 
+            ? itemPrice * (1 - badgeDiscount / 100)
+            : itemPrice;
+          totalUsd += discountedPrice * quantity;
         }
       }
     }
+  }
+  
+  // Log discount info
+  if (badgeDiscount > 0) {
+    const discountAmount = totalUsdBeforeDiscount - totalUsd;
+    console.log(`💰 [STORE] Discount: ${badgeDiscount}% off, Saved: $${discountAmount.toFixed(2)}`);
   }
   
   // Check balance before proceeding
@@ -1107,7 +1261,8 @@ async function proceedToPurchase() {
       body: JSON.stringify({
         playerAddress: walletAddress,
         items: items,
-        paymentToken: paymentToken
+        paymentToken: paymentToken,
+        badgeDiscount: badgeDiscount  // Send badge discount to backend for validation
       })
     });
     
@@ -1184,7 +1339,7 @@ async function proceedToPurchase() {
     // Reload items and inventory
     await loadStoreItems();
     await loadInventoryDisplay();
-    updateStoreUI();
+    await updateStoreUI();
     
     // Show success message
     const successMsg = confirmed 

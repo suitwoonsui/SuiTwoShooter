@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
+import { getBadgeService } from '@/lib/sui/badge-service';
 import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 
 /**
@@ -106,12 +107,61 @@ export async function POST(request: NextRequest) {
     );
 
     if (result.success) {
+      // After successful score submission, check if badge operations are needed
+      const badgeService = getBadgeService();
+      let badgeInfo = null;
+
+      try {
+        // Check if player has badge
+        const hasBadge = await badgeService.hasBadge(playerAddress);
+        
+        if (!hasBadge) {
+          // First game - player can mint badge
+          // Frontend will handle minting flow
+          badgeInfo = {
+            canMint: true,
+            hasBadge: false,
+          };
+        } else {
+          // Check if tier upgrade is needed
+          // Note: If this fails, it will be added to retry queue automatically
+          const updateResult = await badgeService.checkAndBuildBadgeUpdate(
+            playerAddress,
+            sessionId || `session_${Date.now()}`,
+            true // Add to retry queue on failure
+          );
+          
+          if (updateResult.success && updateResult.tierUpgraded) {
+            badgeInfo = {
+              canMint: false,
+              hasBadge: true,
+              tierUpgraded: true,
+              newTier: updateResult.newTier,
+              // Frontend will handle tier upgrade transaction
+            };
+          } else {
+            badgeInfo = {
+              canMint: false,
+              hasBadge: true,
+              tierUpgraded: false,
+            };
+          }
+        }
+      } catch (badgeError) {
+        // Don't fail score submission if badge check fails
+        console.warn('⚠️ Badge check failed (non-critical):', badgeError);
+        badgeInfo = {
+          error: 'Badge check failed',
+        };
+      }
+
       return NextResponse.json({
         success: true,
         digest: result.digest,
         playerAddress,
         gasPaidBy: 'admin_wallet',
-        message: 'Score submitted successfully. Admin wallet paid gas fees.'
+        message: 'Score submitted successfully. Admin wallet paid gas fees.',
+        badge: badgeInfo,
       }, { headers: corsHeaders });
     } else {
       return NextResponse.json(

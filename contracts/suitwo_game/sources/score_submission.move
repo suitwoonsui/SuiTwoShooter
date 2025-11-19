@@ -31,6 +31,43 @@ module suitwo_game::score_submission {
         used_sessions: Table<vector<u8>, bool>,  // session_id -> true if used
     }
     
+    /// Player statistics - tracks comprehensive player performance
+    /// Used for badge progression, leaderboards, and player profiles
+    struct PlayerStats has key, store {
+        id: UID,
+        player: address,
+        
+        // Game Count
+        total_games: u64,  // Total games played (non-demo only)
+        
+        // Personal Bests (highest value achieved in a single game)
+        best_score: u64,                    // Highest score in one game
+        best_distance: u64,                 // Longest distance in one game
+        best_coins: u64,                    // Most coins collected in one game
+        best_bosses_defeated: u64,          // Most bosses defeated in one game
+        best_enemies_defeated: u64,         // Most enemies defeated in one game
+        best_coin_streak: u64,              // Longest coin streak in one game
+        
+        // Totals (for calculating averages: total_field / total_games)
+        total_score: u64,                   // Sum of all scores
+        total_distance: u64,                // Sum of all distance traveled
+        total_coins: u64,                   // Sum of all coins collected
+        total_bosses_defeated: u64,         // Sum of all bosses defeated
+        total_enemies_defeated: u64,        // Sum of all enemies defeated
+        total_coin_streak: u64,             // Sum of all coin streaks (for average)
+        
+        // Timestamps
+        first_game_date: u64,               // Timestamp of first game
+        last_game_date: u64,                // Timestamp of most recent game
+    }
+    
+    /// Registry to store player statistics
+    /// Shared object accessible by all for querying player stats
+    struct StatisticsRegistry has key {
+        id: UID,
+        player_stats: Table<address, PlayerStats>,  // player address -> PlayerStats
+    }
+    
     /// Complete game session statistics stored on-chain
     struct GameSession has key, store {
         id: UID,
@@ -70,7 +107,7 @@ module suitwo_game::score_submission {
 
     // ===== INITIALIZATION =====
     
-    /// Initialize the session registry (one-time setup)
+    /// Initialize the session registry and statistics registry (one-time setup)
     fun init(ctx: &mut TxContext) {
         // Create session registry (shared object for duplicate checking)
         let registry = SessionRegistry {
@@ -78,6 +115,13 @@ module suitwo_game::score_submission {
             used_sessions: table::new(ctx),
         };
         transfer::share_object(registry);
+        
+        // Create statistics registry (shared object for player statistics)
+        let stats_registry = StatisticsRegistry {
+            id: object::new(ctx),
+            player_stats: table::new(ctx),
+        };
+        transfer::share_object(stats_registry);
     }
     
     /// Create admin capability and transfer to admin address
@@ -103,6 +147,100 @@ module suitwo_game::score_submission {
     /// Mark session ID as used
     fun mark_session_used(registry: &mut SessionRegistry, session_id: vector<u8>) {
         table::add(&mut registry.used_sessions, session_id, true);
+    }
+    
+    // ===== STATISTICS FUNCTIONS =====
+    
+    /// Get or create PlayerStats for a player
+    /// If player doesn't have stats yet, creates new PlayerStats with all fields initialized to 0
+    fun get_or_create_player_stats(
+        stats_registry: &mut StatisticsRegistry,
+        player: address,
+        ctx: &mut TxContext
+    ): &mut PlayerStats {
+        if (table::contains(&stats_registry.player_stats, player)) {
+            table::borrow_mut(&mut stats_registry.player_stats, player)
+        } else {
+            // Create new PlayerStats for this player (all fields initialized to 0)
+            let stats = PlayerStats {
+                id: object::new(ctx),
+                player,
+                total_games: 0,
+                best_score: 0,
+                best_distance: 0,
+                best_coins: 0,
+                best_bosses_defeated: 0,
+                best_enemies_defeated: 0,
+                best_coin_streak: 0,
+                total_score: 0,
+                total_distance: 0,
+                total_coins: 0,
+                total_bosses_defeated: 0,
+                total_enemies_defeated: 0,
+                total_coin_streak: 0,
+                first_game_date: 0,
+                last_game_date: 0,
+            };
+            table::add(&mut stats_registry.player_stats, player, stats);
+            table::borrow_mut(&mut stats_registry.player_stats, player)
+        }
+    }
+    
+    /// Update player statistics with game session data
+    /// Called after successful game session submission
+    /// Updates personal bests, totals, and timestamps
+    fun update_player_stats(
+        stats_registry: &mut StatisticsRegistry,
+        player: address,
+        score: u64,
+        distance: u64,
+        coins: u64,
+        bosses_defeated: u64,
+        enemies_defeated: u64,
+        longest_coin_streak: u64,
+        timestamp: u64,
+        ctx: &mut TxContext
+    ) {
+        let stats = get_or_create_player_stats(stats_registry, player, ctx);
+        
+        // Increment game count
+        stats.total_games = stats.total_games + 1;
+        
+        // Update personal bests (if current game is better)
+        if (score > stats.best_score) {
+            stats.best_score = score;
+        };
+        if (distance > stats.best_distance) {
+            stats.best_distance = distance;
+        };
+        if (coins > stats.best_coins) {
+            stats.best_coins = coins;
+        };
+        if (bosses_defeated > stats.best_bosses_defeated) {
+            stats.best_bosses_defeated = bosses_defeated;
+        };
+        if (enemies_defeated > stats.best_enemies_defeated) {
+            stats.best_enemies_defeated = enemies_defeated;
+        };
+        if (longest_coin_streak > stats.best_coin_streak) {
+            stats.best_coin_streak = longest_coin_streak;
+        };
+        
+        // Update totals (for average calculations)
+        stats.total_score = stats.total_score + score;
+        stats.total_distance = stats.total_distance + distance;
+        stats.total_coins = stats.total_coins + coins;
+        stats.total_bosses_defeated = stats.total_bosses_defeated + bosses_defeated;
+        stats.total_enemies_defeated = stats.total_enemies_defeated + enemies_defeated;
+        stats.total_coin_streak = stats.total_coin_streak + longest_coin_streak;
+        
+        // Update timestamps
+        if (stats.first_game_date == 0) {
+            // First game - set first_game_date
+            stats.first_game_date = timestamp;
+        };
+        // Always update last_game_date to most recent game
+        stats.last_game_date = timestamp;
     }
     
     /// Calculate exact expected score from boss tiers
@@ -272,9 +410,11 @@ module suitwo_game::score_submission {
     /// REQUIRES AdminCapability - only admin wallet can call this function
     /// This prevents unauthorized score submissions and cheating
     /// Admin wallet pays gas fees
+    /// NOTE: Demo mode games do NOT create GameSession objects, so they are automatically excluded from statistics
     public entry fun submit_game_session_for_player(
         _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
         registry: &mut SessionRegistry,  // Session registry for duplicate prevention
+        stats_registry: &mut StatisticsRegistry,  // Statistics registry for tracking total_games
         player: address,  // Explicit player address (user's wallet)
         clock: &Clock,
         score: u64,
@@ -330,6 +470,22 @@ module suitwo_game::score_submission {
 
         // Transfer ownership to player (ownership proof)
         transfer::transfer(session, player);
+        
+        // ===== UPDATE PLAYER STATISTICS =====
+        // Update comprehensive player statistics with this game's data
+        // NOTE: Demo mode games do NOT call this function, so they are automatically excluded
+        update_player_stats(
+            stats_registry,
+            player,
+            score,
+            distance,
+            coins,
+            bosses_defeated,
+            enemies_defeated,
+            longest_coin_streak,
+            current_time,
+            ctx
+        );
 
         // Emit comprehensive event for leaderboard queries
         event::emit(ScoreSubmitted {
@@ -373,6 +529,65 @@ module suitwo_game::score_submission {
             session.session_id,
             session.timestamp,
         )
+    }
+    
+    /// Get player statistics for a given player address
+    /// Returns comprehensive PlayerStats if player exists
+    /// Used by backend to query player statistics for badge progression, leaderboards, and profiles
+    public fun get_player_stats(
+        stats_registry: &StatisticsRegistry,
+        player: address
+    ): (
+        bool,      // has_stats
+        u64,       // total_games
+        u64,       // best_score
+        u64,       // best_distance
+        u64,       // best_coins
+        u64,       // best_bosses_defeated
+        u64,       // best_enemies_defeated
+        u64,       // best_coin_streak
+        u64,       // total_score
+        u64,       // total_distance
+        u64,       // total_coins
+        u64,       // total_bosses_defeated
+        u64,       // total_enemies_defeated
+        u64,       // total_coin_streak
+        u64,       // first_game_date
+        u64        // last_game_date
+    ) {
+        if (table::contains(&stats_registry.player_stats, player)) {
+            let stats = table::borrow(&stats_registry.player_stats, player);
+            (
+                true,
+                stats.total_games,
+                stats.best_score,
+                stats.best_distance,
+                stats.best_coins,
+                stats.best_bosses_defeated,
+                stats.best_enemies_defeated,
+                stats.best_coin_streak,
+                stats.total_score,
+                stats.total_distance,
+                stats.total_coins,
+                stats.total_bosses_defeated,
+                stats.total_enemies_defeated,
+                stats.total_coin_streak,
+                stats.first_game_date,
+                stats.last_game_date,
+            )
+        } else {
+            // Player has no stats yet (hasn't played any games)
+            // Return all zeros
+            (false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        }
+    }
+    
+    /// Check if player has statistics recorded
+    public fun has_player_stats(
+        stats_registry: &StatisticsRegistry,
+        player: address
+    ): bool {
+        table::contains(&stats_registry.player_stats, player)
     }
 }
 

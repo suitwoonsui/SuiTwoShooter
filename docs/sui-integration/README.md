@@ -112,6 +112,7 @@ This guide is organized into focused sections for easier navigation:
 - [TIER_SYSTEM.md](./TIER_SYSTEM.md) - Game tier system documentation
 - [RENDER_FREE_TIER_OPTIMIZATION.md](./RENDER_FREE_TIER_OPTIMIZATION.md) - Deployment optimization guide
 - [INTEGRATION_CHECKLIST.md](./INTEGRATION_CHECKLIST.md) - Detailed integration checklist
+- [NFT_BADGE_SYSTEM_PLAN.md](./NFT_BADGE_SYSTEM_PLAN.md) - Dynamic NFT badge system planning (Early Supporter Badges)
 
 ### **Premium Store Admin Features**
 - [STORE_ADMIN_ADD_ITEMS.md](./STORE_ADMIN_ADD_ITEMS.md) - Admin add items feature (security, usage, examples)

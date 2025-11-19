@@ -113,8 +113,8 @@ async function deploy() {
     txb.transferObjects([upgradeCap], address);
     
     // Set higher gas budget for contract deployment (publishing requires more gas)
-    // With 2 modules (score_submission + premium_store, excluding mews), we need more gas
-    txb.setGasBudget(100_000_000); // 0.1 SUI - deployment needs more gas than regular transactions
+    // With 3 modules (score_submission + premium_store + badge_system, excluding mews), we need more gas
+    txb.setGasBudget(150_000_000); // 0.15 SUI - deployment needs more gas than regular transactions
     
     // Sign and execute
     const result = await client.signAndExecuteTransaction({
@@ -126,10 +126,11 @@ async function deploy() {
       },
     });
     
-    // Extract package ID, Session Registry, and Premium Store object IDs from transaction effects
+    // Extract package ID, Session Registry, Premium Store, and Badge Registry object IDs from transaction effects
     let packageId = null;
     let sessionRegistryObjectId = null;
     let premiumStoreObjectId = null;
+    let badgeRegistryObjectId = null;
     
     // Check objectChanges (most reliable method)
     if (result.effects?.objectChanges) {
@@ -138,13 +139,16 @@ async function deploy() {
         if (change.type === 'published') {
           packageId = change.packageId;
         }
-        // Session Registry from created shared object
+        // Session Registry, Premium Store, and Badge Registry from created shared objects
         if (change.type === 'created' && change.objectType) {
           if (change.objectType.includes('SessionRegistry')) {
             sessionRegistryObjectId = change.objectId;
           }
           if (change.objectType.includes('PremiumStore')) {
             premiumStoreObjectId = change.objectId;
+          }
+          if (change.objectType.includes('BadgeRegistry')) {
+            badgeRegistryObjectId = change.objectId;
           }
         }
       }
@@ -156,11 +160,17 @@ async function deploy() {
         if (obj.owner === 'Immutable' && !packageId) {
           packageId = obj.reference?.objectId;
         }
-        // Check for shared object (SessionRegistry)
+        // Check for shared objects (SessionRegistry, PremiumStore, BadgeRegistry)
         if (obj.owner && typeof obj.owner === 'object' && 'Shared' in obj.owner) {
           const objectType = obj.reference?.objectType || '';
           if (objectType.includes('SessionRegistry')) {
             sessionRegistryObjectId = obj.reference?.objectId;
+          }
+          if (objectType.includes('PremiumStore')) {
+            premiumStoreObjectId = obj.reference?.objectId;
+          }
+          if (objectType.includes('BadgeRegistry')) {
+            badgeRegistryObjectId = obj.reference?.objectId;
           }
         }
       }
@@ -191,6 +201,9 @@ async function deploy() {
       if (premiumStoreObjectId) {
         console.log('   🛒 Premium Store Object ID:', premiumStoreObjectId);
       }
+      if (badgeRegistryObjectId) {
+        console.log('   🏅 Badge Registry Object ID:', badgeRegistryObjectId);
+      }
       
       console.log('   📝 Transaction Digest:', result.digest);
       console.log('\n🔗 View on Sui Explorer:');
@@ -213,6 +226,9 @@ async function deploy() {
       }
       if (premiumStoreObjectId) {
         console.log(`   PREMIUM_STORE_OBJECT_ID_TESTNET=${premiumStoreObjectId}`);
+      }
+      if (badgeRegistryObjectId) {
+        console.log(`   BADGE_REGISTRY_OBJECT_ID_TESTNET=${badgeRegistryObjectId}`);
       }
     } else {
       throw new Error(`Deployment failed: ${result.effects?.status?.error || 'Unknown error'}`);

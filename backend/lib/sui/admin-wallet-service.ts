@@ -210,6 +210,15 @@ export class AdminWalletService {
         throw new Error(`Admin capability object ID not configured for ${network}. Please call create_admin_capability function after contract deployment and set ADMIN_CAPABILITY_OBJECT_ID_${network.toUpperCase()} environment variable.`);
       }
 
+      // Get statistics registry object ID from config
+      // This is used to track player statistics (total_games) for badge progression
+      // This will be set after contract deployment (created by init function)
+      const statisticsRegistryObjectId = this.config.contracts.statisticsRegistry;
+      if (!statisticsRegistryObjectId || statisticsRegistryObjectId === '' || statisticsRegistryObjectId === '0x...') {
+        const network = this.config.sui.network;
+        throw new Error(`Statistics registry object ID not configured for ${network}. Please set STATISTICS_REGISTRY_OBJECT_ID_${network.toUpperCase()} environment variable after contract deployment.`);
+      }
+
       // Convert player name and session ID to bytes (UTF-8)
       const playerNameBytes = new TextEncoder().encode(playerName || '');
       const sessionIdBytes = sessionId ? new TextEncoder().encode(sessionId) : new TextEncoder().encode('');
@@ -274,6 +283,7 @@ export class AdminWalletService {
         arguments: [
           txb.object(adminCapabilityObjectId),        // _admin_cap: &AdminCapability (proves caller is admin)
           txb.object(registryObjectId),              // registry: &mut SessionRegistry
+          txb.object(statisticsRegistryObjectId),     // stats_registry: &mut StatisticsRegistry (for tracking total_games)
           txb.pure.address(playerAddress),           // player: address
           txb.object('0x6'),                        // clock: &Clock (standard Sui Clock)
           txb.pure.u64(score),                      // score: u64
@@ -356,6 +366,158 @@ export class AdminWalletService {
         balance: '0',
         balanceInSUI: 0,
         hasEnough: false,
+      };
+    }
+  }
+
+  /**
+   * Get comprehensive player statistics from blockchain
+   * Returns personal bests, totals (for averages), and timestamps
+   * Used for badge progression, leaderboards, and player profiles
+   */
+  async getPlayerStats(playerAddress: string): Promise<{
+    success: boolean;
+    hasStats?: boolean;
+    // Game count
+    totalGames?: number;
+    // Personal bests
+    bestScore?: number;
+    bestDistance?: number;
+    bestCoins?: number;
+    bestBossesDefeated?: number;
+    bestEnemiesDefeated?: number;
+    bestCoinStreak?: number;
+    // Totals (for calculating averages)
+    totalScore?: number;
+    totalDistance?: number;
+    totalCoins?: number;
+    totalBossesDefeated?: number;
+    totalEnemiesDefeated?: number;
+    totalCoinStreak?: number;
+    // Timestamps
+    firstGameDate?: number;
+    lastGameDate?: number;
+    // Calculated averages (convenience)
+    averageScore?: number;
+    averageDistance?: number;
+    averageCoins?: number;
+    averageBossesDefeated?: number;
+    averageEnemiesDefeated?: number;
+    averageCoinStreak?: number;
+    error?: string;
+  }> {
+    try {
+      const packageId = this.config.contracts.gameScore;
+      if (!packageId || packageId === '' || packageId === '0x...') {
+        const network = this.config.sui.network;
+        throw new Error(`Game score contract not configured for ${network}. Please set GAME_SCORE_CONTRACT_${network.toUpperCase()} environment variable after contract deployment.`);
+      }
+
+      const statisticsRegistryObjectId = this.config.contracts.statisticsRegistry;
+      if (!statisticsRegistryObjectId || statisticsRegistryObjectId === '' || statisticsRegistryObjectId === '0x...') {
+        const network = this.config.sui.network;
+        throw new Error(`Statistics registry object ID not configured for ${network}. Please set STATISTICS_REGISTRY_OBJECT_ID_${network.toUpperCase()} environment variable after contract deployment.`);
+      }
+
+      // Use the appropriate client based on network
+      const client = this.config.sui.network === 'testnet' ? this.testnetClient : this.mainnetClient;
+
+      // Call the view function get_player_stats
+      // This is a read-only call, no transaction needed
+      const txb = new Transaction();
+      txb.moveCall({
+        target: `${packageId}::score_submission::get_player_stats`,
+        arguments: [
+          txb.object(statisticsRegistryObjectId),
+          txb.pure.address(playerAddress),
+        ],
+      });
+
+      const result = await client.devInspectTransactionBlock({
+        sender: this.address,
+        transactionBlock: txb,
+      });
+
+      // Parse the result
+      if (result.results && result.results.length > 0) {
+        const returnValues = result.results[0].returnValues;
+        if (returnValues && returnValues.length >= 16) {
+          // get_player_stats returns (bool, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64)
+          // Parse all 16 return values
+          const parseU64 = (val: any): number => {
+            if (Array.isArray(val)) {
+              // Sui returns values as [type, value] tuples
+              return parseInt(val[1] || val[0] || '0', 10);
+            }
+            return parseInt(val || '0', 10);
+          };
+
+          // Parse boolean: Sui returns bool as [type, "0" or "1"]
+          const hasStatsValue = returnValues[0];
+          const hasStats = Array.isArray(hasStatsValue) 
+            ? (String(hasStatsValue[1]) === '1' || Number(hasStatsValue[1]) === 1)
+            : Boolean(hasStatsValue);
+          const totalGames = parseU64(returnValues[1]);
+          const bestScore = parseU64(returnValues[2]);
+          const bestDistance = parseU64(returnValues[3]);
+          const bestCoins = parseU64(returnValues[4]);
+          const bestBossesDefeated = parseU64(returnValues[5]);
+          const bestEnemiesDefeated = parseU64(returnValues[6]);
+          const bestCoinStreak = parseU64(returnValues[7]);
+          const totalScore = parseU64(returnValues[8]);
+          const totalDistance = parseU64(returnValues[9]);
+          const totalCoins = parseU64(returnValues[10]);
+          const totalBossesDefeated = parseU64(returnValues[11]);
+          const totalEnemiesDefeated = parseU64(returnValues[12]);
+          const totalCoinStreak = parseU64(returnValues[13]);
+          const firstGameDate = parseU64(returnValues[14]);
+          const lastGameDate = parseU64(returnValues[15]);
+
+          // Calculate averages (convenience)
+          const calculateAverage = (total: number, games: number): number => {
+            return games > 0 ? Math.round(total / games) : 0;
+          };
+
+          return {
+            success: true,
+            hasStats,
+            totalGames,
+            bestScore,
+            bestDistance,
+            bestCoins,
+            bestBossesDefeated,
+            bestEnemiesDefeated,
+            bestCoinStreak,
+            totalScore,
+            totalDistance,
+            totalCoins,
+            totalBossesDefeated,
+            totalEnemiesDefeated,
+            totalCoinStreak,
+            firstGameDate,
+            lastGameDate,
+            // Calculated averages
+            averageScore: calculateAverage(totalScore, totalGames),
+            averageDistance: calculateAverage(totalDistance, totalGames),
+            averageCoins: calculateAverage(totalCoins, totalGames),
+            averageBossesDefeated: calculateAverage(totalBossesDefeated, totalGames),
+            averageEnemiesDefeated: calculateAverage(totalEnemiesDefeated, totalGames),
+            averageCoinStreak: calculateAverage(totalCoinStreak, totalGames),
+          };
+        }
+      }
+
+      // If no return values or insufficient values, player has no stats
+      return {
+        success: true,
+        hasStats: false,
+        totalGames: 0,
+      };
+    } catch (error) {
+      console.error('❌ Error querying player stats:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }

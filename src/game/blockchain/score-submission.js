@@ -134,15 +134,56 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
       console.log('✅ [BLOCKCHAIN] Score submitted successfully!', {
         digest: result.digest,
         playerAddress: result.playerAddress,
-        gasPaidBy: result.gasPaidBy
+        gasPaidBy: result.gasPaidBy,
+        badge: result.badge
       });
+      
+      // Handle badge operations if present
+      if (result.badge) {
+        if (result.badge.canMint) {
+          // First game - show minting modal
+          console.log('🎖️ [BADGE] Player can mint badge');
+          // Show minting modal after a short delay (let game over screen be visible)
+          setTimeout(() => {
+            if (window.BadgeUI && window.BadgeUI.showBadgeMintingModal) {
+              window.BadgeUI.showBadgeMintingModal();
+            }
+          }, 1000);
+        } else if (result.badge.tierUpgraded) {
+          // Tier upgraded - show upgrade notification
+          console.log('🎖️ [BADGE] Badge tier upgraded to:', result.badge.newTier);
+          // Show upgrade modal after a short delay
+          setTimeout(async () => {
+            if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
+              // Get badge data to show new tier image
+              const badgeData = await window.BadgeService.getBadge();
+              if (badgeData.success && badgeData.badge) {
+                window.BadgeUI.showTierUpgradeModal({
+                  oldTier: badgeData.badge.tier - 1, // Previous tier
+                  newTier: result.badge.newTier,
+                  newTierName: window.BadgeService.getTierName(result.badge.newTier),
+                  imageData: badgeData.badge.imageData,
+                });
+              } else {
+                // Fallback without image
+                window.BadgeUI.showTierUpgradeModal({
+                  oldTier: result.badge.newTier - 1,
+                  newTier: result.badge.newTier,
+                  newTierName: window.BadgeService.getTierName(result.badge.newTier),
+                });
+              }
+            }
+          }, 1000);
+        }
+      }
       
       return {
         success: true,
         digest: result.digest,
         playerAddress: result.playerAddress,
         gasPaidBy: result.gasPaidBy,
-        message: result.message
+        message: result.message,
+        badge: result.badge // Include badge info in return value
       };
     } else {
       throw new Error(result.error || 'Score submission failed');

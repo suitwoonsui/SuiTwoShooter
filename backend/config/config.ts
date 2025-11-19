@@ -25,6 +25,10 @@ interface TokenConfig {
 interface ContractsConfig {
   gameScore: string;
   sessionRegistry: string;  // Session registry object ID (from init function)
+  statisticsRegistry: string;  // Statistics registry object ID (from init function) - for player stats tracking
+  badgeRegistry: string;  // Badge registry object ID (from badge_system::init function)
+  badgePublisher: string;  // Badge Publisher object ID (created automatically by init() function) - for updating badge display metadata
+  badgeDisplay: string;  // Badge Display object ID (created via create_display function) - configures how badges appear in wallets
   adminCapability: string;   // Admin capability object ID (from create_admin_capability function) - for score submission
   tokenBurn: string;
   subscription: string;
@@ -149,6 +153,34 @@ export function getConfig(): Config {
       sessionRegistry: network === 'testnet'
         ? (process.env.SESSION_REGISTRY_OBJECT_ID_TESTNET || process.env.SESSION_REGISTRY_OBJECT_ID || '')
         : (process.env.SESSION_REGISTRY_OBJECT_ID_MAINNET || process.env.SESSION_REGISTRY_OBJECT_ID || ''),
+      // Support network-specific statistics registry object IDs
+      // Use STATISTICS_REGISTRY_OBJECT_ID_TESTNET or STATISTICS_REGISTRY_OBJECT_ID_MAINNET if available
+      // Otherwise fall back to STATISTICS_REGISTRY_OBJECT_ID (for backward compatibility)
+      // NOTE: Statistics registry is created by init() function, same as session registry
+      statisticsRegistry: network === 'testnet'
+        ? (process.env.STATISTICS_REGISTRY_OBJECT_ID_TESTNET || process.env.STATISTICS_REGISTRY_OBJECT_ID || '')
+        : (process.env.STATISTICS_REGISTRY_OBJECT_ID_MAINNET || process.env.STATISTICS_REGISTRY_OBJECT_ID || ''),
+      // Support network-specific badge registry object IDs
+      // Use BADGE_REGISTRY_OBJECT_ID_TESTNET or BADGE_REGISTRY_OBJECT_ID_MAINNET if available
+      // Otherwise fall back to BADGE_REGISTRY_OBJECT_ID (for backward compatibility)
+      // NOTE: Badge registry is created by badge_system::init() function
+      badgeRegistry: network === 'testnet'
+        ? (process.env.BADGE_REGISTRY_OBJECT_ID_TESTNET || process.env.BADGE_REGISTRY_OBJECT_ID || '')
+        : (process.env.BADGE_REGISTRY_OBJECT_ID_MAINNET || process.env.BADGE_REGISTRY_OBJECT_ID || ''),
+      // Support network-specific badge publisher object IDs
+      // Use BADGE_PUBLISHER_OBJECT_ID_TESTNET or BADGE_PUBLISHER_OBJECT_ID_MAINNET if available
+      // Otherwise fall back to BADGE_PUBLISHER_OBJECT_ID (for backward compatibility)
+      // NOTE: Badge Publisher is created automatically by init() function via package::claim_and_keep
+      badgePublisher: network === 'testnet'
+        ? (process.env.BADGE_PUBLISHER_OBJECT_ID_TESTNET || process.env.BADGE_PUBLISHER_OBJECT_ID || '')
+        : (process.env.BADGE_PUBLISHER_OBJECT_ID_MAINNET || process.env.BADGE_PUBLISHER_OBJECT_ID || ''),
+      // Support network-specific badge display object IDs
+      // Use BADGE_DISPLAY_OBJECT_ID_TESTNET or BADGE_DISPLAY_OBJECT_ID_MAINNET if available
+      // Otherwise fall back to BADGE_DISPLAY_OBJECT_ID (for backward compatibility)
+      // NOTE: Badge Display is created via create_display function using the Publisher
+      badgeDisplay: network === 'testnet'
+        ? (process.env.BADGE_DISPLAY_OBJECT_ID_TESTNET || process.env.BADGE_DISPLAY_OBJECT_ID || '')
+        : (process.env.BADGE_DISPLAY_OBJECT_ID_MAINNET || process.env.BADGE_DISPLAY_OBJECT_ID || ''),
       // Support network-specific admin capability object IDs
       // Use ADMIN_CAPABILITY_OBJECT_ID_TESTNET or ADMIN_CAPABILITY_OBJECT_ID_MAINNET if available
       // Otherwise fall back to ADMIN_CAPABILITY_OBJECT_ID (for backward compatibility)
