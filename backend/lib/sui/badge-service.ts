@@ -137,6 +137,16 @@ export class BadgeService {
       });
 
       console.log(`🔍 [BADGE LOOKUP] devInspect completed`);
+      console.log(`🔍 [BADGE LOOKUP] Raw result object:`, result);
+      console.log(`🔍 [BADGE LOOKUP] result.results:`, result.results);
+      if (result.results && result.results.length > 0) {
+        console.log(`🔍 [BADGE LOOKUP] First result:`, result.results[0]);
+        console.log(`🔍 [BADGE LOOKUP] First result returnValues:`, result.results[0].returnValues);
+        if (result.results[0].returnValues && result.results[0].returnValues.length > 0) {
+          console.log(`🔍 [BADGE LOOKUP] First returnValue:`, result.results[0].returnValues[0]);
+          console.log(`🔍 [BADGE LOOKUP] First returnValue stringified:`, JSON.stringify(result.results[0].returnValues[0], null, 2));
+        }
+      }
       console.log(`🔍 [BADGE LOOKUP] Full result structure:`, JSON.stringify({
         hasResults: !!result.results,
         resultsLength: result.results?.length || 0,
@@ -148,6 +158,7 @@ export class BadgeService {
             type: rv[0],
             value: rv[1],
             valueType: typeof rv[1],
+            fullReturnValue: rv, // Include full return value for inspection
           })) || [],
           mutableReferenceOutputs: r.mutableReferenceOutputs?.length || 0,
         })) || [],
@@ -160,30 +171,91 @@ export class BadgeService {
         console.log(`   - returnValues length: ${firstResult.returnValues?.length || 0}`);
         console.log(`   - mutableReferenceOutputs length: ${firstResult.mutableReferenceOutputs?.length || 0}`);
         
-        const returnValue = firstResult.returnValues?.[0];
+        const returnValue = firstResult.returnValues?.[0] as any;
         if (returnValue) {
           console.log(`🔍 [BADGE LOOKUP] Found return value:`);
-          console.log(`   - Type: ${returnValue[0]}`);
-          console.log(`   - Value: ${returnValue[1]}`);
-          console.log(`   - Value type: ${typeof returnValue[1]}`);
-          console.log(`   - Value as string: "${String(returnValue[1])}"`);
-          console.log(`   - Value as number: ${Number(returnValue[1])}`);
+          console.log(`   - Full returnValue:`, JSON.stringify(returnValue, null, 2));
+          console.log(`   - returnValue is array: ${Array.isArray(returnValue)}`);
+          console.log(`   - returnValue length: ${Array.isArray(returnValue) ? returnValue.length : 'N/A'}`);
           
-          // Parse return value (boolean as u8: 0 = false, 1 = true)
-          // returnValue[1] is a string, so we check for string '1' or convert to number
-          const value = returnValue[1];
-          const stringCheck = String(value) === '1';
-          const numberCheck = Number(value) === 1;
-          const hasBadge = stringCheck || numberCheck;
+          // Based on the pattern found in gamePass.ts, the structure might be:
+          // returnValue = [typeArray, value] where typeArray = [typeCode]
+          // But if returnValue[1] is "bool" (type name), the actual value might be nested
           
-          console.log(`🔍 [BADGE LOOKUP] Parsing logic:`);
-          console.log(`   - String(value) === '1': ${stringCheck}`);
-          console.log(`   - Number(value) === 1: ${numberCheck}`);
-          console.log(`   - Combined: ${hasBadge}`);
-          console.log(`   - Boolean conversion: ${Boolean(hasBadge)}`);
-          console.log(`🔍 [BADGE LOOKUP] Final result: ${Boolean(hasBadge)}`);
+          let actualValue: any = null;
           
-          return Boolean(hasBadge);
+          // Strategy 1: Check if returnValue[1] is the actual value (should be "0", "1", true, false)
+          const value1 = returnValue[1];
+          if (value1 === "0" || value1 === "1" || value1 === 0 || value1 === 1 || value1 === true || value1 === false) {
+            actualValue = value1;
+            console.log(`🔍 [BADGE LOOKUP] Strategy 1: Found value in returnValue[1]: ${actualValue}`);
+          }
+          // Strategy 2: Check if returnValue[0] is an array and contains the value
+          else if (Array.isArray(returnValue[0])) {
+            // returnValue[0] might be [typeCode] or [typeCode, value]
+            if (returnValue[0].length > 1) {
+              // Check if second element is the value
+              const possibleValue = returnValue[0][1];
+              if (possibleValue === "0" || possibleValue === "1" || possibleValue === 0 || possibleValue === 1 || possibleValue === true || possibleValue === false) {
+                actualValue = possibleValue;
+                console.log(`🔍 [BADGE LOOKUP] Strategy 2: Found value in returnValue[0][1]: ${actualValue}`);
+              }
+            }
+            // Check if first element of nested array is the value (unlikely but possible)
+            if (actualValue === null && returnValue[0].length > 0) {
+              const possibleValue = returnValue[0][0];
+              if (possibleValue === "0" || possibleValue === "1" || possibleValue === 0 || possibleValue === 1 || possibleValue === true || possibleValue === false) {
+                actualValue = possibleValue;
+                console.log(`🔍 [BADGE LOOKUP] Strategy 3: Found value in returnValue[0][0]: ${actualValue}`);
+              }
+            }
+          }
+          // Strategy 4: Check if there's a third element
+          else if (Array.isArray(returnValue) && returnValue.length > 2) {
+            const possibleValue = returnValue[2];
+            if (possibleValue === "0" || possibleValue === "1" || possibleValue === 0 || possibleValue === 1 || possibleValue === true || possibleValue === false) {
+              actualValue = possibleValue;
+              console.log(`🔍 [BADGE LOOKUP] Strategy 4: Found value in returnValue[2]: ${actualValue}`);
+            }
+          }
+          
+          // If we still haven't found the value, check all elements
+          if (actualValue === null && Array.isArray(returnValue)) {
+            console.log(`🔍 [BADGE LOOKUP] Strategy 5: Searching all elements for boolean value...`);
+            for (let i = 0; i < returnValue.length; i++) {
+              const item = returnValue[i];
+              // Skip type arrays and type names
+              if (item === "bool" || (Array.isArray(item) && item.length === 1 && item[0] === 1)) {
+                continue;
+              }
+              // Check if this is a boolean value
+              if (item === "0" || item === "1" || item === 0 || item === 1 || item === true || item === false) {
+                actualValue = item;
+                console.log(`🔍 [BADGE LOOKUP] Strategy 5: Found value at index ${i}: ${actualValue}`);
+                break;
+              }
+            }
+          }
+          
+          // Parse the actual value
+          let hasBadge = false;
+          if (actualValue !== null && actualValue !== undefined) {
+            if (actualValue === "1" || actualValue === 1 || actualValue === true) {
+              hasBadge = true;
+            } else if (actualValue === "0" || actualValue === 0 || actualValue === false) {
+              hasBadge = false;
+            }
+            console.log(`🔍 [BADGE LOOKUP] Parsed value: ${hasBadge} (from ${actualValue})`);
+          } else {
+            console.error(`❌ [BADGE LOOKUP] Could not find actual boolean value in returnValue`);
+            console.error(`❌ [BADGE LOOKUP] returnValue structure:`, JSON.stringify(returnValue, null, 2));
+            // Default to false if we can't parse
+            hasBadge = false;
+          }
+          
+          console.log(`🔍 [BADGE LOOKUP] Final result: ${hasBadge}`);
+          
+          return hasBadge;
         } else {
           console.log(`🔍 [BADGE LOOKUP] No return value in first result`);
           console.log(`🔍 [BADGE LOOKUP] returnValues array:`, firstResult.returnValues);
