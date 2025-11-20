@@ -531,21 +531,68 @@ export class BadgeService {
             try {
               const badgeObj = await client.getObject({
                 id: badge.badgeId,
-                options: { showContent: true },
+                options: { showContent: true, showOwner: true },
               });
               if (badgeObj.data && !badgeObj.error) {
-                return {
-                  success: false,
-                  error: 'Player already has a badge. Use the burn function to remove it first if you want to mint a new one.',
-                };
+                // Badge object exists and is valid - check if it's in admin wallet
+                const owner = badgeObj.data.owner;
+                if (owner && typeof owner === 'object' && 'AddressOwner' in owner) {
+                  const ownerAddress = owner.AddressOwner.toLowerCase();
+                  const adminAddress = this.adminWallet.getAddress().toLowerCase();
+                  
+                  if (ownerAddress === adminAddress) {
+                    // Badge is in admin wallet - we can burn it first, then mint
+                    console.log(`🔄 [ADMIN BADGE] Badge exists in admin wallet. Burning it first before minting new one...`);
+                    const burnResult = await this.adminBurnBadge(badge.badgeId);
+                    if (burnResult.success) {
+                      console.log(`✅ [ADMIN BADGE] Burned existing badge. Proceeding with mint...`);
+                      // Continue with minting after burn
+                    } else {
+                      return {
+                        success: false,
+                        error: `Player already has a badge. Failed to burn existing badge: ${burnResult.error}. Please burn it manually first.`,
+                      };
+                    }
+                  } else {
+                    // Badge is in player's wallet - cannot burn (soulbound)
+                    return {
+                      success: false,
+                      error: `Player already has a badge in their wallet. Badges are soulbound and cannot be transferred or burned by admin. The player must burn it themselves if they want a new one.`,
+                    };
+                  }
+                } else {
+                  return {
+                    success: false,
+                    error: 'Player already has a badge, but ownership information is invalid.',
+                  };
+                }
+              } else {
+                // Badge object doesn't exist - registry entry is orphaned
+                console.warn(`⚠️ [ADMIN BADGE] Registry entry exists but badge object not found for ${playerAddress}. Cleaning up orphaned entry...`);
+                const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
+                if (cleanupResult.success) {
+                  console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry. Proceeding with mint...`);
+                  // Continue with minting after cleanup
+                } else {
+                  return {
+                    success: false,
+                    error: `Registry entry exists but badge object not found. Failed to clean up orphaned entry: ${cleanupResult.error}`,
+                  };
+                }
               }
             } catch (objError) {
-              // Badge object doesn't exist - registry entry is orphaned
-              console.warn(`⚠️ [ADMIN BADGE] Registry entry exists but badge object not found for ${playerAddress}. This is an orphaned entry.`);
-              return {
-                success: false,
-                error: 'Registry entry exists but badge object not found. The registry entry is orphaned. You may need to clean up the registry entry first, or contact support.',
-              };
+              // Error checking badge object - assume it's an orphaned entry
+              console.warn(`⚠️ [ADMIN BADGE] Error checking badge object for ${playerAddress}:`, objError);
+              const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
+              if (cleanupResult.success) {
+                console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry. Proceeding with mint...`);
+                // Continue with minting after cleanup
+              } else {
+                return {
+                  success: false,
+                  error: `Error checking badge. Failed to clean up orphaned entry: ${cleanupResult.error}`,
+                };
+              }
             }
             } else {
               // Registry says player has badge but getBadge returned null - orphaned entry
@@ -781,18 +828,36 @@ export class BadgeService {
 
         // Check ownership - badge must be owned by admin wallet
         const owner = badgeObject.data.owner;
+        console.log(`🔍 [ADMIN BADGE] Checking badge ownership. Badge ID: ${badgeId}, Owner:`, JSON.stringify(owner), `Admin: ${adminAddress}`);
+        
         if (owner && typeof owner === 'object' && 'AddressOwner' in owner) {
           const ownerAddress = owner.AddressOwner.toLowerCase();
-          if (ownerAddress !== adminAddress.toLowerCase()) {
+          const adminAddressLower = adminAddress.toLowerCase();
+          
+          console.log(`🔍 [ADMIN BADGE] Owner address: ${ownerAddress}, Admin address: ${adminAddressLower}, Match: ${ownerAddress === adminAddressLower}`);
+          
+          if (ownerAddress !== adminAddressLower) {
+            // Try to get the badge's metadata owner (the player it was minted for)
+            let metadataOwner = 'unknown';
+            try {
+              const badgeContent = badgeObject.data.content;
+              if (badgeContent && 'fields' in badgeContent && badgeContent.fields && 'owner' in badgeContent.fields) {
+                metadataOwner = String(badgeContent.fields.owner);
+              }
+            } catch (e) {
+              // Ignore errors getting metadata
+            }
+            
             return {
               success: false,
-              error: `Badge is not owned by admin wallet. Badge owner: ${ownerAddress}, Admin wallet: ${adminAddress}. Badges are soulbound and cannot be transferred, so the badge must be minted to the admin wallet to be burned.`,
+              error: `Badge is not owned by admin wallet. Object owner: ${ownerAddress}, Admin wallet: ${adminAddress}. Badge metadata owner (player): ${metadataOwner}. Badges are soulbound and cannot be transferred. To burn a badge, it must be in the admin wallet. If this badge was minted via admin_mint_badge, it should be in the admin wallet. If it was minted normally by the player, it cannot be burned by admin.`,
             };
           }
         } else {
+          console.log(`⚠️ [ADMIN BADGE] Badge ownership format unexpected:`, owner);
           return {
             success: false,
-            error: `Badge ownership is not an address owner. Badges must be owned by the admin wallet to be burned.`,
+            error: `Badge ownership is not an address owner. Owner type: ${typeof owner}, Value: ${JSON.stringify(owner)}. Badges must be owned by the admin wallet to be burned.`,
           };
         }
       } catch (error) {
