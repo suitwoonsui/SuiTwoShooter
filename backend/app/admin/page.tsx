@@ -107,7 +107,7 @@ export default function AdminPage() {
         };
 
         script.onerror = () => {
-          console.error('❌ Failed to load wallet script from:', scriptPaths[0]);
+          console.error('❌ Failed to load wallet script from:', walletModuleUrl);
           setWalletError('Failed to load wallet module. Please ensure the wallet module is accessible.');
         };
 
