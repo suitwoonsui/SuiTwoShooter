@@ -472,10 +472,10 @@ export class BadgeService {
     digest?: string;
     error?: string;
   }> {
-    if (!this.config.contracts.badgeRegistry) {
+    if (!this.config.contracts.badgeRegistry || this.config.contracts.badgeRegistry.trim() === '') {
       return {
         success: false,
-        error: 'BadgeRegistry object ID not configured',
+        error: 'BadgeRegistry object ID not configured. Please set BADGE_REGISTRY_OBJECT_ID_TESTNET (or BADGE_REGISTRY_OBJECT_ID) environment variable in Vercel.',
       };
     }
 
@@ -493,6 +493,32 @@ export class BadgeService {
       const statsRegistryObjectId = this.config.contracts.statisticsRegistry;
       const adminCapabilityObjectId = this.config.contracts.adminCapability;
       const packageId = this.config.contracts.gameScore;
+
+      // Validate all required object IDs
+      if (!registryObjectId || registryObjectId.trim() === '') {
+        return {
+          success: false,
+          error: 'BadgeRegistry object ID is missing. Please set BADGE_REGISTRY_OBJECT_ID_TESTNET in Vercel environment variables.',
+        };
+      }
+      if (!statsRegistryObjectId || statsRegistryObjectId.trim() === '') {
+        return {
+          success: false,
+          error: 'StatisticsRegistry object ID is missing. Please set STATISTICS_REGISTRY_OBJECT_ID_TESTNET in Vercel environment variables.',
+        };
+      }
+      if (!adminCapabilityObjectId || adminCapabilityObjectId.trim() === '') {
+        return {
+          success: false,
+          error: 'AdminCapability object ID is missing. Please set ADMIN_CAPABILITY_OBJECT_ID_TESTNET in Vercel environment variables.',
+        };
+      }
+      if (!packageId || packageId.trim() === '') {
+        return {
+          success: false,
+          error: 'Game Score package ID is missing. Please set GAME_SCORE_CONTRACT_TESTNET in Vercel environment variables.',
+        };
+      }
 
       // Load badge image for the tier
       const imageData = await this.loadBadgeImage(tier);
