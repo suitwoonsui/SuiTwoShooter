@@ -343,7 +343,34 @@ export class BadgeService {
         return null;
       }
 
-      const badgeId = result1.results[0].returnValues[0][1] as string;
+      const returnValue = result1.results[0].returnValues[0] as any;
+      console.log(`🔍 [BADGE LOOKUP] Raw returnValue from get_badge_id:`, JSON.stringify(returnValue, null, 2));
+      
+      // The returnValue structure is [typeArray, typeNameString]
+      // typeArray contains the BCS-encoded object ID bytes (32 bytes)
+      // typeNameString is like "0x2::object::ID"
+      // We need to extract the actual object ID from the type array
+      let badgeId: string | null = null;
+      
+      if (Array.isArray(returnValue[0]) && returnValue[0].length === 32) {
+        // Convert byte array to hex string
+        const bytes = returnValue[0] as number[];
+        const hexString = bytes.map(byte => byte.toString(16).padStart(2, '0')).join('');
+        badgeId = `0x${hexString}`;
+        console.log(`🔍 [BADGE LOOKUP] Extracted badge ID from type array: ${badgeId}`);
+      } else if (typeof returnValue[1] === 'string' && returnValue[1].startsWith('0x') && returnValue[1].length === 66) {
+        // Fallback: if the value is already a valid object ID hex string, use it
+        badgeId = returnValue[1];
+        console.log(`🔍 [BADGE LOOKUP] Using badge ID from value string: ${badgeId}`);
+      } else {
+        console.error(`❌ [BADGE LOOKUP] Could not extract badge ID from returnValue`);
+        console.error(`❌ [BADGE LOOKUP] returnValue[0]:`, returnValue[0]);
+        console.error(`❌ [BADGE LOOKUP] returnValue[0] is array: ${Array.isArray(returnValue[0])}`);
+        console.error(`❌ [BADGE LOOKUP] returnValue[0] length: ${Array.isArray(returnValue[0]) ? returnValue[0].length : 'N/A'}`);
+        console.error(`❌ [BADGE LOOKUP] returnValue[1]:`, returnValue[1]);
+        return null;
+      }
+      
       console.log(`🔍 [BADGE LOOKUP] Badge ID extracted: ${badgeId}`);
       console.log(`🔍 [BADGE LOOKUP] Badge ID type: ${typeof badgeId}`);
       console.log(`🔍 [BADGE LOOKUP] Badge ID length: ${badgeId?.length || 0}`);
