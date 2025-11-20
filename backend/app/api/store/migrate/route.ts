@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { adminWalletService } from '@/lib/sui/admin-wallet-service';
 import { MigrationService } from '@/lib/sui/migration-service';
+import { getConfig } from '@/config/config';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
     console.log('🔄 [MIGRATION API] Request body:', JSON.stringify(body, null, 2));
     
     const { playerAddress, oldPackageId, oldStoreObjectId } = body;
+    const config = getConfig();
 
     // Validate required fields
     if (!playerAddress) {
@@ -29,18 +31,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!oldPackageId) {
-      console.error('❌ [MIGRATION API] Missing oldPackageId');
+    // Use old store IDs from request body, or fall back to environment variables
+    const finalOldPackageId = oldPackageId || config.contracts.oldPremiumStorePackageId;
+    const finalOldStoreObjectId = oldStoreObjectId || config.contracts.oldPremiumStoreObjectId;
+
+    if (!finalOldPackageId) {
+      console.error('❌ [MIGRATION API] Missing oldPackageId (not provided in request and not in environment variables)');
       return NextResponse.json(
-        { success: false, error: 'oldPackageId is required' },
+        { 
+          success: false, 
+          error: 'oldPackageId is required. Provide it in the request body or set OLD_PREMIUM_STORE_PACKAGE_ID environment variable.' 
+        },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    if (!oldStoreObjectId) {
-      console.error('❌ [MIGRATION API] Missing oldStoreObjectId');
+    if (!finalOldStoreObjectId) {
+      console.error('❌ [MIGRATION API] Missing oldStoreObjectId (not provided in request and not in environment variables)');
       return NextResponse.json(
-        { success: false, error: 'oldStoreObjectId is required' },
+        { 
+          success: false, 
+          error: 'oldStoreObjectId is required. Provide it in the request body or set OLD_PREMIUM_STORE_OBJECT_ID environment variable.' 
+        },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -54,15 +66,15 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`🔄 [MIGRATION API] Migrating inventory for ${playerAddress}`);
-    console.log(`   Old Package: ${oldPackageId}`);
-    console.log(`   Old Store: ${oldStoreObjectId}`);
+    console.log(`   Old Package: ${finalOldPackageId}${oldPackageId ? '' : ' (from environment)'}`);
+    console.log(`   Old Store: ${finalOldStoreObjectId}${oldStoreObjectId ? '' : ' (from environment)'}`);
 
     // Create migration service and migrate
     const migrationService = new MigrationService(adminWalletService);
     const result = await migrationService.migratePlayerInventory(
       playerAddress,
-      oldPackageId,
-      oldStoreObjectId
+      finalOldPackageId,
+      finalOldStoreObjectId
     );
 
     if (!result.success) {

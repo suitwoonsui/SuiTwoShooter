@@ -208,10 +208,66 @@ export class MigrationService {
       const newStoreObjectId = this.config.contracts.premiumStoreObject;
       const adminCapabilityObjectId = this.config.contracts.premiumStoreAdminCapability;
 
-      if (!newStoreObjectId || !adminCapabilityObjectId) {
+      if (!newStoreObjectId || !adminCapabilityObjectId || adminCapabilityObjectId === '') {
         return {
           success: false,
-          error: 'New store not configured',
+          error: `New store not configured. Missing: ${!newStoreObjectId ? 'PREMIUM_STORE_OBJECT_ID_TESTNET' : ''} ${!adminCapabilityObjectId || adminCapabilityObjectId === '' ? 'PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET' : ''}`,
+        };
+      }
+
+      // Verify the admin capability object exists and is the correct type
+      try {
+        const network = this.config.sui.network;
+        const client = network === 'testnet' 
+          ? this.adminWallet.getTestnetClient()
+          : this.adminWallet.getMainnetClient();
+        
+        const adminCapObject = await client.getObject({
+          id: adminCapabilityObjectId,
+          options: { showType: true },
+        });
+
+        if (adminCapObject.error) {
+          console.error(`❌ [MIGRATION] Admin capability object not found: ${adminCapabilityObjectId}`);
+          return {
+            success: false,
+            error: `Admin capability object not found: ${adminCapabilityObjectId}. Please verify PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET is correct.`,
+          };
+        }
+
+        const objectType = adminCapObject.data?.type || 'unknown';
+        const owner = adminCapObject.data?.owner;
+        
+        // Extract package ID from admin capability type
+        const adminCapPackageId = objectType.split('::')[0];
+        
+        console.log(`🔍 [MIGRATION] Admin capability object type: ${objectType}`);
+        console.log(`🔍 [MIGRATION] Admin capability package ID: ${adminCapPackageId}`);
+        console.log(`🔍 [MIGRATION] New store package ID: ${newPackageId}`);
+        console.log(`🔍 [MIGRATION] Admin capability owner: ${JSON.stringify(owner)}`);
+        console.log(`🔍 [MIGRATION] Admin wallet address: ${this.adminWallet.getAddress()}`);
+
+        // Verify it's the correct type (premium_store::AdminCapability, not score_submission::AdminCapability)
+        if (!objectType.includes('premium_store::AdminCapability')) {
+          return {
+            success: false,
+            error: `Wrong admin capability type! The object at ${adminCapabilityObjectId} is of type ${objectType}, but expected premium_store::AdminCapability. Please use the premium_store admin capability, not the score_submission admin capability.`,
+          };
+        }
+
+        // CRITICAL: Verify the admin capability is from the same package as the new store
+        if (adminCapPackageId !== newPackageId) {
+          return {
+            success: false,
+            error: `Package ID mismatch! The admin capability is from package ${adminCapPackageId}, but the new store is from package ${newPackageId}. They must match. Please ensure PREMIUM_STORE_CONTRACT_TESTNET matches the package that created the admin capability, or use an admin capability from the correct package.`,
+          };
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('❌ [MIGRATION] Could not verify admin capability object:', errorMessage);
+        return {
+          success: false,
+          error: `Failed to verify admin capability object: ${errorMessage}. Please check that PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET is correct.`,
         };
       }
 

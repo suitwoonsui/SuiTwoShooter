@@ -35,6 +35,8 @@ interface ContractsConfig {
   premiumStore: string;      // Premium store package ID
   premiumStoreObject: string; // Premium store object ID (from init function)
   premiumStoreAdminCapability: string; // Premium store admin capability object ID (separate from score submission)
+  oldPremiumStorePackageId: string; // Old premium store package ID (for migration from old contract)
+  oldPremiumStoreObjectId: string; // Old premium store object ID (for migration from old contract)
 }
 
 interface SecurityConfig {
@@ -198,7 +200,15 @@ export function getConfig(): Config {
         : (process.env.PREMIUM_STORE_OBJECT_ID_MAINNET || process.env.PREMIUM_STORE_OBJECT_ID || ''),
       premiumStoreAdminCapability: network === 'testnet'
         ? (process.env.PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET || process.env.ADMIN_CAPABILITY_OBJECT_ID_TESTNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || '')
-        : (process.env.PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || '')
+        : (process.env.PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.ADMIN_CAPABILITY_OBJECT_ID || ''),
+      // Old store IDs for migration (optional - can be provided in API request instead)
+      // Supports both CONTRACT and PACKAGE_ID naming conventions
+      oldPremiumStorePackageId: network === 'testnet'
+        ? (process.env.OLD_PREMIUM_STORE_CONTRACT_TESTNET || process.env.OLD_PREMIUM_STORE_PACKAGE_ID_TESTNET || process.env.OLD_PREMIUM_STORE_PACKAGE_ID || process.env.OLD_PREMIUM_STORE_CONTRACT || '')
+        : (process.env.OLD_PREMIUM_STORE_CONTRACT_MAINNET || process.env.OLD_PREMIUM_STORE_PACKAGE_ID_MAINNET || process.env.OLD_PREMIUM_STORE_PACKAGE_ID || process.env.OLD_PREMIUM_STORE_CONTRACT || ''),
+      oldPremiumStoreObjectId: network === 'testnet'
+        ? (process.env.OLD_PREMIUM_STORE_OBJECT_ID_TESTNET || process.env.OLD_PREMIUM_STORE_OBJECT_ID || '')
+        : (process.env.OLD_PREMIUM_STORE_OBJECT_ID_MAINNET || process.env.OLD_PREMIUM_STORE_OBJECT_ID || '')
     },
     security: {
       apiKey: process.env.API_KEY || '',
