@@ -189,7 +189,8 @@ export class MigrationService {
       for (const field of allFields.data) {
         // Dynamic field name should be of type 'address'
         if (field.name?.type === 'address' && field.name?.value) {
-          wallets.push(field.name.value);
+          // Type assertion: when type is 'address', value is a string
+          wallets.push(String(field.name.value));
         }
       }
 
