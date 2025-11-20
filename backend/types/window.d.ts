@@ -9,9 +9,14 @@ interface WalletAPIInstance {
   disconnect(): Promise<void>;
 }
 
+interface WalletAPIConstructor {
+  initialize(options?: { network?: string; containerId?: string }): Promise<WalletAPIInstance>;
+}
+
 declare global {
   interface Window {
     walletAPIInstance?: WalletAPIInstance;
+    WalletAPI?: WalletAPIConstructor;
   }
 }
 
