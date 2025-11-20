@@ -112,6 +112,10 @@ export class BadgeService {
       throw new Error('BadgeRegistry object ID not configured');
     }
 
+    console.log(`🔍 [BADGE LOOKUP] Checking if player has badge. Address: ${playerAddress}`);
+    console.log(`🔍 [BADGE LOOKUP] BadgeRegistry ID: ${this.config.contracts.badgeRegistry}`);
+    console.log(`🔍 [BADGE LOOKUP] Package ID: ${this.config.contracts.gameScore}`);
+
     try {
       const client = this.getClient();
       
@@ -125,10 +129,24 @@ export class BadgeService {
         ],
       });
 
+      console.log(`🔍 [BADGE LOOKUP] Calling has_badge with sender: ${this.adminWallet.getAddress()}`);
+
       const result = await client.devInspectTransactionBlock({
         transactionBlock: tx,
         sender: this.adminWallet.getAddress(),
       });
+
+      console.log(`🔍 [BADGE LOOKUP] devInspect result:`, JSON.stringify({
+        hasResults: !!result.results,
+        resultsLength: result.results?.length || 0,
+        firstResult: result.results?.[0] ? {
+          returnValues: result.results[0].returnValues?.length || 0,
+          returnValue0: result.results[0].returnValues?.[0] ? {
+            type: result.results[0].returnValues[0][0],
+            value: result.results[0].returnValues[0][1],
+          } : null,
+        } : null,
+      }, null, 2));
 
       if (result.results && result.results.length > 0) {
         const returnValue = result.results[0].returnValues?.[0];
@@ -137,13 +155,20 @@ export class BadgeService {
           // returnValue[1] is a string, so we check for string '1' or convert to number
           const value = returnValue[1];
           const hasBadge = String(value) === '1' || Number(value) === 1;
+          console.log(`🔍 [BADGE LOOKUP] Return value: ${value}, Parsed: ${hasBadge}, Final: ${Boolean(hasBadge)}`);
           return Boolean(hasBadge);
+        } else {
+          console.log(`🔍 [BADGE LOOKUP] No return value in result`);
         }
+      } else {
+        console.log(`🔍 [BADGE LOOKUP] No results returned from devInspect`);
       }
 
+      console.log(`🔍 [BADGE LOOKUP] Returning false (no badge found)`);
       return false;
     } catch (error) {
-      console.error('Error checking if player has badge:', error);
+      console.error('❌ [BADGE LOOKUP] Error checking if player has badge:', error);
+      console.error('❌ [BADGE LOOKUP] Error details:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -162,16 +187,21 @@ export class BadgeService {
       throw new Error('BadgeRegistry object ID not configured');
     }
 
+    console.log(`🔍 [BADGE LOOKUP] Getting badge data for: ${playerAddress}`);
+
     try {
       // First check if player has badge
       const hasBadge = await this.hasBadge(playerAddress);
+      console.log(`🔍 [BADGE LOOKUP] hasBadge result: ${hasBadge}`);
       if (!hasBadge) {
+        console.log(`🔍 [BADGE LOOKUP] Player does not have badge, returning null`);
         return null;
       }
 
       const client = this.getClient();
       
       // Get badge ID from registry
+      console.log(`🔍 [BADGE LOOKUP] Calling get_badge_id...`);
       const tx1 = new Transaction();
       tx1.moveCall({
         target: `${this.config.contracts.gameScore}::badge_system::get_badge_id`,
@@ -186,13 +216,28 @@ export class BadgeService {
         sender: this.adminWallet.getAddress(),
       });
 
+      console.log(`🔍 [BADGE LOOKUP] get_badge_id result:`, JSON.stringify({
+        hasResults: !!result1.results,
+        resultsLength: result1.results?.length || 0,
+        firstResult: result1.results?.[0] ? {
+          returnValues: result1.results[0].returnValues?.length || 0,
+          returnValue0: result1.results[0].returnValues?.[0] ? {
+            type: result1.results[0].returnValues[0][0],
+            value: result1.results[0].returnValues[0][1],
+          } : null,
+        } : null,
+      }, null, 2));
+
       if (!result1.results || !result1.results[0].returnValues?.[0]) {
+        console.log(`🔍 [BADGE LOOKUP] No badge ID returned from get_badge_id`);
         return null;
       }
 
       const badgeId = result1.results[0].returnValues[0][1] as string;
+      console.log(`🔍 [BADGE LOOKUP] Badge ID found: ${badgeId}`);
 
       // Get badge data
+      console.log(`🔍 [BADGE LOOKUP] Calling get_badge_data for badge ID: ${badgeId}...`);
       const tx2 = new Transaction();
       tx2.moveCall({
         target: `${this.config.contracts.gameScore}::badge_system::get_badge_data`,
@@ -204,20 +249,35 @@ export class BadgeService {
         sender: this.adminWallet.getAddress(),
       });
 
+      console.log(`🔍 [BADGE LOOKUP] get_badge_data result:`, JSON.stringify({
+        hasResults: !!result2.results,
+        resultsLength: result2.results?.length || 0,
+        firstResult: result2.results?.[0] ? {
+          returnValues: result2.results[0].returnValues?.length || 0,
+        } : null,
+      }, null, 2));
+
       if (!result2.results || !result2.results[0].returnValues) {
+        console.log(`🔍 [BADGE LOOKUP] No badge data returned from get_badge_data`);
         return null;
       }
 
       const returnValues = result2.results[0].returnValues;
-      return {
+      const badgeData = {
         badgeId,
         tier: Number(returnValues[1][1]),
         gamesPlayed: Number(returnValues[2][1]),
         mintDate: Number(returnValues[3][1]),
         lastUpdated: Number(returnValues[4][1]),
       };
+      console.log(`🔍 [BADGE LOOKUP] Badge data retrieved:`, JSON.stringify(badgeData, null, 2));
+      return badgeData;
     } catch (error) {
-      console.error('Error getting badge data:', error);
+      console.error('❌ [BADGE LOOKUP] Error getting badge data:', error);
+      console.error('❌ [BADGE LOOKUP] Error details:', error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        console.error('❌ [BADGE LOOKUP] Stack trace:', error.stack);
+      }
       throw error;
     }
   }

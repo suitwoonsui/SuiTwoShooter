@@ -53,14 +53,17 @@ export async function GET(
       );
     }
 
-    console.log(`📥 Badge query request received for: ${playerAddress}`);
+    console.log(`📥 [BADGE API] Badge query request received for: ${playerAddress}`);
 
     const badgeService = getBadgeService();
     
     // Check if player has badge
+    console.log(`📥 [BADGE API] Checking if player has badge...`);
     const hasBadge = await badgeService.hasBadge(playerAddress);
+    console.log(`📥 [BADGE API] hasBadge result: ${hasBadge}`);
     
     if (!hasBadge) {
+      console.log(`📥 [BADGE API] Player does not have badge, returning hasBadge: false`);
       return NextResponse.json(
         {
           success: true,
@@ -71,9 +74,12 @@ export async function GET(
     }
 
     // Get badge data
+    console.log(`📥 [BADGE API] Player has badge, getting badge data...`);
     const badge = await badgeService.getBadge(playerAddress);
+    console.log(`📥 [BADGE API] getBadge result:`, badge ? `Found badge ID: ${badge.badgeId}` : 'null');
     
     if (!badge) {
+      console.log(`📥 [BADGE API] getBadge returned null even though hasBadge was true. This might indicate an orphaned registry entry.`);
       return NextResponse.json(
         {
           success: true,
