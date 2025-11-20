@@ -74,12 +74,37 @@ This document describes all environment variables required for the SuiTwo game b
 - **Description**: Fallback contract address (used if network-specific variable not set)
 - **Required**: No (use network-specific variables instead)
 
-**`SESSION_REGISTRY_OBJECT_ID`** (NEW - REQUIRED after deployment)
-- **Description**: Object ID of the SessionRegistry shared object created by the `init` function
+**`SESSION_REGISTRY_OBJECT_ID_TESTNET`** (Recommended for testnet)
+- **Description**: Object ID of the SessionRegistry shared object created by the `init` function on testnet
 - **Format**: Object ID (e.g., `0x...`)
 - **Example**: `0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef`
-- **Required**: Yes (after contract deployment)
+- **Required**: Yes (after contract deployment to testnet)
 - **Note**: This is created automatically when the contract is deployed. Extract it from the deployment transaction.
+
+**`SESSION_REGISTRY_OBJECT_ID_MAINNET`** (For production)
+- **Description**: Object ID of the SessionRegistry shared object created by the `init` function on mainnet
+- **Format**: Object ID (e.g., `0x...`)
+- **Required**: Yes (after contract deployment to mainnet)
+
+**`SESSION_REGISTRY_OBJECT_ID`** (Fallback)
+- **Description**: Fallback SessionRegistry object ID (used if network-specific variable not set)
+- **Required**: No (use network-specific variables instead)
+
+**`STATISTICS_REGISTRY_OBJECT_ID_TESTNET`** (Recommended for testnet)
+- **Description**: Object ID of the StatisticsRegistry shared object created by the `init` function on testnet
+- **Format**: Object ID (e.g., `0x...`)
+- **Example**: `0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef`
+- **Required**: Yes (after contract deployment to testnet)
+- **Note**: This is created automatically when the contract is deployed. Used for tracking player statistics (total_games) for badge progression.
+
+**`STATISTICS_REGISTRY_OBJECT_ID_MAINNET`** (For production)
+- **Description**: Object ID of the StatisticsRegistry shared object created by the `init` function on mainnet
+- **Format**: Object ID (e.g., `0x...`)
+- **Required**: Yes (after contract deployment to mainnet)
+
+**`STATISTICS_REGISTRY_OBJECT_ID`** (Fallback)
+- **Description**: Fallback StatisticsRegistry object ID (used if network-specific variable not set)
+- **Required**: No (use network-specific variables instead)
 
 **`TOKEN_BURN_CONTRACT`** (Future)
 - **Description**: Token burn contract address
@@ -160,7 +185,8 @@ GAME_WALLET_PRIVATE_KEY=suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgus
 # Sui Network (REQUIRED after deployment)
 SUI_TESTNET_NETWORK=testnet
 GAME_SCORE_CONTRACT_TESTNET=0x...  # Package ID - Set after contract deployment
-SESSION_REGISTRY_OBJECT_ID=0x...  # Registry Object ID - Set after contract deployment
+SESSION_REGISTRY_OBJECT_ID_TESTNET=0x...  # Session Registry Object ID - Set after contract deployment
+STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0x...  # Statistics Registry Object ID - Set after contract deployment
 
 # Token Configuration (REQUIRED)
 MEWS_TOKEN_TYPE_ID=0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS

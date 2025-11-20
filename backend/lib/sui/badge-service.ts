@@ -262,10 +262,10 @@ export class BadgeService {
 
       // Get StatisticsRegistry object ID from config
       const statsRegistryId = this.config.contracts.statisticsRegistry;
-      if (!statsRegistryId) {
+      if (!statsRegistryId || statsRegistryId.trim() === '') {
         return {
           success: false,
-          error: 'StatisticsRegistry object ID not configured',
+          error: 'StatisticsRegistry object ID not configured. Please set STATISTICS_REGISTRY_OBJECT_ID_TESTNET (or STATISTICS_REGISTRY_OBJECT_ID) environment variable in Vercel.',
         };
       }
 

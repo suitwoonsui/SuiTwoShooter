@@ -32,6 +32,7 @@ async function extractObjects() {
     });
 
     let sessionRegistryObjectId = null;
+    let statisticsRegistryObjectId = null;
     let premiumStoreObjectId = null;
     let badgeRegistryObjectId = null;
 
@@ -43,6 +44,12 @@ async function extractObjects() {
           if (change.objectType.includes('SessionRegistry')) {
             sessionRegistryObjectId = change.objectId;
             console.log('\n✅ Found Session Registry!');
+            console.log('   Object ID:', change.objectId);
+            console.log('   Object Type:', change.objectType);
+          }
+          if (change.objectType.includes('StatisticsRegistry')) {
+            statisticsRegistryObjectId = change.objectId;
+            console.log('\n✅ Found Statistics Registry!');
             console.log('   Object ID:', change.objectId);
             console.log('   Object Type:', change.objectType);
           }
@@ -77,6 +84,11 @@ async function extractObjects() {
     } else {
       console.log('   ⚠️  Session Registry: Not found');
     }
+    if (statisticsRegistryObjectId) {
+      console.log(`   ✅ Statistics Registry: ${statisticsRegistryObjectId}`);
+    } else {
+      console.log('   ⚠️  Statistics Registry: Not found');
+    }
     if (premiumStoreObjectId) {
       console.log(`   ✅ Premium Store: ${premiumStoreObjectId}`);
     } else {
@@ -88,7 +100,7 @@ async function extractObjects() {
       console.log('   ⚠️  Badge Registry: Not found (may need to be initialized separately)');
     }
 
-    return { sessionRegistryObjectId, premiumStoreObjectId, badgeRegistryObjectId };
+    return { sessionRegistryObjectId, statisticsRegistryObjectId, premiumStoreObjectId, badgeRegistryObjectId };
   } catch (error) {
     console.error('❌ Error:', error.message);
     console.error(error.stack);
