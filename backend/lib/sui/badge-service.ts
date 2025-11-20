@@ -596,11 +596,72 @@ export class BadgeService {
       };
     }
 
+    // Validate badge ID format (must be a valid Sui object ID)
+    if (!badgeId || !badgeId.startsWith('0x') || badgeId.length !== 66) {
+      return {
+        success: false,
+        error: 'Invalid badge ID format. Must be a valid Sui object ID (0x followed by 64 hex characters). Note: This should be the badge object ID, not a wallet address.',
+      };
+    }
+
     try {
       const client = this.getClient();
       const registryObjectId = this.config.contracts.badgeRegistry;
       const adminCapabilityObjectId = this.config.contracts.adminCapability;
       const packageId = this.config.contracts.gameScore;
+      const adminAddress = this.adminWallet.getAddress();
+
+      // Verify the badge exists and is owned by the admin wallet
+      try {
+        const badgeObject = await client.getObject({
+          id: badgeId,
+          options: {
+            showType: true,
+            showOwner: true,
+          },
+        });
+
+        if (!badgeObject.data) {
+          return {
+            success: false,
+            error: `Badge object ${badgeId} does not exist. Please verify the badge ID is correct.`,
+          };
+        }
+
+        // Check if it's actually a badge
+        const badgeType = badgeObject.data.type;
+        if (!badgeType || !badgeType.includes('badge_system::EarlySupporterBadge')) {
+          return {
+            success: false,
+            error: `Object ${badgeId} is not a badge. Expected type: badge_system::EarlySupporterBadge, got: ${badgeType || 'unknown'}`,
+          };
+        }
+
+        // Check ownership - badge must be owned by admin wallet
+        const owner = badgeObject.data.owner;
+        if (typeof owner === 'object' && 'AddressOwner' in owner) {
+          const ownerAddress = owner.AddressOwner.toLowerCase();
+          if (ownerAddress !== adminAddress.toLowerCase()) {
+            return {
+              success: false,
+              error: `Badge is not owned by admin wallet. Badge owner: ${ownerAddress}, Admin wallet: ${adminAddress}. Badges are soulbound and cannot be transferred, so the badge must be minted to the admin wallet to be burned.`,
+            };
+          }
+        } else {
+          return {
+            success: false,
+            error: `Badge ownership is not an address owner. Badges must be owned by the admin wallet to be burned.`,
+          };
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('not found')) {
+          return {
+            success: false,
+            error: `Badge object ${badgeId} does not exist. Please verify the badge ID is correct.`,
+          };
+        }
+        throw error; // Re-throw if it's a different error
+      }
 
       // Build transaction
       const txb = new Transaction();

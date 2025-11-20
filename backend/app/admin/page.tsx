@@ -27,6 +27,9 @@ export default function AdminPage() {
   const [badgeId, setBadgeId] = useState('');
   const [badgesLoading, setBadgesLoading] = useState(false);
   const [badgesResult, setBadgesResult] = useState<{ success: boolean; message?: string; error?: string; digest?: string } | null>(null);
+  const [lookupAddress, setLookupAddress] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupResult, setLookupResult] = useState<{ badgeId?: string; error?: string } | null>(null);
 
   // Migration state
   const [migrationMode, setMigrationMode] = useState<'single' | 'batch' | 'auto'>('auto');
@@ -437,6 +440,45 @@ export default function AdminPage() {
     }
   };
 
+  // Badge lookup function
+  const handleBadgeLookup = async () => {
+    setLookupLoading(true);
+    setLookupResult(null);
+
+    try {
+      if (!lookupAddress || !lookupAddress.startsWith('0x') || lookupAddress.length !== 66) {
+        setLookupResult({
+          error: 'Invalid address format. Must be a valid Sui address (0x followed by 64 hex characters)',
+        });
+        setLookupLoading(false);
+        return;
+      }
+
+      const response = await fetch(`/api/badges/${lookupAddress}`);
+      const data = await response.json();
+
+      if (response.ok && data.success && data.hasBadge && data.badge) {
+        setLookupResult({
+          badgeId: data.badge.badgeId,
+        });
+        // Auto-fill the badge ID if in burn mode
+        if (badgeAction === 'burn') {
+          setBadgeId(data.badge.badgeId);
+        }
+      } else {
+        setLookupResult({
+          error: data.error || (data.hasBadge === false ? 'Player does not have a badge' : 'Failed to lookup badge'),
+        });
+      }
+    } catch (error) {
+      setLookupResult({
+        error: error instanceof Error ? error.message : 'Network error',
+      });
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
   // Badges functions
   const handleBadgesSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -818,6 +860,54 @@ export default function AdminPage() {
             </>
           ) : (
             <div>
+              <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+                <strong>🔍 Lookup Badge ID by Player Address:</strong>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={lookupAddress}
+                    onChange={(e) => setLookupAddress(e.target.value)}
+                    placeholder="Enter player address (0x...)"
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem',
+                      fontSize: '0.9rem',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBadgeLookup}
+                    disabled={lookupLoading || !lookupAddress}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: lookupLoading || !lookupAddress ? '#ccc' : '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: lookupLoading || !lookupAddress ? 'not-allowed' : 'pointer',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    {lookupLoading ? 'Looking up...' : 'Lookup'}
+                  </button>
+                </div>
+                {lookupResult && (
+                  <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: lookupResult.badgeId ? '#d4edda' : '#f8d7da', borderRadius: '4px', fontSize: '0.9rem' }}>
+                    {lookupResult.badgeId ? (
+                      <div>
+                        <strong>✅ Badge ID:</strong> <code style={{ backgroundColor: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.4rem', borderRadius: '3px' }}>{lookupResult.badgeId}</code>
+                      </div>
+                    ) : (
+                      <div>
+                        <strong>❌ Error:</strong> {lookupResult.error}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
                 Badge ID:
               </label>
@@ -825,7 +915,7 @@ export default function AdminPage() {
                 type="text"
                 value={badgeId}
                 onChange={(e) => setBadgeId(e.target.value)}
-                placeholder="0x..."
+                placeholder="0x... (or use lookup above)"
                 required
                 style={{
                   width: '100%',
@@ -836,7 +926,7 @@ export default function AdminPage() {
                 }}
               />
               <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-                ⚠️ Note: Badge must be in admin wallet to burn (badges are soulbound and cannot be transferred)
+                ⚠️ Note: Badge must be in admin wallet to burn (badges are soulbound and cannot be transferred). Use the lookup above to find the badge ID for a player address.
               </p>
             </div>
           )}
