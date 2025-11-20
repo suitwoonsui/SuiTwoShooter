@@ -136,35 +136,67 @@ export class BadgeService {
         sender: this.adminWallet.getAddress(),
       });
 
-      console.log(`🔍 [BADGE LOOKUP] devInspect result:`, JSON.stringify({
+      console.log(`🔍 [BADGE LOOKUP] devInspect completed`);
+      console.log(`🔍 [BADGE LOOKUP] Full result structure:`, JSON.stringify({
         hasResults: !!result.results,
         resultsLength: result.results?.length || 0,
-        firstResult: result.results?.[0] ? {
-          returnValues: result.results[0].returnValues?.length || 0,
-          returnValue0: result.results[0].returnValues?.[0] ? {
-            type: result.results[0].returnValues[0][0],
-            value: result.results[0].returnValues[0][1],
-          } : null,
-        } : null,
+        results: result.results?.map((r, idx) => ({
+          index: idx,
+          returnValues: r.returnValues?.length || 0,
+          returnValuesDetails: r.returnValues?.map((rv, rvIdx) => ({
+            index: rvIdx,
+            type: rv[0],
+            value: rv[1],
+            valueType: typeof rv[1],
+          })) || [],
+          mutableReferenceOutputs: r.mutableReferenceOutputs?.length || 0,
+          returnValuesMut: r.returnValuesMut?.length || 0,
+        })) || [],
       }, null, 2));
 
       if (result.results && result.results.length > 0) {
-        const returnValue = result.results[0].returnValues?.[0];
+        console.log(`🔍 [BADGE LOOKUP] Found ${result.results.length} result(s)`);
+        const firstResult = result.results[0];
+        console.log(`🔍 [BADGE LOOKUP] First result details:`);
+        console.log(`   - returnValues length: ${firstResult.returnValues?.length || 0}`);
+        console.log(`   - mutableReferenceOutputs length: ${firstResult.mutableReferenceOutputs?.length || 0}`);
+        console.log(`   - returnValuesMut length: ${firstResult.returnValuesMut?.length || 0}`);
+        
+        const returnValue = firstResult.returnValues?.[0];
         if (returnValue) {
+          console.log(`🔍 [BADGE LOOKUP] Found return value:`);
+          console.log(`   - Type: ${returnValue[0]}`);
+          console.log(`   - Value: ${returnValue[1]}`);
+          console.log(`   - Value type: ${typeof returnValue[1]}`);
+          console.log(`   - Value as string: "${String(returnValue[1])}"`);
+          console.log(`   - Value as number: ${Number(returnValue[1])}`);
+          
           // Parse return value (boolean as u8: 0 = false, 1 = true)
           // returnValue[1] is a string, so we check for string '1' or convert to number
           const value = returnValue[1];
-          const hasBadge = String(value) === '1' || Number(value) === 1;
-          console.log(`🔍 [BADGE LOOKUP] Return value: ${value}, Parsed: ${hasBadge}, Final: ${Boolean(hasBadge)}`);
+          const stringCheck = String(value) === '1';
+          const numberCheck = Number(value) === 1;
+          const hasBadge = stringCheck || numberCheck;
+          
+          console.log(`🔍 [BADGE LOOKUP] Parsing logic:`);
+          console.log(`   - String(value) === '1': ${stringCheck}`);
+          console.log(`   - Number(value) === 1: ${numberCheck}`);
+          console.log(`   - Combined: ${hasBadge}`);
+          console.log(`   - Boolean conversion: ${Boolean(hasBadge)}`);
+          console.log(`🔍 [BADGE LOOKUP] Final result: ${Boolean(hasBadge)}`);
+          
           return Boolean(hasBadge);
         } else {
-          console.log(`🔍 [BADGE LOOKUP] No return value in result`);
+          console.log(`🔍 [BADGE LOOKUP] No return value in first result`);
+          console.log(`🔍 [BADGE LOOKUP] returnValues array:`, firstResult.returnValues);
+          console.log(`🔍 [BADGE LOOKUP] returnValues[0]:`, firstResult.returnValues?.[0]);
         }
       } else {
         console.log(`🔍 [BADGE LOOKUP] No results returned from devInspect`);
+        console.log(`🔍 [BADGE LOOKUP] result.results:`, result.results);
       }
 
-      console.log(`🔍 [BADGE LOOKUP] Returning false (no badge found)`);
+      console.log(`🔍 [BADGE LOOKUP] No badge found - returning false`);
       return false;
     } catch (error) {
       console.error('❌ [BADGE LOOKUP] Error checking if player has badge:', error);
@@ -216,25 +248,35 @@ export class BadgeService {
         sender: this.adminWallet.getAddress(),
       });
 
-      console.log(`🔍 [BADGE LOOKUP] get_badge_id result:`, JSON.stringify({
+      console.log(`🔍 [BADGE LOOKUP] get_badge_id devInspect completed`);
+      console.log(`🔍 [BADGE LOOKUP] Full get_badge_id result:`, JSON.stringify({
         hasResults: !!result1.results,
         resultsLength: result1.results?.length || 0,
-        firstResult: result1.results?.[0] ? {
-          returnValues: result1.results[0].returnValues?.length || 0,
-          returnValue0: result1.results[0].returnValues?.[0] ? {
-            type: result1.results[0].returnValues[0][0],
-            value: result1.results[0].returnValues[0][1],
-          } : null,
-        } : null,
+        results: result1.results?.map((r, idx) => ({
+          index: idx,
+          returnValues: r.returnValues?.length || 0,
+          returnValuesDetails: r.returnValues?.map((rv, rvIdx) => ({
+            index: rvIdx,
+            type: rv[0],
+            value: rv[1],
+            valueType: typeof rv[1],
+          })) || [],
+        })) || [],
       }, null, 2));
 
       if (!result1.results || !result1.results[0].returnValues?.[0]) {
         console.log(`🔍 [BADGE LOOKUP] No badge ID returned from get_badge_id`);
+        console.log(`🔍 [BADGE LOOKUP] result1.results:`, result1.results);
+        console.log(`🔍 [BADGE LOOKUP] result1.results[0]:`, result1.results?.[0]);
+        console.log(`🔍 [BADGE LOOKUP] result1.results[0].returnValues:`, result1.results?.[0]?.returnValues);
+        console.log(`🔍 [BADGE LOOKUP] result1.results[0].returnValues[0]:`, result1.results?.[0]?.returnValues?.[0]);
         return null;
       }
 
       const badgeId = result1.results[0].returnValues[0][1] as string;
-      console.log(`🔍 [BADGE LOOKUP] Badge ID found: ${badgeId}`);
+      console.log(`🔍 [BADGE LOOKUP] Badge ID extracted: ${badgeId}`);
+      console.log(`🔍 [BADGE LOOKUP] Badge ID type: ${typeof badgeId}`);
+      console.log(`🔍 [BADGE LOOKUP] Badge ID length: ${badgeId?.length || 0}`);
 
       // Get badge data
       console.log(`🔍 [BADGE LOOKUP] Calling get_badge_data for badge ID: ${badgeId}...`);
@@ -249,20 +291,39 @@ export class BadgeService {
         sender: this.adminWallet.getAddress(),
       });
 
-      console.log(`🔍 [BADGE LOOKUP] get_badge_data result:`, JSON.stringify({
+      console.log(`🔍 [BADGE LOOKUP] get_badge_data devInspect completed`);
+      console.log(`🔍 [BADGE LOOKUP] Full get_badge_data result:`, JSON.stringify({
         hasResults: !!result2.results,
         resultsLength: result2.results?.length || 0,
-        firstResult: result2.results?.[0] ? {
-          returnValues: result2.results[0].returnValues?.length || 0,
-        } : null,
+        results: result2.results?.map((r, idx) => ({
+          index: idx,
+          returnValues: r.returnValues?.length || 0,
+          returnValuesDetails: r.returnValues?.map((rv, rvIdx) => ({
+            index: rvIdx,
+            type: rv[0],
+            value: rv[1],
+            valueType: typeof rv[1],
+          })) || [],
+        })) || [],
       }, null, 2));
 
       if (!result2.results || !result2.results[0].returnValues) {
         console.log(`🔍 [BADGE LOOKUP] No badge data returned from get_badge_data`);
+        console.log(`🔍 [BADGE LOOKUP] result2.results:`, result2.results);
+        console.log(`🔍 [BADGE LOOKUP] result2.results[0]:`, result2.results?.[0]);
+        console.log(`🔍 [BADGE LOOKUP] result2.results[0].returnValues:`, result2.results?.[0]?.returnValues);
         return null;
       }
 
       const returnValues = result2.results[0].returnValues;
+      console.log(`🔍 [BADGE LOOKUP] Parsing badge data from returnValues:`);
+      console.log(`   - returnValues length: ${returnValues.length}`);
+      console.log(`   - returnValues[0]:`, returnValues[0]);
+      console.log(`   - returnValues[1]:`, returnValues[1], `(tier)`);
+      console.log(`   - returnValues[2]:`, returnValues[2], `(gamesPlayed)`);
+      console.log(`   - returnValues[3]:`, returnValues[3], `(mintDate)`);
+      console.log(`   - returnValues[4]:`, returnValues[4], `(lastUpdated)`);
+      
       const badgeData = {
         badgeId,
         tier: Number(returnValues[1][1]),
@@ -270,7 +331,15 @@ export class BadgeService {
         mintDate: Number(returnValues[3][1]),
         lastUpdated: Number(returnValues[4][1]),
       };
-      console.log(`🔍 [BADGE LOOKUP] Badge data retrieved:`, JSON.stringify(badgeData, null, 2));
+      
+      console.log(`🔍 [BADGE LOOKUP] Parsed badge data:`, JSON.stringify(badgeData, null, 2));
+      console.log(`🔍 [BADGE LOOKUP] Badge data validation:`);
+      console.log(`   - badgeId valid: ${!!badgeData.badgeId && badgeData.badgeId.length === 66}`);
+      console.log(`   - tier valid: ${badgeData.tier >= 0 && badgeData.tier <= 5}`);
+      console.log(`   - gamesPlayed: ${badgeData.gamesPlayed}`);
+      console.log(`   - mintDate: ${badgeData.mintDate} (${new Date(badgeData.mintDate).toISOString()})`);
+      console.log(`   - lastUpdated: ${badgeData.lastUpdated} (${new Date(badgeData.lastUpdated).toISOString()})`);
+      
       return badgeData;
     } catch (error) {
       console.error('❌ [BADGE LOOKUP] Error getting badge data:', error);
@@ -532,168 +601,156 @@ export class BadgeService {
     digest?: string;
     error?: string;
   }> {
+    console.log(`\n🎯 [ADMIN MINT] ========== STARTING ADMIN MINT BADGE ==========`);
+    console.log(`🎯 [ADMIN MINT] Parameters:`);
+    console.log(`   - playerAddress: ${playerAddress}`);
+    console.log(`   - tier: ${tier}`);
+    console.log(`   - timestamp: ${new Date().toISOString()}`);
+
+    // Step 1: Validate BadgeRegistry configuration
+    console.log(`\n📋 [ADMIN MINT] Step 1: Validating BadgeRegistry configuration...`);
     if (!this.config.contracts.badgeRegistry || this.config.contracts.badgeRegistry.trim() === '') {
+      console.error(`❌ [ADMIN MINT] BadgeRegistry not configured`);
       return {
         success: false,
         error: 'BadgeRegistry object ID not configured. Please set BADGE_REGISTRY_OBJECT_ID_TESTNET (or BADGE_REGISTRY_OBJECT_ID) environment variable in Vercel.',
       };
     }
+    console.log(`✅ [ADMIN MINT] BadgeRegistry configured: ${this.config.contracts.badgeRegistry}`);
 
-    // Validate tier
+    // Step 2: Validate tier
+    console.log(`\n📋 [ADMIN MINT] Step 2: Validating tier...`);
     if (tier < 0 || tier > 5) {
+      console.error(`❌ [ADMIN MINT] Invalid tier: ${tier} (must be 0-5)`);
       return {
         success: false,
         error: 'Invalid tier. Must be 0-5',
       };
     }
+    console.log(`✅ [ADMIN MINT] Tier valid: ${tier}`);
 
     try {
+      // Step 3: Get client and configuration
+      console.log(`\n📋 [ADMIN MINT] Step 3: Getting Sui client and configuration...`);
       const client = this.getClient();
       const registryObjectId = this.config.contracts.badgeRegistry;
       const statsRegistryObjectId = this.config.contracts.statisticsRegistry;
       const adminCapabilityObjectId = this.config.contracts.adminCapability;
       const packageId = this.config.contracts.gameScore;
+      
+      console.log(`📋 [ADMIN MINT] Configuration values:`);
+      console.log(`   - registryObjectId: ${registryObjectId}`);
+      console.log(`   - statsRegistryObjectId: ${statsRegistryObjectId}`);
+      console.log(`   - adminCapabilityObjectId: ${adminCapabilityObjectId}`);
+      console.log(`   - packageId: ${packageId}`);
+      console.log(`   - network: ${this.config.sui.network}`);
+      console.log(`   - adminWallet address: ${this.adminWallet.getAddress()}`);
 
-      // Validate all required object IDs
+      // Step 4: Validate all required object IDs
+      console.log(`\n📋 [ADMIN MINT] Step 4: Validating all required object IDs...`);
       if (!registryObjectId || registryObjectId.trim() === '') {
+        console.error(`❌ [ADMIN MINT] BadgeRegistry object ID is missing`);
         return {
           success: false,
           error: 'BadgeRegistry object ID is missing. Please set BADGE_REGISTRY_OBJECT_ID_TESTNET in Vercel environment variables.',
         };
       }
+      console.log(`✅ [ADMIN MINT] BadgeRegistry object ID: ${registryObjectId}`);
+      
       if (!statsRegistryObjectId || statsRegistryObjectId.trim() === '') {
+        console.error(`❌ [ADMIN MINT] StatisticsRegistry object ID is missing`);
         return {
           success: false,
           error: 'StatisticsRegistry object ID is missing. Please set STATISTICS_REGISTRY_OBJECT_ID_TESTNET in Vercel environment variables.',
         };
       }
+      console.log(`✅ [ADMIN MINT] StatisticsRegistry object ID: ${statsRegistryObjectId}`);
+      
       if (!adminCapabilityObjectId || adminCapabilityObjectId.trim() === '') {
+        console.error(`❌ [ADMIN MINT] AdminCapability object ID is missing`);
         return {
           success: false,
           error: 'AdminCapability object ID is missing. Please set ADMIN_CAPABILITY_OBJECT_ID_TESTNET in Vercel environment variables.',
         };
       }
+      console.log(`✅ [ADMIN MINT] AdminCapability object ID: ${adminCapabilityObjectId}`);
+      
       if (!packageId || packageId.trim() === '') {
+        console.error(`❌ [ADMIN MINT] Game Score package ID is missing`);
         return {
           success: false,
           error: 'Game Score package ID is missing. Please set GAME_SCORE_CONTRACT_TESTNET in Vercel environment variables.',
         };
       }
+      console.log(`✅ [ADMIN MINT] Game Score package ID: ${packageId}`);
+      console.log(`✅ [ADMIN MINT] All object IDs validated successfully`);
 
-      // Check if player already has a badge in the registry
+      // Step 5: Check if player already has a badge in the registry
+      // This uses the same hasBadge function that the lookup uses
+      console.log(`\n📋 [ADMIN MINT] Step 5: Checking if player already has badge...`);
+      console.log(`📋 [ADMIN MINT] Calling hasBadge('${playerAddress}')...`);
+      console.log(`📋 [ADMIN MINT] Using same function as lookup - should return same result`);
+      
       const hasBadge = await this.hasBadge(playerAddress);
+      
+      console.log(`\n📋 [ADMIN MINT] hasBadge() returned: ${hasBadge}`);
+      console.log(`📋 [ADMIN MINT] Type: ${typeof hasBadge}, Value: ${hasBadge}`);
+      
       if (hasBadge) {
-        // Check if the badge object actually exists
+        console.log(`\n⚠️ [ADMIN MINT] Player HAS a badge - cannot mint another one`);
+        console.log(`⚠️ [ADMIN MINT] Attempting to get badge details for error message...`);
+        
+        // Try to get the badge to provide more details in the error message
+        let badgeInfo = '';
         try {
+          console.log(`📋 [ADMIN MINT] Calling getBadge('${playerAddress}')...`);
           const badge = await this.getBadge(playerAddress);
+          console.log(`📋 [ADMIN MINT] getBadge() returned:`, badge ? `Found badge` : 'null');
+          
           if (badge && badge.badgeId) {
-            // Badge exists - check if object is valid
-            try {
-              const badgeObj = await client.getObject({
-                id: badge.badgeId,
-                options: { showContent: true, showOwner: true },
-              });
-              if (badgeObj.data && !badgeObj.error) {
-                // Badge object exists and is valid - check if it's in admin wallet
-                const owner = badgeObj.data.owner;
-                if (owner && typeof owner === 'object' && 'AddressOwner' in owner) {
-                  const ownerAddress = owner.AddressOwner.toLowerCase();
-                  const adminAddress = this.adminWallet.getAddress().toLowerCase();
-                  
-                  if (ownerAddress === adminAddress) {
-                    // Badge is in admin wallet - we can burn it first, then mint
-                    console.log(`🔄 [ADMIN BADGE] Badge exists in admin wallet. Burning it first before minting new one...`);
-                    const burnResult = await this.adminBurnBadge(badge.badgeId);
-                    if (burnResult.success) {
-                      console.log(`✅ [ADMIN BADGE] Burned existing badge. Proceeding with mint...`);
-                      // Continue with minting after burn
-                    } else {
-                      return {
-                        success: false,
-                        error: `Player already has a badge. Failed to burn existing badge: ${burnResult.error}. Please burn it manually first.`,
-                      };
-                    }
-                  } else {
-                    // Badge is in player's wallet - cannot burn (soulbound)
-                    return {
-                      success: false,
-                      error: `Player already has a badge in their wallet. Badges are soulbound and cannot be transferred or burned by admin. The player must burn it themselves if they want a new one.`,
-                    };
-                  }
-                } else {
-                  return {
-                    success: false,
-                    error: 'Player already has a badge, but ownership information is invalid.',
-                  };
-                }
-              } else {
-                // Badge object doesn't exist - registry entry is orphaned
-                console.warn(`⚠️ [ADMIN BADGE] Registry entry exists but badge object not found for ${playerAddress}. Cleaning up orphaned entry...`);
-                const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
-                if (cleanupResult.success) {
-                  console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry. Proceeding with mint...`);
-                  // Continue with minting after cleanup
-                } else {
-                  return {
-                    success: false,
-                    error: `Registry entry exists but badge object not found. Failed to clean up orphaned entry: ${cleanupResult.error}`,
-                  };
-                }
-              }
-            } catch (objError) {
-              // Error checking badge object - assume it's an orphaned entry
-              console.warn(`⚠️ [ADMIN BADGE] Error checking badge object for ${playerAddress}:`, objError);
-              const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
-              if (cleanupResult.success) {
-                console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry. Proceeding with mint...`);
-                // Continue with minting after cleanup
-              } else {
-                return {
-                  success: false,
-                  error: `Error checking badge. Failed to clean up orphaned entry: ${cleanupResult.error}`,
-                };
-              }
-            }
-            } else {
-              // Registry says player has badge but getBadge returned null - orphaned entry
-              console.warn(`⚠️ [ADMIN BADGE] Registry entry exists but badge data not found for ${playerAddress}. Cleaning up orphaned entry...`);
-              // Try to clean up the orphaned entry
-              const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
-              if (cleanupResult.success) {
-                console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry for ${playerAddress}. Proceeding with mint...`);
-                // Continue with minting after cleanup
-              } else {
-                return {
-                  success: false,
-                  error: `Registry entry exists but badge data not found. Failed to clean up orphaned entry: ${cleanupResult.error}`,
-                };
-              }
-            }
-          } catch (error) {
-            // Error checking badge - assume it's an orphaned entry
-            console.warn(`⚠️ [ADMIN BADGE] Error checking badge for ${playerAddress}:`, error);
-            // Try to clean up the orphaned entry
-            const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
-            if (cleanupResult.success) {
-              console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry for ${playerAddress}. Proceeding with mint...`);
-              // Continue with minting after cleanup
-            } else {
-              return {
-                success: false,
-                error: `Registry entry exists but badge check failed. Failed to clean up orphaned entry: ${cleanupResult.error}`,
-              };
-            }
+            badgeInfo = ` Badge ID: ${badge.badgeId}, Tier: ${badge.tier}.`;
+            console.log(`📋 [ADMIN MINT] Badge details:`, JSON.stringify(badge, null, 2));
+          } else {
+            console.log(`⚠️ [ADMIN MINT] getBadge returned null or no badgeId - this is inconsistent with hasBadge=true`);
           }
+        } catch (error) {
+          // Ignore errors getting badge details - just use the hasBadge result
+          console.warn(`⚠️ [ADMIN MINT] Error getting badge details:`, error);
+          console.warn(`⚠️ [ADMIN MINT] Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+          console.warn(`⚠️ [ADMIN MINT] Error message: ${error instanceof Error ? error.message : String(error)}`);
         }
+        
+        console.error(`❌ [ADMIN MINT] MINT FAILED: Player already has badge`);
+        return {
+          success: false,
+          error: `Player already has a badge in the registry.${badgeInfo} Please burn the existing badge first if you want to mint a new one.`,
+        };
+      }
+      
+      console.log(`\n✅ [ADMIN MINT] Player does NOT have badge - proceeding with mint...`);
 
-      // Load badge image for the tier
+      // Step 6: Load badge image for the tier
+      console.log(`\n📋 [ADMIN MINT] Step 6: Loading badge image for tier ${tier}...`);
       const imageData = await this.loadBadgeImage(tier);
+      console.log(`✅ [ADMIN MINT] Badge image loaded: ${imageData.length} bytes`);
 
-      // Build transaction
+      // Step 7: Build transaction
+      console.log(`\n📋 [ADMIN MINT] Step 7: Building transaction...`);
       const txb = new Transaction();
 
+      const moveCallTarget = `${packageId}::badge_system::admin_mint_badge`;
+      console.log(`📋 [ADMIN MINT] Move call target: ${moveCallTarget}`);
+      console.log(`📋 [ADMIN MINT] Transaction arguments:`);
+      console.log(`   - adminCapability: ${adminCapabilityObjectId}`);
+      console.log(`   - registry: ${registryObjectId}`);
+      console.log(`   - statsRegistry: ${statsRegistryObjectId}`);
+      console.log(`   - clock: 0x6`);
+      console.log(`   - player: ${playerAddress}`);
+      console.log(`   - tier: ${tier}`);
+      console.log(`   - imageData: ${imageData.length} bytes`);
+
       txb.moveCall({
-        target: `${packageId}::badge_system::admin_mint_badge`,
+        target: moveCallTarget,
         arguments: [
           txb.object(adminCapabilityObjectId),  // Admin capability
           txb.object(registryObjectId),         // Badge registry
@@ -706,12 +763,15 @@ export class BadgeService {
       });
 
       txb.setGasBudget(this.config.sui.gasBudget);
+      console.log(`✅ [ADMIN MINT] Transaction built with gas budget: ${this.config.sui.gasBudget}`);
 
-      console.log(`🔧 [ADMIN BADGE] Minting badge for ${playerAddress}, tier: ${tier}`);
-
-      // Sign and execute with admin wallet
+      // Step 8: Sign and execute transaction
+      console.log(`\n📋 [ADMIN MINT] Step 8: Signing and executing transaction...`);
+      console.log(`📋 [ADMIN MINT] Signer: ${this.adminWallet.getAddress()}`);
+      
       const keypair = this.adminWallet.getKeypair();
       
+      console.log(`📋 [ADMIN MINT] Calling signAndExecuteTransaction...`);
       const result = await client.signAndExecuteTransaction({
         signer: keypair,
         transaction: txb,
@@ -721,21 +781,50 @@ export class BadgeService {
         },
       });
 
-      // Check if transaction succeeded
+      console.log(`📋 [ADMIN MINT] Transaction executed`);
+      console.log(`📋 [ADMIN MINT] Transaction digest: ${result.digest}`);
+      console.log(`📋 [ADMIN MINT] Transaction status:`, result.effects?.status?.status);
+      console.log(`📋 [ADMIN MINT] Transaction effects:`, JSON.stringify(result.effects, null, 2));
+
+      // Step 9: Check if transaction succeeded
+      console.log(`\n📋 [ADMIN MINT] Step 9: Checking transaction result...`);
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [ADMIN BADGE] Badge minted successfully: ${result.digest}`);
+        console.log(`\n✅ [ADMIN MINT] ========== MINT SUCCESSFUL ==========`);
+        console.log(`✅ [ADMIN MINT] Badge minted successfully`);
+        console.log(`✅ [ADMIN MINT] Transaction digest: ${result.digest}`);
+        console.log(`✅ [ADMIN MINT] Player: ${playerAddress}`);
+        console.log(`✅ [ADMIN MINT] Tier: ${tier}`);
+        console.log(`✅ [ADMIN MINT] ========================================\n`);
+        
         return {
           success: true,
           digest: result.digest,
         };
       } else {
+        const errorMsg = result.effects?.status?.error || 'Transaction failed';
+        console.error(`\n❌ [ADMIN MINT] ========== MINT FAILED ==========`);
+        console.error(`❌ [ADMIN MINT] Transaction status: ${result.effects?.status?.status}`);
+        console.error(`❌ [ADMIN MINT] Error: ${errorMsg}`);
+        console.error(`❌ [ADMIN MINT] Transaction digest: ${result.digest}`);
+        console.error(`❌ [ADMIN MINT] =====================================\n`);
+        
         return {
           success: false,
-          error: result.effects?.status?.error || 'Transaction failed',
+          error: errorMsg,
         };
       }
     } catch (error) {
-      console.error('❌ [ADMIN BADGE] Error minting badge:', error);
+      console.error(`\n❌ [ADMIN MINT] ========== MINT ERROR ==========`);
+      console.error(`❌ [ADMIN MINT] Exception caught during mint process`);
+      console.error(`❌ [ADMIN MINT] Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+      console.error(`❌ [ADMIN MINT] Error message: ${error instanceof Error ? error.message : String(error)}`);
+      if (error instanceof Error && error.stack) {
+        console.error(`❌ [ADMIN MINT] Stack trace:`, error.stack);
+      }
+      console.error(`❌ [ADMIN MINT] Player: ${playerAddress}`);
+      console.error(`❌ [ADMIN MINT] Tier: ${tier}`);
+      console.error(`❌ [ADMIN MINT] ===================================\n`);
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
