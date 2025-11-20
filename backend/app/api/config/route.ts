@@ -18,9 +18,20 @@ export async function GET(request: NextRequest) {
   
   // Return only safe configuration that frontend needs
   // Don't expose sensitive data like private keys, API keys, etc.
+  
+  // Determine wallet module URL based on environment
+  // Check for explicit env var first, then fall back to defaults
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  const walletModuleUrl = process.env.WALLET_MODULE_URL || (
+    isProduction
+      ? 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs'
+      : 'wallet-module/dist/wallet-api.umd.cjs'
+  );
+  
   return NextResponse.json({
     network: config.sui.network,
     rpcUrl: config.sui.rpcUrl,
+    walletModuleUrl,
     // Add other safe config as needed
   }, { headers: corsHeaders });
 }

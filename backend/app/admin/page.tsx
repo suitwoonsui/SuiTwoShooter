@@ -47,8 +47,79 @@ export default function AdminPage() {
     'Legendary (5)',
   ];
 
-  // Load admin address on mount
+  // Load wallet API script and initialize
   useEffect(() => {
+    let scriptLoaded = false;
+    let checkInterval: NodeJS.Timeout | null = null;
+
+    const loadWalletAPI = async () => {
+      // Check if already loaded
+      if (window.walletAPIInstance) {
+        console.log('✅ Wallet API already loaded');
+        return;
+      }
+
+      // Check if script is already in the DOM
+      if (document.querySelector('script[src*="wallet-api"]')) {
+        console.log('✅ Wallet script already in DOM, waiting for initialization...');
+        // Wait for initialization
+        checkInterval = setInterval(() => {
+          if (window.walletAPIInstance) {
+            clearInterval(checkInterval!);
+            console.log('✅ Wallet API initialized after script load');
+          }
+        }, 500);
+        return;
+      }
+
+      // Load the wallet script
+      try {
+        // Get network and wallet module URL from config
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        const network = config.network || 'testnet';
+        const walletModuleUrl = config.walletModuleUrl || '/wallet-module/dist/wallet-api.umd.cjs';
+
+        // Create and load script
+        const script = document.createElement('script');
+        script.src = walletModuleUrl;
+        script.async = true;
+        
+        script.onload = async () => {
+          console.log('✅ Wallet script loaded');
+          
+          // Initialize wallet API
+          if (typeof window.WalletAPI !== 'undefined') {
+            try {
+              if (typeof window.WalletAPI.initialize === 'function') {
+                const api = await window.WalletAPI.initialize({ network });
+                window.walletAPIInstance = api;
+                console.log('✅ Wallet API initialized:', api);
+              } else {
+                console.error('❌ WalletAPI.initialize is not a function');
+              }
+            } catch (error) {
+              console.error('❌ Failed to initialize wallet API:', error);
+            }
+          } else {
+            console.error('❌ WalletAPI not found after script load');
+          }
+        };
+
+        script.onerror = () => {
+          console.error('❌ Failed to load wallet script from:', scriptPaths[0]);
+          setWalletError('Failed to load wallet module. Please ensure the wallet module is accessible.');
+        };
+
+        document.head.appendChild(script);
+        scriptLoaded = true;
+      } catch (error) {
+        console.error('❌ Error loading wallet API:', error);
+        setWalletError('Failed to load wallet API. Please refresh the page.');
+      }
+    };
+
+    // Load admin address
     fetch('/api/admin/verify-wallet')
       .then(res => res.json())
       .then(data => {
@@ -57,6 +128,9 @@ export default function AdminPage() {
         }
       })
       .catch(err => console.error('Failed to load admin address:', err));
+
+    // Load wallet API
+    loadWalletAPI();
 
     // Check if wallet is already connected
     const checkWallet = setInterval(() => {
@@ -71,14 +145,35 @@ export default function AdminPage() {
       }
     }, 500);
 
-    return () => clearInterval(checkWallet);
+    return () => {
+      clearInterval(checkWallet);
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
+    };
   }, []);
 
   const connectWallet = async () => {
     setWalletError(null);
     
+    // Try to initialize if WalletAPI is available but not initialized
+    if (!window.walletAPIInstance && window.WalletAPI && typeof window.WalletAPI.initialize === 'function') {
+      try {
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        const network = config.network || 'testnet';
+        const api = await window.WalletAPI.initialize({ network });
+        window.walletAPIInstance = api;
+        console.log('✅ Wallet API initialized on connect');
+      } catch (error) {
+        console.error('❌ Failed to initialize wallet API:', error);
+        setWalletError('Failed to initialize wallet API. Please refresh the page.');
+        return;
+      }
+    }
+    
     if (!window.walletAPIInstance) {
-      setWalletError('Wallet API not loaded. Please refresh the page.');
+      setWalletError('Wallet API not loaded. Please refresh the page and ensure the wallet module is accessible.');
       return;
     }
 
