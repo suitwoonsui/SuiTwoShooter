@@ -639,7 +639,7 @@ export class BadgeService {
 
         // Check ownership - badge must be owned by admin wallet
         const owner = badgeObject.data.owner;
-        if (typeof owner === 'object' && 'AddressOwner' in owner) {
+        if (owner && typeof owner === 'object' && 'AddressOwner' in owner) {
           const ownerAddress = owner.AddressOwner.toLowerCase();
           if (ownerAddress !== adminAddress.toLowerCase()) {
             return {
