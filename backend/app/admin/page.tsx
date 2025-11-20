@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-type Tab = 'items' | 'badges';
+type Tab = 'items' | 'badges' | 'migration';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('items');
@@ -27,6 +27,18 @@ export default function AdminPage() {
   const [badgeId, setBadgeId] = useState('');
   const [badgesLoading, setBadgesLoading] = useState(false);
   const [badgesResult, setBadgesResult] = useState<{ success: boolean; message?: string; error?: string; digest?: string } | null>(null);
+
+  // Migration state
+  const [migrationMode, setMigrationMode] = useState<'single' | 'batch' | 'auto'>('auto');
+  const [migrationAddress, setMigrationAddress] = useState('');
+  const [migrationAddresses, setMigrationAddresses] = useState('');
+  const [oldPackageId, setOldPackageId] = useState('');
+  const [oldStoreObjectId, setOldStoreObjectId] = useState('');
+  const [migrationLoading, setMigrationLoading] = useState(false);
+  const [migrationResults, setMigrationResults] = useState<Array<{ address: string; success: boolean; digest?: string; error?: string }>>([]);
+  const [migrationProgress, setMigrationProgress] = useState<{ current: number; total: number } | null>(null);
+  const [discoveredWallets, setDiscoveredWallets] = useState<string[]>([]);
+  const [discoveringWallets, setDiscoveringWallets] = useState(false);
 
   const itemTypes = [
     { id: 'extraLives', name: 'Extra Lives', levels: [1, 2, 3] },
@@ -285,6 +297,146 @@ export default function AdminPage() {
     }
   };
 
+  // Migration functions
+  const handleDiscoverWallets = async () => {
+    setDiscoveringWallets(true);
+    setDiscoveredWallets([]);
+
+    try {
+      if (!isAdminWalletConnected || connectedAddress !== adminAddress) {
+        alert('Admin wallet not connected. Please connect the admin wallet.');
+        setDiscoveringWallets(false);
+        return;
+      }
+
+      const oldStoreId = oldStoreObjectId || undefined;
+      const queryParam = oldStoreId ? `?oldStoreObjectId=${encodeURIComponent(oldStoreId)}` : '';
+      
+      const response = await fetch(`/api/store/migrate${queryParam}`);
+      const data = await response.json();
+
+      if (response.ok && data.success && data.wallets) {
+        setDiscoveredWallets(data.wallets);
+        if (data.wallets.length === 0) {
+          alert('No wallets with inventory found in the old store.');
+        }
+      } else {
+        alert(data.error || 'Failed to discover wallets');
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Network error');
+    } finally {
+      setDiscoveringWallets(false);
+    }
+  };
+
+  const handleMigrationSubmit = async () => {
+    setMigrationLoading(true);
+    setMigrationResults([]);
+    setMigrationProgress(null);
+
+    try {
+      if (!isAdminWalletConnected || connectedAddress !== adminAddress) {
+        setMigrationResults([{
+          address: 'N/A',
+          success: false,
+          error: 'Admin wallet not connected. Please connect the admin wallet.',
+        }]);
+        setMigrationLoading(false);
+        return;
+      }
+
+      let addresses: string[] = [];
+      
+      if (migrationMode === 'auto') {
+        addresses = discoveredWallets;
+      } else if (migrationMode === 'single') {
+        addresses = [migrationAddress.trim()];
+      } else {
+        addresses = migrationAddresses
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && line.startsWith('0x'));
+      }
+
+      if (addresses.length === 0) {
+        setMigrationResults([{
+          address: 'N/A',
+          success: false,
+          error: 'No valid addresses provided',
+        }]);
+        setMigrationLoading(false);
+        return;
+      }
+
+      setMigrationProgress({ current: 0, total: addresses.length });
+      const results: Array<{ address: string; success: boolean; digest?: string; error?: string }> = [];
+
+      for (let i = 0; i < addresses.length; i++) {
+        const address = addresses[i];
+        setMigrationProgress({ current: i, total: addresses.length });
+
+        try {
+          const response = await fetch('/api/store/migrate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              playerAddress: address,
+              ...(oldPackageId && { oldPackageId }),
+              ...(oldStoreObjectId && { oldStoreObjectId }),
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            results.push({
+              address,
+              success: true,
+              digest: data.digest,
+            });
+          } else {
+            results.push({
+              address,
+              success: false,
+              error: data.error || 'Migration failed',
+            });
+          }
+        } catch (error) {
+          results.push({
+            address,
+            success: false,
+            error: error instanceof Error ? error.message : 'Network error',
+          });
+        }
+
+        // Update results as we go
+        setMigrationResults([...results]);
+      }
+
+      setMigrationProgress({ current: addresses.length, total: addresses.length });
+      setMigrationResults(results);
+
+      // Clear form on success
+      if (migrationMode === 'single') {
+        setMigrationAddress('');
+      } else {
+        setMigrationAddresses('');
+      }
+    } catch (error) {
+      setMigrationResults([{
+        address: 'N/A',
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }]);
+    } finally {
+      setMigrationLoading(false);
+      setMigrationProgress(null);
+    }
+  };
+
   // Badges functions
   const handleBadgesSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -441,6 +593,22 @@ export default function AdminPage() {
             }}
           >
             🎖️ Badge Management
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('migration')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: activeTab === 'migration' ? '#2196F3' : 'transparent',
+              color: activeTab === 'migration' ? 'white' : '#2196F3',
+              border: 'none',
+              borderBottom: activeTab === 'migration' ? '3px solid #2196F3' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+            }}
+          >
+            🔄 Inventory Migration
           </button>
         </div>
       </div>
@@ -692,8 +860,279 @@ export default function AdminPage() {
         </form>
       )}
 
+      {/* Migration Tab */}
+      {activeTab === 'migration' && (
+        <div style={{ display: isAdminWalletConnected ? 'flex' : 'none', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+            <strong>📋 Migration Instructions:</strong>
+            <ul style={{ marginTop: '0.5rem', marginLeft: '1.5rem', fontSize: '0.9rem' }}>
+              <li>Migrate player inventories from the old PremiumStore to the new PremiumStore</li>
+              <li>Single mode: Migrate one wallet at a time</li>
+              <li>Batch mode: Migrate multiple wallets (one address per line)</li>
+              <li>Old store IDs can be left empty to use environment defaults</li>
+            </ul>
+          </div>
+
+          {/* Migration Mode Selector */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Migration Mode:
+            </label>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="auto"
+                  checked={migrationMode === 'auto'}
+                  onChange={(e) => setMigrationMode(e.target.value as 'single' | 'batch' | 'auto')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Auto (Discover All Wallets)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="single"
+                  checked={migrationMode === 'single'}
+                  onChange={(e) => setMigrationMode(e.target.value as 'single' | 'batch' | 'auto')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Single Wallet
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="batch"
+                  checked={migrationMode === 'batch'}
+                  onChange={(e) => setMigrationMode(e.target.value as 'single' | 'batch' | 'auto')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Batch (Manual List)
+              </label>
+            </div>
+          </div>
+
+          {/* Old Store Configuration */}
+          <div style={{ padding: '1rem', backgroundColor: '#f0f0f0', borderRadius: '4px', marginBottom: '1rem' }}>
+            <strong>📋 Old Store Configuration:</strong>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
+              These fields are optional. If left empty, the system will use environment variables:
+              <br />• <code>OLD_PREMIUM_STORE_PACKAGE_ID</code> (for Package ID)
+              <br />• <code>OLD_PREMIUM_STORE_OBJECT_ID</code> (for Object ID)
+            </p>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Old Store Package ID (optional - uses <code>OLD_PREMIUM_STORE_PACKAGE_ID</code> if empty):
+            </label>
+            <input
+              type="text"
+              value={oldPackageId}
+              onChange={(e) => setOldPackageId(e.target.value)}
+              placeholder="Leave empty to use environment variable"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Old Store Object ID (optional - uses <code>OLD_PREMIUM_STORE_OBJECT_ID</code> if empty):
+            </label>
+            <input
+              type="text"
+              value={oldStoreObjectId}
+              onChange={(e) => setOldStoreObjectId(e.target.value)}
+              placeholder="Leave empty to use environment variable"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+
+          {/* Auto Mode - Discover Wallets */}
+          {migrationMode === 'auto' && (
+            <div>
+              <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '4px' }}>
+                <strong>🔍 Auto Discovery:</strong>
+                <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                  This mode will automatically discover all wallets that have inventory in the old store by querying the smart contract's dynamic fields.
+                </p>
+              </div>
+              
+              {discoveredWallets.length > 0 && (
+                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                  <strong>✅ Discovered {discoveredWallets.length} wallet(s) with inventory:</strong>
+                  <div style={{ marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto', fontSize: '0.9rem', fontFamily: 'monospace' }}>
+                    {discoveredWallets.map((wallet, index) => (
+                      <div key={index} style={{ padding: '0.25rem 0' }}>
+                        {wallet}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleDiscoverWallets}
+                disabled={discoveringWallets || !isAdminWalletConnected}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: discoveringWallets || !isAdminWalletConnected ? '#ccc' : '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: discoveringWallets || !isAdminWalletConnected ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  marginBottom: '1rem',
+                }}
+              >
+                {discoveringWallets ? 'Discovering...' : '🔍 Discover Wallets with Inventory'}
+              </button>
+            </div>
+          )}
+
+          {/* Single Mode */}
+          {migrationMode === 'single' && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Player Address:
+              </label>
+              <input
+                type="text"
+                value={migrationAddress}
+                onChange={(e) => setMigrationAddress(e.target.value)}
+                placeholder="0x..."
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Batch Mode */}
+          {migrationMode === 'batch' && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Player Addresses (one per line):
+              </label>
+              <textarea
+                value={migrationAddresses}
+                onChange={(e) => setMigrationAddresses(e.target.value)}
+                placeholder="0x...&#10;0x...&#10;0x..."
+                rows={10}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Progress Display */}
+          {migrationProgress && (
+            <div style={{ padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '4px' }}>
+              <strong>⏳ Migration Progress:</strong>
+              <p>
+                Processing {migrationProgress.current} of {migrationProgress.total} wallets...
+              </p>
+              <div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', height: '20px', marginTop: '0.5rem' }}>
+                <div
+                  style={{
+                    width: `${(migrationProgress.current / migrationProgress.total) * 100}%`,
+                    backgroundColor: '#2196F3',
+                    height: '100%',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Results Display */}
+          {migrationResults.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>📊 Migration Results:</strong>
+              <div style={{ marginTop: '0.5rem', maxHeight: '400px', overflowY: 'auto', border: '1px solid #ccc', borderRadius: '4px', padding: '1rem' }}>
+                {migrationResults.map((result, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '0.75rem',
+                      marginBottom: '0.5rem',
+                      backgroundColor: result.success ? '#d4edda' : '#f8d7da',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                      {result.success ? '✅' : '❌'} {result.address.substring(0, 10)}...{result.address.substring(result.address.length - 8)}
+                    </div>
+                    {result.success && result.digest && (
+                      <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                        Digest: <code>{result.digest}</code>
+                      </div>
+                    )}
+                    {!result.success && result.error && (
+                      <div style={{ fontSize: '0.85rem', color: '#721c24', marginTop: '0.25rem' }}>
+                        Error: {result.error}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleMigrationSubmit}
+            disabled={migrationLoading || !isAdminWalletConnected || (migrationMode === 'auto' ? discoveredWallets.length === 0 : migrationMode === 'single' ? !migrationAddress : !migrationAddresses.trim())}
+            style={{
+              padding: '1rem',
+              fontSize: '1.1rem',
+              backgroundColor: migrationLoading || !isAdminWalletConnected ? '#ccc' : '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: migrationLoading || !isAdminWalletConnected ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            {migrationLoading 
+              ? 'Migrating...' 
+              : migrationMode === 'auto' 
+                ? `Migrate ${discoveredWallets.length} Inventories` 
+                : migrationMode === 'single' 
+                  ? 'Migrate Inventory' 
+                  : 'Migrate All Inventories'}
+          </button>
+        </div>
+      )}
+
       {/* Results Display */}
-      {(itemsResult || badgesResult) && (
+      {(itemsResult || badgesResult) && activeTab !== 'migration' && (
         <div
           style={{
             marginTop: '2rem',

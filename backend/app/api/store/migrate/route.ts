@@ -116,3 +116,72 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// GET endpoint to fetch all wallets with inventory
+export async function GET(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
+  
+  console.log('🔍 [MIGRATION API] Received GET request to /api/store/migrate (list wallets)');
+  
+  try {
+    const { searchParams } = new URL(request.url);
+    const oldStoreObjectId = searchParams.get('oldStoreObjectId');
+    const config = getConfig();
+
+    // Use old store ID from query param or fall back to environment variable
+    const finalOldStoreObjectId = oldStoreObjectId || config.contracts.oldPremiumStoreObjectId;
+
+    if (!finalOldStoreObjectId) {
+      console.error('❌ [MIGRATION API] Missing oldStoreObjectId');
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'oldStoreObjectId is required. Provide it as a query parameter or set OLD_PREMIUM_STORE_OBJECT_ID environment variable.' 
+        },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    console.log(`🔍 [MIGRATION API] Fetching wallets with inventory from old store: ${finalOldStoreObjectId}`);
+
+    // Create migration service and get wallets
+    const migrationService = new MigrationService(adminWalletService);
+    const result = await migrationService.getAllWalletsWithInventory(finalOldStoreObjectId);
+
+    if (!result.success) {
+      console.error('❌ [MIGRATION API] Failed to fetch wallets:', result.error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: result.error || 'Failed to fetch wallets with inventory',
+        },
+        { status: 500, headers: corsHeaders }
+      );
+    }
+
+    console.log(`✅ [MIGRATION API] Found ${result.wallets?.length || 0} wallets with inventory`);
+
+    return NextResponse.json(
+      {
+        success: true,
+        wallets: result.wallets || [],
+        count: result.wallets?.length || 0,
+      },
+      { headers: corsHeaders }
+    );
+  } catch (error) {
+    console.error('❌ [MIGRATION API] Error in GET migrate endpoint:', error);
+    if (error instanceof Error) {
+      console.error('   Message:', error.message);
+      console.error('   Stack:', error.stack);
+    }
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500, headers: corsHeaders }
+    );
+  }
+}
+

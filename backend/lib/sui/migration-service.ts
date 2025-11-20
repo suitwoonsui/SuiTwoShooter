@@ -160,6 +160,55 @@ export class MigrationService {
   }
 
   /**
+   * Get all wallet addresses that have inventory in the old store
+   */
+  async getAllWalletsWithInventory(
+    oldStoreObjectId: string
+  ): Promise<{
+    success: boolean;
+    wallets?: string[];
+    error?: string;
+  }> {
+    try {
+      const network = this.config.sui.network;
+      const client = network === 'testnet' 
+        ? this.adminWallet.getTestnetClient()
+        : this.adminWallet.getMainnetClient();
+
+      console.log(`🔍 [MIGRATION] Fetching all wallets with inventory from old store...`);
+      
+      // Get all dynamic fields from the old store
+      const allFields = await client.getDynamicFields({
+        parentId: oldStoreObjectId,
+      });
+
+      console.log(`📋 [MIGRATION] Found ${allFields.data.length} dynamic fields (inventories)`);
+
+      // Extract wallet addresses from dynamic field names
+      const wallets: string[] = [];
+      for (const field of allFields.data) {
+        // Dynamic field name should be of type 'address'
+        if (field.name?.type === 'address' && field.name?.value) {
+          wallets.push(field.name.value);
+        }
+      }
+
+      console.log(`✅ [MIGRATION] Found ${wallets.length} wallets with inventory`);
+
+      return {
+        success: true,
+        wallets,
+      };
+    } catch (error) {
+      console.error('❌ [MIGRATION] Error fetching wallets with inventory:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Migrate player inventory from old store to new store
    */
   async migratePlayerInventory(
