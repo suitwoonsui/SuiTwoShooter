@@ -159,7 +159,6 @@ export class BadgeService {
         console.log(`🔍 [BADGE LOOKUP] First result details:`);
         console.log(`   - returnValues length: ${firstResult.returnValues?.length || 0}`);
         console.log(`   - mutableReferenceOutputs length: ${firstResult.mutableReferenceOutputs?.length || 0}`);
-        console.log(`   - returnValuesMut length: ${firstResult.returnValuesMut?.length || 0}`);
         
         const returnValue = firstResult.returnValues?.[0];
         if (returnValue) {
