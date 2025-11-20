@@ -442,39 +442,108 @@ export default function AdminPage() {
 
   // Badge lookup function
   const handleBadgeLookup = async () => {
+    // IMPORTANT: These logs appear in the BROWSER console, not the server console!
+    // Open your browser's Developer Tools (F12) and check the Console tab
+    console.log(`\n🔍 [FRONTEND LOOKUP] ========== BADGE LOOKUP CLICKED ==========`);
+    console.log(`🔍 [FRONTEND LOOKUP] ⚠️ NOTE: Check BROWSER console (F12), not server console!`);
+    console.log(`🔍 [FRONTEND LOOKUP] Timestamp: ${new Date().toISOString()}`);
+    console.log(`🔍 [FRONTEND LOOKUP] Lookup address: ${lookupAddress}`);
+    console.log(`🔍 [FRONTEND LOOKUP] Badge action: ${badgeAction}`);
+    
+    // Also show an alert to confirm the function is being called
+    // (You can remove this after confirming it works)
+    if (typeof window !== 'undefined') {
+      console.log(`🔍 [FRONTEND LOOKUP] Window object available - this is client-side code`);
+    }
+    
     setLookupLoading(true);
     setLookupResult(null);
+    console.log(`🔍 [FRONTEND LOOKUP] Set loading state to true`);
 
     try {
+      // Step 1: Validate address format
+      console.log(`\n🔍 [FRONTEND LOOKUP] Step 1: Validating address format...`);
+      console.log(`   - lookupAddress: ${lookupAddress}`);
+      console.log(`   - Starts with 0x: ${lookupAddress?.startsWith('0x') || false}`);
+      console.log(`   - Length: ${lookupAddress?.length || 0} (expected 66)`);
+      
       if (!lookupAddress || !lookupAddress.startsWith('0x') || lookupAddress.length !== 66) {
+        console.error(`❌ [FRONTEND LOOKUP] Invalid address format`);
         setLookupResult({
           error: 'Invalid address format. Must be a valid Sui address (0x followed by 64 hex characters)',
         });
         setLookupLoading(false);
         return;
       }
+      console.log(`✅ [FRONTEND LOOKUP] Address format valid`);
 
-      const response = await fetch(`/api/badges/${lookupAddress}`);
+      // Step 2: Call API
+      console.log(`\n🔍 [FRONTEND LOOKUP] Step 2: Calling API...`);
+      const apiUrl = `/api/badges/${lookupAddress}`;
+      console.log(`🔍 [FRONTEND LOOKUP] API URL: ${apiUrl}`);
+      console.log(`🔍 [FRONTEND LOOKUP] Making fetch request...`);
+      
+      const response = await fetch(apiUrl);
+      console.log(`🔍 [FRONTEND LOOKUP] Response received`);
+      console.log(`   - Status: ${response.status}`);
+      console.log(`   - Status text: ${response.statusText}`);
+      console.log(`   - OK: ${response.ok}`);
+
+      // Step 3: Parse response
+      console.log(`\n🔍 [FRONTEND LOOKUP] Step 3: Parsing response...`);
       const data = await response.json();
+      console.log(`🔍 [FRONTEND LOOKUP] Response data:`, JSON.stringify(data, null, 2));
 
+      // Step 4: Process result
+      console.log(`\n🔍 [FRONTEND LOOKUP] Step 4: Processing result...`);
       if (response.ok && data.success && data.hasBadge && data.badge) {
+        console.log(`✅ [FRONTEND LOOKUP] Badge found!`);
+        console.log(`   - Badge ID: ${data.badge.badgeId}`);
+        console.log(`   - Tier: ${data.badge.tier}`);
+        console.log(`   - Games played: ${data.badge.gamesPlayed}`);
+        
         setLookupResult({
           badgeId: data.badge.badgeId,
         });
+        
         // Auto-fill the badge ID if in burn mode
         if (badgeAction === 'burn') {
+          console.log(`🔍 [FRONTEND LOOKUP] Auto-filling badge ID in burn mode`);
           setBadgeId(data.badge.badgeId);
         }
+        
+        console.log(`✅ [FRONTEND LOOKUP] ========== LOOKUP SUCCESS ==========\n`);
       } else {
+        console.log(`⚠️ [FRONTEND LOOKUP] Badge not found or error`);
+        console.log(`   - response.ok: ${response.ok}`);
+        console.log(`   - data.success: ${data.success}`);
+        console.log(`   - data.hasBadge: ${data.hasBadge}`);
+        console.log(`   - data.badge: ${data.badge ? 'exists' : 'null'}`);
+        console.log(`   - data.error: ${data.error || 'none'}`);
+        
+        const errorMsg = data.error || (data.hasBadge === false ? 'Player does not have a badge' : 'Failed to lookup badge');
+        console.log(`🔍 [FRONTEND LOOKUP] Setting error: ${errorMsg}`);
+        
         setLookupResult({
-          error: data.error || (data.hasBadge === false ? 'Player does not have a badge' : 'Failed to lookup badge'),
+          error: errorMsg,
         });
+        
+        console.log(`⚠️ [FRONTEND LOOKUP] ========== LOOKUP FAILED ==========\n`);
       }
     } catch (error) {
+      console.error(`\n❌ [FRONTEND LOOKUP] ========== EXCEPTION ==========`);
+      console.error(`❌ [FRONTEND LOOKUP] Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+      console.error(`❌ [FRONTEND LOOKUP] Error message: ${error instanceof Error ? error.message : String(error)}`);
+      if (error instanceof Error && error.stack) {
+        console.error(`❌ [FRONTEND LOOKUP] Stack trace:`, error.stack);
+      }
+      console.error(`❌ [FRONTEND LOOKUP] ===================================\n`);
+      
       setLookupResult({
         error: error instanceof Error ? error.message : 'Network error',
       });
     } finally {
+      console.log(`🔍 [FRONTEND LOOKUP] Setting loading state to false`);
       setLookupLoading(false);
     }
   };
