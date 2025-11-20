@@ -150,7 +150,6 @@ export class BadgeService {
             valueType: typeof rv[1],
           })) || [],
           mutableReferenceOutputs: r.mutableReferenceOutputs?.length || 0,
-          returnValuesMut: r.returnValuesMut?.length || 0,
         })) || [],
       }, null, 2));
 
