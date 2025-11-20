@@ -520,6 +520,65 @@ export class BadgeService {
         };
       }
 
+      // Check if player already has a badge in the registry
+      const hasBadge = await this.hasBadge(playerAddress);
+      if (hasBadge) {
+        // Check if the badge object actually exists
+        try {
+          const badge = await this.getBadge(playerAddress);
+          if (badge && badge.badgeId) {
+            // Badge exists - check if object is valid
+            try {
+              const badgeObj = await client.getObject({
+                id: badge.badgeId,
+                options: { showContent: true },
+              });
+              if (badgeObj.data && !badgeObj.error) {
+                return {
+                  success: false,
+                  error: 'Player already has a badge. Use the burn function to remove it first if you want to mint a new one.',
+                };
+              }
+            } catch (objError) {
+              // Badge object doesn't exist - registry entry is orphaned
+              console.warn(`⚠️ [ADMIN BADGE] Registry entry exists but badge object not found for ${playerAddress}. This is an orphaned entry.`);
+              return {
+                success: false,
+                error: 'Registry entry exists but badge object not found. The registry entry is orphaned. You may need to clean up the registry entry first, or contact support.',
+              };
+            }
+            } else {
+              // Registry says player has badge but getBadge returned null - orphaned entry
+              console.warn(`⚠️ [ADMIN BADGE] Registry entry exists but badge data not found for ${playerAddress}. Cleaning up orphaned entry...`);
+              // Try to clean up the orphaned entry
+              const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
+              if (cleanupResult.success) {
+                console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry for ${playerAddress}. Proceeding with mint...`);
+                // Continue with minting after cleanup
+              } else {
+                return {
+                  success: false,
+                  error: `Registry entry exists but badge data not found. Failed to clean up orphaned entry: ${cleanupResult.error}`,
+                };
+              }
+            }
+          } catch (error) {
+            // Error checking badge - assume it's an orphaned entry
+            console.warn(`⚠️ [ADMIN BADGE] Error checking badge for ${playerAddress}:`, error);
+            // Try to clean up the orphaned entry
+            const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
+            if (cleanupResult.success) {
+              console.log(`✅ [ADMIN BADGE] Cleaned up orphaned registry entry for ${playerAddress}. Proceeding with mint...`);
+              // Continue with minting after cleanup
+            } else {
+              return {
+                success: false,
+                error: `Registry entry exists but badge check failed. Failed to clean up orphaned entry: ${cleanupResult.error}`,
+              };
+            }
+          }
+        }
+
       // Load badge image for the tier
       const imageData = await this.loadBadgeImage(tier);
 
@@ -570,6 +629,89 @@ export class BadgeService {
       }
     } catch (error) {
       console.error('❌ [ADMIN BADGE] Error minting badge:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Admin function: Clean up orphaned registry entry
+   * Removes registry entry if badge object doesn't exist
+   * @param playerAddress - Player address to clean up
+   * @returns Transaction result
+   */
+  async adminCleanupOrphanedEntry(
+    playerAddress: string
+  ): Promise<{
+    success: boolean;
+    digest?: string;
+    error?: string;
+  }> {
+    if (!this.config.contracts.badgeRegistry) {
+      return {
+        success: false,
+        error: 'BadgeRegistry object ID not configured',
+      };
+    }
+
+    if (!this.config.contracts.adminCapability) {
+      return {
+        success: false,
+        error: 'AdminCapability object ID not configured',
+      };
+    }
+
+    try {
+      const client = this.getClient();
+      const registryObjectId = this.config.contracts.badgeRegistry;
+      const adminCapabilityObjectId = this.config.contracts.adminCapability;
+      const packageId = this.config.contracts.gameScore;
+
+      // Build transaction
+      const txb = new Transaction();
+
+      txb.moveCall({
+        target: `${packageId}::badge_system::admin_cleanup_orphaned_entry`,
+        arguments: [
+          txb.object(adminCapabilityObjectId),  // Admin capability
+          txb.object(registryObjectId),         // Badge registry
+          txb.pure.address(playerAddress),       // Player address
+        ],
+      });
+
+      txb.setGasBudget(this.config.sui.gasBudget);
+
+      console.log(`🧹 [ADMIN BADGE] Cleaning up orphaned registry entry for ${playerAddress}`);
+
+      // Sign and execute with admin wallet
+      const keypair = this.adminWallet.getKeypair();
+      
+      const result = await client.signAndExecuteTransaction({
+        signer: keypair,
+        transaction: txb,
+        options: {
+          showEffects: true,
+          showEvents: true,
+        },
+      });
+
+      // Check if transaction succeeded
+      if (result.effects?.status?.status === 'success') {
+        console.log(`✅ [ADMIN BADGE] Orphaned entry cleaned up successfully: ${result.digest}`);
+        return {
+          success: true,
+          digest: result.digest,
+        };
+      } else {
+        return {
+          success: false,
+          error: result.effects?.status?.error || 'Transaction failed',
+        };
+      }
+    } catch (error) {
+      console.error('❌ [ADMIN BADGE] Error cleaning up orphaned entry:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

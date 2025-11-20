@@ -544,5 +544,25 @@ module suitwo_game::badge_system {
         // Emit event (optional - for testing/debugging)
         // Note: We don't have a BadgeBurned event, but we could add one if needed
     }
+
+    /// Admin-only function to clean up orphaned registry entries
+    /// Removes registry entry if badge object doesn't exist
+    /// This fixes cases where registry entry exists but badge object was deleted/burned
+    /// @param player: Player address to check and clean up
+    #[allow(lint(public_entry))]
+    public entry fun admin_cleanup_orphaned_entry(
+        _admin_cap: &AdminCapability,  // Proves caller is admin
+        registry: &mut BadgeRegistry,
+        player: address
+    ) {
+        // Check if player has entry in registry
+        if (table::contains(&registry.badges, player)) {
+            // Remove the orphaned entry
+            // Note: We can't verify the badge object exists from Move, but if this function
+            // is called, it means the backend verified the object doesn't exist
+            table::remove(&mut registry.badges, player);
+        };
+        // If no entry exists, do nothing (idempotent)
+    }
 }
 
