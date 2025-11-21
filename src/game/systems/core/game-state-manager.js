@@ -43,7 +43,9 @@ function loadGameData() {
     gameStats = { ...gameStats, ...JSON.parse(savedStats) };
   }
   
-  updateMenuStats();
+  // updateMenuStats is now async, but we don't need to await it here
+  // It will update the UI when stats are fetched
+  updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
   applySettings();
 }
 
@@ -54,15 +56,69 @@ function saveGameData() {
 }
 
 // Update menu statistics display
-function updateMenuStats() {
+async function updateMenuStats() {
   const bestScoreElement = document.getElementById('bestScoreDisplay');
   const gamesPlayedElement = document.getElementById('gamesPlayedDisplay');
   
-  if (bestScoreElement) {
-    bestScoreElement.textContent = gameStats.bestScore.toLocaleString();
+  // Get wallet address if connected
+  let walletAddress = null;
+  if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
   }
-  if (gamesPlayedElement) {
-    gamesPlayedElement.textContent = gameStats.gamesPlayed;
+  
+  // If no wallet is connected, show "--"
+  if (!walletAddress) {
+    if (bestScoreElement) {
+      bestScoreElement.textContent = '--';
+    }
+    if (gamesPlayedElement) {
+      gamesPlayedElement.textContent = '--';
+    }
+    return;
+  }
+  
+  // Wallet is connected, fetch stats from blockchain
+  try {
+    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const response = await fetch(`${API_BASE_URL}/stats/${walletAddress}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        // Update display with blockchain stats (show 0 if no stats)
+        if (bestScoreElement) {
+          bestScoreElement.textContent = (data.bestScore || 0).toLocaleString();
+        }
+        if (gamesPlayedElement) {
+          gamesPlayedElement.textContent = data.totalGames || 0;
+        }
+        console.log('✅ [MENU] Stats updated from blockchain:', { bestScore: data.bestScore, totalGames: data.totalGames });
+        return;
+      }
+    }
+    
+    // API call failed or returned error, show 0
+    console.warn('⚠️ [MENU] Failed to fetch stats from blockchain');
+    if (bestScoreElement) {
+      bestScoreElement.textContent = '0';
+    }
+    if (gamesPlayedElement) {
+      gamesPlayedElement.textContent = '0';
+    }
+  } catch (error) {
+    console.warn('⚠️ [MENU] Error fetching stats from blockchain:', error);
+    // Show 0 on error
+    if (bestScoreElement) {
+      bestScoreElement.textContent = '0';
+    }
+    if (gamesPlayedElement) {
+      gamesPlayedElement.textContent = '0';
+    }
   }
 }
 

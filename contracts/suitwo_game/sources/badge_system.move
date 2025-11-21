@@ -15,7 +15,7 @@ module suitwo_game::badge_system {
     // ===== CONSTANTS =====
     
     // Tier constants
-    const TIER_STARTER: u8 = 0;
+    const TIER_STANDARD: u8 = 0;
     const TIER_COMMON: u8 = 1;
     const TIER_UNCOMMON: u8 = 2;
     const TIER_RARE: u8 = 3;
@@ -31,7 +31,7 @@ module suitwo_game::badge_system {
     const THRESHOLD_LEGENDARY: u64 = 150;
     
     // Store discount percentages (0-25%)
-    const DISCOUNT_STARTER_STORE: u8 = 0;
+    const DISCOUNT_STANDARD_STORE: u8 = 0;
     const DISCOUNT_COMMON_STORE: u8 = 5;
     const DISCOUNT_UNCOMMON_STORE: u8 = 10;
     const DISCOUNT_RARE_STORE: u8 = 15;
@@ -39,7 +39,7 @@ module suitwo_game::badge_system {
     const DISCOUNT_LEGENDARY_STORE: u8 = 25;
     
     // Gameplay discount percentages (0-20%)
-    const DISCOUNT_STARTER_GAMEPLAY: u8 = 0;
+    const DISCOUNT_STANDARD_GAMEPLAY: u8 = 0;
     const DISCOUNT_COMMON_GAMEPLAY: u8 = 0;
     const DISCOUNT_UNCOMMON_GAMEPLAY: u8 = 5;
     const DISCOUNT_RARE_GAMEPLAY: u8 = 10;
@@ -163,7 +163,7 @@ module suitwo_game::badge_system {
         } else if (games_played >= THRESHOLD_COMMON) {
             TIER_COMMON
         } else {
-            TIER_STARTER
+            TIER_STANDARD
         }
     }
     
@@ -181,7 +181,7 @@ module suitwo_game::badge_system {
         } else if (tier == TIER_COMMON) {
             DISCOUNT_COMMON_STORE
         } else {
-            DISCOUNT_STARTER_STORE
+            DISCOUNT_STANDARD_STORE
         }
     }
     
@@ -199,7 +199,7 @@ module suitwo_game::badge_system {
         } else if (tier == TIER_COMMON) {
             DISCOUNT_COMMON_GAMEPLAY
         } else {
-            DISCOUNT_STARTER_GAMEPLAY
+            DISCOUNT_STANDARD_GAMEPLAY
         }
     }
     
@@ -230,7 +230,7 @@ module suitwo_game::badge_system {
     /// Mint a badge for a first-time player
     /// Player signs this transaction (tx_context::sender() is the player)
     /// Player pays minting fee ($0.10 dollar-pegged) + gas fees
-    /// Creates badge with Starter tier (tier 0)
+    /// Creates badge with Standard tier (tier 0)
     /// Badge is created directly in player's wallet (truly soulbound - no 'store' ability)
     /// NOTE: Demo mode games do NOT call this function, so they are automatically excluded
     /// NOTE: Frontend should calculate exact SUI amount based on current price to maintain $0.10 value
@@ -240,7 +240,7 @@ module suitwo_game::badge_system {
         stats_registry: &StatisticsRegistry,
         clock: &Clock,
         payment: Coin<SUI>,  // Minting fee payment ($0.10 dollar-pegged, frontend calculates SUI amount)
-        image_data: vector<u8>,  // Starter tier badge image (WebP, 512x512px)
+        image_data: vector<u8>,  // Standard tier badge image (WebP, 512x512px)
         ctx: &mut TxContext
     ) {
         let player = tx_context::sender(ctx);  // Player signs the transaction
@@ -258,19 +258,19 @@ module suitwo_game::badge_system {
         assert!(!has_badge(registry, player), E_PLAYER_ALREADY_HAS_BADGE);
         
         // Get player's total_games from statistics registry
-        // If player has no stats yet, they have 0 games (will be Starter tier)
+        // If player has no stats yet, they have 0 games (will be Standard tier)
         let (has_stats, total_games, _best_score, _best_distance, _best_coins, _best_bosses_defeated, _best_enemies_defeated, _best_coin_streak, _total_score, _total_distance, _total_coins, _total_bosses_defeated, _total_enemies_defeated, _total_coin_streak, _first_game_date, _last_game_date) = score_submission::get_player_stats(stats_registry, player);
         
-        // Create badge with Starter tier (tier 0) for first-time players
+        // Create badge with Standard tier (tier 0) for first-time players
         // Badge is created directly in player's wallet (no transfer needed - truly soulbound)
         let badge = EarlySupporterBadge {
             id: object::new(ctx),
             owner: player,
-            tier: TIER_STARTER,  // Always start at Starter tier when minting
+            tier: TIER_STANDARD,  // Always start at Standard tier when minting
             games_played: if (has_stats) { total_games } else { 0 },
             mint_date: current_time,
             last_updated: current_time,
-            image_data,  // Starter tier badge image
+            image_data,  // Standard tier badge image
         };
         
         // Get badge ID before transferring (must get ID before transfer consumes the badge)
@@ -289,7 +289,7 @@ module suitwo_game::badge_system {
         event::emit(BadgeMinted {
             owner: player,
             badge_id,
-            tier: TIER_STARTER,
+            tier: TIER_STANDARD,
             timestamp: current_time,
         });
     }
@@ -391,7 +391,7 @@ module suitwo_game::badge_system {
         } else if (tier == TIER_COMMON) {
             string::utf8(b"Common")
         } else {
-            string::utf8(b"Starter")
+            string::utf8(b"Standard")
         }
     }
     
@@ -409,6 +409,7 @@ module suitwo_game::badge_system {
             string::utf8(b"name"),
             string::utf8(b"description"),
             string::utf8(b"link"),
+            string::utf8(b"image_url"),
             string::utf8(b"tier_name"),
             string::utf8(b"games_played"),
             string::utf8(b"mint_date"),
@@ -422,6 +423,7 @@ module suitwo_game::badge_system {
             string::utf8(b"Early Supporter Badge - {tier}"),
             string::utf8(b"A soulbound badge that evolves based on games played. This badge represents your dedication as an early supporter of SuiTwo. It cannot be transferred or sold - it's permanently bound to your wallet."),
             string::utf8(b"https://suitwo.game/badge/{id}"),
+            string::utf8(b"https://suitwo.game/api/badges/{owner}/image"),
             string::utf8(b"{tier}"),
             string::utf8(b"{games_played}"),
             string::utf8(b"{mint_date}"),

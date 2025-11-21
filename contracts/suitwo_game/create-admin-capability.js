@@ -9,9 +9,10 @@ const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4
 
 // Get package ID from environment variable or use the one from your backend .env
 // Update this to match PREMIUM_STORE_CONTRACT_TESTNET from your backend .env file
-const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
+const packageId = process.env.GAME_SCORE_CONTRACT_TESTNET || 
+                  process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0xf4ebdb147f861f925a2129f39f983867b34fa64575b7e9245189407a78f475ed'; // New package with Publisher
+                  '0xe854820fb67bea5736cede2314d9f9eb4e4e58c3d0444d7d9ad7c5f402f21607'; // Latest package
 
 function decodePrivateKey(privateKey) {
   if (privateKey.startsWith('suiprivkey1')) {

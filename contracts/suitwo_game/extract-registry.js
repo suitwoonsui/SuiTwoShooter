@@ -3,7 +3,7 @@ const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
 const client = new SuiClient({ url: getFullnodeUrl('testnet') });
 // Deployment transaction
-const deployTxDigest = 'GPsvcwadr6kQ6i2GvwsNVcZn5HSHqJ2KAMgEof5UswTG';
+const deployTxDigest = 'EEpwYW2EN566p3x3onsApw7cJrq1MHdYRHQzeq4GYR5F';
 // Badge Registry initialization transaction
 const badgeInitTxDigest = 'FNChhLzYgEkXegeswPUSLc7NWucU5F2tN4DKWsCpQJxz';
 
@@ -34,6 +34,7 @@ async function extractObjects() {
     let sessionRegistryObjectId = null;
     let statisticsRegistryObjectId = null;
     let premiumStoreObjectId = null;
+    let publisherObjectId = null;
     let badgeRegistryObjectId = null;
 
     console.log('\n📋 Checking deployment objectChanges...');
@@ -56,6 +57,12 @@ async function extractObjects() {
           if (change.objectType.includes('PremiumStore')) {
             premiumStoreObjectId = change.objectId;
             console.log('\n✅ Found Premium Store!');
+            console.log('   Object ID:', change.objectId);
+            console.log('   Object Type:', change.objectType);
+          }
+          if (change.objectType.includes('Publisher')) {
+            publisherObjectId = change.objectId;
+            console.log('\n✅ Found Publisher!');
             console.log('   Object ID:', change.objectId);
             console.log('   Object Type:', change.objectType);
           }
@@ -94,13 +101,18 @@ async function extractObjects() {
     } else {
       console.log('   ⚠️  Premium Store: Not found');
     }
+    if (publisherObjectId) {
+      console.log(`   ✅ Publisher: ${publisherObjectId}`);
+    } else {
+      console.log('   ⚠️  Publisher: Not found');
+    }
     if (badgeRegistryObjectId) {
       console.log(`   ✅ Badge Registry: ${badgeRegistryObjectId}`);
     } else {
       console.log('   ⚠️  Badge Registry: Not found (may need to be initialized separately)');
     }
 
-    return { sessionRegistryObjectId, statisticsRegistryObjectId, premiumStoreObjectId, badgeRegistryObjectId };
+    return { sessionRegistryObjectId, statisticsRegistryObjectId, premiumStoreObjectId, publisherObjectId, badgeRegistryObjectId };
   } catch (error) {
     console.error('❌ Error:', error.message);
     console.error(error.stack);

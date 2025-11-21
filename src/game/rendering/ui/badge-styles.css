@@ -271,6 +271,76 @@
   border-radius: 8px;
 }
 
+/* Badge icon in store header (next to "Premium Store" title) */
+.store-badge-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: min(1vw, 1.5vh);
+}
+
+.store-badge-icon-wrapper {
+  display: flex;
+  align-items: center;
+  gap: min(1vw, 1.5vh);
+}
+
+.store-badge-icon-image {
+  width: clamp(40px, min(6vh, 7vw), 60px);
+  height: clamp(40px, min(6vh, 7vw), 60px);
+  border-radius: 8px;
+  border: 2px solid #4DA2FF;
+  object-fit: cover;
+  box-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  flex-shrink: 0;
+  display: block;
+}
+
+.store-badge-icon-placeholder {
+  display: inline-block;
+  width: clamp(32px, min(5vh, 6vw), 48px);
+  height: clamp(32px, min(5vh, 6vw), 48px);
+  border-radius: 8px;
+  border: 2px solid #4DA2FF;
+  background: rgba(77, 162, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(18px, min(3vh, 3.5vw), 28px);
+  box-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.store-badge-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: min(0.2vh, 0.3vw);
+}
+
+.store-badge-tier {
+  font-size: clamp(12px, min(1.8vh, 2.2vw), 16px);
+  font-weight: 600;
+  color: #4DA2FF !important;
+  -webkit-text-fill-color: #4DA2FF !important;
+  text-transform: capitalize;
+  line-height: 1.2;
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
+.store-badge-discount {
+  font-size: clamp(10px, min(1.4vh, 1.7vw), 13px);
+  font-weight: 600;
+  color: #39ff14 !important;
+  -webkit-text-fill-color: #39ff14 !important;
+  line-height: 1.2;
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
 .store-badge-info {
   color: #ffffff;
 }

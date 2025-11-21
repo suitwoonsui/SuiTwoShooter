@@ -84,11 +84,11 @@ async function showStoreInternal() {
   storeContent.innerHTML = `
     <!-- Store Header -->
     <div class="store-header">
-      <h2 id="storeTitle">🛒 Premium Store</h2>
+      <h2 id="storeTitle">
+        <span>🛒 Premium Store</span>
+        <span id="storeBadgeDisplay" class="store-badge-icon" style="display: none;"></span>
+      </h2>
     </div>
-    
-    <!-- Badge Display (if player has badge) -->
-    <div id="storeBadgeDisplay" class="store-badge-display" style="display: none;"></div>
     
     <!-- Payment Token Selector -->
     <div class="store-payment-selector">
@@ -166,7 +166,8 @@ async function showStoreInternal() {
 }
 
 /**
- * Load and display badge in store (if player has one)
+ * Load and display badge icon in store header (if player has one)
+ * Shows only the badge image/icon to the right of "Premium Store" title
  */
 async function loadStoreBadgeDisplay() {
   const badgeDisplayContainer = document.getElementById('storeBadgeDisplay');
@@ -186,6 +187,7 @@ async function loadStoreBadgeDisplay() {
   if (!walletAddress) {
     // No wallet connected, hide badge display
     badgeDisplayContainer.style.display = 'none';
+    badgeDisplayContainer.innerHTML = '';
     return;
   }
   
@@ -194,6 +196,7 @@ async function loadStoreBadgeDisplay() {
     if (!window.BadgeService || !window.BadgeService.getBadge) {
       console.warn('⚠️ [STORE] BadgeService not available');
       badgeDisplayContainer.style.display = 'none';
+      badgeDisplayContainer.innerHTML = '';
       return;
     }
     
@@ -202,62 +205,71 @@ async function loadStoreBadgeDisplay() {
     if (!badgeData || !badgeData.success || !badgeData.hasBadge || !badgeData.badge) {
       // Player doesn't have a badge, hide display
       badgeDisplayContainer.style.display = 'none';
+      badgeDisplayContainer.innerHTML = '';
       return;
     }
     
-    // Player has a badge, display it
-    // Use BadgeUI.displayBadgeInUI if available, otherwise create custom display
-    if (window.BadgeUI && typeof window.BadgeUI.displayBadgeInUI === 'function') {
-      // Use the existing BadgeUI function for consistency
-      window.BadgeUI.displayBadgeInUI(badgeDisplayContainer, badgeData);
-      badgeDisplayContainer.style.display = 'block';
-    } else {
-      // Fallback: create custom display
-      const { badge } = badgeData;
-      const tierName = window.BadgeService.getTierName(badge.tier);
-      const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
-      
-      // Convert image data to base64 if available
-      let imageSrc = '';
-      if (badge.imageData && badge.imageData.length > 0) {
-        // Manual conversion
-        let base64;
-        if (Array.isArray(badge.imageData)) {
-          const bytes = new Uint8Array(badge.imageData);
-          const binary = String.fromCharCode.apply(null, bytes);
-          base64 = btoa(binary);
+    // Player has a badge, display badge image with tier name and discount
+    const { badge } = badgeData;
+    const tierName = window.BadgeService.getTierName(badge.tier);
+    const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
+    const storeDiscount = discounts.store || 0;
+    
+    console.log('📋 [STORE] Badge data:', { tier: badge.tier, tierName, discounts, storeDiscount });
+    
+    // Convert image data to base64 using the helper function if available
+    let imageSrc = null;
+    if (badge.imageData && badge.imageData.length > 0) {
+      try {
+        // Use arrayBufferToBase64 from BadgeUI if available, otherwise manual conversion
+        if (window.BadgeUI && typeof window.BadgeUI.arrayBufferToBase64 === 'function') {
+          imageSrc = `data:image/webp;base64,${window.BadgeUI.arrayBufferToBase64(badge.imageData)}`;
         } else {
-          const binary = String.fromCharCode.apply(null, badge.imageData);
-          base64 = btoa(binary);
+          // Manual conversion
+          let base64;
+          if (Array.isArray(badge.imageData)) {
+            const bytes = new Uint8Array(badge.imageData);
+            const binary = String.fromCharCode.apply(null, Array.from(bytes));
+            base64 = btoa(binary);
+          } else if (badge.imageData instanceof Uint8Array) {
+            const binary = String.fromCharCode.apply(null, Array.from(badge.imageData));
+            base64 = btoa(binary);
+          } else {
+            const binary = String.fromCharCode.apply(null, Array.from(new Uint8Array(badge.imageData)));
+            base64 = btoa(binary);
+          }
+          imageSrc = `data:image/webp;base64,${base64}`;
         }
-        imageSrc = `data:image/webp;base64,${base64}`;
+        console.log('✅ [STORE] Badge image converted successfully');
+      } catch (error) {
+        console.warn('⚠️ [STORE] Failed to convert badge image:', error);
       }
-      
-      const badgeHTML = `
-        <div class="store-badge-info">
-          <h3>🎖️ Your ${tierName} Badge</h3>
-          <div style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
-            ${imageSrc 
-              ? `<img src="${imageSrc}" alt="Badge" style="width: 60px; height: 60px; border-radius: 8px; border: 2px solid #4DA2FF;" />`
-              : `<div style="width: 60px; height: 60px; border-radius: 8px; border: 2px solid #4DA2FF; background: rgba(77, 162, 255, 0.1); display: flex; align-items: center; justify-content: center; font-size: 30px;">🎖️</div>`
-            }
-            <div>
-              <p style="margin: 5px 0; color: #ffffff;">Games Played: ${badge.gamesPlayed || 0}</p>
-              ${discounts.store > 0 ? `<p style="margin: 5px 0; color: #39ff14; font-weight: bold;">Store Discount: ${discounts.store}% off</p>` : ''}
-              ${discounts.gameplay > 0 ? `<p style="margin: 5px 0; color: #39ff14; font-weight: bold;">Gameplay Discount: ${discounts.gameplay}% off</p>` : ''}
-            </div>
-          </div>
-        </div>
-      `;
-      
-      badgeDisplayContainer.innerHTML = badgeHTML;
-      badgeDisplayContainer.style.display = 'block';
+    } else {
+      console.warn('⚠️ [STORE] No image data in badge');
     }
     
-    console.log('✅ [STORE] Badge displayed in store');
+    // Always show badge image (use placeholder if image conversion failed)
+    const badgeHTML = `
+      <div class="store-badge-icon-wrapper">
+        ${imageSrc 
+          ? `<img src="${imageSrc}" alt="Badge" class="store-badge-icon-image" />`
+          : `<span class="store-badge-icon-placeholder">🎖️</span>`
+        }
+        <div class="store-badge-text">
+          <div class="store-badge-tier">${tierName}</div>
+          <div class="store-badge-discount">${storeDiscount}% off</div>
+        </div>
+      </div>
+    `;
+    
+    badgeDisplayContainer.innerHTML = badgeHTML;
+    badgeDisplayContainer.style.display = 'inline-block';
+    
+    console.log('✅ [STORE] Badge displayed in store header:', { tierName, storeDiscount, hasImage: !!imageSrc });
   } catch (error) {
     console.error('❌ [STORE] Error loading badge display:', error);
     badgeDisplayContainer.style.display = 'none';
+    badgeDisplayContainer.innerHTML = '';
   }
 }
 

@@ -409,6 +409,7 @@ module suitwo_game::badge_system {
             string::utf8(b"name"),
             string::utf8(b"description"),
             string::utf8(b"link"),
+            string::utf8(b"image_url"),
             string::utf8(b"tier_name"),
             string::utf8(b"games_played"),
             string::utf8(b"mint_date"),
@@ -422,6 +423,7 @@ module suitwo_game::badge_system {
             string::utf8(b"Early Supporter Badge - {tier}"),
             string::utf8(b"A soulbound badge that evolves based on games played. This badge represents your dedication as an early supporter of SuiTwo. It cannot be transferred or sold - it's permanently bound to your wallet."),
             string::utf8(b"https://suitwo.game/badge/{id}"),
+            string::utf8(b"https://suitwo.game/api/badges/{owner}/image"),
             string::utf8(b"{tier}"),
             string::utf8(b"{games_played}"),
             string::utf8(b"{mint_date}"),
@@ -543,6 +545,26 @@ module suitwo_game::badge_system {
         
         // Emit event (optional - for testing/debugging)
         // Note: We don't have a BadgeBurned event, but we could add one if needed
+    }
+
+    /// Admin-only function to clean up orphaned registry entries
+    /// Removes registry entry if badge object doesn't exist
+    /// This fixes cases where registry entry exists but badge object was deleted/burned
+    /// @param player: Player address to check and clean up
+    #[allow(lint(public_entry))]
+    public entry fun admin_cleanup_orphaned_entry(
+        _admin_cap: &AdminCapability,  // Proves caller is admin
+        registry: &mut BadgeRegistry,
+        player: address
+    ) {
+        // Check if player has entry in registry
+        if (table::contains(&registry.badges, player)) {
+            // Remove the orphaned entry
+            // Note: We can't verify the badge object exists from Move, but if this function
+            // is called, it means the backend verified the object doesn't exist
+            table::remove(&mut registry.badges, player);
+        };
+        // If no entry exists, do nothing (idempotent)
     }
 }
 

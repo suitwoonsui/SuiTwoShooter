@@ -6,9 +6,10 @@
  * Badge Service - Handles badge queries, minting, and updates
  */
 
-// Cache for badge data
+// Cache for badge data (keyed by address)
 let badgeCache = {
   data: null,
+  address: null, // Track which address the cache is for
   timestamp: 0,
   cacheDuration: 60000, // 1 minute cache
 };
@@ -44,11 +45,19 @@ async function getBadge(playerAddress = null) {
     };
   }
 
-  // Check cache
+  // Check cache (only use if it's for the same address)
   const now = Date.now();
-  if (badgeCache.data && (now - badgeCache.timestamp) < badgeCache.cacheDuration) {
-    console.log('📋 [BADGE] Using cached badge data');
+  if (badgeCache.data && badgeCache.address === address && (now - badgeCache.timestamp) < badgeCache.cacheDuration) {
+    console.log('📋 [BADGE] Using cached badge data for address:', address);
     return badgeCache.data;
+  }
+  
+  // If cache is for a different address, clear it
+  if (badgeCache.address && badgeCache.address !== address) {
+    console.log('📋 [BADGE] Cache is for different address, clearing cache');
+    badgeCache.data = null;
+    badgeCache.address = null;
+    badgeCache.timestamp = 0;
   }
 
   try {
@@ -70,8 +79,9 @@ async function getBadge(playerAddress = null) {
 
     const data = await response.json();
     
-    // Update cache
+    // Update cache with address
     badgeCache.data = data;
+    badgeCache.address = address;
     badgeCache.timestamp = now;
 
     return data;
@@ -374,7 +384,7 @@ async function signAndExecuteBadgeTransaction(transactionData) {
  */
 function getDiscountsForTier(tier) {
   const discounts = [
-    { store: 0, gameplay: 0 },    // Starter
+    { store: 0, gameplay: 0 },    // Standard
     { store: 5, gameplay: 0 },     // Common
     { store: 10, gameplay: 5 },    // Uncommon
     { store: 15, gameplay: 10 },   // Rare
@@ -391,7 +401,7 @@ function getDiscountsForTier(tier) {
  */
 function getTierName(tier) {
   const tierNames = [
-    'Starter',
+    'Standard',
     'Common',
     'Uncommon',
     'Rare',
@@ -406,6 +416,7 @@ function getTierName(tier) {
  */
 function clearBadgeCache() {
   badgeCache.data = null;
+  badgeCache.address = null;
   badgeCache.timestamp = 0;
 }
 

@@ -24,7 +24,7 @@ async function showBadgeMintingModal(badgePreview = null) {
   modal.id = 'badgeMintingModal';
 
   // Get tier name
-  const tierName = window.BadgeService ? window.BadgeService.getTierName(0) : 'Starter';
+  const tierName = window.BadgeService ? window.BadgeService.getTierName(0) : 'Standard';
 
   modal.innerHTML = `
     <div class="badge-modal-content">
@@ -305,6 +305,7 @@ if (typeof window !== 'undefined') {
     showTierUpgradeModal,
     displayBadgeInUI,
     hideBadgeModal,
+    arrayBufferToBase64,
   };
 }
 

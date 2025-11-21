@@ -1,22 +1,61 @@
+// ==========================================
 // Create Badge Display Object
+// ==========================================
 // This configures how badges appear in wallets (Sui Wallet, Sui Explorer, etc.)
+//
+// IMPORTANT: Only use this if:
+//   1. You don't have a Display object yet, OR
+//   2. Your Display object is from a different package (contract was redeployed)
+//
+// To check if you need to recreate: node check-display-object.js
+// To update existing Display: node update-badge-display-image.js
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 const { fromHEX } = require('@mysten/sui/utils');
 const { bech32 } = require('bech32');
 const { Transaction } = require('@mysten/sui/transactions');
+const fs = require('fs');
+const path = require('path');
 
-const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m';
+// Load environment variables manually
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+  const content = fs.readFileSync(filePath, 'utf8');
+  const env = {};
+  content.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const [key, ...valueParts] = trimmed.split('=');
+      if (key && valueParts.length > 0) {
+        env[key.trim()] = valueParts.join('=').trim();
+      }
+    }
+  });
+  return env;
+}
 
-// Get package ID from environment variable or use the one from deployment
-const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
-                  process.env.PREMIUM_STORE_CONTRACT || 
-                  '0xf4ebdb147f861f925a2129f39f983867b34fa64575b7e9245189407a78f475ed'; // New package with Publisher
+const envPath = path.join(__dirname, '../../backend/.env.local');
+const env = loadEnvFile(envPath);
+Object.keys(env).forEach(key => {
+  if (!process.env[key]) {
+    process.env[key] = env[key];
+  }
+});
 
-// Publisher object ID - get from deployment transaction or pass as argument
-// You can find this in your deployment transaction output
-// Look for an object with type containing "Publisher"
-const publisherObjectId = process.argv[2] || process.env.PUBLISHER_OBJECT_ID || null;
+// Also check for ADMIN_PRIVATE_KEY or GAME_WALLET_PRIVATE_KEY
+// Can also be passed as 4th command line argument
+const privateKey = process.argv[4] || process.env.ADMIN_PRIVATE_KEY || process.env.ADMIN_WALLET_PRIVATE_KEY || process.env.GAME_WALLET_PRIVATE_KEY;
+
+// Get package ID from environment variable or command line
+// Note: The package ID is stored as GAME_SCORE_CONTRACT in the backend config
+const packageId = process.argv[3] || process.env.GAME_SCORE_CONTRACT_TESTNET || process.env.GAME_SCORE_CONTRACT || process.env.GAME_SCORE_PACKAGE_ID_TESTNET || process.env.GAME_SCORE_PACKAGE_ID;
+
+// Publisher object ID will be obtained from:
+// 1. Command line argument: node create-badge-display.js <PUBLISHER_OBJECT_ID>
+// 2. Environment variable: BADGE_PUBLISHER_OBJECT_ID_TESTNET or BADGE_PUBLISHER_OBJECT_ID
+// 3. Auto-discovery (if not provided)
 
 function decodePrivateKey(privateKey) {
   if (privateKey.startsWith('suiprivkey1')) {
@@ -109,6 +148,24 @@ async function findPublisherObject(client, packageId) {
 
 async function createBadgeDisplay() {
   try {
+    if (!packageId) {
+      console.error('❌ Package ID not found');
+      console.error('   Please provide it as:');
+      console.error('   node create-badge-display.js <PUBLISHER_OBJECT_ID> [PACKAGE_ID]');
+      console.error('   Or set GAME_SCORE_CONTRACT_TESTNET in .env.local');
+      process.exit(1);
+    }
+    
+    if (!privateKey) {
+      console.error('❌ Private key not found');
+      console.error('   Please set one of:');
+      console.error('   - ADMIN_PRIVATE_KEY');
+      console.error('   - ADMIN_WALLET_PRIVATE_KEY');
+      console.error('   - GAME_WALLET_PRIVATE_KEY');
+      console.error('   Or provide as 4th argument: node create-badge-display.js <PUBLISHER_ID> [PACKAGE_ID] [PRIVATE_KEY]');
+      process.exit(1);
+    }
+    
     console.log('🔧 Initializing admin wallet...');
     const decodedKey = decodePrivateKey(privateKey);
     const keypair = Ed25519Keypair.fromSecretKey(decodedKey);
@@ -116,12 +173,13 @@ async function createBadgeDisplay() {
     
     console.log('✅ Admin wallet initialized');
     console.log('   Address:', address);
+    console.log('   Package ID:', packageId);
     
     // Initialize Sui client
     const client = new SuiClient({ url: getFullnodeUrl('testnet') });
     
     // Get Publisher object ID
-    let publisherId = publisherObjectId;
+    let publisherId = process.argv[2] || process.env.BADGE_PUBLISHER_OBJECT_ID_TESTNET || process.env.BADGE_PUBLISHER_OBJECT_ID || null;
     
     if (!publisherId) {
       console.log('\n🔍 Publisher object ID not provided, attempting to find it...');

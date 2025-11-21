@@ -48,8 +48,8 @@ export class BadgeService {
     }
 
     // Tier names for file lookup
-    const tierNames = ['starter', 'common', 'uncommon', 'rare', 'epic', 'legendary'];
-    const tierName = tierNames[tier] || 'starter';
+    const tierNames = ['standard', 'common', 'uncommon', 'rare', 'epic', 'legendary'];
+    const tierName = tierNames[tier] || 'standard';
     
     // Try to load actual image file
     const imagePath = path.join(process.cwd(), 'public', 'badges', `${tierName}.webp`);
@@ -284,6 +284,7 @@ export class BadgeService {
     gamesPlayed: number;
     mintDate: number;
     lastUpdated: number;
+    imageData?: Uint8Array;
   } | null> {
     if (!this.config.contracts.badgeRegistry) {
       throw new Error('BadgeRegistry object ID not configured');
@@ -442,21 +443,92 @@ export class BadgeService {
       console.log(`   - returnValues[3]:`, returnValues[3], `(mintDate)`);
       console.log(`   - returnValues[4]:`, returnValues[4], `(lastUpdated)`);
       
-      const badgeData = {
-        badgeId,
-        tier: Number(returnValues[1][1]),
-        gamesPlayed: Number(returnValues[2][1]),
-        mintDate: Number(returnValues[3][1]),
-        lastUpdated: Number(returnValues[4][1]),
+      // Helper function to parse u64 from byte array (little-endian)
+      const parseU64 = (byteArray: number[]): number => {
+        if (!Array.isArray(byteArray) || byteArray.length !== 8) {
+          console.error(`❌ [BADGE LOOKUP] Invalid u64 byte array:`, byteArray);
+          return 0;
+        }
+        // Convert little-endian byte array to number
+        let value = 0;
+        for (let i = 0; i < 8; i++) {
+          value += byteArray[i] * Math.pow(256, i);
+        }
+        return value;
       };
       
-      console.log(`🔍 [BADGE LOOKUP] Parsed badge data:`, JSON.stringify(badgeData, null, 2));
+      // Parse tier (u8) - first element of the array
+      const tierValue = Array.isArray(returnValues[1][0]) && returnValues[1][0].length > 0
+        ? returnValues[1][0][0]
+        : 0;
+      
+      // Parse u64 values (gamesPlayed, mintDate, lastUpdated)
+      const gamesPlayedValue = Array.isArray(returnValues[2][0]) && returnValues[2][0].length === 8
+        ? parseU64(returnValues[2][0] as number[])
+        : 0;
+      
+      const mintDateValue = Array.isArray(returnValues[3][0]) && returnValues[3][0].length === 8
+        ? parseU64(returnValues[3][0] as number[])
+        : 0;
+      
+      const lastUpdatedValue = Array.isArray(returnValues[4][0]) && returnValues[4][0].length === 8
+        ? parseU64(returnValues[4][0] as number[])
+        : 0;
+      
+      // Get badge image data
+      console.log(`🔍 [BADGE LOOKUP] Fetching badge image data...`);
+      const tx3 = new Transaction();
+      tx3.moveCall({
+        target: `${this.config.contracts.gameScore}::badge_system::get_badge_image`,
+        arguments: [tx3.object(badgeId)],
+      });
+
+      const result3 = await client.devInspectTransactionBlock({
+        transactionBlock: tx3,
+        sender: this.adminWallet.getAddress(),
+      });
+
+      let imageData: Uint8Array | undefined;
+      if (result3.results && result3.results[0]?.returnValues?.[0]) {
+        const imageReturnValue = result3.results[0].returnValues[0] as any;
+        if (Array.isArray(imageReturnValue) && Array.isArray(imageReturnValue[0])) {
+          // Convert byte array to Uint8Array
+          imageData = new Uint8Array(imageReturnValue[0] as number[]);
+          console.log(`🔍 [BADGE LOOKUP] Image data fetched: ${imageData.length} bytes`);
+        }
+      }
+
+      const badgeData = {
+        badgeId,
+        tier: Number(tierValue),
+        gamesPlayed: gamesPlayedValue,
+        mintDate: mintDateValue,
+        lastUpdated: lastUpdatedValue,
+        imageData,
+      };
+      
+      console.log(`🔍 [BADGE LOOKUP] Parsed badge data:`, JSON.stringify({
+        ...badgeData,
+        imageData: imageData ? `${imageData.length} bytes` : 'none',
+      }, null, 2));
       console.log(`🔍 [BADGE LOOKUP] Badge data validation:`);
       console.log(`   - badgeId valid: ${!!badgeData.badgeId && badgeData.badgeId.length === 66}`);
       console.log(`   - tier valid: ${badgeData.tier >= 0 && badgeData.tier <= 5}`);
       console.log(`   - gamesPlayed: ${badgeData.gamesPlayed}`);
-      console.log(`   - mintDate: ${badgeData.mintDate} (${new Date(badgeData.mintDate).toISOString()})`);
-      console.log(`   - lastUpdated: ${badgeData.lastUpdated} (${new Date(badgeData.lastUpdated).toISOString()})`);
+      console.log(`   - imageData: ${imageData ? `${imageData.length} bytes` : 'none'}`);
+      
+      // Only convert to Date if the value is valid
+      if (badgeData.mintDate > 0) {
+        console.log(`   - mintDate: ${badgeData.mintDate} (${new Date(badgeData.mintDate).toISOString()})`);
+      } else {
+        console.log(`   - mintDate: ${badgeData.mintDate} (invalid/zero)`);
+      }
+      
+      if (badgeData.lastUpdated > 0) {
+        console.log(`   - lastUpdated: ${badgeData.lastUpdated} (${new Date(badgeData.lastUpdated).toISOString()})`);
+      } else {
+        console.log(`   - lastUpdated: ${badgeData.lastUpdated} (invalid/zero)`);
+      }
       
       return badgeData;
     } catch (error) {
@@ -504,8 +576,8 @@ export class BadgeService {
         };
       }
 
-      // Load Starter tier badge image
-      const imageData = await this.loadBadgeImage(0); // Tier 0 = Starter
+      // Load Standard tier badge image
+      const imageData = await this.loadBadgeImage(0); // Tier 0 = Standard
 
       // Get StatisticsRegistry object ID from config
       const statsRegistryId = this.config.contracts.statisticsRegistry;
@@ -1195,7 +1267,7 @@ export class BadgeService {
     gameplay: number;
   } {
     const discounts = [
-      { store: 0, gameplay: 0 },    // Starter
+      { store: 0, gameplay: 0 },    // Standard
       { store: 5, gameplay: 0 },     // Common
       { store: 10, gameplay: 5 },    // Uncommon
       { store: 15, gameplay: 10 },   // Rare

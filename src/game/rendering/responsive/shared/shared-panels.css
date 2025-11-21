@@ -785,6 +785,10 @@
   font-size: min(4vw, 4.5vh);
   margin: 0;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: min(1vw, 1.5vh);
 }
 
 /* Payment Token Selector */

@@ -1,8 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '@/lib/api-base-url';
 
 type Tab = 'items' | 'badges' | 'migration';
+
+// Helper function to get full API URL
+const getApiUrl = (path: string): string => {
+  const baseUrl = getApiBaseUrl();
+  // Remove leading slash from path if baseUrl is provided (to avoid double slashes)
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  return baseUrl ? `${baseUrl}/${cleanPath}` : `/${cleanPath}`;
+};
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('items');
@@ -90,7 +99,7 @@ export default function AdminPage() {
       // Load the wallet script
       try {
         // Get network and wallet module URL from config
-        const configResponse = await fetch('/api/config');
+        const configResponse = await fetch(getApiUrl('api/config'));
         const config = await configResponse.json();
         const network = config.network || 'testnet';
         const walletModuleUrl = config.walletModuleUrl || '/wallet-module/dist/wallet-api.umd.cjs';
@@ -135,7 +144,7 @@ export default function AdminPage() {
     };
 
     // Load admin address
-    fetch('/api/admin/verify-wallet')
+    fetch(getApiUrl('api/admin/verify-wallet'))
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -174,7 +183,7 @@ export default function AdminPage() {
     // Try to initialize if WalletAPI is available but not initialized
     if (!window.walletAPIInstance && window.WalletAPI && typeof window.WalletAPI.initialize === 'function') {
       try {
-        const configResponse = await fetch('/api/config');
+        const configResponse = await fetch(getApiUrl('api/config'));
         const config = await configResponse.json();
         const network = config.network || 'testnet';
         const api = await window.WalletAPI.initialize({ network });
@@ -262,7 +271,7 @@ export default function AdminPage() {
         return;
       }
 
-      const response = await fetch('/api/admin/add-items', {
+      const response = await fetch(getApiUrl('api/admin/add-items'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -315,7 +324,7 @@ export default function AdminPage() {
       const oldStoreId = oldStoreObjectId || undefined;
       const queryParam = oldStoreId ? `?oldStoreObjectId=${encodeURIComponent(oldStoreId)}` : '';
       
-      const response = await fetch(`/api/store/migrate${queryParam}`);
+      const response = await fetch(`${getApiUrl('api/store/migrate')}${queryParam}`);
       const data = await response.json();
 
       if (response.ok && data.success && data.wallets) {
@@ -380,7 +389,7 @@ export default function AdminPage() {
         setMigrationProgress({ current: i, total: addresses.length });
 
         try {
-          const response = await fetch('/api/store/migrate', {
+          const response = await fetch(getApiUrl('api/store/migrate'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -479,7 +488,7 @@ export default function AdminPage() {
 
       // Step 2: Call API
       console.log(`\n🔍 [FRONTEND LOOKUP] Step 2: Calling API...`);
-      const apiUrl = `/api/badges/${lookupAddress}`;
+      const apiUrl = getApiUrl(`api/badges/${lookupAddress}`);
       console.log(`🔍 [FRONTEND LOOKUP] API URL: ${apiUrl}`);
       console.log(`🔍 [FRONTEND LOOKUP] Making fetch request...`);
       
@@ -564,7 +573,7 @@ export default function AdminPage() {
         return;
       }
 
-      const response = await fetch('/api/admin/badges', {
+      const response = await fetch(getApiUrl('api/admin/badges'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

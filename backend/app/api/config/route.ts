@@ -22,10 +22,14 @@ export async function GET(request: NextRequest) {
   // Determine wallet module URL based on environment
   // Check for explicit env var first, then fall back to defaults
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  
+  // Use local frontend dev server (port 8000) in development, Vercel URL in production
+  // The frontend dev server serves wallet-module/dist/wallet-api.umd.cjs
+  // Can be overridden with WALLET_MODULE_URL env var
   const walletModuleUrl = process.env.WALLET_MODULE_URL || (
     isProduction
       ? 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs'
-      : 'wallet-module/dist/wallet-api.umd.cjs'
+      : 'http://localhost:8000/wallet-module/dist/wallet-api.umd.cjs'  // Frontend dev server
   );
   
   return NextResponse.json({

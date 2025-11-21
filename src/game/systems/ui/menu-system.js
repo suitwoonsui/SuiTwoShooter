@@ -29,6 +29,10 @@ async function handleConnectWallet() {
       // Check balance first, then enable/disable button based on result
       // Don't enable button immediately - wait for balance check
       await checkMEWSBalanceAndUpdateUI(result.address);
+      // Update menu stats from blockchain when wallet connects
+      if (typeof updateMenuStats === 'function') {
+        updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
+      }
       // Always enable test mode button if wallet is connected (bypasses gatekeeping)
       const testBtn = document.getElementById('startGameTestBtn');
       if (testBtn) {
@@ -67,8 +71,22 @@ async function handleDisconnectWallet() {
     const result = await window.walletAPIInstance.disconnect();
     if (result.success) {
       console.log('✅ Wallet disconnected');
+      // Clear badge cache and display immediately
+      if (window.BadgeService && typeof window.BadgeService.clearBadgeCache === 'function') {
+        window.BadgeService.clearBadgeCache();
+        console.log('📋 [MENU] Cleared badge cache on wallet disconnect');
+      }
+      const badgeDisplay = document.getElementById('menuBadgeDisplay');
+      if (badgeDisplay) {
+        badgeDisplay.style.display = 'none';
+        badgeDisplay.innerHTML = ''; // Clear any existing badge content
+      }
       updateWalletUI(null);
       disableStartGameButton();
+      // Clear menu stats (show "--") when wallet disconnects
+      if (typeof updateMenuStats === 'function') {
+        updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
+      }
     }
   } catch (error) {
     console.error('❌ Error disconnecting wallet:', error);
@@ -105,6 +123,7 @@ function updateWalletUI(address) {
     if (walletAddressDisplay) {
       walletAddressDisplay.style.display = 'none';
     }
+    // Note: Badge is loaded in checkMEWSBalanceAndUpdateUI() when balance is checked
   } else {
     // Wallet not connected - show connect button
     if (connectBtn) {
@@ -117,6 +136,99 @@ function updateWalletUI(address) {
     if (walletAddressDisplay) {
       walletAddressDisplay.style.display = 'none';
     }
+    
+    // Hide badge display when wallet is not connected
+    const badgeDisplay = document.getElementById('menuBadgeDisplay');
+    if (badgeDisplay) {
+      badgeDisplay.style.display = 'none';
+    }
+  }
+}
+
+/**
+ * Load and display badge in main menu (if player has one)
+ * @param {string} walletAddress - Player's wallet address
+ */
+async function loadMenuBadgeDisplay(walletAddress) {
+  const badgeDisplay = document.getElementById('menuBadgeDisplay');
+  if (!badgeDisplay) {
+    console.warn('⚠️ [MENU] Badge display container not found');
+    return;
+  }
+
+  try {
+    // No wallet connected, hide badge display
+    if (!walletAddress) {
+      badgeDisplay.style.display = 'none';
+      return;
+    }
+
+    // Get badge data from BadgeService
+    if (!window.BadgeService || !window.BadgeService.getBadge) {
+      console.warn('⚠️ [MENU] BadgeService not available');
+      badgeDisplay.style.display = 'none';
+      return;
+    }
+
+    const badgeData = await window.BadgeService.getBadge(walletAddress);
+
+    if (!badgeData || !badgeData.success || !badgeData.hasBadge || !badgeData.badge) {
+      // Player doesn't have a badge, hide display
+      badgeDisplay.style.display = 'none';
+      return;
+    }
+
+    // Player has a badge, display it
+    // Use BadgeUI.displayBadgeInUI if available, otherwise create custom display
+    if (window.BadgeUI && typeof window.BadgeUI.displayBadgeInUI === 'function') {
+      // Use the existing BadgeUI function for consistency
+      window.BadgeUI.displayBadgeInUI(badgeDisplay, badgeData);
+      badgeDisplay.style.display = 'block';
+    } else {
+      // Fallback: create custom display
+      const { badge } = badgeData;
+      const tierName = window.BadgeService.getTierName(badge.tier);
+      const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
+
+      // Convert image data if available
+      let imageSrc = null;
+      if (badge.imageData && badge.imageData.length > 0) {
+        try {
+          if (Array.isArray(badge.imageData)) {
+            const bytes = new Uint8Array(badge.imageData);
+            const binary = String.fromCharCode.apply(null, Array.from(bytes));
+            imageSrc = 'data:image/webp;base64,' + btoa(binary);
+          } else {
+            const binary = String.fromCharCode.apply(null, Array.from(badge.imageData));
+            imageSrc = 'data:image/webp;base64,' + btoa(binary);
+          }
+        } catch (error) {
+          console.warn('⚠️ [MENU] Failed to convert badge image:', error);
+        }
+      }
+
+      const badgeHTML = `
+        <div class="menu-badge-info">
+          <h3>🎖️ Your ${tierName} Badge</h3>
+          ${imageSrc
+            ? `<img src="${imageSrc}" alt="Badge" class="menu-badge-image" />`
+            : `<div class="menu-badge-placeholder">🎖️</div>`
+          }
+          <div class="menu-badge-details">
+            <p>Games Played: ${badge.gamesPlayed || 0}</p>
+            ${discounts.store > 0 ? `<p>Store: ${discounts.store}% off</p>` : ''}
+            ${discounts.gameplay > 0 ? `<p>Gameplay: ${discounts.gameplay}% off</p>` : ''}
+          </div>
+        </div>
+      `;
+      badgeDisplay.innerHTML = badgeHTML;
+      badgeDisplay.style.display = 'block';
+    }
+
+    console.log('✅ [MENU] Badge displayed in main menu');
+  } catch (error) {
+    console.error('❌ [MENU] Error loading badge display:', error);
+    badgeDisplay.style.display = 'none';
   }
 }
 
@@ -170,26 +282,48 @@ async function initializeWalletIntegration() {
       // Listen for wallet changes
       api.on(async (event) => {
         console.log('🔔 Wallet event:', event);
+        
+        // Clear badge cache and display immediately when wallet changes (disconnect or new connect)
+        if (window.BadgeService && typeof window.BadgeService.clearBadgeCache === 'function') {
+          window.BadgeService.clearBadgeCache();
+          console.log('📋 [MENU] Cleared badge cache due to wallet change');
+        }
+        
+        const badgeDisplay = document.getElementById('menuBadgeDisplay');
+        if (badgeDisplay) {
+          badgeDisplay.style.display = 'none';
+          badgeDisplay.innerHTML = ''; // Clear any existing badge content
+        }
+        
         updateWalletUI(event.address);
         
         if (event.type === 'connected' && event.address) {
-          // Check MEWS balance when wallet connects
+          // Check MEWS balance when wallet connects (this will also load badge for new wallet)
           await checkMEWSBalanceAndUpdateUI(event.address);
+          // Update menu stats from blockchain when wallet connects
+          if (typeof updateMenuStats === 'function') {
+            updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
+          }
         } else if (event.type === 'disconnected') {
           disableStartGameButton();
           updateBalanceUI(null, false);
           updateWalletRequirementsUI(false, false);
+          // Badge already cleared above
           const walletStatusText = document.getElementById('walletStatusText');
           if (walletStatusText) {
             walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect Sui wallet to play</span>';
           }
-        // Disable test button on disconnect
-        const testBtn = document.getElementById('startGameTestBtn');
-        if (testBtn) {
-          testBtn.disabled = true;
-          testBtn.style.opacity = '0.5';
-          testBtn.style.cursor = 'not-allowed';
-        }
+          // Clear menu stats (show "--") when wallet disconnects
+          if (typeof updateMenuStats === 'function') {
+            updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
+          }
+          // Disable test button on disconnect
+          const testBtn = document.getElementById('startGameTestBtn');
+          if (testBtn) {
+            testBtn.disabled = true;
+            testBtn.style.opacity = '0.5';
+            testBtn.style.cursor = 'not-allowed';
+          }
         }
       });
       
@@ -199,6 +333,10 @@ async function initializeWalletIntegration() {
         updateWalletUI(address);
         // Check balance for already connected wallet (don't enable button until check completes)
         await checkMEWSBalanceAndUpdateUI(address);
+        // Update menu stats from blockchain for already connected wallet
+        if (typeof updateMenuStats === 'function') {
+          updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
+        }
         // Always enable test mode button if wallet is connected (bypasses gatekeeping)
         const testBtn = document.getElementById('startGameTestBtn');
         if (testBtn) {
@@ -319,6 +457,21 @@ async function checkMEWSBalanceAndUpdateUI(address) {
       // Update requirements UI
       updateWalletRequirementsUI(true, balanceResult.hasMinimumBalance);
       
+      // Clear badge cache and display first (in case of wallet switch), then load new badge
+      if (window.BadgeService && typeof window.BadgeService.clearBadgeCache === 'function') {
+        window.BadgeService.clearBadgeCache();
+        console.log('📋 [MENU] Cleared badge cache before loading badge for address:', address);
+      }
+      
+      const badgeDisplay = document.getElementById('menuBadgeDisplay');
+      if (badgeDisplay) {
+        badgeDisplay.style.display = 'none';
+        badgeDisplay.innerHTML = ''; // Clear any existing badge content
+      }
+      
+      // Load and display badge when balance is checked (wallet is fully loaded)
+      await loadMenuBadgeDisplay(address);
+      
       if (balanceResult.hasMinimumBalance) {
         // Only enable button if balance is sufficient
         enableStartGameButton();
@@ -348,6 +501,11 @@ async function checkMEWSBalanceAndUpdateUI(address) {
       disableStartGameButton();
       updateBalanceUI(null, false);
       updateWalletRequirementsUI(true, false);
+      // Hide badge display on balance check error
+      const badgeDisplay = document.getElementById('menuBadgeDisplay');
+      if (badgeDisplay) {
+        badgeDisplay.style.display = 'none';
+      }
       const walletStatusText = document.getElementById('walletStatusText');
       if (walletStatusText) {
         walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Failed to check balance: ${balanceResult.error || 'Unknown error'}</span>`;
@@ -359,6 +517,11 @@ async function checkMEWSBalanceAndUpdateUI(address) {
     disableStartGameButton();
     updateBalanceUI(null, false);
     updateWalletRequirementsUI(true, false);
+    // Hide badge display on error
+    const badgeDisplay = document.getElementById('menuBadgeDisplay');
+    if (badgeDisplay) {
+      badgeDisplay.style.display = 'none';
+    }
     const walletStatusText = document.getElementById('walletStatusText');
     if (walletStatusText) {
       walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Error checking balance: ${error.message || 'Unknown error'}</span>`;
@@ -713,12 +876,20 @@ function showMainMenu() {
   // Close game completely when returning to menu
   closeGame();
   
-  updateMenuStats();
+  // updateMenuStats is now async - fetch stats from blockchain
+  updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
   
   // Update wallet UI when menu is shown
   if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
     updateWalletUI(window.walletAPIInstance.getAddress());
+    // Load and display badge if player has one
+    loadMenuBadgeDisplay(window.walletAPIInstance.getAddress());
   } else {
     updateWalletUI(null);
+    // Hide badge display when wallet is not connected
+    const badgeDisplay = document.getElementById('menuBadgeDisplay');
+    if (badgeDisplay) {
+      badgeDisplay.style.display = 'none';
+    }
   }
 }

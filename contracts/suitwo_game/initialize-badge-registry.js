@@ -8,9 +8,10 @@ const { Transaction } = require('@mysten/sui/transactions');
 const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m';
 
 // Get package ID from environment variable or use the one from deployment
-const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
+const packageId = process.env.GAME_SCORE_CONTRACT_TESTNET || 
+                  process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0xf4ebdb147f861f925a2129f39f983867b34fa64575b7e9245189407a78f475ed'; // New package with Publisher
+                  '0xe854820fb67bea5736cede2314d9f9eb4e4e58c3d0444d7d9ad7c5f402f21607'; // Latest package
 
 // Fee recipient address (admin wallet address)
 const feeRecipient = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
