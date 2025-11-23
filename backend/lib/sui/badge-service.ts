@@ -126,7 +126,7 @@ export class BadgeService {
    * @param tier - Badge tier (0-5)
    * @returns Full URL to the badge image (e.g., "http://localhost:3000/Badges/Common.webp")
    */
-  private getBadgeImageUrl(tier: number): string {
+  public getBadgeImageUrl(tier: number): string {
     const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
     const tierName = tierNames[tier] || 'Standard';
     const baseUrl = this.config.server.apiBaseUrl;
@@ -439,7 +439,7 @@ export class BadgeService {
     gamesPlayed: number;
     mintDate: number;
     lastUpdated: number;
-    imageData?: Uint8Array;
+    imageUrl?: string;
   } | null> {
     if (!this.config.contracts.badgeRegistry) {
       throw new Error('BadgeRegistry object ID not configured');
@@ -630,11 +630,11 @@ export class BadgeService {
         ? parseU64(returnValues[4][0] as number[])
         : 0;
       
-      // Get badge image data
-      console.log(`🔍 [BADGE LOOKUP] Fetching badge image data...`);
+      // Get badge image URL
+      console.log(`🔍 [BADGE LOOKUP] Fetching badge image URL...`);
       const tx3 = new Transaction();
       tx3.moveCall({
-        target: `${this.config.contracts.gameScore}::badge_system::get_badge_image`,
+        target: `${this.config.contracts.gameScore}::badge_system::get_badge_image_url`,
         arguments: [tx3.object(badgeId)],
       });
 
@@ -643,13 +643,16 @@ export class BadgeService {
         sender: this.adminWallet.getAddress(),
       });
 
-      let imageData: Uint8Array | undefined;
+      let imageUrl: string | undefined;
       if (result3.results && result3.results[0]?.returnValues?.[0]) {
         const imageReturnValue = result3.results[0].returnValues[0] as any;
-        if (Array.isArray(imageReturnValue) && Array.isArray(imageReturnValue[0])) {
-          // Convert byte array to Uint8Array
-          imageData = new Uint8Array(imageReturnValue[0] as number[]);
-          console.log(`🔍 [BADGE LOOKUP] Image data fetched: ${imageData.length} bytes`);
+        // The return value is a String, which comes as [typeArray, valueString]
+        if (Array.isArray(imageReturnValue) && typeof imageReturnValue[1] === 'string') {
+          imageUrl = imageReturnValue[1];
+          console.log(`🔍 [BADGE LOOKUP] Image URL fetched: ${imageUrl}`);
+        } else if (typeof imageReturnValue === 'string') {
+          imageUrl = imageReturnValue;
+          console.log(`🔍 [BADGE LOOKUP] Image URL fetched (direct string): ${imageUrl}`);
         }
       }
 
@@ -659,18 +662,18 @@ export class BadgeService {
         gamesPlayed: gamesPlayedValue,
         mintDate: mintDateValue,
         lastUpdated: lastUpdatedValue,
-        imageData,
+        imageUrl,
       };
       
       console.log(`🔍 [BADGE LOOKUP] Parsed badge data:`, JSON.stringify({
         ...badgeData,
-        imageData: imageData ? `${imageData.length} bytes` : 'none',
+        imageUrl: imageUrl || 'none',
       }, null, 2));
       console.log(`🔍 [BADGE LOOKUP] Badge data validation:`);
       console.log(`   - badgeId valid: ${!!badgeData.badgeId && badgeData.badgeId.length === 66}`);
       console.log(`   - tier valid: ${badgeData.tier >= 0 && badgeData.tier <= 5}`);
       console.log(`   - gamesPlayed: ${badgeData.gamesPlayed}`);
-      console.log(`   - imageData: ${imageData ? `${imageData.length} bytes` : 'none'}`);
+      console.log(`   - imageUrl: ${imageUrl || 'none'}`);
       
       // Only convert to Date if the value is valid
       if (badgeData.mintDate > 0) {

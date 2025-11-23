@@ -45,26 +45,23 @@ export async function GET(
       );
     }
 
-    // Get badge data (includes image)
+    // Get badge data to determine tier
     const badge = await badgeService.getBadge(playerAddress);
-    if (!badge || !badge.imageData) {
+    if (!badge) {
       return NextResponse.json(
-        { error: 'Badge image not found' },
+        { error: 'Badge not found' },
         { status: 404, headers: corsHeaders }
       );
     }
 
-    // Convert image data to Buffer
-    const imageBuffer = Buffer.from(badge.imageData);
-
-    // Return image with proper headers
-    return new NextResponse(imageBuffer, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'image/webp',
-        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
-      },
+    // Get image URL from badge, or construct from tier
+    const imageUrl = badge.imageUrl || badgeService.getBadgeImageUrl(badge.tier);
+    
+    // Redirect to the static image file
+    // The image is served from the public/Badges/ directory
+    return NextResponse.redirect(new URL(imageUrl), {
+      status: 302,
+      headers: corsHeaders,
     });
   } catch (error) {
     console.error('Error fetching badge image:', error);
