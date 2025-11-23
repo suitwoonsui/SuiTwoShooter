@@ -75,6 +75,7 @@ export async function GET(
     });
 
     // Query BadgeMinted events from old contract to find badge ID
+    // Note: Filter by sender is no longer supported in queryEvents, so we fetch and filter manually
     const events = await client.queryEvents({
       query: {
         MoveModule: {
@@ -82,18 +83,17 @@ export async function GET(
           module: 'badge_system',
         },
       },
-      filter: {
-        Sender: address,
-      },
-      limit: 10,
+      limit: 50, // Fetch more events to increase chance of finding the badge
       order: 'descending',
     });
 
     // Find the most recent badge for this player
+    // Filter by owner address in the event data
     let oldBadgeId = null;
     for (const event of events.data) {
       if (event.parsedJson) {
         const eventData = event.parsedJson as any;
+        // Check if this event is for the requested address
         if (eventData.owner === address && eventData.badge_id) {
           oldBadgeId = eventData.badge_id;
           break;
