@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Use old stats registry IDs from request body, or fall back to environment variables
-    const finalOldPackageId = oldPackageId || config.contracts.oldGameScorePackageId;
-    const finalOldStatsRegistryId = oldStatsRegistryId || config.contracts.oldStatisticsRegistryId;
+    const finalOldPackageId = oldPackageId || process.env.OLD_GAME_SCORE_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT;
+    const finalOldStatsRegistryId = oldStatsRegistryId || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID;
 
     if (!finalOldPackageId) {
       console.error('❌ [SCORE MIGRATION API] Missing oldPackageId (not provided in request and not in environment variables)');
@@ -129,8 +129,8 @@ export async function GET(request: NextRequest) {
     const config = getConfig();
 
     // Use old stats registry ID from query param or fall back to environment variable
-    const finalOldStatsRegistryId = oldStatsRegistryId || config.contracts.oldStatisticsRegistryId;
-    const finalOldPackageId = oldPackageId || config.contracts.oldGameScorePackageId;
+    const finalOldStatsRegistryId = oldStatsRegistryId || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID;
+    const finalOldPackageId = oldPackageId || process.env.OLD_GAME_SCORE_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT;
 
     if (!finalOldStatsRegistryId) {
       console.error('❌ [SCORE MIGRATION API] Missing oldStatsRegistryId');

@@ -164,30 +164,19 @@ export async function GET(
       const oldGamesPlayed = parseInt(fields.games_played || '0', 10);
       const oldMintDate = parseInt(fields.mint_date || '0', 10);
       
-      // Extract image data
-      let imageData: number[] = [];
-      if (fields.image_data) {
-        if (Array.isArray(fields.image_data)) {
-          imageData = fields.image_data;
-        } else if (typeof fields.image_data === 'string') {
-          // If it's a hex string, convert it
-          const hex = fields.image_data.replace('0x', '');
-          imageData = hex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || [];
-        }
-      }
-
-      // If no image data, load default tier image
-      if (imageData.length === 0) {
-        const imageBuffer = await badgeService.loadBadgeImage(oldTier);
-        imageData = Array.from(imageBuffer);
-      }
+      // Construct image URL based on tier (new system uses static URLs)
+      const { getConfig } = await import('@/config/config');
+      const config = getConfig();
+      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+      const tierName = tierNames[oldTier] || 'Standard';
+      const imageUrl = `${config.server.apiBaseUrl}/Badges/${tierName}.webp`;
 
       console.log(`✅ [BADGE MIGRATION] Found old badge for ${address}:`, {
         badgeId: oldBadgeId,
         tier: oldTier,
         gamesPlayed: oldGamesPlayed,
         mintDate: oldMintDate,
-        imageDataSize: imageData.length,
+        imageUrl,
       });
 
       return NextResponse.json(
@@ -199,7 +188,7 @@ export async function GET(
             oldTier,
             oldGamesPlayed,
             oldMintDate,
-            imageData,
+            imageUrl, // Return URL instead of image data
           },
         },
         { headers: corsHeaders }

@@ -530,9 +530,13 @@ export class MigrationService {
       try {
         // Query ScoreSubmitted events from the old package
         // These events are emitted when scores are submitted, so all players with stats should have events
+        // Note: filter property is no longer supported, using query instead
         const events = await client.queryEvents({
-          filter: {
-            Package: oldPackageId,
+          query: {
+            MoveModule: {
+              package: oldPackageId,
+              module: 'score_submission',
+            },
           },
           limit: 1000, // Adjust as needed
         });
