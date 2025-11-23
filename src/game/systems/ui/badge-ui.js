@@ -538,44 +538,23 @@ async function handleBadgeMigration(migrationData) {
       return;
     }
 
-    const { oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageUrl, imageData, oldPackageId } = migrationData;
+    const { oldTier } = migrationData;
+    const playerAddress = window.walletAPIInstance?.getAddress?.();
 
-    // Construct imageUrl from tier if not provided
-    let finalImageUrl = imageUrl;
-    if (!finalImageUrl) {
-      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
-      const tierName = tierNames[oldTier] || 'Standard';
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      const baseUrl = API_BASE_URL.replace(/\/api$/, '');
-      finalImageUrl = `${baseUrl}/Badges/${tierName}.webp`;
+    if (!playerAddress) {
+      throw new Error('Wallet not connected');
     }
 
-    // Build migration transaction using backend API
-    // This will include both migration AND old badge deletion in a single atomic transaction
-    // If oldBadgeId and oldPackageId are provided, the transaction will attempt to delete the old badge
-    // The deletion happens atomically - if migration fails, deletion won't happen; if deletion fails, entire transaction fails
-    const txbResult = await window.BadgeService.buildMigrateBadgeTransaction(
-      oldBadgeId, // Old badge ID (optional - if provided, will attempt to delete)
-      oldTier,
-      oldGamesPlayed,
-      oldMintDate,
-      finalImageUrl,
-      oldPackageId // Old package ID (optional - if provided, will attempt to delete old badge)
-    );
+    // Simply call the migration API - backend handles everything
+    // The backend will create a new badge at the same tier using adminMintBadge
+    // The new badge will use the current system's image URL generation automatically
+    const result = await window.BadgeService.migrateBadge(playerAddress, oldTier);
 
-    if (!txbResult.success) {
-      throw new Error(txbResult.error || 'Failed to build migration transaction');
-    }
-
-    // Pass the base64 transaction string directly to wallet API
-    // The wallet API accepts base64 strings directly (similar to store purchases)
-    const signResult = await window.walletAPIInstance.signAndExecuteTransaction(txbResult.transaction);
-    
-    if (!signResult.success) {
-      throw new Error(signResult.error || 'Transaction signing failed');
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to migrate badge');
     }
     
-    console.log('✅ [BADGE] Badge migrated successfully! Transaction:', signResult.digest);
+    console.log('✅ [BADGE] Badge migrated successfully! Transaction:', result.digest);
     alert('🎉 Badge migrated successfully!');
     hideBadgeModal('badgeMigrationModal');
     // Clear badge cache

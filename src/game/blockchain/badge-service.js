@@ -547,43 +547,44 @@ function clearBadgeCache() {
  * @param {string} oldPackageId - Package ID of the old badge contract (optional - if provided, will attempt to delete old badge)
  * @returns {Promise<Object>} Transaction data (base64 string)
  */
-async function buildMigrateBadgeTransaction(oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageUrl = null, oldPackageId = null) {
+/**
+ * Migrate badge from old system to new system
+ * Creates a new badge at the same tier - the backend handles everything
+ * @param {string} playerAddress - Player's wallet address
+ * @param {number} oldTier - Tier from old badge (0-5)
+ * @returns {Promise<{success: boolean, digest?: string, error?: string}>}
+ */
+async function migrateBadge(playerAddress, oldTier) {
   try {
-    // If imageUrl is not provided, construct it from tier
-    if (!imageUrl) {
-      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
-      const tierName = tierNames[oldTier] || 'Standard';
-      const API_BASE_URL = getApiBaseUrl();
-      const baseUrl = API_BASE_URL.replace(/\/api$/, '');
-      imageUrl = `${baseUrl}/Badges/${tierName}.webp`;
-    }
-
-    // Validate imageUrl format
-    if (!imageUrl || typeof imageUrl !== 'string' || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+    // Validate inputs
+    if (!playerAddress || typeof playerAddress !== 'string' || !playerAddress.startsWith('0x')) {
       return {
         success: false,
-        error: 'Invalid imageUrl format. Must be a valid HTTP/HTTPS URL.',
+        error: 'Invalid player address',
+      };
+    }
+
+    if (oldTier === undefined || oldTier === null || typeof oldTier !== 'number' || oldTier < 0 || oldTier > 5) {
+      return {
+        success: false,
+        error: 'Invalid tier. Must be a number between 0 and 5',
       };
     }
 
     // Get API base URL
     const API_BASE_URL = getApiBaseUrl();
     
-    // Call backend API to build transaction
-    // This will include both migration AND old badge deletion in a single atomic transaction
-    // If oldBadgeId and oldPackageId are provided, the transaction will attempt to delete the old badge
+    // Call backend API to migrate badge
+    // The backend will use adminMintBadge to create a new badge at the same tier
+    // The new badge will use the current system's image URL generation automatically
     const response = await fetch(`${API_BASE_URL}/badges/migrate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        oldBadgeId: oldBadgeId || undefined, // Only include if provided
+        playerAddress,
         oldTier,
-        oldGamesPlayed,
-        oldMintDate,
-        imageUrl,
-        oldPackageId: oldPackageId || undefined, // Only include if provided
       }),
     });
 
@@ -597,24 +598,24 @@ async function buildMigrateBadgeTransaction(oldBadgeId, oldTier, oldGamesPlayed,
 
     const data = await response.json();
     
-    if (!data.success || !data.transaction) {
+    if (!data.success) {
       return {
         success: false,
-        error: data.error || 'Failed to build migration transaction',
+        error: data.error || 'Failed to migrate badge',
       };
     }
 
-    // Return base64 transaction string (similar to store purchases)
+    // Return success with transaction digest
     return {
       success: true,
-      transaction: data.transaction, // Base64 encoded transaction bytes
-      gasEstimate: data.gasEstimate,
+      digest: data.digest,
+      message: data.message,
     };
   } catch (error) {
-    console.error('❌ [BADGE] Error building migration transaction:', error);
+    console.error('❌ [BADGE] Error migrating badge:', error);
     return {
       success: false,
-      error: error.message || 'Failed to build migration transaction',
+      error: error.message || 'Failed to migrate badge',
     };
   }
 }
@@ -629,7 +630,7 @@ if (typeof window !== 'undefined') {
     buildMintBadgeTransaction,
     checkAndBuildBadgeUpdate,
     signAndExecuteBadgeTransaction,
-    buildMigrateBadgeTransaction,
+    migrateBadge,
     getDiscountsForTier,
     getTierName,
     clearBadgeCache,
