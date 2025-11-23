@@ -1,39 +1,26 @@
 /**
  * Get the API base URL for making requests
  * 
- * If NEXT_PUBLIC_API_BASE_URL is set, use it (e.g., "http://localhost:3000")
- * Otherwise, default to Vercel URL in production, or empty string for relative URLs in development
+ * HARDCODED to Vercel URL - no localhost, no detection, no fallback
+ * Set NEXT_PUBLIC_API_BASE_URL environment variable to override
  */
+const VERCEL_BACKEND_URL = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+
 export function getApiBaseUrl(): string {
-  // Check if environment variable is set (highest priority)
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  // Only use env var if it's explicitly set AND not localhost
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (envUrl && !envUrl.includes('localhost')) {
+    console.log('[API-BASE-URL] Using env var (non-localhost):', envUrl);
+    return envUrl;
   }
   
-  // In browser/client-side code, detect production environment
+  // ALWAYS return Vercel URL - no exceptions
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    
-    // If on Vercel domain or using HTTPS (production), use Vercel URL
-    if (hostname.includes('vercel.app') || (protocol === 'https:' && hostname !== 'localhost' && hostname !== '127.0.0.1')) {
-      return 'https://sui-two-shooter-backend-sui-integra.vercel.app';
-    }
-    
-    // For localhost in development, check if we're on the same origin
-    // If the admin page is part of the backend app, use relative URLs
-    // Otherwise, default to Vercel URL even on localhost (for testing deployed backend)
-    // This allows testing the admin page locally while connecting to deployed backend
-    return 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+    console.log('[API-BASE-URL] Client-side: FORCING Vercel URL:', VERCEL_BACKEND_URL);
+    console.log('[API-BASE-URL] Window location:', window.location.href);
+    console.log('[API-BASE-URL] Env var was:', envUrl || 'not set');
   }
   
-  // Server-side: check NODE_ENV
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://sui-two-shooter-backend-sui-integra.vercel.app';
-  }
-  
-  // Server-side development: default to Vercel URL (allows testing against deployed backend)
-  // To use local backend, set NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
-  return 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+  return VERCEL_BACKEND_URL;
 }
 

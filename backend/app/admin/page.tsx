@@ -6,11 +6,21 @@ import { getApiBaseUrl } from '@/lib/api-base-url';
 type Tab = 'items' | 'badges' | 'migration' | 'score-migration';
 
 // Helper function to get full API URL
+// ALWAYS uses Vercel URL - no localhost fallback
 const getApiUrl = (path: string): string => {
   const baseUrl = getApiBaseUrl();
+  console.log('[ADMIN-PAGE] getApiUrl called:', { path, baseUrl, envVar: process.env.NEXT_PUBLIC_API_BASE_URL });
+  
   // Remove leading slash from path if baseUrl is provided (to avoid double slashes)
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-  return baseUrl ? `${baseUrl}/${cleanPath}` : `/${cleanPath}`;
+  
+  // FORCE Vercel URL if baseUrl is empty or localhost
+  const vercelBaseUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+  const finalBaseUrl = (!baseUrl || baseUrl.includes('localhost')) ? vercelBaseUrl : baseUrl;
+  
+  const fullUrl = `${finalBaseUrl}/${cleanPath}`;
+  console.log('[ADMIN-PAGE] Final URL:', fullUrl);
+  return fullUrl;
 };
 
 export default function AdminPage() {
