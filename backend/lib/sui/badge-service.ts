@@ -749,14 +749,8 @@ export class BadgeService {
     paymentCoinId: string // Player's payment coin (SUI) for minting fee
   ): Promise<{
     success: boolean;
-    transactionData?: {
-      packageId: string;
-      module: string;
-      function: string;
-      arguments: any[];
-      imageDataObjectId: string; // Pre-populated BadgeImageData object ID
-      imageData?: Uint8Array; // Raw image data (for reference)
-    };
+    transaction?: string; // Serialized transaction bytes (base64)
+    gasEstimate?: string;
     error?: string;
   }> {
     if (!this.config.contracts.badgeRegistry) {
@@ -838,24 +832,40 @@ export class BadgeService {
       // Note: Clock is a well-known shared object, we can reference it directly
       const clockId = '0x6'; // Sui Clock object ID (well-known shared object)
 
-      // Return transaction data for frontend to build and sign
-      // Frontend should use imageDataObjectId as an object argument, not pure vector
+      // Build transaction
+      const txb = new Transaction();
+      
+      // Call mint_badge function
+      txb.moveCall({
+        target: `${this.config.contracts.gameScore}::badge_system::mint_badge`,
+        arguments: [
+          txb.object(this.config.contracts.badgeRegistry),
+          txb.object(statsRegistryId),
+          txb.object(clockId),
+          txb.object(paymentCoinId),
+          txb.object(imageDataObjectId), // Pre-populated BadgeImageData object
+        ],
+      });
+
+      // Set sender (required for building transaction, even if not signing)
+      txb.setSender(playerAddress);
+
+      // Estimate gas (add 15% buffer)
+      const gasEstimate = this.config.sui.gasBudget;
+      const gasWithBuffer = Math.round(gasEstimate * 1.15);
+      txb.setGasBudget(gasWithBuffer);
+
+      // Build transaction (don't sign - frontend will sign)
+      const client = this.getClient();
+      const transactionBytes = await txb.build({ client });
+
+      console.log('✅ [MINT BUILD] Transaction built successfully');
+      console.log(`   Gas estimate: ${gasWithBuffer} MIST (${(gasWithBuffer / 1_000_000_000).toFixed(4)} SUI)`);
+
       return {
         success: true,
-        transactionData: {
-          packageId: this.config.contracts.gameScore,
-          module: 'badge_system',
-          function: 'mint_badge',
-          arguments: [
-            this.config.contracts.badgeRegistry,
-            statsRegistryId,
-            clockId,
-            paymentCoinId,
-            imageDataObjectId, // Pre-populated BadgeImageData object ID (frontend should pass as object)
-          ],
-          imageDataObjectId, // Object ID for frontend to use
-          imageData, // Also return raw image data if needed
-        },
+        transaction: Buffer.from(transactionBytes).toString('base64'),
+        gasEstimate: gasWithBuffer.toString(),
       };
     } catch (error) {
       console.error('Error minting badge:', error);

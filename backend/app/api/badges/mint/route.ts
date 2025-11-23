@@ -96,17 +96,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return transaction data (imageDataObjectId is already included)
-    const transactionData = result.transactionData!;
-
+    // Return serialized transaction
     return NextResponse.json(
       {
         success: true,
-        transactionData: {
-          ...transactionData,
-          // imageDataObjectId is already in transactionData
-          // imageData (raw) is optional and included if available
-        },
+        transaction: result.transaction,
+        gasEstimate: result.gasEstimate,
       },
       { headers: corsHeaders }
     );

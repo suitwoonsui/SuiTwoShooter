@@ -237,8 +237,8 @@ async function handleBadgeMint() {
       throw new Error(result.error || 'Failed to build mint transaction');
     }
 
-    // Sign and execute transaction
-    const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transactionData);
+    // Sign and execute transaction (result.transaction is base64 string)
+    const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
     
     if (txResult.success) {
       console.log('✅ [BADGE] Badge minted successfully!');

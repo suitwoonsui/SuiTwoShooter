@@ -395,10 +395,10 @@ async function checkAndBuildBadgeUpdate(sessionId) {
 
 /**
  * Sign and execute badge transaction
- * @param {Object} transactionData - Transaction data from backend
+ * @param {string|Object} transaction - Serialized transaction bytes (base64 string) or legacy transactionData object
  * @returns {Promise<Object>} Transaction result
  */
-async function signAndExecuteBadgeTransaction(transactionData) {
+async function signAndExecuteBadgeTransaction(transaction) {
   if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) {
     return {
       success: false,
@@ -406,49 +406,25 @@ async function signAndExecuteBadgeTransaction(transactionData) {
     };
   }
 
+  // Handle legacy transactionData object format
+  if (transaction && typeof transaction === 'object' && !(transaction instanceof Uint8Array)) {
+    return {
+      success: false,
+      error: 'Legacy transaction format no longer supported. Please use the new API.',
+    };
+  }
+
+  if (!transaction || (typeof transaction !== 'string' && !(transaction instanceof Uint8Array))) {
+    return {
+      success: false,
+      error: 'Invalid transaction data. Expected base64 string or Uint8Array.',
+    };
+  }
+
   try {
-    // Build transaction using Sui SDK
-    const { Transaction } = await import('@mysten/sui/transactions');
-    const txb = new Transaction();
-
-    // Convert arguments - handle object IDs and other types appropriately
-    // The backend now returns object IDs as strings, which need to be converted to txb.object()
-    const convertedArgs = transactionData.arguments.map((arg, index) => {
-      // If it's a string that looks like an object ID (0x followed by 64 hex chars)
-      // This handles BadgeImageData object IDs and other object references
-      if (typeof arg === 'string' && arg.startsWith('0x') && arg.length === 66) {
-        return txb.object(arg);
-      }
-      // If it's already a TransactionArgument (from previous txb calls), use as-is
-      // Check if it has properties that indicate it's already a TransactionArgument
-      if (arg && typeof arg === 'object' && ('kind' in arg || 'Input' in arg)) {
-        return arg;
-      }
-      // For numbers, we need to infer the type based on context
-      // For now, use u64 for all numbers (contract functions will handle conversion)
-      if (typeof arg === 'number') {
-        return txb.pure.u64(BigInt(arg));
-      }
-      if (typeof arg === 'bigint') {
-        return txb.pure.u64(arg);
-      }
-      // For arrays, assume vector<u8> (most common case for image data, session IDs, etc.)
-      if (Array.isArray(arg)) {
-        return txb.pure.vector('u8', arg);
-      }
-      // For other types (strings that aren't object IDs, etc.), pass as-is
-      // The transaction builder will handle them or throw an error if invalid
-      return arg;
-    });
-
-    // Add move call
-    txb.moveCall({
-      target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
-      arguments: convertedArgs,
-    });
-
-    // Sign and execute
-    const result = await window.walletAPIInstance.signAndExecuteTransaction(txb);
+    // Pass base64 transaction string directly to wallet API
+    // The wallet API will handle deserialization
+    const result = await window.walletAPIInstance.signAndExecuteTransaction(transaction);
 
     if (result.success) {
       console.log('✅ [BADGE] Transaction executed:', result.digest);
