@@ -1,6 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '@/lib/api-base-url';
+
+// Helper function to get full API URL
+const getApiUrl = (path: string): string => {
+  const baseUrl = getApiBaseUrl();
+  // Remove leading slash from path if baseUrl is provided (to avoid double slashes)
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  return baseUrl ? `${baseUrl}/${cleanPath}` : `/${cleanPath}`;
+};
 
 export default function AdminBadgesPage() {
   const [action, setAction] = useState<'mint' | 'burn'>('mint');
@@ -24,7 +33,7 @@ export default function AdminBadgesPage() {
 
   // Load admin address on mount
   useEffect(() => {
-    fetch('/api/admin/verify-wallet')
+    fetch(getApiUrl('api/admin/verify-wallet'))
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -106,7 +115,7 @@ export default function AdminBadgesPage() {
       }
 
       // Use server-side proxy that automatically handles API key
-      const response = await fetch('/api/admin/badges', {
+      const response = await fetch(getApiUrl('api/admin/badges'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
