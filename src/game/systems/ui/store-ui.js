@@ -279,6 +279,9 @@ async function loadStoreBadgeDisplay() {
     // Use imageUrl if available (from badge.image field), otherwise fall back to constructing from tier or imageData
     let imageSrc = null;
     
+    // Declare apiBaseUrl at function scope to avoid duplicate declaration
+    const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    
     // First, try to use imageUrl from badge
     if (badge.imageUrl && typeof badge.imageUrl === 'string' && (badge.imageUrl.startsWith('http://') || badge.imageUrl.startsWith('https://'))) {
       // Use the URL directly from the badge's image field (validate it's a real URL)
@@ -290,7 +293,6 @@ async function loadStoreBadgeDisplay() {
       
       // Fallback 1: Construct URL from tier
       const tierName = tierNames[badge.tier] || 'Standard';
-      const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
       // Remove /api suffix if present, then add /Badges/
       const baseUrl = apiBaseUrl.replace(/\/api$/, '');
       const constructedUrl = `${baseUrl}/Badges/${tierName}.webp`;
@@ -326,10 +328,10 @@ async function loadStoreBadgeDisplay() {
           // Keep the constructed URL as fallback
         }
       }
+    }
     
     // Construct fallback URL from tier in case image fails to load
     const tierNameForUrl = tierNames[badge.tier] || 'Standard';
-    const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
     const baseUrl = apiBaseUrl.replace(/\/api$/, '');
     const fallbackUrl = `${baseUrl}/Badges/${tierNameForUrl}.webp`;
     
