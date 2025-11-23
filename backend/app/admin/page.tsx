@@ -40,7 +40,7 @@ export default function AdminPage() {
   const [itemsResult, setItemsResult] = useState<{ success: boolean; message?: string; error?: string; digest?: string } | null>(null);
 
   // Badges state
-  const [badgeAction, setBadgeAction] = useState<'mint' | 'burn'>('mint');
+  const [badgeAction, setBadgeAction] = useState<'mint' | 'burn' | 'update-image'>('mint');
   const [badgePlayerAddress, setBadgePlayerAddress] = useState('');
   const [tier, setTier] = useState<number>(0);
   const [badgeId, setBadgeId] = useState('');
@@ -49,6 +49,11 @@ export default function AdminPage() {
   const [lookupAddress, setLookupAddress] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupResult, setLookupResult] = useState<{ badgeId?: string; error?: string } | null>(null);
+  
+  // Update image URL state
+  const [updateImageAddress, setUpdateImageAddress] = useState('');
+  const [updateImageLoading, setUpdateImageLoading] = useState(false);
+  const [updateImageResult, setUpdateImageResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
 
   // Migration state
   const [migrationMode, setMigrationMode] = useState<'single' | 'batch' | 'auto'>('auto');
@@ -724,6 +729,53 @@ export default function AdminPage() {
   };
 
   // Badges functions
+  const handleUpdateImageUrl = async () => {
+    if (!updateImageAddress || !updateImageAddress.startsWith('0x') || updateImageAddress.length !== 66) {
+      setUpdateImageResult({
+        success: false,
+        error: 'Invalid player address format',
+      });
+      return;
+    }
+
+    setUpdateImageLoading(true);
+    setUpdateImageResult(null);
+
+    try {
+      const response = await fetch(getApiUrl('api/admin/badges/update-image-url'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerAddress: updateImageAddress,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setUpdateImageResult({
+          success: true,
+          message: data.message || 'Badge image URL updated successfully',
+        });
+        setUpdateImageAddress('');
+      } else {
+        setUpdateImageResult({
+          success: false,
+          error: data.error || 'Failed to update badge image URL',
+        });
+      }
+    } catch (error) {
+      setUpdateImageResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Network error',
+      });
+    } finally {
+      setUpdateImageLoading(false);
+    }
+  };
+
   const handleBadgesSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBadgesLoading(true);
@@ -896,6 +948,22 @@ export default function AdminPage() {
           >
             🔄 Inventory Migration
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('score-migration')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: activeTab === 'score-migration' ? '#2196F3' : 'transparent',
+              color: activeTab === 'score-migration' ? 'white' : '#2196F3',
+              border: 'none',
+              borderBottom: activeTab === 'score-migration' ? '3px solid #2196F3' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+            }}
+          >
+            📊 Stats Migration
+          </button>
         </div>
       </div>
 
@@ -1033,13 +1101,13 @@ export default function AdminPage() {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
               Action:
             </label>
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                 <input
                   type="radio"
                   value="mint"
                   checked={badgeAction === 'mint'}
-                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn')}
+                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'update-image')}
                   style={{ marginRight: '0.5rem' }}
                 />
                 Mint Badge
@@ -1049,15 +1117,96 @@ export default function AdminPage() {
                   type="radio"
                   value="burn"
                   checked={badgeAction === 'burn'}
-                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn')}
+                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'update-image')}
                   style={{ marginRight: '0.5rem' }}
                 />
                 Burn Badge
               </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="update-image"
+                  checked={badgeAction === 'update-image'}
+                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'update-image')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Update Image URL
+              </label>
             </div>
           </div>
 
-          {badgeAction === 'mint' ? (
+          {badgeAction === 'update-image' ? (
+            <div style={{ padding: '1.5rem', background: '#f0f7ff', borderRadius: '8px', border: '1px solid #b3d9ff' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>🖼️ Update Badge Image URL</h3>
+              <p style={{ marginBottom: '1rem', color: '#666', fontSize: '0.9rem' }}>
+                Update a badge's image URL to point to the correct static file. This is useful for fixing badges that were minted with localhost URLs.
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                    Player Address:
+                  </label>
+                  <input
+                    type="text"
+                    value={updateImageAddress}
+                    onChange={(e) => setUpdateImageAddress(e.target.value)}
+                    placeholder="0x..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      fontSize: '1rem',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                    }}
+                  />
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={handleUpdateImageUrl}
+                  disabled={updateImageLoading || !updateImageAddress}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '1rem',
+                    backgroundColor: updateImageLoading || !updateImageAddress ? '#ccc' : '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: updateImageLoading || !updateImageAddress ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {updateImageLoading ? 'Updating...' : 'Update Image URL'}
+                </button>
+              </div>
+
+              {updateImageResult && (
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    borderRadius: '4px',
+                    backgroundColor: updateImageResult.success ? '#d4edda' : '#f8d7da',
+                    color: updateImageResult.success ? '#155724' : '#721c24',
+                    border: `1px solid ${updateImageResult.success ? '#c3e6cb' : '#f5c6cb'}`,
+                  }}
+                >
+                  {updateImageResult.success ? (
+                    <div>
+                      <strong>✅ Success!</strong>
+                      <p>{updateImageResult.message}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <strong>❌ Error:</strong>
+                      <p>{updateImageResult.error}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : badgeAction === 'mint' ? (
             <>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
@@ -1177,7 +1326,7 @@ export default function AdminPage() {
 
           <button
             type="submit"
-            disabled={badgesLoading || !isAdminWalletConnected || (badgeAction === 'mint' ? !badgePlayerAddress : !badgeId)}
+            disabled={badgesLoading || !isAdminWalletConnected || (badgeAction === 'mint' ? !badgePlayerAddress : badgeAction === 'burn' ? !badgeId : false)}
             style={{
               padding: '1rem',
               fontSize: '1.1rem',
@@ -1187,6 +1336,7 @@ export default function AdminPage() {
               borderRadius: '4px',
               cursor: badgesLoading || !isAdminWalletConnected ? 'not-allowed' : 'pointer',
               fontWeight: 'bold',
+              display: badgeAction === 'update-image' ? 'none' : 'block',
             }}
           >
             {badgesLoading ? (badgeAction === 'mint' ? 'Minting Badge...' : 'Burning Badge...') : (badgeAction === 'mint' ? 'Mint Badge' : 'Burn Badge')}
