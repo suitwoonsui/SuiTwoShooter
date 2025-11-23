@@ -469,12 +469,12 @@ module suitwo_game::badge_system {
         ctx: &mut TxContext
     ) {
         // Create Display object for EarlySupporterBadge type with all fields
-        // Note: Use "url" instead of "image_url" for wallet compatibility (Slush, SuiVision, etc.)
+        // Note: Wallets (Slush, SuiVision, etc.) look for "image_url" field (lowercase, underscore)
         let fields = vector[
             string::utf8(b"name"),
             string::utf8(b"description"),
             string::utf8(b"link"),
-            string::utf8(b"url"),  // Changed from "image_url" to "url" for wallet compatibility
+            string::utf8(b"image_url"),  // Wallets expect "image_url" (lowercase, underscore)
             string::utf8(b"tier_name"),
             string::utf8(b"games_played"),
             string::utf8(b"mint_date"),
@@ -507,6 +507,7 @@ module suitwo_game::badge_system {
     
     /// Update Display object fields (if needed in the future)
     /// Can be called by anyone who owns the Display object
+    /// IMPORTANT: Always call this after updating Display fields so wallets see the changes
     #[allow(lint(public_entry))]
     public entry fun update_display(
         display: &mut Display<EarlySupporterBadge>,
@@ -515,7 +516,7 @@ module suitwo_game::badge_system {
     ) {
         // Update multiple fields at once
         display::add_multiple(display, fields, values);
-        // Bump version to signal update
+        // Bump version to signal update - REQUIRED for wallets to see changes
         display::update_version(display);
     }
 
@@ -643,6 +644,7 @@ module suitwo_game::badge_system {
     /// 
     /// SAFETY: This function ensures the new badge is created and registered BEFORE the old badge is deleted.
     /// If any step fails, the transaction aborts and the old badge remains safe.
+    #[allow(lint(public_entry))]
     public entry fun migrate_badge<T: key + store>(
         registry: &mut BadgeRegistry,
         stats_registry: &StatisticsRegistry,

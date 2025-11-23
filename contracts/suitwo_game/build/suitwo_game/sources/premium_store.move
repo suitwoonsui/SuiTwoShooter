@@ -119,6 +119,7 @@ module suitwo_game::premium_store {
     
     /// Create admin capability for premium store
     /// This should be called once after contract deployment
+    #[allow(lint(public_entry))]
     public entry fun create_admin_capability(admin_address: address, ctx: &mut TxContext) {
         let admin_cap = AdminCapability {
             id: object::new(ctx),
@@ -427,6 +428,7 @@ module suitwo_game::premium_store {
     /// Purchase an item (player signs, player pays)
     /// Payment transfer should happen in the same transaction (handled by frontend/backend)
     /// This function only updates the inventory
+    #[allow(lint(public_entry))]
     public entry fun purchase_item(
         store: &mut PremiumStore,
         clock: &Clock,
@@ -478,6 +480,7 @@ module suitwo_game::premium_store {
     
     /// Consume items from inventory (admin wallet signs, admin pays gas)
     /// Called when player starts a game and uses purchased items
+    #[allow(lint(public_entry))]
     public entry fun consume_item(
         _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
         store: &mut PremiumStore,
@@ -535,6 +538,7 @@ module suitwo_game::premium_store {
     /// Admin function to add items to a player's inventory
     /// Used for: testing, promotions, refunds, corrections
     /// Requires AdminCapability to prevent unauthorized access
+    #[allow(lint(public_entry))]
     public entry fun admin_add_items(
         _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
         store: &mut PremiumStore,
@@ -577,6 +581,7 @@ module suitwo_game::premium_store {
     /// Migrate player inventory from old store to new store
     /// Admin-only function to transfer all items for a player
     /// This is used when migrating from an old contract package to a new one
+    #[allow(lint(public_entry))]
     public entry fun migrate_player_inventory(
         _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
         store: &mut PremiumStore,

@@ -128,6 +128,7 @@ module suitwo_game::score_submission {
     /// This function should be called once after contract deployment
     /// Only the admin wallet can use this capability to submit scores
     /// This prevents unauthorized score submissions and cheating
+    #[allow(lint(public_entry))]
     public entry fun create_admin_capability(admin_address: address, ctx: &mut TxContext) {
         // Create admin capability and transfer to admin address
         // Only the admin wallet can use this capability to submit scores
@@ -345,6 +346,7 @@ module suitwo_game::score_submission {
     
     /// Submit a complete game session with all statistics
     /// Ownership validation: sender() must be the player (built into Sui - can't fake sender)
+    #[allow(lint(public_entry))]
     public entry fun submit_game_session(
         clock: &Clock,
         score: u64,
@@ -411,6 +413,7 @@ module suitwo_game::score_submission {
     /// This prevents unauthorized score submissions and cheating
     /// Admin wallet pays gas fees
     /// NOTE: Demo mode games do NOT create GameSession objects, so they are automatically excluded from statistics
+    #[allow(lint(public_entry))]
     public entry fun submit_game_session_for_player(
         _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
         registry: &mut SessionRegistry,  // Session registry for duplicate prevention
@@ -596,6 +599,7 @@ module suitwo_game::score_submission {
     /// This allows migrating player stats when upgrading to a new contract
     /// REQUIRES AdminCapability - only admin wallet can call this function
     /// If player already has stats in new registry, merges the data (takes maximums for bests, sums for totals)
+    #[allow(lint(public_entry))]
     public entry fun migrate_player_stats(
         _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
         old_stats_registry: &StatisticsRegistry,  // Old statistics registry to read from

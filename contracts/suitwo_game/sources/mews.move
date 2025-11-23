@@ -11,6 +11,7 @@ module suitwo_game::mews {
     /// Initialize the MEWS token
     /// This creates the token metadata and returns a TreasuryCap
     /// The TreasuryCap allows minting and burning of MEWS tokens
+    #[allow(deprecated_usage)]
     fun init(witness: MEWS, ctx: &mut TxContext) {
         let (treasury, metadata) = coin::create_currency<MEWS>(
             witness,
@@ -31,6 +32,7 @@ module suitwo_game::mews {
 
     /// Mint MEWS tokens to a recipient
     /// Requires the TreasuryCap (only deployer can mint)
+    #[allow(lint(public_entry))]
     public entry fun mint(
         treasury: &mut TreasuryCap<MEWS>,
         amount: u64,
@@ -42,6 +44,7 @@ module suitwo_game::mews {
     }
 
     /// Mint MEWS tokens to the sender
+    #[allow(lint(public_entry))]
     public entry fun mint_to_sender(
         treasury: &mut TreasuryCap<MEWS>,
         amount: u64,
@@ -53,6 +56,7 @@ module suitwo_game::mews {
 
     /// Burn MEWS tokens
     /// Requires the TreasuryCap (only deployer can burn)
+    #[allow(lint(public_entry))]
     public entry fun burn(
         treasury: &mut TreasuryCap<MEWS>,
         coin: Coin<MEWS>
