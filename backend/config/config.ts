@@ -132,24 +132,12 @@ export function getConfig(): Config {
       nodeEnv: (process.env.NODE_ENV || 'development') as NodeEnv,
       corsOrigin: process.env.CORS_ORIGIN || '*', // Default to * for development (allows localhost:8000)
       // Determine API base URL:
-      // Priority: VERCEL_URL > VERCEL env > explicit non-localhost URL > production check > localhost
+      // Priority: explicit env var > production domain (always use fixed production URL, not deployment-specific VERCEL_URL)
       apiBaseUrl: (() => {
-        // First, check if we're on Vercel (VERCEL_URL is automatically set by Vercel)
-        // Format: sui-two-shooter-backend-sui-integra.vercel.app (without https://)
-        if (process.env.VERCEL_URL) {
-          const vercelUrl = `https://${process.env.VERCEL_URL}`;
-          console.log(`[CONFIG] Using VERCEL_URL: ${vercelUrl}`);
-          return vercelUrl;
-        }
+        // Fixed production domain URL (doesn't change with deployments)
+        const PRODUCTION_URL = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
         
-        // Check VERCEL env var (set to '1' on Vercel)
-        if (process.env.VERCEL === '1') {
-          const vercelUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
-          console.log(`[CONFIG] Using VERCEL=1, defaulting to: ${vercelUrl}`);
-          return vercelUrl;
-        }
-        
-        // Check explicit environment variables
+        // Check explicit environment variables first
         const explicitUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
         
         // If explicitly set to a non-localhost URL, use it
@@ -158,17 +146,18 @@ export function getConfig(): Config {
           return explicitUrl;
         }
         
-        // If in production and no explicit URL set, use Vercel URL
-        if (process.env.NODE_ENV === 'production') {
-          const vercelUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
-          console.log(`[CONFIG] Production mode, defaulting to: ${vercelUrl}`);
-          return vercelUrl;
-        }
-        
         // If explicitly set to localhost, use it (for local development)
         if (explicitUrl && explicitUrl.includes('localhost')) {
           console.log(`[CONFIG] Using explicit localhost URL: ${explicitUrl}`);
           return explicitUrl;
+        }
+        
+        // If on Vercel (VERCEL env var is set) or in production, use fixed production URL
+        // NOTE: We use VERCEL env var to detect Vercel, but use the fixed production URL, not VERCEL_URL
+        // This ensures we always use the production domain, not the deployment-specific URL
+        if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'production') {
+          console.log(`[CONFIG] Vercel/Production detected, using fixed production URL: ${PRODUCTION_URL}`);
+          return PRODUCTION_URL;
         }
         
         // Default to localhost for local development
