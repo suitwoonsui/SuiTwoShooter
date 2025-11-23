@@ -1,6 +1,5 @@
-favicon.ico:1  GET https://sui-two-shooter-backend-sui-integra.vercel.app/favicon.ico 404 (Not Found)
-page-7b8a19fd75d30c0d.js:1  GET http://localhost:3000/api/admin/verify-wallet net::ERR_CONNECTION_REFUSED
-(anonymous) @ page-7b8a19fd75d30c0d.js:1
+page-5302b9efed91199f.js:1  GET http://localhost:3000/api/admin/verify-wallet net::ERR_CONNECTION_REFUSED
+(anonymous) @ page-5302b9efed91199f.js:1
 o1 @ 4bd1b696-c023c6e3521b1417.js:1
 uE @ 4bd1b696-c023c6e3521b1417.js:1
 ux @ 4bd1b696-c023c6e3521b1417.js:1
@@ -135,28 +134,12 @@ postMessage
 h @ inpage.js:166
 b @ inpage.js:166
 l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-t.unstable_scheduleCallback @ 255-cf2e1d3491ac955b.js:1
+(anonymous) @ 255-cf2e1d3491ac955b.js:1
 iY @ 4bd1b696-c023c6e3521b1417.js:1
 iK @ 4bd1b696-c023c6e3521b1417.js:1
 (anonymous) @ 4bd1b696-c023c6e3521b1417.js:1
-page-7b8a19fd75d30c0d.js:1 Failed to load admin address: TypeError: Failed to fetch
-    at page-7b8a19fd75d30c0d.js:1:3106
+page-5302b9efed91199f.js:1 Failed to load admin address: TypeError: Failed to fetch
+    at page-5302b9efed91199f.js:1:3102
     at o1 (4bd1b696-c023c6e3521b1417.js:1:88951)
     at uE (4bd1b696-c023c6e3521b1417.js:1:104843)
     at ux (4bd1b696-c023c6e3521b1417.js:1:104727)
@@ -166,9 +149,9 @@ page-7b8a19fd75d30c0d.js:1 Failed to load admin address: TypeError: Failed to fe
     at ux (4bd1b696-c023c6e3521b1417.js:1:104727)
     at uE (4bd1b696-c023c6e3521b1417.js:1:104888)
     at ux (4bd1b696-c023c6e3521b1417.js:1:104727)
-(anonymous) @ page-7b8a19fd75d30c0d.js:1
+(anonymous) @ page-5302b9efed91199f.js:1
 Promise.catch
-(anonymous) @ page-7b8a19fd75d30c0d.js:1
+(anonymous) @ page-5302b9efed91199f.js:1
 o1 @ 4bd1b696-c023c6e3521b1417.js:1
 uE @ 4bd1b696-c023c6e3521b1417.js:1
 ux @ 4bd1b696-c023c6e3521b1417.js:1
@@ -303,29 +286,13 @@ postMessage
 h @ inpage.js:166
 b @ inpage.js:166
 l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-t.unstable_scheduleCallback @ 255-cf2e1d3491ac955b.js:1
+(anonymous) @ 255-cf2e1d3491ac955b.js:1
 iY @ 4bd1b696-c023c6e3521b1417.js:1
 iK @ 4bd1b696-c023c6e3521b1417.js:1
 (anonymous) @ 4bd1b696-c023c6e3521b1417.js:1
-page-7b8a19fd75d30c0d.js:1  GET http://localhost:3000/api/config net::ERR_CONNECTION_REFUSED
-t @ page-7b8a19fd75d30c0d.js:1
-(anonymous) @ page-7b8a19fd75d30c0d.js:1
+page-5302b9efed91199f.js:1  GET http://localhost:3000/api/config net::ERR_CONNECTION_REFUSED
+t @ page-5302b9efed91199f.js:1
+(anonymous) @ page-5302b9efed91199f.js:1
 o1 @ 4bd1b696-c023c6e3521b1417.js:1
 uE @ 4bd1b696-c023c6e3521b1417.js:1
 ux @ 4bd1b696-c023c6e3521b1417.js:1
@@ -460,29 +427,13 @@ postMessage
 h @ inpage.js:166
 b @ inpage.js:166
 l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-t.unstable_scheduleCallback @ 255-cf2e1d3491ac955b.js:1
+(anonymous) @ 255-cf2e1d3491ac955b.js:1
 iY @ 4bd1b696-c023c6e3521b1417.js:1
 iK @ 4bd1b696-c023c6e3521b1417.js:1
 (anonymous) @ 4bd1b696-c023c6e3521b1417.js:1
-page-7b8a19fd75d30c0d.js:1 ❌ Error loading wallet API: TypeError: Failed to fetch
-    at t (page-7b8a19fd75d30c0d.js:1:2176)
-    at page-7b8a19fd75d30c0d.js:1:3273
+page-5302b9efed91199f.js:1 ❌ Error loading wallet API: TypeError: Failed to fetch
+    at t (page-5302b9efed91199f.js:1:2172)
+    at page-5302b9efed91199f.js:1:3269
     at o1 (4bd1b696-c023c6e3521b1417.js:1:88951)
     at uE (4bd1b696-c023c6e3521b1417.js:1:104843)
     at ux (4bd1b696-c023c6e3521b1417.js:1:104727)
@@ -491,9 +442,9 @@ page-7b8a19fd75d30c0d.js:1 ❌ Error loading wallet API: TypeError: Failed to fe
     at uE (4bd1b696-c023c6e3521b1417.js:1:104888)
     at ux (4bd1b696-c023c6e3521b1417.js:1:104727)
     at uE (4bd1b696-c023c6e3521b1417.js:1:104888)
-t @ page-7b8a19fd75d30c0d.js:1
+t @ page-5302b9efed91199f.js:1
 await in t
-(anonymous) @ page-7b8a19fd75d30c0d.js:1
+(anonymous) @ page-5302b9efed91199f.js:1
 o1 @ 4bd1b696-c023c6e3521b1417.js:1
 uE @ 4bd1b696-c023c6e3521b1417.js:1
 ux @ 4bd1b696-c023c6e3521b1417.js:1
@@ -628,23 +579,7 @@ postMessage
 h @ inpage.js:166
 b @ inpage.js:166
 l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-w @ 255-cf2e1d3491ac955b.js:1
-_ @ inpage.js:166
-w @ inpage.js:166
-Y @ inpage.js:166
-postMessage
-h @ inpage.js:166
-b @ inpage.js:166
-l @ 255-cf2e1d3491ac955b.js:1
-t.unstable_scheduleCallback @ 255-cf2e1d3491ac955b.js:1
+(anonymous) @ 255-cf2e1d3491ac955b.js:1
 iY @ 4bd1b696-c023c6e3521b1417.js:1
 iK @ 4bd1b696-c023c6e3521b1417.js:1
 (anonymous) @ 4bd1b696-c023c6e3521b1417.js:1
