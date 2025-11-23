@@ -40,18 +40,26 @@ const getConfig = () => {
     
     // 3. Set defaults based on environment
     if (!config.backendUrl) {
-      // For Vercel: Set your actual backend URL here or via meta tag
-      // You can also set this via Vercel environment variable and inject it at build time
-      config.backendUrl = isProduction 
-        ? 'https://sui-two-shooter-backend-sui-integra.vercel.app/api'  // Production backend URL
-        : 'http://localhost:3000/api';
+      // Default to Vercel backend URL (can be overridden via meta tag or localhost detection)
+      // For local development, you can add a meta tag to override this
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // Only use localhost if explicitly running locally
+        config.backendUrl = 'http://localhost:3000/api';
+      } else {
+        // Use Vercel backend for all other cases (production, staging, etc.)
+        config.backendUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app/api';
+      }
     }
     
     if (!config.walletModuleUrl) {
-      // For Vercel: Set your actual wallet module URL here or via meta tag
-      config.walletModuleUrl = isProduction
-        ? 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs'  // Production wallet module URL
-        : 'wallet-module/dist/wallet-api.umd.cjs';  // Local path
+      // Default to Vercel wallet module URL (can be overridden via meta tag or localhost detection)
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // Only use local path if explicitly running locally
+        config.walletModuleUrl = 'wallet-module/dist/wallet-api.umd.cjs';
+      } else {
+        // Use Vercel wallet module for all other cases (production, staging, etc.)
+        config.walletModuleUrl = 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs';
+      }
     }
   } else {
     // Fallback for non-browser environments

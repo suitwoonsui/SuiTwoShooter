@@ -1,7 +1,7 @@
 // Extract Display object ID from transaction
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
-const txDigest = '7APN5GfyjgSPKgATNFVGk8Dyqgp7kmpjhtHzKkymW8c5';
+const txDigest = '5Y8TLNnXq4ei6p5vNN56FkKEsvh25jNUsr5xXHGMQV9K';
 
 async function extractDisplayId() {
   try {

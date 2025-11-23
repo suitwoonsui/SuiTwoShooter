@@ -1,8 +1,8 @@
 // Extract all object IDs from deployment transaction
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
-const txDigest = 'FiFL46L99TqY3h91EfNLy2pbu8uLR7yFEPC6kZStQRTo';
-const packageId = '0xa235c3069ff0f2cd158ab6ecd9eccc436c094f064e3b5625957f88e3f47e0884';
+const txDigest = 'B8rJBJXm6voZfCXtJwpARKuL38HZxYv8vd9S4Er2iFTF';
+const packageId = '0x9b981a5b3d2acbee7ed3989e1707de1c5868d9e1ff89b6b14a107cff9fac96b1';
 
 async function extractDeploymentIds() {
   try {
