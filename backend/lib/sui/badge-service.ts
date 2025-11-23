@@ -1653,10 +1653,9 @@ export class BadgeService {
 
   /**
    * Update badge image URL for wallet display
-   * Updates the badge's image field with a URL pointing to the API endpoint
-   * This allows wallets to display the image even though we can't pass large data URIs
+   * Updates the badge's image field with a URL pointing to the static image file
    * @param playerAddress - Player's wallet address
-   * @param imageUrl - URL to the badge image (e.g., "https://suitwo.game/api/badges/{address}/image")
+   * @param imageUrl - URL to the badge image (optional, will construct from tier if not provided)
    * @returns Success status
    */
   async updateBadgeImageUrl(
@@ -1668,7 +1667,7 @@ export class BadgeService {
       const packageId = this.config.contracts.gameScore;
       const keypair = this.adminWallet.getKeypair();
 
-      // Get badge to verify it exists and get badge ID
+      // Get badge to verify it exists and get badge ID and tier
       const badge = await this.getBadge(playerAddress);
       if (!badge || !badge.badgeId) {
         return {
@@ -1679,9 +1678,8 @@ export class BadgeService {
       const badgeId = badge.badgeId;
 
       // Construct image URL if not provided
-      // Use configurable API base URL from config
-      const apiBaseUrl = this.config.server.apiBaseUrl;
-      const url = imageUrl || `${apiBaseUrl}/api/badges/${playerAddress}/image`;
+      // Use the static file URL based on tier
+      const url = imageUrl || this.getBadgeImageUrl(badge.tier);
 
       console.log(`🖼️ [UPDATE IMAGE URL] Updating badge image URL for ${playerAddress}`);
       console.log(`🖼️ [UPDATE IMAGE URL] Badge ID: ${badgeId}`);

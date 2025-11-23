@@ -131,7 +131,23 @@ export function getConfig(): Config {
       port: parseInt(process.env.PORT || '3000', 10),
       nodeEnv: (process.env.NODE_ENV || 'development') as NodeEnv,
       corsOrigin: process.env.CORS_ORIGIN || '*', // Default to * for development (allows localhost:8000)
-      apiBaseUrl: process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || (process.env.NODE_ENV === 'production' ? 'https://sui-two-shooter-backend-sui-integra.vercel.app' : 'http://localhost:3000') // Base URL for API endpoints
+      // Determine API base URL:
+      // 1. Use explicit env var if set
+      // 2. If on Vercel (VERCEL env var exists) or production, default to Vercel URL
+      // 3. Otherwise default to localhost (for local development)
+      apiBaseUrl: (() => {
+        // Explicit override via environment variable
+        if (process.env.API_BASE_URL) return process.env.API_BASE_URL;
+        if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
+        
+        // If on Vercel or in production, use Vercel URL
+        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+          return 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+        }
+        
+        // Default to localhost for local development
+        return 'http://localhost:3000';
+      })()
     },
     sui: {
       network,
