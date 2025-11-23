@@ -557,8 +557,40 @@ async function handleBadgeMigration(migrationData) {
     console.log('✅ [BADGE] Badge migrated successfully! Transaction:', result.digest);
     alert('🎉 Badge migrated successfully!');
     hideBadgeModal('badgeMigrationModal');
+    
     // Clear badge cache
     window.BadgeService.clearBadgeCache();
+    
+    // Reload badge display in menu after migration
+    // Wait a moment for the transaction to be processed on-chain
+    setTimeout(async () => {
+      const playerAddress = window.walletAPIInstance?.getAddress?.();
+      if (playerAddress) {
+        // Dispatch a custom event to trigger badge reload
+        // The menu system or other components can listen for this event
+        if (window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('badgeMigrated', { 
+            detail: { 
+              address: playerAddress,
+              digest: result.digest 
+            } 
+          }));
+        }
+        
+        // Also try to directly reload badge if loadMenuBadgeDisplay is accessible
+        // This function is defined in menu-system.js and should be in the same scope
+        // We'll try to call it directly, or trigger through checkMEWSBalanceAndUpdateUI
+        if (typeof checkMEWSBalanceAndUpdateUI === 'function') {
+          // This function loads the badge as part of its process
+          await checkMEWSBalanceAndUpdateUI(playerAddress);
+        } else if (typeof loadMenuBadgeDisplay === 'function') {
+          // Direct call if function is accessible
+          await loadMenuBadgeDisplay(playerAddress);
+        } else {
+          console.log('⚠️ [BADGE] Could not find badge reload function. Badge will reload on next menu open.');
+        }
+      }
+    }, 2000); // Wait 2 seconds for transaction to be processed on-chain
   } catch (error) {
     console.error('❌ [BADGE] Error migrating badge:', error);
     alert(`Failed to migrate badge: ${error.message}`);

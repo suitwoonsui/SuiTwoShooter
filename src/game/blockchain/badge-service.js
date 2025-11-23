@@ -148,6 +148,7 @@ async function hasBadge(playerAddress = null) {
 
 /**
  * Get SUI coins from wallet and select/merge for payment
+ * Uses backend API to avoid importing @mysten/sui/client in frontend
  * @param {number} requiredAmountMist - Required amount in MIST (1 SUI = 1,000,000,000 MIST)
  * @returns {Promise<Object>} Coin ID or error
  */
@@ -161,61 +162,33 @@ async function getPaymentCoin(requiredAmountMist) {
   }
 
   try {
-    // Get Sui client
-    const { SuiClient, getFullnodeUrl } = await import('@mysten/sui/client');
-    const network = window.GAME_CONFIG?.SUI_NETWORK || 'testnet';
-    const client = new SuiClient({ url: getFullnodeUrl(network) });
+    // Call backend API to get payment coin
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(
+      `${API_BASE_URL}/badges/payment-coin?address=${encodeURIComponent(address)}&requiredAmount=${requiredAmountMist}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-    // Get all SUI coins
-    const coins = await client.getCoins({
-      owner: address,
-      coinType: '0x2::sui::SUI',
-    });
-
-    if (!coins.data || coins.data.length === 0) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       return {
         success: false,
-        error: 'No SUI coins found in wallet',
+        error: errorData.error || `HTTP ${response.status}`,
       };
     }
 
-    // Calculate total balance
-    let totalBalance = BigInt(0);
-    coins.data.forEach(coin => {
-      totalBalance += BigInt(coin.balance);
-    });
-
-    // Check if balance is sufficient
-    if (totalBalance < BigInt(requiredAmountMist)) {
-      return {
-        success: false,
-        error: `Insufficient SUI balance. Required: ${requiredAmountMist / 1_000_000_000} SUI`,
-      };
-    }
-
-    // If we have a single coin with sufficient balance, use it
-    const sufficientCoin = coins.data.find(coin => BigInt(coin.balance) >= BigInt(requiredAmountMist));
-    if (sufficientCoin) {
-      return {
-        success: true,
-        coinId: sufficientCoin.coinObjectId,
-      };
-    }
-
-    // Otherwise, we need to merge coins
-    // For now, we'll use the first coin and let the transaction handle merging
-    // In a production system, you'd want to merge coins first
-    // But for MVP, we can use the first coin and the transaction will handle it
-    return {
-      success: true,
-      coinId: coins.data[0].coinObjectId,
-      needsMerge: true,
-    };
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('❌ [BADGE] Error getting payment coin:', error);
     return {
       success: false,
-      error: error.message || 'Failed to get SUI coins',
+      error: error.message || 'Failed to get payment coin',
     };
   }
 }
