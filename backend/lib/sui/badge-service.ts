@@ -891,12 +891,15 @@ export class BadgeService {
       // This is needed because txb.build() requires gas coins to be selected
       // IMPORTANT: 
       // 1. We must use SUI coins ONLY (not MEWS, USDC, or any other token)
-      // 2. We must NOT use the paymentCoinId for gas, as it's used for payment
+      // 2. We can use the same coin for both payment and gas if it has sufficient balance
       // Reuse client from validation above
+      console.log(`🔍 [MINT BUILD] Querying ${this.config.sui.network} SUI coins for ${playerAddress}`);
       const coins = await client.getCoins({
         owner: playerAddress,
         coinType: '0x2::sui::SUI', // Explicitly use SUI only
       });
+      
+      console.log(`💰 [MINT BUILD] Found ${coins.data?.length || 0} SUI coins on ${this.config.sui.network}`);
 
       if (!coins.data || coins.data.length === 0) {
         return {
@@ -905,20 +908,48 @@ export class BadgeService {
         };
       }
 
-      // Filter out the payment coin from gas selection (can't use same coin for both)
-      const availableCoins = coins.data.filter(coin => coin.coinObjectId !== paymentCoinId);
-
-      if (availableCoins.length === 0) {
+      // Find the payment coin to check its balance
+      const paymentCoin = coins.data.find(coin => coin.coinObjectId === paymentCoinId);
+      if (!paymentCoin) {
         return {
           success: false,
-          error: 'No available gas coins. The payment coin cannot be used for gas. Please ensure you have additional SUI coins for gas fees.',
+          error: 'Payment coin not found in wallet. Please ensure the payment coin is valid.',
         };
       }
 
-      // Select a coin with sufficient balance for gas (excluding payment coin)
-      // We need at least gasWithBuffer for gas
+      const paymentCoinBalance = BigInt(paymentCoin.balance);
+      const paymentAmount = BigInt(150_000_000); // 0.15 SUI for payment
+      const totalRequired = paymentAmount + BigInt(gasWithBuffer);
+
+      // Check if payment coin has enough for both payment and gas
+      const canUsePaymentCoinForGas = paymentCoinBalance >= totalRequired;
+
+      // Filter out the payment coin from gas selection (unless it's the only option with enough balance)
+      let availableCoins = coins.data.filter(coin => coin.coinObjectId !== paymentCoinId);
+
+      // If no other coins available, but payment coin has enough for both, we can use it
+      if (availableCoins.length === 0) {
+        if (canUsePaymentCoinForGas) {
+          // Use payment coin for gas - transaction will handle splitting for payment
+          availableCoins = [paymentCoin];
+        } else {
+          return {
+            success: false,
+            error: `Insufficient balance in payment coin. Need ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI (${(Number(paymentAmount) / 1_000_000_000).toFixed(4)} for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas), but only have ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI.`,
+          };
+        }
+      }
+
+      // Select a coin with sufficient balance for gas
+      // If we're using the payment coin (because it's the only one), it must have enough for both
+      // Otherwise, we need at least gasWithBuffer for gas
       const gasCoin = availableCoins.find(coin => {
         const balance = BigInt(coin.balance);
+        if (coin.coinObjectId === paymentCoinId) {
+          // If using payment coin for gas, it needs enough for both payment and gas
+          return balance >= totalRequired;
+        }
+        // Otherwise, just needs enough for gas
         return balance >= BigInt(gasWithBuffer);
       });
 
