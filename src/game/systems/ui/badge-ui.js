@@ -615,14 +615,24 @@ function displayBadgeInUI(container, badgeData) {
   const tierName = window.BadgeService ? window.BadgeService.getTierName(badge.tier) : 'Unknown';
   const discounts = window.BadgeService ? window.BadgeService.getDiscountsForTier(badge.tier) : { store: 0, gameplay: 0 };
 
+  // Use imageUrl if available (from badge.image field), otherwise fall back to imageData
+  let imageSrc = null;
+  if (badge.imageUrl) {
+    // Use the URL directly from the badge's image field
+    imageSrc = badge.imageUrl;
+  } else if (badge.imageData && badge.imageData.length > 0) {
+    // Fallback to base64 data URI for backwards compatibility
+    imageSrc = `data:image/webp;base64,${arrayBufferToBase64(badge.imageData)}`;
+  }
+
   const badgeHTML = `
     <div class="badge-display-container">
       <div class="badge-display-header">
         <h3>🎖️ Your Badge</h3>
       </div>
       <div class="badge-display-content">
-        ${badge.imageData 
-          ? `<img src="data:image/webp;base64,${arrayBufferToBase64(badge.imageData)}" alt="Badge" class="badge-display-image" />`
+        ${imageSrc 
+          ? `<img src="${imageSrc}" alt="Badge" class="badge-display-image" />`
           : `<div class="badge-display-placeholder">🎖️</div>`
         }
         <div class="badge-display-info">

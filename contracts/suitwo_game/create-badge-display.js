@@ -9,13 +9,22 @@
 //
 // To check if you need to recreate: node check-display-object.js
 // To update existing Display: node update-badge-display-image.js
-const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
-const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
-const { fromHEX } = require('@mysten/sui/utils');
-const { bech32 } = require('bech32');
-const { Transaction } = require('@mysten/sui/transactions');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
+// Resolve modules from root node_modules
+const rootNodeModules = path.resolve(__dirname, '../../node_modules');
+const resolveModule = (moduleName) => {
+  try {
+    return require.resolve(moduleName, { paths: [rootNodeModules, __dirname] });
+  } catch (e) {
+    return require(moduleName);
+  }
+};
+const { SuiClient, getFullnodeUrl } = require(path.join(rootNodeModules, '@mysten/sui/client'));
+const { Ed25519Keypair } = require(path.join(rootNodeModules, '@mysten/sui/keypairs/ed25519'));
+const { fromHEX } = require(path.join(rootNodeModules, '@mysten/sui/utils'));
+const { bech32 } = require(path.join(rootNodeModules, 'bech32'));
+const { Transaction } = require(path.join(rootNodeModules, '@mysten/sui/transactions'));
 
 // Load environment variables manually
 function loadEnvFile(filePath) {

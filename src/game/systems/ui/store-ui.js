@@ -273,8 +273,14 @@ async function loadStoreBadgeDisplay() {
     console.log('📋 [STORE] Badge data:', { tier: badge.tier, tierName, discounts, storeDiscount });
     
     // Convert image data to base64 using the helper function if available
+    // Use imageUrl if available (from badge.image field), otherwise fall back to imageData
     let imageSrc = null;
-    if (badge.imageData && badge.imageData.length > 0) {
+    if (badge.imageUrl) {
+      // Use the URL directly from the badge's image field
+      imageSrc = badge.imageUrl;
+      console.log('✅ [STORE] Using badge image URL:', imageSrc);
+    } else if (badge.imageData && badge.imageData.length > 0) {
+      // Fallback to base64 data URI for backwards compatibility
       try {
         // Use arrayBufferToBase64 from BadgeUI if available, otherwise manual conversion
         if (window.BadgeUI && typeof window.BadgeUI.arrayBufferToBase64 === 'function') {
@@ -295,12 +301,12 @@ async function loadStoreBadgeDisplay() {
           }
           imageSrc = `data:image/webp;base64,${base64}`;
         }
-        console.log('✅ [STORE] Badge image converted successfully');
+        console.log('✅ [STORE] Badge image converted from imageData');
       } catch (error) {
         console.warn('⚠️ [STORE] Failed to convert badge image:', error);
       }
     } else {
-      console.warn('⚠️ [STORE] No image data in badge');
+      console.warn('⚠️ [STORE] No image URL or imageData in badge');
     }
     
     // Always show badge image (use placeholder if image conversion failed)

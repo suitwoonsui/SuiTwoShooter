@@ -157,6 +157,7 @@ export async function GET(
           gamesPlayed: badge.gamesPlayed,
           mintDate: badge.mintDate,
           lastUpdated: badge.lastUpdated,
+          imageUrl: badge.imageUrl, // Include image URL from badge object
           discounts,
         },
       },

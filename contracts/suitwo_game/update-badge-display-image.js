@@ -13,6 +13,8 @@
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 const { Ed25519Keypair } = require('@mysten/sui/keypairs/ed25519');
 const { Transaction } = require('@mysten/sui/transactions');
+const { fromHEX } = require('@mysten/sui/utils');
+const { bech32 } = require('bech32');
 const fs = require('fs');
 const path = require('path');
 
@@ -20,9 +22,12 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../backend/.env.local') });
 
 // Configuration
-const packageId = process.env.GAME_SCORE_PACKAGE_ID_TESTNET || process.env.GAME_SCORE_PACKAGE_ID;
-const displayObjectId = process.env.BADGE_DISPLAY_OBJECT_ID_TESTNET || process.env.BADGE_DISPLAY_OBJECT_ID;
-const privateKey = process.env.ADMIN_PRIVATE_KEY;
+// Package ID extracted from badge type: 0x66b58fb2066e41c32152148ad35ad54fe95c2d079a797199f301443725fda34b
+const packageId = process.env.GAME_SCORE_PACKAGE_ID_TESTNET || process.env.GAME_SCORE_PACKAGE_ID || '0x66b58fb2066e41c32152148ad35ad54fe95c2d079a797199f301443725fda34b';
+// Use the specific Display object ID from the user
+const displayObjectId = process.env.BADGE_DISPLAY_OBJECT_ID_TESTNET || process.env.BADGE_DISPLAY_OBJECT_ID || '0x6897f6b256e19b26ad1eec9c28c17114119920a07bb913a9d0e0787fa94b4869';
+// Use same private key as setup-badge-system.js (or from env)
+const privateKey = process.env.ADMIN_PRIVATE_KEY || 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m';
 
 if (!packageId) {
   console.error('❌ GAME_SCORE_PACKAGE_ID_TESTNET or GAME_SCORE_PACKAGE_ID not set');
@@ -42,11 +47,24 @@ if (!privateKey) {
 }
 
 function decodePrivateKey(privateKey) {
-  // Remove 0x prefix if present
-  const key = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
-  // Convert hex string to Uint8Array
-  const keyBytes = new Uint8Array(Buffer.from(key, 'hex'));
-  return keyBytes;
+  // Support both bech32 (suiprivkey1...) and hex formats
+  if (privateKey.startsWith('suiprivkey1')) {
+    const decoded = bech32.decode(privateKey);
+    const bytes = bech32.fromWords(decoded.words);
+    if (bytes.length === 33) {
+      return new Uint8Array(bytes.slice(1));
+    } else if (bytes.length === 32) {
+      return new Uint8Array(bytes);
+    } else {
+      throw new Error(`Unexpected key length: ${bytes.length} bytes`);
+    }
+  } else {
+    let hexKey = privateKey.trim();
+    if (hexKey.startsWith('0x') || hexKey.startsWith('0X')) {
+      hexKey = hexKey.slice(2);
+    }
+    return fromHEX(hexKey);
+  }
 }
 
 async function updateBadgeDisplay() {
@@ -73,28 +91,32 @@ async function updateBadgeDisplay() {
     // Get the Display object
     const displayObj = txb.object(displayObjectId);
     
-    // Prepare fields and values to add
-    // Note: We're adding the image_url field
-    // The Move function expects vector<String>, so we pass arrays directly
+    // Prepare fields and values to update
+    // IMPORTANT: The Display template must reference the struct field using {image}
+    // Wallets look for the key "image_url" but the value should be "{image}" to reference
+    // the badge's image field (not a hardcoded URL)
+    // The {image} placeholder will be replaced with the actual URL from each badge's image field
     const fields = ['image_url'];
-    const values = ['https://suitwo.game/api/badges/{owner}/image'];
+    const values = ['{image}'];  // References the 'image' field in EarlySupporterBadge struct
     
     // Call update_display function
-    // Note: The Sui SDK will convert the arrays to Move vectors
+    // Note: For vector<String>, we need to use 'string' (lowercase) as the type name
+    // This will add the field if it doesn't exist, or update it if it does
     txb.moveCall({
       target: `${packageId}::badge_system::update_display`,
       arguments: [
         displayObj,
-        txb.pure.vector('String', fields),
-        txb.pure.vector('String', values),
+        txb.pure.vector('string', fields),
+        txb.pure.vector('string', values),
       ],
     });
     
     txb.setGasBudget(50_000_000); // 0.05 SUI
     
     console.log('✅ Transaction built');
-    console.log('   Adding field: image_url');
-    console.log('   Value: https://suitwo.game/api/badges/{owner}/image');
+    console.log('   Updating field: image_url');
+    console.log('   Template value: {image} (references badge.image field)');
+    console.log('   This will map display.image_url -> badge.image for each badge');
     
     // Sign and execute
     console.log('\n📤 Signing and executing transaction...');

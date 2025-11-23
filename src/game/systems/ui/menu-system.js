@@ -257,9 +257,13 @@ async function loadMenuBadgeDisplay(walletAddress) {
       const tierName = window.BadgeService.getTierName(badge.tier);
       const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
 
-      // Convert image data if available
+      // Use imageUrl if available (from badge.image field), otherwise fall back to imageData
       let imageSrc = null;
-      if (badge.imageData && badge.imageData.length > 0) {
+      if (badge.imageUrl) {
+        // Use the URL directly from the badge's image field
+        imageSrc = badge.imageUrl;
+      } else if (badge.imageData && badge.imageData.length > 0) {
+        // Fallback to base64 data URI for backwards compatibility
         try {
           if (Array.isArray(badge.imageData)) {
             const bytes = new Uint8Array(badge.imageData);

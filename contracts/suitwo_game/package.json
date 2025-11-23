@@ -1,0 +1,17 @@
+{
+  "name": "suitwo_game",
+  "version": "1.0.0",
+  "description": "This is the Move smart contract for score submission in the SuiTwo shooter game.",
+  "main": "check-admin-address.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@mysten/sui": "^1.45.0",
+    "bech32": "^2.0.0"
+  }
+}
