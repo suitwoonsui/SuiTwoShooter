@@ -91,7 +91,8 @@ async function showBadgeMintingModal(badgePreview = null) {
 
 /**
  * Show tier upgrade notification modal
- * @param {Object} upgradeData - Upgrade data {oldTier, newTier, newTierName, imageData}
+ * @param {Object} upgradeData - Upgrade data {oldTier, newTier, newTierName, imageData, transactionData, onUpgradeComplete}
+ * @param {Function} onUpgradeComplete - Optional callback when upgrade completes (for showing store, etc.)
  */
 async function showTierUpgradeModal(upgradeData) {
   console.log('🎖️ [BADGE] Showing tier upgrade modal:', upgradeData);
@@ -109,15 +110,16 @@ async function showTierUpgradeModal(upgradeData) {
   modal.className = 'badge-modal badge-modal-visible';
   modal.id = 'badgeUpgradeModal';
 
-  const { oldTier, newTier, newTierName, imageData } = upgradeData;
+  const { oldTier, newTier, newTierName, imageData, transactionData, onUpgradeComplete } = upgradeData;
   const oldTierName = window.BadgeService ? window.BadgeService.getTierName(oldTier) : 'Unknown';
   const discounts = window.BadgeService ? window.BadgeService.getDiscountsForTier(newTier) : { store: 0, gameplay: 0 };
+  const needsTransaction = !!transactionData;
 
   modal.innerHTML = `
     <div class="badge-modal-content">
       <div class="badge-modal-header">
-        <h2>🎉 Badge Upgraded!</h2>
-        <p class="badge-modal-subtitle">Your badge has evolved to ${newTierName}!</p>
+        <h2>🎉 Badge Upgrade Available!</h2>
+        <p class="badge-modal-subtitle">Your badge can evolve to ${newTierName}!</p>
       </div>
       
       <div class="badge-modal-body">
@@ -130,20 +132,37 @@ async function showTierUpgradeModal(upgradeData) {
         </div>
         
         <div class="badge-upgrade-info">
-          <p><strong>Upgraded from:</strong> ${oldTierName} → ${newTierName}</p>
+          <p><strong>Upgrade from:</strong> ${oldTierName} → ${newTierName}</p>
           
           <h3>✨ New Benefits:</h3>
           <ul class="badge-perks-list">
             ${discounts.store > 0 ? `<li>🎁 <strong>Store Discount:</strong> ${discounts.store}% off all purchases</li>` : ''}
             ${discounts.gameplay > 0 ? `<li>🎮 <strong>Gameplay Discount:</strong> ${discounts.gameplay}% off game start costs</li>` : ''}
           </ul>
+          
+          ${needsTransaction ? `
+            <div class="badge-cost-info">
+              <p><strong>Gas Fee:</strong> ~$0.001-0.01 USD (paid in SUI)</p>
+              <p class="badge-cost-note">You'll need to sign a transaction to upgrade your badge</p>
+              <p class="badge-cost-note" style="font-size: 0.85em; margin-top: 0.5rem;">⚠️ Make sure you have at least 0.002 SUI in your wallet for gas fees</p>
+            </div>
+          ` : ''}
         </div>
       </div>
       
       <div class="badge-modal-actions">
-        <button id="badgeUpgradeCloseBtn" class="badge-btn badge-btn-primary">
-          Awesome!
-        </button>
+        ${needsTransaction ? `
+          <button id="badgeUpgradeBtn" class="badge-btn badge-btn-primary">
+            Upgrade Badge
+          </button>
+          <button id="badgeUpgradeLaterBtn" class="badge-btn badge-btn-secondary">
+            Maybe Later
+          </button>
+        ` : `
+          <button id="badgeUpgradeCloseBtn" class="badge-btn badge-btn-primary">
+            Awesome!
+          </button>
+        `}
       </div>
     </div>
   `;
@@ -156,10 +175,24 @@ async function showTierUpgradeModal(upgradeData) {
     document.body.appendChild(modal);
   }
 
-  // Add event listener
-  document.getElementById('badgeUpgradeCloseBtn').addEventListener('click', () => {
-    hideBadgeModal('badgeUpgradeModal');
-  });
+  // Add event listeners
+  if (needsTransaction) {
+    document.getElementById('badgeUpgradeBtn').addEventListener('click', () => handleBadgeUpgrade(transactionData, onUpgradeComplete));
+    document.getElementById('badgeUpgradeLaterBtn').addEventListener('click', () => {
+      hideBadgeModal('badgeUpgradeModal');
+      // If callback provided and user declined, we can still call it (e.g., to show store)
+      if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
+        onUpgradeComplete(false); // false = upgrade declined
+      }
+    });
+  } else {
+    document.getElementById('badgeUpgradeCloseBtn').addEventListener('click', () => {
+      hideBadgeModal('badgeUpgradeModal');
+      if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
+        onUpgradeComplete(false);
+      }
+    });
+  }
 }
 
 /**
@@ -236,6 +269,313 @@ function handleBadgeMaybeLater() {
 }
 
 /**
+ * Handle badge upgrade button click
+ * @param {Object} transactionData - Transaction data from backend
+ * @param {Function} onComplete - Optional callback when upgrade completes
+ */
+async function handleBadgeUpgrade(transactionData, onComplete = null) {
+  const btn = document.getElementById('badgeUpgradeBtn');
+  const errorMessage = document.getElementById('badgeUpgradeError');
+  
+  // Clear any previous error messages
+  if (errorMessage) {
+    errorMessage.style.display = 'none';
+    errorMessage.textContent = '';
+  }
+  
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Checking balance...';
+  }
+
+  try {
+    // Check wallet connection
+    if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) {
+      showUpgradeError('Please connect your wallet first.');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Upgrade Badge';
+      }
+      return;
+    }
+
+    const walletAddress = window.walletAPIInstance.getAddress();
+    const network = window.GAME_CONFIG?.SUI_NETWORK || 'testnet';
+    
+    // Check SUI balance before attempting transaction
+    if (window.walletAPIInstance.checkSUIBalance) {
+      btn.textContent = 'Checking gas balance...';
+      const balanceResult = await window.walletAPIInstance.checkSUIBalance(walletAddress, network);
+      
+      if (!balanceResult.success) {
+        showUpgradeError(`Failed to check balance: ${balanceResult.error || 'Unknown error'}`);
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Upgrade Badge';
+        }
+        return;
+      }
+      
+      // Check if balance is sufficient (need at least 0.002 SUI for gas)
+      const minRequiredSUI = 0.002;
+      const balanceInSUI = balanceResult.balanceInSUI || parseFloat(balanceResult.formattedBalance?.replace(/,/g, '') || '0');
+      
+      if (balanceInSUI < minRequiredSUI) {
+        const shortfall = minRequiredSUI - balanceInSUI;
+        showUpgradeError(
+          `Insufficient SUI for gas fees.\n\n` +
+          `Required: ${minRequiredSUI} SUI\n` +
+          `You have: ${balanceResult.formattedBalance || '0'} SUI\n` +
+          `Shortfall: ${shortfall.toFixed(4)} SUI\n\n` +
+          `Please add more SUI to your wallet to cover gas fees.`
+        );
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Upgrade Badge';
+        }
+        return;
+      }
+    }
+
+    // Balance check passed, proceed with transaction
+    if (btn) {
+      btn.textContent = 'Signing transaction...';
+    }
+
+    // Sign and execute transaction
+    const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(transactionData);
+    
+    if (txResult.success) {
+      console.log('✅ [BADGE] Badge upgraded successfully!');
+      
+      // Show success message in modal before closing
+      if (errorMessage) {
+        errorMessage.style.display = 'block';
+        errorMessage.style.color = '#39ff14';
+        errorMessage.textContent = '✅ Badge upgraded successfully!';
+      }
+      
+      // Wait a moment to show success message
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      hideBadgeModal('badgeUpgradeModal');
+      // Clear badge cache
+      window.BadgeService.clearBadgeCache();
+      
+      // Call callback if provided
+      if (onComplete && typeof onComplete === 'function') {
+        onComplete(true); // true = upgrade completed
+      }
+    } else {
+      // Transaction failed - parse error message
+      const errorMsg = txResult.error || 'Transaction failed';
+      let userFriendlyError = errorMsg;
+      
+      // Provide more specific error messages
+      if (errorMsg.includes('insufficient') || errorMsg.includes('balance')) {
+        userFriendlyError = 'Insufficient SUI balance for gas fees. Please add more SUI to your wallet.';
+      } else if (errorMsg.includes('rejected') || errorMsg.includes('denied') || errorMsg.includes('user')) {
+        userFriendlyError = 'Transaction was rejected. Please try again when ready.';
+      } else if (errorMsg.includes('timeout')) {
+        userFriendlyError = 'Transaction timed out. Please check your network connection and try again.';
+      }
+      
+      showUpgradeError(userFriendlyError);
+      throw new Error(userFriendlyError);
+    }
+  } catch (error) {
+    console.error('❌ [BADGE] Error upgrading badge:', error);
+    
+    // Show error in modal (already shown by showUpgradeError if it was called)
+    if (!errorMessage || errorMessage.style.display === 'none') {
+      showUpgradeError(`Failed to upgrade badge: ${error.message || 'Unknown error'}`);
+    }
+    
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Upgrade Badge';
+    }
+    
+    // Don't call callback on error - keep modal open so user can retry
+    // Only call callback if explicitly requested (e.g., for store flow)
+    // For now, we'll keep modal open on error
+  }
+}
+
+/**
+ * Show error message in upgrade modal
+ * @param {string} message - Error message to display
+ */
+function showUpgradeError(message) {
+  let errorMessage = document.getElementById('badgeUpgradeError');
+  
+  // Create error message element if it doesn't exist
+  if (!errorMessage) {
+    const modal = document.getElementById('badgeUpgradeModal');
+    if (modal) {
+      const modalBody = modal.querySelector('.badge-modal-body');
+      if (modalBody) {
+        errorMessage = document.createElement('div');
+        errorMessage.id = 'badgeUpgradeError';
+        errorMessage.className = 'badge-error-message';
+        errorMessage.style.cssText = 'display: block; color: #ff4444; margin-top: 1rem; padding: 0.75rem; background: rgba(255, 68, 68, 0.1); border-radius: 0.5rem; border: 1px solid rgba(255, 68, 68, 0.3); white-space: pre-line;';
+        modalBody.appendChild(errorMessage);
+      }
+    }
+  }
+  
+  if (errorMessage) {
+    errorMessage.style.display = 'block';
+    errorMessage.style.color = '#ff4444';
+    errorMessage.textContent = message;
+    
+    // Scroll error into view
+    errorMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+/**
+ * Show badge migration modal
+ * @param {Object} migrationData - Migration data {oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData}
+ */
+async function showBadgeMigrationModal(migrationData) {
+  console.log('🔄 [BADGE] Showing badge migration modal:', migrationData);
+
+  // Check if modal already exists
+  let modal = document.getElementById('badgeMigrationModal');
+  if (modal) {
+    modal.classList.add('badge-modal-visible');
+    modal.classList.remove('badge-modal-hidden');
+    return;
+  }
+
+  // Create modal
+  modal = document.createElement('div');
+  modal.className = 'badge-modal badge-modal-visible';
+  modal.id = 'badgeMigrationModal';
+
+  const { oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData } = migrationData;
+  const oldTierName = window.BadgeService ? window.BadgeService.getTierName(oldTier) : 'Unknown';
+
+  modal.innerHTML = `
+    <div class="badge-modal-content">
+      <div class="badge-modal-header">
+        <h2>🔄 Badge Migration Required</h2>
+        <p class="badge-modal-subtitle">Migrate your badge to the new contract</p>
+      </div>
+      
+      <div class="badge-modal-body">
+        <div class="badge-preview-container">
+          ${imageData 
+            ? `<img src="data:image/webp;base64,${arrayBufferToBase64(imageData)}" alt="Badge Preview" class="badge-preview-image" />`
+            : `<div class="badge-preview-placeholder">🎖️</div>`
+          }
+          <p class="badge-tier-name">${oldTierName} Badge</p>
+        </div>
+        
+        <div class="badge-info-section">
+          <h3>What is migration?</h3>
+          <p>Your badge was created with an older version of the contract. To continue using it, you need to migrate it to the new contract.</p>
+          
+          <h3>What happens during migration?</h3>
+          <ul class="badge-perks-list">
+            <li>✅ Your badge data is preserved (tier, games played, mint date)</li>
+            <li>✅ A new badge is created in your wallet</li>
+            <li>✅ Your old badge is automatically burned (deleted)</li>
+            <li>✅ All your progress is maintained</li>
+          </ul>
+          
+          <div class="badge-cost-info">
+            <p><strong>Gas Fee:</strong> ~$0.001-0.01 USD (paid in SUI)</p>
+            <p class="badge-cost-note">You'll need to sign a transaction to migrate your badge</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="badge-modal-actions">
+        <button id="badgeMigrateBtn" class="badge-btn badge-btn-primary">
+          Migrate Badge
+        </button>
+        <button id="badgeMigrateLaterBtn" class="badge-btn badge-btn-secondary">
+          Maybe Later
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Append to viewport container
+  const viewportContainer = document.querySelector('.viewport-container');
+  if (viewportContainer) {
+    viewportContainer.appendChild(modal);
+  } else {
+    document.body.appendChild(modal);
+  }
+
+  // Add event listeners
+  document.getElementById('badgeMigrateBtn').addEventListener('click', () => handleBadgeMigration(migrationData));
+  document.getElementById('badgeMigrateLaterBtn').addEventListener('click', () => hideBadgeModal('badgeMigrationModal'));
+}
+
+/**
+ * Handle badge migration button click
+ * @param {Object} migrationData - Migration data
+ */
+async function handleBadgeMigration(migrationData) {
+  const btn = document.getElementById('badgeMigrateBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Migrating...';
+  }
+
+  try {
+    // Check wallet connection
+    if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) {
+      alert('Please connect your wallet first.');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Migrate Badge';
+      }
+      return;
+    }
+
+    const { oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData } = migrationData;
+
+    // Build migration transaction using BadgeService helper
+    const txbResult = await window.BadgeService.buildMigrateBadgeTransaction(
+      oldBadgeId,
+      oldTier,
+      oldGamesPlayed,
+      oldMintDate,
+      imageData
+    );
+
+    if (!txbResult.success) {
+      throw new Error(txbResult.error || 'Failed to build migration transaction');
+    }
+
+    // Sign and execute transaction
+    const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(txbResult.transactionData);
+    
+    if (txResult.success) {
+      console.log('✅ [BADGE] Badge migrated successfully!');
+      alert('🎉 Badge migrated successfully!');
+      hideBadgeModal('badgeMigrationModal');
+      // Clear badge cache
+      window.BadgeService.clearBadgeCache();
+    } else {
+      throw new Error(txResult.error || 'Transaction failed');
+    }
+  } catch (error) {
+    console.error('❌ [BADGE] Error migrating badge:', error);
+    alert(`Failed to migrate badge: ${error.message}`);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Migrate Badge';
+    }
+  }
+}
+
+/**
  * Hide badge modal
  */
 function hideBadgeModal(modalId) {
@@ -303,6 +643,7 @@ if (typeof window !== 'undefined') {
   window.BadgeUI = {
     showBadgeMintingModal,
     showTierUpgradeModal,
+    showBadgeMigrationModal,
     displayBadgeInUI,
     hideBadgeModal,
     arrayBufferToBase64,

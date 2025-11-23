@@ -3,7 +3,7 @@ module suitwo_game::mews {
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
     use std::option;
-    use std::string::{Self, String};
+    // use std::string::{Self, String};  // Unused - removed to fix warning
 
     /// The MEWS token type (one-time witness)
     struct MEWS has drop {}

@@ -95,6 +95,48 @@ async function getBadge(playerAddress = null) {
 }
 
 /**
+ * Check if player needs to migrate their badge
+ * @param {string} playerAddress - Player's wallet address (optional)
+ * @returns {Promise<Object>} Migration data if migration needed, null otherwise
+ */
+async function checkBadgeMigration(playerAddress = null) {
+  const address = playerAddress || getPlayerAddress();
+  if (!address) {
+    return {
+      success: false,
+      error: 'Wallet not connected',
+    };
+  }
+
+  try {
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/badges/${address}/migrate-data`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return {
+        success: false,
+        error: errorData.error || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('❌ [BADGE] Error checking migration:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to check migration',
+    };
+  }
+}
+
+/**
  * Check if player has a badge
  * @param {string} playerAddress - Player's wallet address (optional)
  * @returns {Promise<boolean>} True if player has badge
@@ -277,6 +319,51 @@ async function buildMintBadgeTransaction(paymentCoinId) {
 }
 
 /**
+ * Check if player has a pending badge tier upgrade
+ * @param {string} playerAddress - Player's wallet address (optional)
+ * @returns {Promise<Object>} Upgrade data if upgrade is pending
+ */
+async function checkPendingUpgrade(playerAddress = null) {
+  const address = playerAddress || getPlayerAddress();
+  if (!address) {
+    return {
+      success: false,
+      hasPendingUpgrade: false,
+      error: 'Wallet not connected',
+    };
+  }
+
+  try {
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/badges/${address}/check-upgrade`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return {
+        success: false,
+        hasPendingUpgrade: false,
+        error: errorData.error || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('❌ [BADGE] Error checking pending upgrade:', error);
+    return {
+      success: false,
+      hasPendingUpgrade: false,
+      error: error.message || 'Failed to check pending upgrade',
+    };
+  }
+}
+
+/**
  * Check and build badge update transaction
  * @param {string} sessionId - Session ID from score submission
  * @returns {Promise<Object>} Transaction data if tier upgrade needed
@@ -351,10 +438,40 @@ async function signAndExecuteBadgeTransaction(transactionData) {
     const { Transaction } = await import('@mysten/sui/transactions');
     const txb = new Transaction();
 
+    // Convert arguments - handle object IDs and other types appropriately
+    // The backend now returns object IDs as strings, which need to be converted to txb.object()
+    const convertedArgs = transactionData.arguments.map((arg, index) => {
+      // If it's a string that looks like an object ID (0x followed by 64 hex chars)
+      // This handles BadgeImageData object IDs and other object references
+      if (typeof arg === 'string' && arg.startsWith('0x') && arg.length === 66) {
+        return txb.object(arg);
+      }
+      // If it's already a TransactionArgument (from previous txb calls), use as-is
+      // Check if it has properties that indicate it's already a TransactionArgument
+      if (arg && typeof arg === 'object' && ('kind' in arg || 'Input' in arg)) {
+        return arg;
+      }
+      // For numbers, we need to infer the type based on context
+      // For now, use u64 for all numbers (contract functions will handle conversion)
+      if (typeof arg === 'number') {
+        return txb.pure.u64(BigInt(arg));
+      }
+      if (typeof arg === 'bigint') {
+        return txb.pure.u64(arg);
+      }
+      // For arrays, assume vector<u8> (most common case for image data, session IDs, etc.)
+      if (Array.isArray(arg)) {
+        return txb.pure.vector('u8', arg);
+      }
+      // For other types (strings that aren't object IDs, etc.), pass as-is
+      // The transaction builder will handle them or throw an error if invalid
+      return arg;
+    });
+
     // Add move call
     txb.moveCall({
       target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
-      arguments: transactionData.arguments,
+      arguments: convertedArgs,
     });
 
     // Sign and execute
@@ -420,14 +537,102 @@ function clearBadgeCache() {
   badgeCache.timestamp = 0;
 }
 
+/**
+ * Build migration transaction for player to sign
+ * @param {string} oldBadgeId - Object ID of the old badge to be burned
+ * @param {number} oldTier - Tier from old badge
+ * @param {number} oldGamesPlayed - Games played from old badge
+ * @param {number} oldMintDate - Original mint date from old badge
+ * @param {Uint8Array} imageData - Badge image data (WebP bytes)
+ * @returns {Promise<Object>} Transaction data
+ */
+async function buildMigrateBadgeTransaction(oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData) {
+  try {
+    // NOTE: For large images (>16KB), we need to use chunked upload
+    // The backend handles this automatically, but the frontend version here
+    // will hit the 16KB limit for large images
+    // TODO: Create API endpoint for migration transaction building that handles chunked upload
+    
+    const { Transaction } = await import('@mysten/sui/transactions');
+    const txb = new Transaction();
+    
+    // Get API base URL and config
+    const API_BASE_URL = getApiBaseUrl();
+    const configResponse = await fetch(`${API_BASE_URL}/config`);
+    const config = await configResponse.json();
+    
+    if (!config.contracts || !config.contracts.gameScore || !config.contracts.badgeRegistry || !config.contracts.statisticsRegistry) {
+      return {
+        success: false,
+        error: 'Contract configuration not available',
+      };
+    }
+
+    // Check if image is too large for direct upload
+    const imageArray = imageData instanceof Uint8Array ? Array.from(imageData) : imageData;
+    const CHUNK_THRESHOLD = 14 * 1024; // 14KB
+    
+    if (imageArray.length > CHUNK_THRESHOLD) {
+      return {
+        success: false,
+        error: `Image too large (${imageArray.length} bytes) for direct upload. Please use the backend API endpoint that supports chunked upload.`,
+      };
+    }
+    
+    // For small images, we can create BadgeImageData directly
+    // But we need to create it first, then use it
+    // Actually, for now, let's just warn and suggest using backend
+    // The proper solution is to create an API endpoint
+    
+    // Create BadgeImageData object first
+    const imageDataObj = txb.moveCall({
+      target: `${config.contracts.gameScore}::badge_system::create_image_data_small`,
+      arguments: [
+        txb.pure.vector('u8', imageArray),
+      ],
+    });
+    
+    txb.moveCall({
+      target: `${config.contracts.gameScore}::badge_system::migrate_badge`,
+      arguments: [
+        txb.object(config.contracts.badgeRegistry),
+        txb.object(config.contracts.statisticsRegistry),
+        txb.object('0x6'), // Clock object
+        txb.object(oldBadgeId), // Old badge object (will be burned)
+        txb.pure.u8(oldTier),
+        txb.pure.u64(oldGamesPlayed),
+        txb.pure.u64(oldMintDate),
+        imageDataObj, // BadgeImageData object
+      ],
+    });
+
+    // Set gas budget
+    txb.setGasBudget(50_000_000); // 0.05 SUI
+
+    return {
+      success: true,
+      transactionData: txb,
+    };
+  } catch (error) {
+    console.error('❌ [BADGE] Error building migration transaction:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to build migration transaction',
+    };
+  }
+}
+
 // Export functions
 if (typeof window !== 'undefined') {
   window.BadgeService = {
     getBadge,
     hasBadge,
+    checkBadgeMigration,
+    checkPendingUpgrade,
     buildMintBadgeTransaction,
     checkAndBuildBadgeUpdate,
     signAndExecuteBadgeTransaction,
+    buildMigrateBadgeTransaction,
     getDiscountsForTier,
     getTierName,
     clearBadgeCache,

@@ -116,7 +116,10 @@ export async function POST(request: NextRequest) {
 
     // Tier upgraded - return transaction data
     const transactionData = result.transactionData!;
-    const imageDataBase64 = Buffer.from(transactionData.imageData).toString('base64');
+    // imageDataObjectId is already in arguments, imageData is optional (for reference)
+    const imageDataBase64 = transactionData.imageData 
+      ? Buffer.from(transactionData.imageData).toString('base64')
+      : undefined;
 
     return NextResponse.json(
       {
@@ -125,7 +128,7 @@ export async function POST(request: NextRequest) {
         newTier: result.newTier,
         transactionData: {
           ...transactionData,
-          imageData: imageDataBase64, // Base64 encoded for JSON
+          ...(imageDataBase64 && { imageData: imageDataBase64 }), // Include if available
         },
       },
       { headers: corsHeaders }

@@ -13,7 +13,7 @@ module suitwo_game::score_submission {
     
     // Score point values (for validation)
     const POINTS_PER_ENEMY_BASE: u64 = 15;
-    const POINTS_PER_COIN: u64 = 10;
+    // const POINTS_PER_COIN: u64 = 10;  // Unused - kept for reference
     const POINTS_PER_BOSS_BASE: u64 = 5000;
     // Note: boss_hits is now total damage dealt (not count), so no multiplication needed
     
@@ -274,10 +274,10 @@ module suitwo_game::score_submission {
     /// If arrays are empty or don't match counts, falls back to conservative estimates
     fun validate_score_logic(
         score: u64,
-        coins: u64,
+        _coins: u64,  // Unused parameter (kept for API compatibility)
         bosses_defeated: u64,
         enemies_defeated: u64,
-        distance: u64,
+        _distance: u64,  // Unused parameter (kept for API compatibility)
         boss_tiers: vector<u64>,
         enemy_types: vector<u64>,
         boss_hits: u64
@@ -588,6 +588,77 @@ module suitwo_game::score_submission {
         player: address
     ): bool {
         table::contains(&stats_registry.player_stats, player)
+    }
+    
+    // ===== MIGRATION FUNCTIONS =====
+    
+    /// Admin function: Migrate player statistics from old StatisticsRegistry to new StatisticsRegistry
+    /// This allows migrating player stats when upgrading to a new contract
+    /// REQUIRES AdminCapability - only admin wallet can call this function
+    /// If player already has stats in new registry, merges the data (takes maximums for bests, sums for totals)
+    public entry fun migrate_player_stats(
+        _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
+        old_stats_registry: &StatisticsRegistry,  // Old statistics registry to read from
+        new_stats_registry: &mut StatisticsRegistry,  // New statistics registry to write to
+        player: address,  // Player address to migrate
+        ctx: &mut TxContext
+    ) {
+        // Check if player has stats in old registry
+        if (!table::contains(&old_stats_registry.player_stats, player)) {
+            // No stats to migrate - nothing to do
+            return
+        };
+        
+        // Read old stats
+        let old_stats = table::borrow(&old_stats_registry.player_stats, player);
+        
+        // Get or create stats in new registry
+        let new_stats = get_or_create_player_stats(new_stats_registry, player, ctx);
+        
+        // Merge stats:
+        // - For personal bests: take the maximum (best of both)
+        // - For totals: sum both (add old totals to new totals)
+        // - For total_games: sum both
+        // - For timestamps: take earliest first_game_date, latest last_game_date
+        
+        // Personal bests: take maximum
+        if (old_stats.best_score > new_stats.best_score) {
+            new_stats.best_score = old_stats.best_score;
+        };
+        if (old_stats.best_distance > new_stats.best_distance) {
+            new_stats.best_distance = old_stats.best_distance;
+        };
+        if (old_stats.best_coins > new_stats.best_coins) {
+            new_stats.best_coins = old_stats.best_coins;
+        };
+        if (old_stats.best_bosses_defeated > new_stats.best_bosses_defeated) {
+            new_stats.best_bosses_defeated = old_stats.best_bosses_defeated;
+        };
+        if (old_stats.best_enemies_defeated > new_stats.best_enemies_defeated) {
+            new_stats.best_enemies_defeated = old_stats.best_enemies_defeated;
+        };
+        if (old_stats.best_coin_streak > new_stats.best_coin_streak) {
+            new_stats.best_coin_streak = old_stats.best_coin_streak;
+        };
+        
+        // Totals: sum both
+        new_stats.total_games = new_stats.total_games + old_stats.total_games;
+        new_stats.total_score = new_stats.total_score + old_stats.total_score;
+        new_stats.total_distance = new_stats.total_distance + old_stats.total_distance;
+        new_stats.total_coins = new_stats.total_coins + old_stats.total_coins;
+        new_stats.total_bosses_defeated = new_stats.total_bosses_defeated + old_stats.total_bosses_defeated;
+        new_stats.total_enemies_defeated = new_stats.total_enemies_defeated + old_stats.total_enemies_defeated;
+        new_stats.total_coin_streak = new_stats.total_coin_streak + old_stats.total_coin_streak;
+        
+        // Timestamps: earliest first_game_date, latest last_game_date
+        if (old_stats.first_game_date > 0) {
+            if (new_stats.first_game_date == 0 || old_stats.first_game_date < new_stats.first_game_date) {
+                new_stats.first_game_date = old_stats.first_game_date;
+            };
+        };
+        if (old_stats.last_game_date > new_stats.last_game_date) {
+            new_stats.last_game_date = old_stats.last_game_date;
+        };
     }
 }
 

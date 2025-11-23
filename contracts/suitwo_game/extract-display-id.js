@@ -1,51 +1,65 @@
 // Extract Display object ID from transaction
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
-const client = new SuiClient({ url: getFullnodeUrl('testnet') });
-const txDigest = '6g668QhNjiWxcqnGYW6jerL7Ad2tZfRGuT8f1t3F2NAi';
+const txDigest = '7APN5GfyjgSPKgATNFVGk8Dyqgp7kmpjhtHzKkymW8c5';
 
 async function extractDisplayId() {
   try {
-    console.log('🔍 Extracting Display Object ID from transaction...\n');
+    const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+    
+    console.log('🔍 Examining transaction:', txDigest);
     
     const tx = await client.getTransactionBlock({
       digest: txDigest,
       options: {
         showEffects: true,
         showObjectChanges: true,
-        showEvents: true,
       },
     });
     
+    let displayObjectId = null;
+    
     if (tx.objectChanges) {
       for (const change of tx.objectChanges) {
-        if (change.type === 'created' || change.type === 'transferred') {
-          const objectType = change.objectType || '';
-          if (objectType.includes('Display')) {
-            console.log('✅✅✅ FOUND DISPLAY OBJECT! ✅✅✅\n');
-            console.log('📋 Display Object Information:');
-            console.log(`   Object ID: ${change.objectId}`);
-            console.log(`   Type: ${objectType}`);
-            console.log(`   Owner: ${JSON.stringify(change.owner)}`);
-            console.log('\n💡 Save this Display Object ID for future updates!');
-            return change.objectId;
+        if ((change.type === 'created' || change.type === 'transferred') && 
+            change.objectType && change.objectType.includes('Display')) {
+          displayObjectId = change.objectId;
+          console.log('✅ Found Display object:', displayObjectId);
+          console.log('   Type:', change.objectType);
+          break;
+        }
+      }
+    }
+    
+    if (!displayObjectId) {
+      console.log('⚠️  Display object ID not found in objectChanges');
+      console.log('Checking created objects...');
+      if (tx.effects?.created) {
+        for (const obj of tx.effects.created) {
+          if (obj.reference?.objectType?.includes('Display')) {
+            displayObjectId = obj.reference.objectId;
+            console.log('✅ Found Display object:', displayObjectId);
+            break;
           }
         }
       }
     }
     
-    console.log('❌ Display object not found in transaction');
-    console.log('\n📋 All object changes:');
-    if (tx.objectChanges) {
-      for (const change of tx.objectChanges) {
-        console.log(`   ${change.type}: ${change.objectType || 'N/A'}`);
-      }
+    if (displayObjectId) {
+      console.log('\n📝 Display Object ID:');
+      console.log(`   BADGE_DISPLAY_OBJECT_ID_TESTNET=${displayObjectId}`);
+    } else {
+      console.log('\n❌ Display object ID not found');
     }
+    
+    return displayObjectId;
     
   } catch (error) {
     console.error('❌ Error:', error.message);
+    if (error.stack) {
+      console.error(error.stack);
+    }
   }
 }
 
-extractDisplayId().catch(console.error);
-
+extractDisplayId();

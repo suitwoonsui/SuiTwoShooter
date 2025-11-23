@@ -18,8 +18,8 @@ module suitwo_game::premium_store {
     const ITEM_TYPE_COIN_TRACTOR_BEAM: u8 = 6;
 
     // Payment token constants
-    const PAYMENT_TOKEN_SUI: u8 = 0;
-    const PAYMENT_TOKEN_MEWS: u8 = 1;
+    // const PAYMENT_TOKEN_SUI: u8 = 0;  // Unused - kept for reference
+    // const PAYMENT_TOKEN_MEWS: u8 = 1;  // Unused - kept for reference
     const PAYMENT_TOKEN_USDC: u8 = 2;
 
     // ===== STRUCTS =====
@@ -486,7 +486,7 @@ module suitwo_game::premium_store {
         item_type: u8,
         item_level: u8,
         quantity: u64,
-        ctx: &mut TxContext
+        _ctx: &mut TxContext
     ) {
         let current_time = clock::timestamp_ms(clock);
         

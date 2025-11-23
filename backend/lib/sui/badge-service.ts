@@ -7,6 +7,7 @@ import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { getConfig } from '@/config/config';
 import { getAdminWalletService } from './admin-wallet-service';
 import { getBadgeRetryQueue } from './badge-retry-queue';
+import { validateAndSanitizeImage, getImageInfo } from './badge-image-validator';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -57,12 +58,27 @@ export class BadgeService {
     try {
       if (fs.existsSync(imagePath)) {
         const imageData = fs.readFileSync(imagePath);
-        this.imageCache.set(cacheKey, imageData);
-        console.log(`✅ Loaded badge image for tier ${tier} (${tierName})`);
-        return imageData;
+        
+        // Validate image data before caching
+        try {
+          const validatedImage = validateAndSanitizeImage(imageData);
+          const imageInfo = getImageInfo(validatedImage);
+          console.log(`✅ Loaded and validated badge image for tier ${tier} (${tierName}):`, {
+            size: `${imageInfo.sizeKB}KB`,
+            format: imageInfo.format,
+            dimensions: imageInfo.width && imageInfo.height ? `${imageInfo.width}x${imageInfo.height}` : 'unknown',
+          });
+          
+          this.imageCache.set(cacheKey, validatedImage);
+          return validatedImage;
+        } catch (validationError) {
+          console.error(`❌ Image validation failed for tier ${tier} (${tierName}):`, validationError);
+          throw new Error(`Invalid badge image file for tier ${tier}: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`);
+        }
       }
     } catch (error) {
       console.warn(`⚠️ Failed to load badge image for tier ${tier}:`, error);
+      throw error; // Re-throw to trigger fallback to placeholder
     }
 
     // Fall back to placeholder image
@@ -102,6 +118,145 @@ export class BadgeService {
     return Array.from(imageData)
       .map(byte => byte.toString(16).padStart(2, '0'))
       .join('');
+  }
+
+  /**
+   * Get static image URL for a badge tier
+   * Maps tier to the corresponding static file in public/Badges/
+   * @param tier - Badge tier (0-5)
+   * @returns Full URL to the badge image (e.g., "http://localhost:3000/Badges/Common.webp")
+   */
+  private getBadgeImageUrl(tier: number): string {
+    const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+    const tierName = tierNames[tier] || 'Standard';
+    const baseUrl = this.config.server.apiBaseUrl;
+    return `${baseUrl}/Badges/${tierName}.webp`;
+  }
+
+  /**
+   * Create BadgeImageData object using chunked upload pattern
+   * This bypasses the 16KB pure argument limit by uploading in chunks
+   * @param imageData - Full image data to upload
+   * @param chunkSize - Size of each chunk in bytes (default: 14KB for safety)
+   * @returns Object ID of the created BadgeImageData object
+   */
+  private async createImageDataObjectChunked(
+    imageData: Uint8Array,
+    chunkSize: number = 14 * 1024 // 14KB chunks (safely under 16KB limit)
+  ): Promise<string> {
+    const client = this.getClient();
+    const packageId = this.config.contracts.gameScore;
+    const keypair = this.adminWallet.getKeypair();
+
+    console.log(`📦 [CHUNKED UPLOAD] Starting chunked upload for ${imageData.length} bytes`);
+    console.log(`📦 [CHUNKED UPLOAD] Chunk size: ${chunkSize} bytes`);
+    
+    // Calculate chunks
+    const totalChunks = Math.ceil(imageData.length / chunkSize);
+    console.log(`📦 [CHUNKED UPLOAD] Will upload ${totalChunks} chunk(s) in a single batched transaction`);
+    
+    // Build a single transaction that:
+    // 1. Creates empty BadgeImageData object
+    // 2. Appends all chunks sequentially
+    // 3. Transfers the object to admin wallet
+    // This reduces 5 transactions to just 1!
+    const txb = new Transaction();
+    
+    // Step 1: Create empty BadgeImageData object
+    console.log(`📦 [CHUNKED UPLOAD] Creating empty BadgeImageData object and batching all chunks...`);
+    const imageDataObj = txb.moveCall({
+      target: `${packageId}::badge_system::create_empty_image_data`,
+      arguments: [],
+    });
+    
+    // Step 2: Append all chunks in the same transaction
+    // Each append will modify the object sequentially within this transaction
+    // IMPORTANT: Do this BEFORE transferring, so we can reference the object
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, imageData.length);
+      const chunk = imageData.slice(start, end);
+      
+      console.log(`📦 [CHUNKED UPLOAD] Adding chunk ${i + 1}/${totalChunks} (${chunk.length} bytes) to batch...`);
+      
+      // Use the object reference from the create call
+      // In Sui, we can reference the object created earlier in the same transaction
+      txb.moveCall({
+        target: `${packageId}::badge_system::append_image_chunk`,
+        arguments: [
+          imageDataObj, // Reference the object created above
+          txb.pure.vector('u8', Array.from(chunk)),
+        ],
+      });
+    }
+    
+    // Step 3: Transfer the object to admin wallet (after all chunks are appended)
+    txb.transferObjects([imageDataObj], this.adminWallet.getAddress());
+    
+    // Set gas budget - need higher budget for batched transaction with multiple chunks
+    // Each append operation modifies the object (storage cost) and processes data (computation cost)
+    // Base budget + (chunk count * per-chunk overhead) + (total data size * per-byte cost)
+    const totalDataSize = imageData.length;
+    // More generous calculation: 300M base + 150M per chunk + 5000 per byte
+    // This accounts for object modifications, storage costs, and computation
+    const batchedGasBudget = Math.max(
+      this.config.sui.gasBudget,
+      300_000_000 + (totalChunks * 150_000_000) + (totalDataSize * 5000) // 300M base + 150M per chunk + 5000 per byte
+    );
+    console.log(`📦 [CHUNKED UPLOAD] Using gas budget: ${batchedGasBudget} MIST (${(batchedGasBudget / 1_000_000_000).toFixed(4)} SUI) for batched transaction`);
+    txb.setGasBudget(batchedGasBudget);
+    
+    // Check wallet balance
+    const address = this.adminWallet.getAddress();
+    const balance = await client.getBalance({ owner: address });
+    const balanceInSUI = BigInt(balance.totalBalance) / BigInt(1_000_000_000);
+    console.log(`📦 [CHUNKED UPLOAD] Wallet balance: ${balanceInSUI.toString()} SUI (${balance.totalBalance} MIST)`);
+    
+    // Verify wallet has sufficient balance
+    const requiredBalance = BigInt(batchedGasBudget) + BigInt(100_000_000); // Add 100M buffer
+    if (BigInt(balance.totalBalance) < requiredBalance) {
+      throw new Error(`Insufficient wallet balance. Need ${(Number(requiredBalance) / 1_000_000_000).toFixed(4)} SUI, have ${balanceInSUI.toString()} SUI`);
+    }
+    
+    // Execute the batched transaction
+    console.log(`📦 [CHUNKED UPLOAD] Executing batched transaction (create + ${totalChunks} chunks)...`);
+    const result = await client.signAndExecuteTransaction({
+      signer: keypair,
+      transaction: txb,
+      options: {
+        showEffects: true,
+        showObjectChanges: true,
+      },
+    });
+
+    if (result.effects?.status?.status !== 'success') {
+      throw new Error(`Failed to create and upload chunks in batched transaction: ${result.effects?.status?.error || 'Unknown error'}`);
+    }
+
+    // Extract the object ID from the transaction effects
+    const createdObjects = result.objectChanges?.filter(
+      (change: any) => change.type === 'created' && change.objectType?.includes('BadgeImageData')
+    );
+    
+    if (!createdObjects || createdObjects.length === 0) {
+      throw new Error('Failed to get BadgeImageData object ID from batched transaction');
+    }
+
+    const imageDataObjectId = (createdObjects[0] as any).objectId;
+    console.log(`✅ [CHUNKED UPLOAD] Created BadgeImageData object and uploaded all ${totalChunks} chunks in a single transaction!`);
+    console.log(`✅ [CHUNKED UPLOAD] Object ID: ${imageDataObjectId}`);
+    
+    // Wait for transaction to be committed
+    await client.waitForTransaction({
+      digest: result.digest,
+      options: {
+        showEffects: true,
+        showObjectChanges: true,
+      },
+    });
+    console.log(`✅ [CHUNKED UPLOAD] Transaction committed, object is ready`);
+
+    return imageDataObjectId;
   }
 
   /**
@@ -544,6 +699,8 @@ export class BadgeService {
   /**
    * Build mint badge transaction for player to sign
    * Returns transaction data that frontend can use to build and sign
+   * NOTE: This function creates the BadgeImageData object server-side using chunked upload
+   * The frontend receives the object ID to use in the transaction
    */
   async buildMintBadgeTransaction(
     playerAddress: string,
@@ -555,7 +712,8 @@ export class BadgeService {
       module: string;
       function: string;
       arguments: any[];
-      imageData: Uint8Array;
+      imageDataObjectId: string; // Pre-populated BadgeImageData object ID
+      imageData?: Uint8Array; // Raw image data (for reference)
     };
     error?: string;
   }> {
@@ -579,6 +737,52 @@ export class BadgeService {
       // Load Standard tier badge image
       const imageData = await this.loadBadgeImage(0); // Tier 0 = Standard
 
+      // Create BadgeImageData object using chunked upload (if >14KB) or direct (if ≤14KB)
+      const CHUNK_THRESHOLD = 14 * 1024; // 14KB
+      let imageDataObjectId: string;
+      
+      if (imageData.length > CHUNK_THRESHOLD) {
+        console.log(`📦 [MINT BUILD] Image is ${imageData.length} bytes (>${CHUNK_THRESHOLD} bytes), using chunked upload...`);
+        imageDataObjectId = await this.createImageDataObjectChunked(imageData);
+      } else {
+        console.log(`📦 [MINT BUILD] Image is ${imageData.length} bytes (≤${CHUNK_THRESHOLD} bytes), using direct upload...`);
+        // Create directly in a single transaction
+        const client = this.getClient();
+        const txbCreate = new Transaction();
+        const imageDataObj = txbCreate.moveCall({
+          target: `${this.config.contracts.gameScore}::badge_system::create_image_data_small`,
+          arguments: [
+            txbCreate.pure.vector('u8', Array.from(imageData)),
+          ],
+        });
+        txbCreate.transferObjects([imageDataObj], this.adminWallet.getAddress());
+        txbCreate.setGasBudget(this.config.sui.gasBudget);
+
+        const resultCreate = await client.signAndExecuteTransaction({
+          signer: this.adminWallet.getKeypair(),
+          transaction: txbCreate,
+          options: {
+            showEffects: true,
+            showObjectChanges: true,
+          },
+        });
+
+        if (resultCreate.effects?.status?.status !== 'success') {
+          throw new Error(`Failed to create BadgeImageData object: ${resultCreate.effects?.status?.error || 'Unknown error'}`);
+        }
+
+        const createdObjects = resultCreate.objectChanges?.filter(
+          (change: any) => change.type === 'created' && change.objectType?.includes('BadgeImageData')
+        );
+        
+        if (!createdObjects || createdObjects.length === 0) {
+          throw new Error('Failed to get BadgeImageData object ID from transaction');
+        }
+
+        imageDataObjectId = (createdObjects[0] as any).objectId;
+        console.log(`✅ [MINT BUILD] Created BadgeImageData object: ${imageDataObjectId}`);
+      }
+
       // Get StatisticsRegistry object ID from config
       const statsRegistryId = this.config.contracts.statisticsRegistry;
       if (!statsRegistryId || statsRegistryId.trim() === '') {
@@ -593,6 +797,7 @@ export class BadgeService {
       const clockId = '0x6'; // Sui Clock object ID (well-known shared object)
 
       // Return transaction data for frontend to build and sign
+      // Frontend should use imageDataObjectId as an object argument, not pure vector
       return {
         success: true,
         transactionData: {
@@ -604,8 +809,9 @@ export class BadgeService {
             statsRegistryId,
             clockId,
             paymentCoinId,
-            Array.from(imageData), // Image data as array for vector<u8>
+            imageDataObjectId, // Pre-populated BadgeImageData object ID (frontend should pass as object)
           ],
+          imageDataObjectId, // Object ID for frontend to use
           imageData, // Also return raw image data if needed
         },
       };
@@ -716,8 +922,62 @@ export class BadgeService {
       }
 
       // Tier increased - need to update badge
-      // Load new tier's badge image
+      // Load new tier's badge image (validated during load)
       const imageData = await this.loadBadgeImage(newTier);
+      
+      // Additional validation before building transaction (double-check)
+      try {
+        validateAndSanitizeImage(imageData);
+      } catch (validationError) {
+        console.error('❌ [BADGE UPDATE] Image validation failed after load:', validationError);
+        throw new Error(`Invalid badge image for tier ${newTier}: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`);
+      }
+
+      // Create BadgeImageData object using chunked upload (if >14KB) or direct (if ≤14KB)
+      const CHUNK_THRESHOLD = 14 * 1024; // 14KB
+      let imageDataObjectId: string;
+      
+      if (imageData.length > CHUNK_THRESHOLD) {
+        console.log(`📦 [BADGE UPDATE] Image is ${imageData.length} bytes (>${CHUNK_THRESHOLD} bytes), using chunked upload...`);
+        imageDataObjectId = await this.createImageDataObjectChunked(imageData);
+      } else {
+        console.log(`📦 [BADGE UPDATE] Image is ${imageData.length} bytes (≤${CHUNK_THRESHOLD} bytes), using direct upload...`);
+        // Create directly in a single transaction
+        const client = this.getClient();
+        const txbCreate = new Transaction();
+        const imageDataObj = txbCreate.moveCall({
+          target: `${this.config.contracts.gameScore}::badge_system::create_image_data_small`,
+          arguments: [
+            txbCreate.pure.vector('u8', Array.from(imageData)),
+          ],
+        });
+        txbCreate.transferObjects([imageDataObj], this.adminWallet.getAddress());
+        txbCreate.setGasBudget(this.config.sui.gasBudget);
+
+        const resultCreate = await client.signAndExecuteTransaction({
+          signer: this.adminWallet.getKeypair(),
+          transaction: txbCreate,
+          options: {
+            showEffects: true,
+            showObjectChanges: true,
+          },
+        });
+
+        if (resultCreate.effects?.status?.status !== 'success') {
+          throw new Error(`Failed to create BadgeImageData object: ${resultCreate.effects?.status?.error || 'Unknown error'}`);
+        }
+
+        const createdObjects = resultCreate.objectChanges?.filter(
+          (change: any) => change.type === 'created' && change.objectType?.includes('BadgeImageData')
+        );
+        
+        if (!createdObjects || createdObjects.length === 0) {
+          throw new Error('Failed to get BadgeImageData object ID from transaction');
+        }
+
+        imageDataObjectId = (createdObjects[0] as any).objectId;
+        console.log(`✅ [BADGE UPDATE] Created BadgeImageData object: ${imageDataObjectId}`);
+      }
 
       // Get Clock object (shared object)
       const clockId = '0x6'; // Sui Clock object ID (well-known shared object)
@@ -740,7 +1000,7 @@ export class BadgeService {
             this.config.contracts.statisticsRegistry,
             clockId,
             sessionIdBytes, // Session ID as vector<u8>
-            Array.from(imageData), // Image data as array for vector<u8>
+            imageDataObjectId, // Pre-populated BadgeImageData object ID
           ],
           badgeId: badge.badgeId!,
           imageData,
@@ -919,13 +1179,14 @@ export class BadgeService {
       
       console.log(`\n✅ [ADMIN MINT] Player does NOT have badge - proceeding with mint...`);
 
-      // Step 6: Load badge image for the tier
-      console.log(`\n📋 [ADMIN MINT] Step 6: Loading badge image for tier ${tier}...`);
-      const imageData = await this.loadBadgeImage(tier);
-      console.log(`✅ [ADMIN MINT] Badge image loaded: ${imageData.length} bytes`);
+      // Step 6: Get badge image URL for the tier
+      console.log(`\n📋 [ADMIN MINT] Step 6: Getting badge image URL for tier ${tier}...`);
+      const imageUrl = this.getBadgeImageUrl(tier);
+      console.log(`✅ [ADMIN MINT] Badge image URL: ${imageUrl}`);
 
-      // Step 7: Build transaction
-      console.log(`\n📋 [ADMIN MINT] Step 7: Building transaction...`);
+      // Step 7: Build mint transaction
+      console.log(`\n📋 [ADMIN MINT] Step 7: Building mint transaction...`);
+      
       const txb = new Transaction();
 
       const moveCallTarget = `${packageId}::badge_system::admin_mint_badge`;
@@ -937,7 +1198,7 @@ export class BadgeService {
       console.log(`   - clock: 0x6`);
       console.log(`   - player: ${playerAddress}`);
       console.log(`   - tier: ${tier}`);
-      console.log(`   - imageData: ${imageData.length} bytes`);
+      console.log(`   - imageUrl: ${imageUrl}`);
 
       txb.moveCall({
         target: moveCallTarget,
@@ -948,7 +1209,7 @@ export class BadgeService {
           txb.object('0x6'),                     // Clock
           txb.pure.address(playerAddress),      // Player address
           txb.pure.u8(tier),                    // Tier
-          txb.pure.vector('u8', Array.from(imageData)), // Image data
+          txb.pure.string(imageUrl),           // URL to static badge image
         ],
       });
 
@@ -984,6 +1245,7 @@ export class BadgeService {
         console.log(`✅ [ADMIN MINT] Transaction digest: ${result.digest}`);
         console.log(`✅ [ADMIN MINT] Player: ${playerAddress}`);
         console.log(`✅ [ADMIN MINT] Tier: ${tier}`);
+        console.log(`✅ [ADMIN MINT] Image URL: ${imageUrl}`);
         console.log(`✅ [ADMIN MINT] ========================================\n`);
         
         return {
@@ -1275,6 +1537,197 @@ export class BadgeService {
       { store: 25, gameplay: 20 },   // Legendary
     ];
     return discounts[tier] || discounts[0];
+  }
+
+  /**
+   * Build migration transaction for player to sign
+   * This allows players to migrate their badge from old contract to new contract
+   * Player must provide old badge data and old badge object ID
+   * The old badge will be burned (deleted) after the new badge is created
+   * The player address is determined from the transaction signer
+   * Player pays gas fees for creating new badge + deleting old badge
+   * NOTE: This function creates the BadgeImageData object server-side using chunked upload
+   * 
+   * @param oldBadgeId - Object ID of the old badge to be burned
+   * @param oldTier - Tier from old badge
+   * @param oldGamesPlayed - Games played from old badge
+   * @param oldMintDate - Original mint date from old badge
+   * @param imageData - Badge image data (WebP bytes)
+   */
+  async buildMigrateBadgeTransaction(
+    oldBadgeId: string,
+    oldTier: number,
+    oldGamesPlayed: number,
+    oldMintDate: number,
+    imageData: Uint8Array
+  ): Promise<Transaction> {
+    if (!this.config.contracts.badgeRegistry || !this.config.contracts.statisticsRegistry) {
+      throw new Error('BadgeRegistry or StatisticsRegistry not configured');
+    }
+
+    // Validate image data before building transaction
+    try {
+      const validatedImage = validateAndSanitizeImage(imageData);
+      const imageInfo = getImageInfo(validatedImage);
+      console.log(`✅ [MIGRATION] Image validated:`, {
+        size: `${imageInfo.sizeKB}KB`,
+        format: imageInfo.format,
+        dimensions: imageInfo.width && imageInfo.height ? `${imageInfo.width}x${imageInfo.height}` : 'unknown',
+      });
+      // Use validated image
+      imageData = validatedImage;
+    } catch (validationError) {
+      console.error(`❌ [MIGRATION] Image validation failed:`, validationError);
+      throw new Error(`Invalid badge image data: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`);
+    }
+
+    // Create BadgeImageData object using chunked upload (if >14KB) or direct (if ≤14KB)
+    const CHUNK_THRESHOLD = 14 * 1024; // 14KB
+    let imageDataObjectId: string;
+    
+    if (imageData.length > CHUNK_THRESHOLD) {
+      console.log(`📦 [MIGRATION] Image is ${imageData.length} bytes (>${CHUNK_THRESHOLD} bytes), using chunked upload...`);
+      imageDataObjectId = await this.createImageDataObjectChunked(imageData);
+    } else {
+      console.log(`📦 [MIGRATION] Image is ${imageData.length} bytes (≤${CHUNK_THRESHOLD} bytes), using direct upload...`);
+      // Create directly in a single transaction
+      const client = this.getClient();
+      const txbCreate = new Transaction();
+      const imageDataObj = txbCreate.moveCall({
+        target: `${this.config.contracts.gameScore}::badge_system::create_image_data_small`,
+        arguments: [
+          txbCreate.pure.vector('u8', Array.from(imageData)),
+        ],
+      });
+      txbCreate.transferObjects([imageDataObj], this.adminWallet.getAddress());
+      txbCreate.setGasBudget(this.config.sui.gasBudget);
+
+      const resultCreate = await client.signAndExecuteTransaction({
+        signer: this.adminWallet.getKeypair(),
+        transaction: txbCreate,
+        options: {
+          showEffects: true,
+          showObjectChanges: true,
+        },
+      });
+
+      if (resultCreate.effects?.status?.status !== 'success') {
+        throw new Error(`Failed to create BadgeImageData object: ${resultCreate.effects?.status?.error || 'Unknown error'}`);
+      }
+
+      const createdObjects = resultCreate.objectChanges?.filter(
+        (change: any) => change.type === 'created' && change.objectType?.includes('BadgeImageData')
+      );
+      
+      if (!createdObjects || createdObjects.length === 0) {
+        throw new Error('Failed to get BadgeImageData object ID from transaction');
+      }
+
+      imageDataObjectId = (createdObjects[0] as any).objectId;
+      console.log(`✅ [MIGRATION] Created BadgeImageData object: ${imageDataObjectId}`);
+    }
+
+    const txb = new Transaction();
+    
+    txb.moveCall({
+      target: `${this.config.contracts.gameScore}::badge_system::migrate_badge`,
+      arguments: [
+        txb.object(this.config.contracts.badgeRegistry),
+        txb.object(this.config.contracts.statisticsRegistry),
+        txb.object('0x6'), // Clock object (well-known shared object)
+        txb.object(oldBadgeId), // Old badge object (will be burned)
+        txb.pure.u8(oldTier),
+        txb.pure.u64(oldGamesPlayed),
+        txb.pure.u64(oldMintDate),
+        txb.object(imageDataObjectId), // Pre-populated BadgeImageData object
+      ],
+    });
+
+    txb.setGasBudget(this.config.sui.gasBudget);
+
+    return txb;
+  }
+
+  /**
+   * Update badge image URL for wallet display
+   * Updates the badge's image field with a URL pointing to the API endpoint
+   * This allows wallets to display the image even though we can't pass large data URIs
+   * @param playerAddress - Player's wallet address
+   * @param imageUrl - URL to the badge image (e.g., "https://suitwo.game/api/badges/{address}/image")
+   * @returns Success status
+   */
+  async updateBadgeImageUrl(
+    playerAddress: string,
+    imageUrl?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const client = this.getClient();
+      const packageId = this.config.contracts.gameScore;
+      const keypair = this.adminWallet.getKeypair();
+
+      // Get badge to verify it exists and get badge ID
+      const badge = await this.getBadge(playerAddress);
+      if (!badge || !badge.badgeId) {
+        return {
+          success: false,
+          error: 'Player does not have a badge',
+        };
+      }
+      const badgeId = badge.badgeId;
+
+      // Construct image URL if not provided
+      // Use configurable API base URL from config
+      const apiBaseUrl = this.config.server.apiBaseUrl;
+      const url = imageUrl || `${apiBaseUrl}/api/badges/${playerAddress}/image`;
+
+      console.log(`🖼️ [UPDATE IMAGE URL] Updating badge image URL for ${playerAddress}`);
+      console.log(`🖼️ [UPDATE IMAGE URL] Badge ID: ${badgeId}`);
+      console.log(`🖼️ [UPDATE IMAGE URL] Image URL: ${url}`);
+
+      const txb = new Transaction();
+
+      // Get the badge object
+      const badgeObj = txb.object(badgeId);
+
+      txb.moveCall({
+        target: `${packageId}::badge_system::update_badge_image_url`,
+        arguments: [
+          badgeObj,
+          txb.object('0x6'), // Clock
+          txb.pure.string(url),
+        ],
+      });
+
+      txb.setGasBudget(this.config.sui.gasBudget);
+
+      const result = await client.signAndExecuteTransaction({
+        signer: keypair,
+        transaction: txb,
+        options: {
+          showEffects: true,
+          showEvents: true,
+        },
+      });
+
+      if (result.effects?.status?.status === 'success') {
+        console.log(`✅ [UPDATE IMAGE URL] Successfully updated badge image URL`);
+        console.log(`✅ [UPDATE IMAGE URL] Transaction digest: ${result.digest}`);
+        return { success: true };
+      } else {
+        const errorMsg = result.effects?.status?.error || 'Unknown error';
+        console.error(`❌ [UPDATE IMAGE URL] Failed to update badge image URL: ${errorMsg}`);
+        return {
+          success: false,
+          error: errorMsg,
+        };
+      }
+    } catch (error) {
+      console.error(`❌ [UPDATE IMAGE URL] Error updating badge image URL:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 }
 

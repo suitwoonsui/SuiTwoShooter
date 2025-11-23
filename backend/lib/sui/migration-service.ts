@@ -399,5 +399,351 @@ export class MigrationService {
       };
     }
   }
+
+  /**
+   * Read player statistics from old StatisticsRegistry
+   */
+  async readOldPlayerStats(
+    oldPackageId: string,
+    oldStatsRegistryId: string,
+    playerAddress: string
+  ): Promise<{
+    success: boolean;
+    stats?: {
+      total_games: number;
+      best_score: number;
+      best_distance: number;
+      best_coins: number;
+      best_bosses_defeated: number;
+      best_enemies_defeated: number;
+      best_coin_streak: number;
+      total_score: number;
+      total_distance: number;
+      total_coins: number;
+      total_bosses_defeated: number;
+      total_enemies_defeated: number;
+      total_coin_streak: number;
+      first_game_date: number;
+      last_game_date: number;
+    };
+    error?: string;
+  }> {
+    try {
+      const network = this.config.sui.network;
+      const client = network === 'testnet' 
+        ? this.adminWallet.getTestnetClient()
+        : this.adminWallet.getMainnetClient();
+
+      console.log(`🔍 [SCORE MIGRATION] Querying old stats for ${playerAddress}...`);
+      
+      const { Transaction } = await import('@mysten/sui/transactions');
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${oldPackageId}::score_submission::get_player_stats`,
+        arguments: [
+          tx.object(oldStatsRegistryId),
+          tx.pure.address(playerAddress),
+        ],
+      });
+
+      const result = await client.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: this.adminWallet.getAddress(),
+      });
+
+      if (!result.results || !result.results[0].returnValues) {
+        return {
+          success: false,
+          error: 'Failed to get player stats from old registry',
+        };
+      }
+
+      const returnValues = result.results[0].returnValues;
+      const hasStats = String(returnValues[0][1]) === '1' || Number(returnValues[0][1]) === 1;
+
+      if (!hasStats) {
+        return {
+          success: false,
+          error: 'Player has no stats in old registry',
+        };
+      }
+
+      // Parse all stats fields
+      const stats = {
+        total_games: Number(returnValues[1][1]),
+        best_score: Number(returnValues[2][1]),
+        best_distance: Number(returnValues[3][1]),
+        best_coins: Number(returnValues[4][1]),
+        best_bosses_defeated: Number(returnValues[5][1]),
+        best_enemies_defeated: Number(returnValues[6][1]),
+        best_coin_streak: Number(returnValues[7][1]),
+        total_score: Number(returnValues[8][1]),
+        total_distance: Number(returnValues[9][1]),
+        total_coins: Number(returnValues[10][1]),
+        total_bosses_defeated: Number(returnValues[11][1]),
+        total_enemies_defeated: Number(returnValues[12][1]),
+        total_coin_streak: Number(returnValues[13][1]),
+        first_game_date: Number(returnValues[14][1]),
+        last_game_date: Number(returnValues[15][1]),
+      };
+
+      console.log(`✅ [SCORE MIGRATION] Successfully read stats from old registry`);
+
+      return {
+        success: true,
+        stats,
+      };
+    } catch (error) {
+      console.error('❌ [SCORE MIGRATION] Error reading old stats:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get all wallet addresses that have statistics in the old StatisticsRegistry
+   * Note: Sui Tables don't support direct enumeration, so we need to query events or use a different approach
+   * For now, this function will return an error suggesting manual input or event-based discovery
+   */
+  async getAllWalletsWithStats(
+    oldPackageId: string,
+    oldStatsRegistryId: string
+  ): Promise<{
+    success: boolean;
+    wallets?: string[];
+    error?: string;
+  }> {
+    try {
+      const network = this.config.sui.network;
+      const client = network === 'testnet' 
+        ? this.adminWallet.getTestnetClient()
+        : this.adminWallet.getMainnetClient();
+
+      console.log(`🔍 [SCORE MIGRATION] Attempting to discover wallets with stats from old registry...`);
+      
+      // Sui Tables don't support enumeration directly
+      // We can try to query ScoreSubmitted events to find all players who have submitted scores
+      // This is the most reliable way to discover wallets with stats
+      
+      try {
+        // Query ScoreSubmitted events from the old package
+        // These events are emitted when scores are submitted, so all players with stats should have events
+        const events = await client.queryEvents({
+          filter: {
+            Package: oldPackageId,
+          },
+          limit: 1000, // Adjust as needed
+        });
+
+        console.log(`📋 [SCORE MIGRATION] Found ${events.data.length} events`);
+
+        // Extract unique player addresses from events
+        const walletsSet = new Set<string>();
+        for (const event of events.data) {
+          if (event.parsedJson && typeof event.parsedJson === 'object') {
+            const player = (event.parsedJson as any).player;
+            if (player && typeof player === 'string' && player.startsWith('0x')) {
+              walletsSet.add(player);
+            }
+          }
+        }
+
+        const wallets = Array.from(walletsSet);
+        console.log(`✅ [SCORE MIGRATION] Found ${wallets.length} unique wallets with stats (from events)`);
+
+        return {
+          success: true,
+          wallets,
+        };
+      } catch (eventError) {
+        console.warn('⚠️ [SCORE MIGRATION] Event-based discovery failed, trying alternative method...');
+        console.warn(`   Error: ${eventError instanceof Error ? eventError.message : String(eventError)}`);
+        
+        // Alternative: Try to get dynamic fields (in case the registry structure is different)
+        try {
+          const allFields = await client.getDynamicFields({
+            parentId: oldStatsRegistryId,
+          });
+
+          console.log(`📋 [SCORE MIGRATION] Found ${allFields.data.length} dynamic fields`);
+
+          const wallets: string[] = [];
+          for (const field of allFields.data) {
+            if (field.name?.type === 'address' && field.name?.value) {
+              wallets.push(String(field.name.value));
+            }
+          }
+
+          if (wallets.length > 0) {
+            console.log(`✅ [SCORE MIGRATION] Found ${wallets.length} wallets with stats (from dynamic fields)`);
+            return {
+              success: true,
+              wallets,
+            };
+          }
+        } catch (dynamicFieldError) {
+          console.warn('⚠️ [SCORE MIGRATION] Dynamic field discovery also failed');
+        }
+
+        // If both methods fail, return an error with helpful message
+        return {
+          success: false,
+          error: 'Unable to automatically discover wallets. Sui Tables do not support enumeration. Please use Single or Batch mode to manually specify wallet addresses, or ensure ScoreSubmitted events are available from the old contract.',
+        };
+      }
+    } catch (error) {
+      console.error('❌ [SCORE MIGRATION] Error fetching wallets with stats:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Migrate player statistics from old StatisticsRegistry to new StatisticsRegistry
+   */
+  async migratePlayerStats(
+    playerAddress: string,
+    oldPackageId: string,
+    oldStatsRegistryId: string
+  ): Promise<{
+    success: boolean;
+    digest?: string;
+    error?: string;
+  }> {
+    try {
+      // 1. Read stats from old registry
+      console.log(`🔄 [SCORE MIGRATION] Reading stats from old registry for ${playerAddress}...`);
+      const oldStats = await this.readOldPlayerStats(oldPackageId, oldStatsRegistryId, playerAddress);
+      
+      if (!oldStats.success || !oldStats.stats) {
+        return {
+          success: false,
+          error: oldStats.error || 'Failed to read old stats',
+        };
+      }
+
+      const stats = oldStats.stats;
+      console.log(`📊 [SCORE MIGRATION] Old stats:`, stats);
+
+      // Check if there are any stats to migrate
+      if (stats.total_games === 0 && stats.best_score === 0) {
+        return {
+          success: false,
+          error: 'No stats to migrate (player has no games recorded)',
+        };
+      }
+
+      // 2. Get new registry configuration
+      const newPackageId = this.config.contracts.gameScore.includes('::')
+        ? this.config.contracts.gameScore.split('::')[0]
+        : this.config.contracts.gameScore;
+      const newStatsRegistryId = this.config.contracts.statisticsRegistry;
+      const adminCapabilityObjectId = this.config.contracts.adminCapability;
+
+      if (!newStatsRegistryId || !adminCapabilityObjectId || adminCapabilityObjectId === '') {
+        return {
+          success: false,
+          error: `New statistics registry not configured. Missing: ${!newStatsRegistryId ? 'STATISTICS_REGISTRY_OBJECT_ID_TESTNET' : ''} ${!adminCapabilityObjectId || adminCapabilityObjectId === '' ? 'ADMIN_CAPABILITY_OBJECT_ID_TESTNET' : ''}`,
+        };
+      }
+
+      // Verify the admin capability object exists
+      try {
+        const network = this.config.sui.network;
+        const client = network === 'testnet' 
+          ? this.adminWallet.getTestnetClient()
+          : this.adminWallet.getMainnetClient();
+        
+        const adminCapObject = await client.getObject({
+          id: adminCapabilityObjectId,
+          options: { showType: true },
+        });
+
+        if (adminCapObject.error) {
+          console.error(`❌ [SCORE MIGRATION] Admin capability object not found: ${adminCapabilityObjectId}`);
+          return {
+            success: false,
+            error: `Admin capability object not found: ${adminCapabilityObjectId}. Please verify ADMIN_CAPABILITY_OBJECT_ID_TESTNET is correct.`,
+          };
+        }
+
+        const objectType = adminCapObject.data?.type || 'unknown';
+        
+        // Verify it's the correct type (score_submission::AdminCapability)
+        if (!objectType.includes('score_submission::AdminCapability')) {
+          return {
+            success: false,
+            error: `Wrong admin capability type! The object at ${adminCapabilityObjectId} is of type ${objectType}, but expected score_submission::AdminCapability. Please use the score_submission admin capability.`,
+          };
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('❌ [SCORE MIGRATION] Could not verify admin capability object:', errorMessage);
+        return {
+          success: false,
+          error: `Failed to verify admin capability object: ${errorMessage}. Please check that ADMIN_CAPABILITY_OBJECT_ID_TESTNET is correct.`,
+        };
+      }
+
+      // 3. Build migration transaction
+      console.log(`🔄 [SCORE MIGRATION] Building migration transaction...`);
+      const { Transaction } = await import('@mysten/sui/transactions');
+      const txb = new Transaction();
+
+      txb.moveCall({
+        target: `${newPackageId}::score_submission::migrate_player_stats`,
+        arguments: [
+          txb.object(adminCapabilityObjectId),
+          txb.object(oldStatsRegistryId), // Old registry (read-only)
+          txb.object(newStatsRegistryId), // New registry (mutable)
+          txb.pure.address(playerAddress),
+        ],
+      });
+
+      txb.setGasBudget(this.config.sui.gasBudget);
+
+      // 4. Sign and execute with admin wallet
+      console.log(`🔐 [SCORE MIGRATION] Signing and executing migration transaction...`);
+      const network = this.config.sui.network;
+      const client = network === 'testnet' 
+        ? this.adminWallet.getTestnetClient()
+        : this.adminWallet.getMainnetClient();
+
+      const result = await client.signAndExecuteTransaction({
+        signer: this.adminWallet.getKeypair(),
+        transaction: txb,
+        options: {
+          showEffects: true,
+          showEvents: true,
+        },
+      });
+
+      if (result.effects?.status?.status === 'success') {
+        console.log(`✅ [SCORE MIGRATION] Stats migrated successfully!`);
+        console.log(`   Transaction Digest: ${result.digest}`);
+        return {
+          success: true,
+          digest: result.digest,
+        };
+      } else {
+        const error = result.effects?.status?.error || 'Unknown error';
+        console.error(`❌ [SCORE MIGRATION] Migration failed:`, error);
+        return {
+          success: false,
+          error: `Migration failed: ${error}`,
+        };
+      }
+    } catch (error) {
+      console.error('❌ [SCORE MIGRATION] Error migrating stats:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
 }
 

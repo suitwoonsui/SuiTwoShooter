@@ -96,16 +96,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert imageData to base64 for JSON response
+    // Return transaction data (imageDataObjectId is already included)
     const transactionData = result.transactionData!;
-    const imageDataBase64 = Buffer.from(transactionData.imageData).toString('base64');
 
     return NextResponse.json(
       {
         success: true,
         transactionData: {
           ...transactionData,
-          imageData: imageDataBase64, // Base64 encoded for JSON
+          // imageDataObjectId is already in transactionData
+          // imageData (raw) is optional and included if available
         },
       },
       { headers: corsHeaders }

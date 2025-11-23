@@ -3,7 +3,7 @@ const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
 const client = new SuiClient({ url: getFullnodeUrl('testnet') });
 // Deployment transaction
-const deployTxDigest = 'EEpwYW2EN566p3x3onsApw7cJrq1MHdYRHQzeq4GYR5F';
+const deployTxDigest = 'Du1xBYhNtksBN9G6hNb4tmNLQRzbARmDaDMLgfvw6TZk';
 // Badge Registry initialization transaction
 const badgeInitTxDigest = 'FNChhLzYgEkXegeswPUSLc7NWucU5F2tN4DKWsCpQJxz';
 

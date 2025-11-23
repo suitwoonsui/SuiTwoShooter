@@ -173,12 +173,79 @@ async function loadMenuBadgeDisplay(walletAddress) {
     const badgeData = await window.BadgeService.getBadge(walletAddress);
 
     if (!badgeData || !badgeData.success || !badgeData.hasBadge || !badgeData.badge) {
-      // Player doesn't have a badge, hide display
+      // Player doesn't have a badge in new contract
+      // Check if they need to migrate an old badge
+      if (window.BadgeService && window.BadgeService.checkBadgeMigration) {
+        const migrationCheck = await window.BadgeService.checkBadgeMigration(walletAddress);
+        
+        if (migrationCheck.success && migrationCheck.needsMigration && migrationCheck.migrationData) {
+          // Player has an old badge that needs migration
+          console.log('🔄 [MENU] Player needs to migrate badge');
+          
+          // Show migration modal
+          if (window.BadgeUI && window.BadgeUI.showBadgeMigrationModal) {
+            // Convert imageData array to Uint8Array if needed
+            let imageData = migrationCheck.migrationData.imageData;
+            if (Array.isArray(imageData)) {
+              imageData = new Uint8Array(imageData);
+            }
+            
+            window.BadgeUI.showBadgeMigrationModal({
+              oldBadgeId: migrationCheck.migrationData.oldBadgeId,
+              oldTier: migrationCheck.migrationData.oldTier,
+              oldGamesPlayed: migrationCheck.migrationData.oldGamesPlayed,
+              oldMintDate: migrationCheck.migrationData.oldMintDate,
+              imageData: imageData,
+            });
+          }
+        }
+      }
+      
+      // Hide badge display (no badge in new contract)
       badgeDisplay.style.display = 'none';
       return;
     }
 
     // Player has a badge, display it
+    // Check for pending tier upgrade
+    if (window.BadgeService && window.BadgeService.checkPendingUpgrade) {
+      const upgradeCheck = await window.BadgeService.checkPendingUpgrade(walletAddress);
+      if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.transactionData) {
+        console.log('🎖️ [MENU] Pending badge upgrade detected');
+        
+        // Convert base64 imageData back to Uint8Array
+        let imageData = null;
+        if (upgradeCheck.transactionData.imageData) {
+          try {
+            const base64 = upgradeCheck.transactionData.imageData;
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+              bytes[i] = binary.charCodeAt(i);
+            }
+            imageData = bytes;
+          } catch (error) {
+            console.warn('⚠️ [MENU] Failed to convert imageData:', error);
+          }
+        }
+        
+        // Show upgrade modal
+        if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
+          const oldTier = badgeData.badge.tier;
+          const newTier = upgradeCheck.newTier || oldTier + 1;
+          const newTierName = window.BadgeService.getTierName(newTier);
+          
+          window.BadgeUI.showTierUpgradeModal({
+            oldTier,
+            newTier,
+            newTierName,
+            imageData,
+            transactionData: upgradeCheck.transactionData,
+          });
+        }
+      }
+    }
+    
     // Use BadgeUI.displayBadgeInUI if available, otherwise create custom display
     if (window.BadgeUI && typeof window.BadgeUI.displayBadgeInUI === 'function') {
       // Use the existing BadgeUI function for consistency

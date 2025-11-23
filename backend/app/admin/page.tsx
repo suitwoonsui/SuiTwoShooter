@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getApiBaseUrl } from '@/lib/api-base-url';
 
-type Tab = 'items' | 'badges' | 'migration';
+type Tab = 'items' | 'badges' | 'migration' | 'score-migration';
 
 // Helper function to get full API URL
 const getApiUrl = (path: string): string => {
@@ -51,6 +51,18 @@ export default function AdminPage() {
   const [migrationProgress, setMigrationProgress] = useState<{ current: number; total: number } | null>(null);
   const [discoveredWallets, setDiscoveredWallets] = useState<string[]>([]);
   const [discoveringWallets, setDiscoveringWallets] = useState(false);
+
+  // Score Migration state
+  const [scoreMigrationMode, setScoreMigrationMode] = useState<'single' | 'batch' | 'auto'>('auto');
+  const [scoreMigrationAddress, setScoreMigrationAddress] = useState('');
+  const [scoreMigrationAddresses, setScoreMigrationAddresses] = useState('');
+  const [oldScorePackageId, setOldScorePackageId] = useState('');
+  const [oldStatsRegistryId, setOldStatsRegistryId] = useState('');
+  const [scoreMigrationLoading, setScoreMigrationLoading] = useState(false);
+  const [scoreMigrationResults, setScoreMigrationResults] = useState<Array<{ address: string; success: boolean; digest?: string; error?: string }>>([]);
+  const [scoreMigrationProgress, setScoreMigrationProgress] = useState<{ current: number; total: number } | null>(null);
+  const [discoveredScoreWallets, setDiscoveredScoreWallets] = useState<string[]>([]);
+  const [discoveringScoreWallets, setDiscoveringScoreWallets] = useState(false);
 
   const itemTypes = [
     { id: 'extraLives', name: 'Extra Lives', levels: [1, 2, 3] },
@@ -446,6 +458,150 @@ export default function AdminPage() {
     } finally {
       setMigrationLoading(false);
       setMigrationProgress(null);
+    }
+  };
+
+  // Score Migration functions
+  const handleDiscoverScoreWallets = async () => {
+    setDiscoveringScoreWallets(true);
+    setDiscoveredScoreWallets([]);
+
+    try {
+      if (!isAdminWalletConnected || connectedAddress !== adminAddress) {
+        alert('Admin wallet not connected. Please connect the admin wallet.');
+        setDiscoveringScoreWallets(false);
+        return;
+      }
+
+      const oldStatsId = oldStatsRegistryId || undefined;
+      const oldPkgId = oldScorePackageId || undefined;
+      const queryParams = new URLSearchParams();
+      if (oldStatsId) queryParams.append('oldStatsRegistryId', oldStatsId);
+      if (oldPkgId) queryParams.append('oldPackageId', oldPkgId);
+      const queryString = queryParams.toString();
+      
+      const response = await fetch(`${getApiUrl('api/scores/migrate')}${queryString ? `?${queryString}` : ''}`);
+      const data = await response.json();
+
+      if (response.ok && data.success && data.wallets) {
+        setDiscoveredScoreWallets(data.wallets);
+        if (data.wallets.length === 0) {
+          alert('No wallets with statistics found in the old registry.');
+        }
+      } else {
+        alert(data.error || 'Failed to discover wallets');
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Network error');
+    } finally {
+      setDiscoveringScoreWallets(false);
+    }
+  };
+
+  const handleScoreMigrationSubmit = async () => {
+    setScoreMigrationLoading(true);
+    setScoreMigrationResults([]);
+    setScoreMigrationProgress(null);
+
+    try {
+      if (!isAdminWalletConnected || connectedAddress !== adminAddress) {
+        setScoreMigrationResults([{
+          address: 'N/A',
+          success: false,
+          error: 'Admin wallet not connected. Please connect the admin wallet.',
+        }]);
+        setScoreMigrationLoading(false);
+        return;
+      }
+
+      let addresses: string[] = [];
+      
+      if (scoreMigrationMode === 'auto') {
+        addresses = discoveredScoreWallets;
+      } else if (scoreMigrationMode === 'single') {
+        addresses = [scoreMigrationAddress.trim()];
+      } else {
+        addresses = scoreMigrationAddresses
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && line.startsWith('0x'));
+      }
+
+      if (addresses.length === 0) {
+        setScoreMigrationResults([{
+          address: 'N/A',
+          success: false,
+          error: 'No valid addresses provided',
+        }]);
+        setScoreMigrationLoading(false);
+        return;
+      }
+
+      setScoreMigrationProgress({ current: 0, total: addresses.length });
+      const results: Array<{ address: string; success: boolean; digest?: string; error?: string }> = [];
+
+      for (let i = 0; i < addresses.length; i++) {
+        const address = addresses[i];
+        setScoreMigrationProgress({ current: i, total: addresses.length });
+
+        try {
+          const response = await fetch(getApiUrl('api/scores/migrate'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              playerAddress: address,
+              ...(oldScorePackageId && { oldPackageId: oldScorePackageId }),
+              ...(oldStatsRegistryId && { oldStatsRegistryId }),
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            results.push({
+              address,
+              success: true,
+              digest: data.digest,
+            });
+          } else {
+            results.push({
+              address,
+              success: false,
+              error: data.error || 'Migration failed',
+            });
+          }
+        } catch (error) {
+          results.push({
+            address,
+            success: false,
+            error: error instanceof Error ? error.message : 'Network error',
+          });
+        }
+
+        // Update results as we go
+        setScoreMigrationResults([...results]);
+      }
+
+      setScoreMigrationProgress({ current: addresses.length, total: addresses.length });
+      setScoreMigrationResults(results);
+
+      // Clear form on success
+      if (scoreMigrationMode === 'single') {
+        setScoreMigrationAddress('');
+      } else {
+        setScoreMigrationAddresses('');
+      }
+    } catch (error) {
+      setScoreMigrationResults([{
+        address: 'N/A',
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }]);
+    } finally {
+      setScoreMigrationLoading(false);
+      setScoreMigrationProgress(null);
     }
   };
 
@@ -1299,8 +1455,281 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Score Migration Tab */}
+      {activeTab === 'score-migration' && (
+        <div style={{ display: isAdminWalletConnected ? 'flex' : 'none', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+            <strong>📋 Score Migration Instructions:</strong>
+            <ul style={{ marginTop: '0.5rem', marginLeft: '1.5rem', fontSize: '0.9rem' }}>
+              <li>Migrate player statistics from the old StatisticsRegistry to the new StatisticsRegistry</li>
+              <li>Single mode: Migrate one wallet at a time</li>
+              <li>Batch mode: Migrate multiple wallets (one address per line)</li>
+              <li>Auto mode: Discover all wallets with stats and migrate them</li>
+              <li>Old registry IDs can be left empty to use environment defaults</li>
+              <li><strong>Note:</strong> Stats are merged (bests take maximum, totals are summed)</li>
+            </ul>
+          </div>
+
+          {/* Migration Mode Selector */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Migration Mode:
+            </label>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="auto"
+                  checked={scoreMigrationMode === 'auto'}
+                  onChange={(e) => setScoreMigrationMode(e.target.value as 'single' | 'batch' | 'auto')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Auto (Discover All Wallets)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="single"
+                  checked={scoreMigrationMode === 'single'}
+                  onChange={(e) => setScoreMigrationMode(e.target.value as 'single' | 'batch' | 'auto')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Single Wallet
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="batch"
+                  checked={scoreMigrationMode === 'batch'}
+                  onChange={(e) => setScoreMigrationMode(e.target.value as 'single' | 'batch' | 'auto')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Batch (Manual List)
+              </label>
+            </div>
+          </div>
+
+          {/* Old Stats Registry Configuration */}
+          <div style={{ padding: '1rem', backgroundColor: '#f0f0f0', borderRadius: '4px', marginBottom: '1rem' }}>
+            <strong>📋 Old Statistics Registry Configuration:</strong>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
+              These fields are optional. If left empty, the system will use environment variables:
+              <br />• <code>OLD_GAME_SCORE_PACKAGE_ID</code> (for Package ID)
+              <br />• <code>OLD_STATISTICS_REGISTRY_OBJECT_ID</code> (for Registry Object ID)
+            </p>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Old Package ID (optional - uses <code>OLD_GAME_SCORE_PACKAGE_ID</code> if empty):
+            </label>
+            <input
+              type="text"
+              value={oldScorePackageId}
+              onChange={(e) => setOldScorePackageId(e.target.value)}
+              placeholder="Leave empty to use environment variable"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Old Statistics Registry Object ID (optional - uses <code>OLD_STATISTICS_REGISTRY_OBJECT_ID</code> if empty):
+            </label>
+            <input
+              type="text"
+              value={oldStatsRegistryId}
+              onChange={(e) => setOldStatsRegistryId(e.target.value)}
+              placeholder="Leave empty to use environment variable"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+
+          {/* Auto Mode - Discover Wallets */}
+          {scoreMigrationMode === 'auto' && (
+            <div>
+              <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '4px' }}>
+                <strong>🔍 Auto Discovery:</strong>
+                <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                  This mode will automatically discover all wallets that have statistics in the old StatisticsRegistry by querying the registry's dynamic fields.
+                </p>
+              </div>
+              
+              {discoveredScoreWallets.length > 0 && (
+                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                  <strong>✅ Discovered {discoveredScoreWallets.length} wallet(s) with statistics:</strong>
+                  <div style={{ marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto', fontSize: '0.9rem', fontFamily: 'monospace' }}>
+                    {discoveredScoreWallets.map((wallet, index) => (
+                      <div key={index} style={{ padding: '0.25rem 0' }}>
+                        {wallet}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleDiscoverScoreWallets}
+                disabled={discoveringScoreWallets || !isAdminWalletConnected}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: discoveringScoreWallets || !isAdminWalletConnected ? '#ccc' : '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: discoveringScoreWallets || !isAdminWalletConnected ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  marginBottom: '1rem',
+                }}
+              >
+                {discoveringScoreWallets ? 'Discovering...' : '🔍 Discover Wallets with Statistics'}
+              </button>
+            </div>
+          )}
+
+          {/* Single Mode */}
+          {scoreMigrationMode === 'single' && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Player Address:
+              </label>
+              <input
+                type="text"
+                value={scoreMigrationAddress}
+                onChange={(e) => setScoreMigrationAddress(e.target.value)}
+                placeholder="0x..."
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Batch Mode */}
+          {scoreMigrationMode === 'batch' && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Player Addresses (one per line):
+              </label>
+              <textarea
+                value={scoreMigrationAddresses}
+                onChange={(e) => setScoreMigrationAddresses(e.target.value)}
+                placeholder="0x...&#10;0x...&#10;0x..."
+                rows={10}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                }}
+              />
+            </div>
+          )}
+
+          {/* Progress Display */}
+          {scoreMigrationProgress && (
+            <div style={{ padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '4px' }}>
+              <strong>⏳ Migration Progress:</strong>
+              <p>
+                Processing {scoreMigrationProgress.current} of {scoreMigrationProgress.total} wallets...
+              </p>
+              <div style={{ width: '100%', backgroundColor: '#ddd', borderRadius: '4px', height: '20px', marginTop: '0.5rem' }}>
+                <div
+                  style={{
+                    width: `${(scoreMigrationProgress.current / scoreMigrationProgress.total) * 100}%`,
+                    backgroundColor: '#2196F3',
+                    height: '100%',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Results Display */}
+          {scoreMigrationResults.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>📊 Migration Results:</strong>
+              <div style={{ marginTop: '0.5rem', maxHeight: '400px', overflowY: 'auto', border: '1px solid #ccc', borderRadius: '4px', padding: '1rem' }}>
+                {scoreMigrationResults.map((result, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '0.75rem',
+                      marginBottom: '0.5rem',
+                      backgroundColor: result.success ? '#d4edda' : '#f8d7da',
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                      {result.success ? '✅' : '❌'} {result.address.substring(0, 10)}...{result.address.substring(result.address.length - 8)}
+                    </div>
+                    {result.success && result.digest && (
+                      <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                        Digest: <code>{result.digest}</code>
+                      </div>
+                    )}
+                    {!result.success && result.error && (
+                      <div style={{ fontSize: '0.85rem', color: '#721c24', marginTop: '0.25rem' }}>
+                        Error: {result.error}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleScoreMigrationSubmit}
+            disabled={scoreMigrationLoading || !isAdminWalletConnected || (scoreMigrationMode === 'auto' ? discoveredScoreWallets.length === 0 : scoreMigrationMode === 'single' ? !scoreMigrationAddress : !scoreMigrationAddresses.trim())}
+            style={{
+              padding: '1rem',
+              fontSize: '1.1rem',
+              backgroundColor: scoreMigrationLoading || !isAdminWalletConnected ? '#ccc' : '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: scoreMigrationLoading || !isAdminWalletConnected ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            {scoreMigrationLoading 
+              ? 'Migrating...' 
+              : scoreMigrationMode === 'auto' 
+                ? `Migrate ${discoveredScoreWallets.length} Statistics` 
+                : scoreMigrationMode === 'single' 
+                  ? 'Migrate Statistics' 
+                  : 'Migrate All Statistics'}
+          </button>
+        </div>
+      )}
+
       {/* Results Display */}
-      {(itemsResult || badgesResult) && activeTab !== 'migration' && (
+      {(itemsResult || badgesResult) && activeTab !== 'migration' && activeTab !== 'score-migration' && (
         <div
           style={{
             marginTop: '2rem',

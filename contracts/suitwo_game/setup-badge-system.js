@@ -11,9 +11,10 @@ const { Transaction } = require('@mysten/sui/transactions');
 const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m';
 
 // Get package ID from environment variable or use the one from deployment
-const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
+const packageId = process.env.GAME_SCORE_CONTRACT_TESTNET || 
+                  process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0xf4ebdb147f861f925a2129f39f983867b34fa64575b7e9245189407a78f475ed'; // New package with Publisher
+                  '0xa235c3069ff0f2cd158ab6ecd9eccc436c094f064e3b5625957f88e3f47e0884'; // Latest package
 
 // Fee recipient address (admin wallet address)
 const feeRecipient = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
@@ -213,7 +214,12 @@ async function setupBadgeSystem() {
     }
     
     // Step 2: Find Publisher and Create Display
-    let publisherId = publisherObjectId;
+    // Use the Publisher from the deployment transaction (package Publisher)
+    let publisherId = publisherObjectId || '0x8e687b671148061b67c3ecbeb76f27b095064454d9381abf00f01ff9eec60b22';
+    
+    // Add a small delay to ensure gas objects are refreshed
+    console.log('\n⏳ Waiting before creating Display...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     if (!publisherId) {
       console.log('\n🔍 Publisher object ID not provided, attempting to find it...');

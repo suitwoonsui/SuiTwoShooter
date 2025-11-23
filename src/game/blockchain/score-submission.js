@@ -150,27 +150,60 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
             }
           }, 1000);
         } else if (result.badge.tierUpgraded) {
-          // Tier upgraded - show upgrade notification
+          // Tier upgraded - show upgrade notification with transaction
           console.log('🎖️ [BADGE] Badge tier upgraded to:', result.badge.newTier);
           // Show upgrade modal after a short delay
           setTimeout(async () => {
             if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
-              // Get badge data to show new tier image
-              const badgeData = await window.BadgeService.getBadge();
-              if (badgeData.success && badgeData.badge) {
-                window.BadgeUI.showTierUpgradeModal({
-                  oldTier: badgeData.badge.tier - 1, // Previous tier
-                  newTier: result.badge.newTier,
-                  newTierName: window.BadgeService.getTierName(result.badge.newTier),
-                  imageData: badgeData.badge.imageData,
-                });
-              } else {
-                // Fallback without image
-                window.BadgeUI.showTierUpgradeModal({
-                  oldTier: result.badge.newTier - 1,
-                  newTier: result.badge.newTier,
-                  newTierName: window.BadgeService.getTierName(result.badge.newTier),
-                });
+              try {
+                // Get transaction data for tier upgrade
+                const sessionId = result.sessionId || `session_${Date.now()}`;
+                const updateResult = await window.BadgeService.checkAndBuildBadgeUpdate(sessionId);
+                
+                if (!updateResult.success || !updateResult.transactionData) {
+                  console.warn('⚠️ [BADGE] Failed to get tier upgrade transaction data');
+                  // Show modal without transaction (informational only)
+                  const badgeData = await window.BadgeService.getBadge();
+                  if (badgeData.success && badgeData.badge) {
+                    window.BadgeUI.showTierUpgradeModal({
+                      oldTier: badgeData.badge.tier - 1,
+                      newTier: result.badge.newTier,
+                      newTierName: window.BadgeService.getTierName(result.badge.newTier),
+                      imageData: badgeData.badge.imageData,
+                      // No transactionData - modal will show as informational
+                    });
+                  }
+                  return;
+                }
+                
+                // Convert imageData array to Uint8Array if needed
+                let imageData = updateResult.transactionData.imageData;
+                if (Array.isArray(imageData)) {
+                  imageData = new Uint8Array(imageData);
+                }
+                
+                // Get badge data to show new tier image
+                const badgeData = await window.BadgeService.getBadge();
+                if (badgeData.success && badgeData.badge) {
+                  window.BadgeUI.showTierUpgradeModal({
+                    oldTier: badgeData.badge.tier - 1, // Previous tier
+                    newTier: result.badge.newTier,
+                    newTierName: window.BadgeService.getTierName(result.badge.newTier),
+                    imageData: imageData,
+                    transactionData: updateResult.transactionData, // Pass transaction data
+                  });
+                } else {
+                  // Fallback without image
+                  window.BadgeUI.showTierUpgradeModal({
+                    oldTier: result.badge.newTier - 1,
+                    newTier: result.badge.newTier,
+                    newTierName: window.BadgeService.getTierName(result.badge.newTier),
+                    imageData: imageData,
+                    transactionData: updateResult.transactionData, // Pass transaction data
+                  });
+                }
+              } catch (error) {
+                console.error('❌ [BADGE] Error showing tier upgrade modal:', error);
               }
             }
           }, 1000);
