@@ -14,7 +14,7 @@ const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4
 const packageId = process.env.GAME_SCORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0x9b981a5b3d2acbee7ed3989e1707de1c5868d9e1ff89b6b14a107cff9fac96b1'; // Latest package
+                  '0x66b58fb2066e41c32152148ad35ad54fe95c2d079a797199f301443725fda34b'; // Latest package
 
 // Fee recipient address (admin wallet address)
 const feeRecipient = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
@@ -215,7 +215,7 @@ async function setupBadgeSystem() {
     
     // Step 2: Find Publisher and Create Display
     // Use the Publisher from the deployment transaction (package Publisher)
-    let publisherId = publisherObjectId || '0xc77412f3ab618a37ad3d2d8f3e07ba02596baefbeabc47daad68f1d99c730830';
+    let publisherId = publisherObjectId || '0xbea00530109982af37b5134fc7236a040735869d67341ce9b953167dc49aee43';
     
     // Add a small delay to ensure gas objects are refreshed
     console.log('\n⏳ Waiting before creating Display...');

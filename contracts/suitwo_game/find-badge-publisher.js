@@ -1,8 +1,8 @@
 // Find Badge Publisher object from deployment transaction
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
-const txDigest = 'B8rJBJXm6voZfCXtJwpARKuL38HZxYv8vd9S4Er2iFTF';
-const packageId = '0x9b981a5b3d2acbee7ed3989e1707de1c5868d9e1ff89b6b14a107cff9fac96b1';
+const txDigest = '28Pt6vgDgpvm8ocKibmbigEj6nJhPsv4nrfPvQdoC2Hb';
+const packageId = '0x66b58fb2066e41c32152148ad35ad54fe95c2d079a797199f301443725fda34b';
 const deployerAddress = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
 
 async function findBadgePublisher() {

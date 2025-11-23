@@ -469,11 +469,12 @@ module suitwo_game::badge_system {
         ctx: &mut TxContext
     ) {
         // Create Display object for EarlySupporterBadge type with all fields
+        // Note: Use "url" instead of "image_url" for wallet compatibility (Slush, SuiVision, etc.)
         let fields = vector[
             string::utf8(b"name"),
             string::utf8(b"description"),
             string::utf8(b"link"),
-            string::utf8(b"image_url"),
+            string::utf8(b"url"),  // Changed from "image_url" to "url" for wallet compatibility
             string::utf8(b"tier_name"),
             string::utf8(b"games_played"),
             string::utf8(b"mint_date"),
@@ -487,7 +488,7 @@ module suitwo_game::badge_system {
             string::utf8(b"Early Supporter Badge - {tier}"),
             string::utf8(b"A soulbound badge that evolves based on games played. This badge represents your dedication as an early supporter of SuiTwo. It cannot be transferred or sold - it's permanently bound to your wallet."),
             string::utf8(b"https://suitwo.game/badge/{id}"),
-            string::utf8(b"{image}"),  // Use data URI from badge struct instead of HTTP URL
+            string::utf8(b"{image}"),  // References the 'image' field in EarlySupporterBadge struct
             string::utf8(b"{tier}"),
             string::utf8(b"{games_played}"),
             string::utf8(b"{mint_date}"),
