@@ -633,23 +633,28 @@ module suitwo_game::badge_system {
         // If no entry exists, do nothing (idempotent)
     }
 
+
     /// Migrate badge from old contract to new contract
     /// This function allows players to migrate their badge data to the new contract
-    /// Player must provide old badge data (tier, games_played, mint_date, image_data) and the old badge object
-    /// This preserves all badge metadata during contract migration and burns the old badge
+    /// Player must provide old badge data (tier, games_played, mint_date, image_data)
+    /// This preserves all badge metadata during contract migration
     /// NOTE: This is a one-time migration function. Player must not already have a badge in new registry.
     /// The player is determined from tx_context::sender() - they must be migrating their own badge.
-    /// The old badge must be passed as an argument and will be deleted ONLY after new badge is verified.
-    /// Player pays gas fees for this transaction (creating new badge + deleting old badge).
     /// 
-    /// SAFETY: This function ensures the new badge is created and registered BEFORE the old badge is deleted.
-    /// If any step fails, the transaction aborts and the old badge remains safe.
+    /// IMPORTANT: The old badge is soulbound (only has 'key' ability, not 'store'), so it cannot be
+    /// transferred or deleted from another module. After this migration succeeds, the player must
+    /// manually delete the old badge from their wallet by calling the delete function in the old badge's module.
+    /// 
+    /// SAFETY: This function ensures the new badge is created and registered. The old badge remains
+    /// in the player's wallet until they delete it separately. This is safe because:
+    /// 1. The new badge is registered and active
+    /// 2. The old badge is from a different package and won't interfere
+    /// 3. The player can delete the old badge when ready
     #[allow(lint(public_entry))]
-    public entry fun migrate_badge<T: key + store>(
+    public entry fun migrate_badge(
         registry: &mut BadgeRegistry,
         stats_registry: &StatisticsRegistry,
         clock: &Clock,
-        old_badge: T,  // Old badge from previous contract (must be in player's wallet, will be deleted)
         old_tier: u8,  // Tier from old badge
         _old_games_played: u64,  // Games played from old badge (unused, kept for API compatibility)
         old_mint_date: u64,  // Original mint date from old badge
@@ -665,8 +670,10 @@ module suitwo_game::badge_system {
         // Validate tier
         assert!(old_tier <= TIER_LEGENDARY, E_INVALID_TIER);
         
-        // NOTE: old_badge ownership is guaranteed by Sui - player must own it to pass it
-        // We can't verify old_badge fields in Move (different package type), but backend should verify
+        // NOTE: We don't take the old badge as an argument because it's soulbound (only 'key', not 'store')
+        // Soulbound objects cannot be transferred or deleted from another module.
+        // The backend should verify the old badge exists and belongs to the player before calling this function.
+        // After migration, the player must manually delete the old badge from their wallet.
         
         // ===== STEP 1: Create new badge =====
         // Get current games_played from statistics registry (source of truth)
@@ -725,24 +732,21 @@ module suitwo_game::badge_system {
             timestamp: current_time,
         });
         
-        // ===== STEP 6: Handle old badge =====
+        // ===== STEP 6: Migration complete =====
         // Only reached if all previous steps succeeded
-        // For generic types with 'key' ability from other modules, we can't use object::delete
-        // directly because we can't extract the UID from a generic type, and we can't use
-        // transfer::transfer because it's restricted to the object's module.
-        // We use transfer::public_transfer which can transfer objects from any module.
-        // NOTE: The old badge will remain in the player's wallet. This is acceptable because:
-        // 1. The new badge is registered and active
-        // 2. The old badge is from a different package and won't interfere
-        // 3. Players can manually delete old badges if desired
-        // The Sui runtime will handle cleanup of objects that are no longer referenced.
-        transfer::public_transfer(old_badge, tx_context::sender(ctx));
         // At this point, we've verified:
         // 1. New badge was created
         // 2. New badge was transferred to player
         // 3. New badge is registered in registry
         // 4. New badge ID matches what we registered
-        // So it's safe to delete the old badge
+        // 
+        // NOTE: The old badge is soulbound (only has 'key' ability, not 'store'), so it cannot be
+        // transferred or deleted from another module. The old badge remains in the player's wallet.
+        // The player must manually delete the old badge by calling the delete function in the
+        // old badge's module. This is safe because:
+        // 1. The new badge is registered and active
+        // 2. The old badge is from a different package and won't interfere with the new system
+        // 3. The player can delete the old badge when ready to free storage
     }
 }
 

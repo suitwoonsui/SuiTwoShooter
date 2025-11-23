@@ -539,79 +539,76 @@ function clearBadgeCache() {
 
 /**
  * Build migration transaction for player to sign
- * @param {string} oldBadgeId - Object ID of the old badge to be burned
+ * @param {string} oldBadgeId - Object ID of the old badge (optional - if provided, will attempt to delete it)
  * @param {number} oldTier - Tier from old badge
  * @param {number} oldGamesPlayed - Games played from old badge
  * @param {number} oldMintDate - Original mint date from old badge
- * @param {Uint8Array} imageData - Badge image data (WebP bytes)
- * @returns {Promise<Object>} Transaction data
+ * @param {string} imageUrl - URL to badge image (or null to construct from tier)
+ * @param {string} oldPackageId - Package ID of the old badge contract (optional - if provided, will attempt to delete old badge)
+ * @returns {Promise<Object>} Transaction data (base64 string)
  */
-async function buildMigrateBadgeTransaction(oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData) {
+async function buildMigrateBadgeTransaction(oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageUrl = null, oldPackageId = null) {
   try {
-    // NOTE: For large images (>16KB), we need to use chunked upload
-    // The backend handles this automatically, but the frontend version here
-    // will hit the 16KB limit for large images
-    // TODO: Create API endpoint for migration transaction building that handles chunked upload
-    
-    const { Transaction } = await import('@mysten/sui/transactions');
-    const txb = new Transaction();
-    
-    // Get API base URL and config
+    // If imageUrl is not provided, construct it from tier
+    if (!imageUrl) {
+      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+      const tierName = tierNames[oldTier] || 'Standard';
+      const API_BASE_URL = getApiBaseUrl();
+      const baseUrl = API_BASE_URL.replace(/\/api$/, '');
+      imageUrl = `${baseUrl}/Badges/${tierName}.webp`;
+    }
+
+    // Validate imageUrl format
+    if (!imageUrl || typeof imageUrl !== 'string' || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+      return {
+        success: false,
+        error: 'Invalid imageUrl format. Must be a valid HTTP/HTTPS URL.',
+      };
+    }
+
+    // Get API base URL
     const API_BASE_URL = getApiBaseUrl();
-    const configResponse = await fetch(`${API_BASE_URL}/config`);
-    const config = await configResponse.json();
     
-    if (!config.contracts || !config.contracts.gameScore || !config.contracts.badgeRegistry || !config.contracts.statisticsRegistry) {
+    // Call backend API to build transaction
+    // This will include both migration AND old badge deletion in a single atomic transaction
+    // If oldBadgeId and oldPackageId are provided, the transaction will attempt to delete the old badge
+    const response = await fetch(`${API_BASE_URL}/badges/migrate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        oldBadgeId: oldBadgeId || undefined, // Only include if provided
+        oldTier,
+        oldGamesPlayed,
+        oldMintDate,
+        imageUrl,
+        oldPackageId: oldPackageId || undefined, // Only include if provided
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       return {
         success: false,
-        error: 'Contract configuration not available',
+        error: errorData.error || `HTTP ${response.status}`,
       };
     }
 
-    // Check if image is too large for direct upload
-    const imageArray = imageData instanceof Uint8Array ? Array.from(imageData) : imageData;
-    const CHUNK_THRESHOLD = 14 * 1024; // 14KB
+    const data = await response.json();
     
-    if (imageArray.length > CHUNK_THRESHOLD) {
+    if (!data.success || !data.transaction) {
       return {
         success: false,
-        error: `Image too large (${imageArray.length} bytes) for direct upload. Please use the backend API endpoint that supports chunked upload.`,
+        error: data.error || 'Failed to build migration transaction',
       };
     }
-    
-    // For small images, we can create BadgeImageData directly
-    // But we need to create it first, then use it
-    // Actually, for now, let's just warn and suggest using backend
-    // The proper solution is to create an API endpoint
-    
-    // Create BadgeImageData object first
-    const imageDataObj = txb.moveCall({
-      target: `${config.contracts.gameScore}::badge_system::create_image_data_small`,
-      arguments: [
-        txb.pure.vector('u8', imageArray),
-      ],
-    });
-    
-    txb.moveCall({
-      target: `${config.contracts.gameScore}::badge_system::migrate_badge`,
-      arguments: [
-        txb.object(config.contracts.badgeRegistry),
-        txb.object(config.contracts.statisticsRegistry),
-        txb.object('0x6'), // Clock object
-        txb.object(oldBadgeId), // Old badge object (will be burned)
-        txb.pure.u8(oldTier),
-        txb.pure.u64(oldGamesPlayed),
-        txb.pure.u64(oldMintDate),
-        imageDataObj, // BadgeImageData object
-      ],
-    });
 
-    // Set gas budget
-    txb.setGasBudget(50_000_000); // 0.05 SUI
-
+    // Return base64 transaction string (similar to store purchases)
     return {
       success: true,
-      transactionData: txb,
+      transaction: data.transaction, // Base64 encoded transaction bytes
+      gasEstimate: data.gasEstimate,
     };
   } catch (error) {
     console.error('❌ [BADGE] Error building migration transaction:', error);

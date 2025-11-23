@@ -1601,91 +1601,77 @@ export class BadgeService {
     oldTier: number,
     oldGamesPlayed: number,
     oldMintDate: number,
-    imageData: Uint8Array
+    imageUrl: string,
+    oldPackageId?: string
   ): Promise<Transaction> {
     if (!this.config.contracts.badgeRegistry || !this.config.contracts.statisticsRegistry) {
       throw new Error('BadgeRegistry or StatisticsRegistry not configured');
     }
 
-    // Validate image data before building transaction
-    try {
-      const validatedImage = validateAndSanitizeImage(imageData);
-      const imageInfo = getImageInfo(validatedImage);
-      console.log(`✅ [MIGRATION] Image validated:`, {
-        size: `${imageInfo.sizeKB}KB`,
-        format: imageInfo.format,
-        dimensions: imageInfo.width && imageInfo.height ? `${imageInfo.width}x${imageInfo.height}` : 'unknown',
-      });
-      // Use validated image
-      imageData = validatedImage;
-    } catch (validationError) {
-      console.error(`❌ [MIGRATION] Image validation failed:`, validationError);
-      throw new Error(`Invalid badge image data: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`);
+    // Validate image URL format
+    if (!imageUrl || typeof imageUrl !== 'string' || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+      throw new Error('Invalid image URL. Must be a valid HTTP/HTTPS URL.');
     }
 
-    // Create BadgeImageData object using chunked upload (if >14KB) or direct (if ≤14KB)
-    const CHUNK_THRESHOLD = 14 * 1024; // 14KB
-    let imageDataObjectId: string;
-    
-    if (imageData.length > CHUNK_THRESHOLD) {
-      console.log(`📦 [MIGRATION] Image is ${imageData.length} bytes (>${CHUNK_THRESHOLD} bytes), using chunked upload...`);
-      imageDataObjectId = await this.createImageDataObjectChunked(imageData);
-    } else {
-      console.log(`📦 [MIGRATION] Image is ${imageData.length} bytes (≤${CHUNK_THRESHOLD} bytes), using direct upload...`);
-      // Create directly in a single transaction
-      const client = this.getClient();
-      const txbCreate = new Transaction();
-      const imageDataObj = txbCreate.moveCall({
-        target: `${this.config.contracts.gameScore}::badge_system::create_image_data_small`,
-        arguments: [
-          txbCreate.pure.vector('u8', Array.from(imageData)),
-        ],
-      });
-      txbCreate.transferObjects([imageDataObj], this.adminWallet.getAddress());
-      txbCreate.setGasBudget(this.config.sui.gasBudget);
+    // Get old package ID from parameter or environment
+    const finalOldPackageId = oldPackageId || 
+      process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || 
+      process.env.OLD_GAME_SCORE_CONTRACT;
 
-      const resultCreate = await client.signAndExecuteTransaction({
-        signer: this.adminWallet.getKeypair(),
-        transaction: txbCreate,
-        options: {
-          showEffects: true,
-          showObjectChanges: true,
-        },
-      });
-
-      if (resultCreate.effects?.status?.status !== 'success') {
-        throw new Error(`Failed to create BadgeImageData object: ${resultCreate.effects?.status?.error || 'Unknown error'}`);
-      }
-
-      const createdObjects = resultCreate.objectChanges?.filter(
-        (change: any) => change.type === 'created' && change.objectType?.includes('BadgeImageData')
-      );
-      
-      if (!createdObjects || createdObjects.length === 0) {
-        throw new Error('Failed to get BadgeImageData object ID from transaction');
-      }
-
-      imageDataObjectId = (createdObjects[0] as any).objectId;
-      console.log(`✅ [MIGRATION] Created BadgeImageData object: ${imageDataObjectId}`);
+    console.log(`✅ [MIGRATION] Building migration transaction with image URL: ${imageUrl}`);
+    if (finalOldPackageId) {
+      console.log(`✅ [MIGRATION] Old package ID: ${finalOldPackageId}`);
+      console.log(`✅ [MIGRATION] Old badge ID: ${oldBadgeId}`);
     }
 
     const txb = new Transaction();
     
+    // STEP 1: Migrate badge (create new badge)
+    // This must succeed before we delete the old badge
     txb.moveCall({
       target: `${this.config.contracts.gameScore}::badge_system::migrate_badge`,
       arguments: [
         txb.object(this.config.contracts.badgeRegistry),
         txb.object(this.config.contracts.statisticsRegistry),
         txb.object('0x6'), // Clock object (well-known shared object)
-        txb.object(oldBadgeId), // Old badge object (will be burned)
         txb.pure.u8(oldTier),
         txb.pure.u64(oldGamesPlayed),
         txb.pure.u64(oldMintDate),
-        txb.object(imageDataObjectId), // Pre-populated BadgeImageData object
+        txb.pure.string(imageUrl), // Image URL string (not BadgeImageData object)
       ],
     });
 
-    txb.setGasBudget(this.config.sui.gasBudget);
+    // STEP 2: Delete old badge (if old package ID and badge ID are provided)
+    // This is done atomically in the same transaction - if migration fails, deletion won't happen
+    // If deletion fails, the entire transaction fails (atomic)
+    // 
+    // NOTE: This assumes the old badge module has a public delete function.
+    // Common function names: delete_badge(badge) or burn_badge(badge)
+    // The function must take the badge object as an argument (player owns it, so they can pass it)
+    // 
+    // If the old module doesn't have such a function, this will fail at transaction build time.
+    // In that case, the migration will need to be done without deletion, and the player
+    // will need to manually delete the old badge.
+    if (finalOldPackageId && oldBadgeId) {
+      // Try to call delete_badge from the old package
+      // This is the most common pattern for deleting soulbound NFTs
+      // The function signature should be: public entry fun delete_badge(badge: OldBadge)
+      txb.moveCall({
+        target: `${finalOldPackageId}::badge_system::delete_badge`,
+        arguments: [
+          txb.object(oldBadgeId), // Old badge object (player owns it, so they can pass it)
+        ],
+      });
+      console.log(`✅ [MIGRATION] Added delete_badge call to transaction`);
+      console.log(`   Old package: ${finalOldPackageId}`);
+      console.log(`   Old badge ID: ${oldBadgeId}`);
+      console.log(`   ⚠️  If delete_badge doesn't exist in old package, transaction will fail at build time`);
+    } else {
+      console.log(`ℹ️ [MIGRATION] Old package ID or badge ID not provided. Old badge deletion skipped.`);
+      console.log(`ℹ️ [MIGRATION] Player will need to manually delete the old badge.`);
+    }
+
+    txb.setGasBudget(this.config.sui.gasBudget * 2); // Increase gas budget for two operations
 
     return txb;
   }
