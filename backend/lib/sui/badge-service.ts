@@ -761,6 +761,38 @@ export class BadgeService {
     }
 
     try {
+      // Validate that paymentCoinId is a SUI coin (not MEWS, USDC, or other tokens)
+      // Badge minting requires SUI payment only
+      const client = this.getClient();
+      try {
+        const coinObject = await client.getObject({
+          id: paymentCoinId,
+          options: { showType: true, showContent: true },
+        });
+        
+        if (!coinObject.data) {
+          return {
+            success: false,
+            error: 'Payment coin not found',
+          };
+        }
+        
+        // Verify it's a SUI coin (0x2::sui::SUI)
+        const coinType = coinObject.data.type;
+        if (!coinType || !coinType.includes('0x2::sui::SUI')) {
+          return {
+            success: false,
+            error: 'Invalid payment coin type. Badge minting requires SUI coins only.',
+          };
+        }
+      } catch (error) {
+        console.error('Error validating payment coin:', error);
+        return {
+          success: false,
+          error: 'Failed to validate payment coin. Please ensure you are using a SUI coin.',
+        };
+      }
+
       // Check if player already has badge
       const hasBadge = await this.hasBadge(playerAddress);
       if (hasBadge) {
@@ -783,7 +815,7 @@ export class BadgeService {
       } else {
         console.log(`📦 [MINT BUILD] Image is ${imageData.length} bytes (≤${CHUNK_THRESHOLD} bytes), using direct upload...`);
         // Create directly in a single transaction
-        const client = this.getClient();
+        // Reuse client from validation above
         const txbCreate = new Transaction();
         const imageDataObj = txbCreate.moveCall({
           target: `${this.config.contracts.gameScore}::badge_system::create_image_data_small`,
@@ -855,8 +887,73 @@ export class BadgeService {
       const gasWithBuffer = Math.round(gasEstimate * 1.15);
       txb.setGasBudget(gasWithBuffer);
 
+      // Query player's SUI coins to select one for gas payment
+      // This is needed because txb.build() requires gas coins to be selected
+      // IMPORTANT: 
+      // 1. We must use SUI coins ONLY (not MEWS, USDC, or any other token)
+      // 2. We must NOT use the paymentCoinId for gas, as it's used for payment
+      // Reuse client from validation above
+      const coins = await client.getCoins({
+        owner: playerAddress,
+        coinType: '0x2::sui::SUI', // Explicitly use SUI only
+      });
+
+      if (!coins.data || coins.data.length === 0) {
+        return {
+          success: false,
+          error: 'No valid gas coins found for the transaction. Please ensure you have SUI in your wallet.',
+        };
+      }
+
+      // Filter out the payment coin from gas selection (can't use same coin for both)
+      const availableCoins = coins.data.filter(coin => coin.coinObjectId !== paymentCoinId);
+
+      if (availableCoins.length === 0) {
+        return {
+          success: false,
+          error: 'No available gas coins. The payment coin cannot be used for gas. Please ensure you have additional SUI coins for gas fees.',
+        };
+      }
+
+      // Select a coin with sufficient balance for gas (excluding payment coin)
+      // We need at least gasWithBuffer for gas
+      const gasCoin = availableCoins.find(coin => {
+        const balance = BigInt(coin.balance);
+        return balance >= BigInt(gasWithBuffer);
+      });
+
+      if (!gasCoin) {
+        // If no single coin has enough, try to find the largest available coin
+        const sortedCoins = availableCoins.sort((a, b) => {
+          return BigInt(b.balance) > BigInt(a.balance) ? 1 : -1;
+        });
+        const largestCoin = sortedCoins[0];
+        
+        // Check if largest coin has at least gas budget
+        if (BigInt(largestCoin.balance) < BigInt(gasWithBuffer)) {
+          return {
+            success: false,
+            error: `Insufficient SUI for gas fees. Required: ${(gasWithBuffer / 1_000_000_000).toFixed(4)} SUI. Please merge your coins or add more SUI.`,
+          };
+        }
+        
+        // Use the largest coin for gas (payment coin is separate)
+        txb.setGasPayment([{
+          objectId: largestCoin.coinObjectId,
+          version: largestCoin.version,
+          digest: largestCoin.digest,
+        }]);
+      } else {
+        // Use the coin that has sufficient balance
+        txb.setGasPayment([{
+          objectId: gasCoin.coinObjectId,
+          version: gasCoin.version,
+          digest: gasCoin.digest,
+        }]);
+      }
+
       // Build transaction (don't sign - frontend will sign)
-      const client = this.getClient();
+      // Reuse client from validation above
       const transactionBytes = await txb.build({ client });
 
       console.log('✅ [MINT BUILD] Transaction built successfully');
