@@ -650,14 +650,36 @@ export class BadgeService {
       let imageUrl: string | undefined;
       if (result3.results && result3.results[0]?.returnValues?.[0]) {
         const imageReturnValue = result3.results[0].returnValues[0] as any;
+        console.log(`🔍 [BADGE LOOKUP] Raw image return value:`, JSON.stringify(imageReturnValue, null, 2));
+        
         // The return value is a String, which comes as [typeArray, valueString]
-        if (Array.isArray(imageReturnValue) && typeof imageReturnValue[1] === 'string') {
-          imageUrl = imageReturnValue[1];
-          console.log(`🔍 [BADGE LOOKUP] Image URL fetched: ${imageUrl}`);
+        if (Array.isArray(imageReturnValue) && imageReturnValue.length >= 2) {
+          // Check if second element is a string and looks like a URL
+          const potentialUrl = imageReturnValue[1];
+          if (typeof potentialUrl === 'string' && (potentialUrl.startsWith('http://') || potentialUrl.startsWith('https://'))) {
+            imageUrl = potentialUrl;
+            console.log(`🔍 [BADGE LOOKUP] Image URL fetched from array: ${imageUrl}`);
+          } else {
+            console.warn(`⚠️ [BADGE LOOKUP] Array element is not a valid URL:`, potentialUrl);
+          }
         } else if (typeof imageReturnValue === 'string') {
-          imageUrl = imageReturnValue;
-          console.log(`🔍 [BADGE LOOKUP] Image URL fetched (direct string): ${imageUrl}`);
+          // Direct string value
+          if (imageReturnValue.startsWith('http://') || imageReturnValue.startsWith('https://')) {
+            imageUrl = imageReturnValue;
+            console.log(`🔍 [BADGE LOOKUP] Image URL fetched (direct string): ${imageUrl}`);
+          } else {
+            console.warn(`⚠️ [BADGE LOOKUP] String value is not a valid URL:`, imageReturnValue);
+          }
+        } else {
+          console.warn(`⚠️ [BADGE LOOKUP] Unexpected return value format:`, typeof imageReturnValue, imageReturnValue);
         }
+      }
+      
+      // Fallback: If imageUrl is not valid, construct from tier
+      if (!imageUrl || !imageUrl.startsWith('http')) {
+        console.log(`🔍 [BADGE LOOKUP] Image URL not found or invalid, constructing from tier ${tierValue}`);
+        imageUrl = this.getBadgeImageUrl(Number(tierValue));
+        console.log(`🔍 [BADGE LOOKUP] Constructed image URL: ${imageUrl}`);
       }
 
       const badgeData = {

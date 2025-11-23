@@ -615,16 +615,43 @@ function displayBadgeInUI(container, badgeData) {
   const tierName = window.BadgeService ? window.BadgeService.getTierName(badge.tier) : 'Unknown';
   const discounts = window.BadgeService ? window.BadgeService.getDiscountsForTier(badge.tier) : { store: 0, gameplay: 0 };
 
-  // Use imageUrl if available (from badge.image field), otherwise fall back to imageData
+  // Use imageUrl if available (from badge.image field), otherwise fall back to constructing from tier or imageData
   let imageSrc = null;
-  if (badge.imageUrl) {
-    // Use the URL directly from the badge's image field
+  
+  // First, try to use imageUrl from badge
+  if (badge.imageUrl && typeof badge.imageUrl === 'string' && (badge.imageUrl.startsWith('http://') || badge.imageUrl.startsWith('https://'))) {
+    // Use the URL directly from the badge's image field (validate it's a real URL)
     imageSrc = badge.imageUrl;
-  } else if (badge.imageData && badge.imageData.length > 0) {
-    // Fallback to base64 data URI for backwards compatibility
-    imageSrc = `data:image/webp;base64,${arrayBufferToBase64(badge.imageData)}`;
+    console.log('✅ [BADGE UI] Using badge imageUrl:', imageSrc);
+  } else {
+    // Log what we received for debugging
+    console.log('🔍 [BADGE UI] Badge imageUrl value:', badge.imageUrl, 'Type:', typeof badge.imageUrl);
+    
+    // Fallback 1: Construct URL from tier
+    const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+    const tierName = tierNames[badge.tier] || 'Standard';
+    const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    // Remove /api suffix if present, then add /Badges/
+    const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+    const constructedUrl = `${baseUrl}/Badges/${tierName}.webp`;
+    imageSrc = constructedUrl;
+    console.log('✅ [BADGE UI] Constructed image URL from tier:', imageSrc);
+    
+    // Fallback 2: If we have imageData, use it instead
+    if (badge.imageData && badge.imageData.length > 0) {
+      // Fallback to base64 data URI for backwards compatibility
+      imageSrc = `data:image/webp;base64,${arrayBufferToBase64(badge.imageData)}`;
+      console.log('✅ [BADGE UI] Using badge imageData (base64) instead of constructed URL');
+    }
   }
 
+  // Construct fallback URL from tier in case image fails to load
+  const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+  const tierNameForUrl = tierNames[badge.tier] || 'Standard';
+  const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+  const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+  const fallbackUrl = `${baseUrl}/Badges/${tierNameForUrl}.webp`;
+  
   const badgeHTML = `
     <div class="badge-display-container">
       <div class="badge-display-header">
@@ -632,7 +659,7 @@ function displayBadgeInUI(container, badgeData) {
       </div>
       <div class="badge-display-content">
         ${imageSrc 
-          ? `<img src="${imageSrc}" alt="Badge" class="badge-display-image" />`
+          ? `<img src="${imageSrc}" alt="Badge" class="badge-display-image" onerror="this.onerror=null; this.src='${fallbackUrl}'; console.warn('⚠️ [BADGE UI] Image failed to load, using fallback:', '${fallbackUrl}');" />`
           : `<div class="badge-display-placeholder">🎖️</div>`
         }
         <div class="badge-display-info">

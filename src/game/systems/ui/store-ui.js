@@ -273,47 +273,70 @@ async function loadStoreBadgeDisplay() {
     console.log('📋 [STORE] Badge data:', { tier: badge.tier, tierName, discounts, storeDiscount });
     
     // Convert image data to base64 using the helper function if available
-    // Use imageUrl if available (from badge.image field), otherwise fall back to imageData
+    // Use imageUrl if available (from badge.image field), otherwise fall back to constructing from tier or imageData
     let imageSrc = null;
-    if (badge.imageUrl) {
-      // Use the URL directly from the badge's image field
+    
+    // First, try to use imageUrl from badge
+    if (badge.imageUrl && typeof badge.imageUrl === 'string' && (badge.imageUrl.startsWith('http://') || badge.imageUrl.startsWith('https://'))) {
+      // Use the URL directly from the badge's image field (validate it's a real URL)
       imageSrc = badge.imageUrl;
       console.log('✅ [STORE] Using badge image URL:', imageSrc);
-    } else if (badge.imageData && badge.imageData.length > 0) {
-      // Fallback to base64 data URI for backwards compatibility
-      try {
-        // Use arrayBufferToBase64 from BadgeUI if available, otherwise manual conversion
-        if (window.BadgeUI && typeof window.BadgeUI.arrayBufferToBase64 === 'function') {
-          imageSrc = `data:image/webp;base64,${window.BadgeUI.arrayBufferToBase64(badge.imageData)}`;
-        } else {
-          // Manual conversion
-          let base64;
-          if (Array.isArray(badge.imageData)) {
-            const bytes = new Uint8Array(badge.imageData);
-            const binary = String.fromCharCode.apply(null, Array.from(bytes));
-            base64 = btoa(binary);
-          } else if (badge.imageData instanceof Uint8Array) {
-            const binary = String.fromCharCode.apply(null, Array.from(badge.imageData));
-            base64 = btoa(binary);
-          } else {
-            const binary = String.fromCharCode.apply(null, Array.from(new Uint8Array(badge.imageData)));
-            base64 = btoa(binary);
-          }
-          imageSrc = `data:image/webp;base64,${base64}`;
-        }
-        console.log('✅ [STORE] Badge image converted from imageData');
-      } catch (error) {
-        console.warn('⚠️ [STORE] Failed to convert badge image:', error);
-      }
     } else {
-      console.warn('⚠️ [STORE] No image URL or imageData in badge');
-    }
+      // Log what we received for debugging
+      console.log('🔍 [STORE] Badge imageUrl value:', badge.imageUrl, 'Type:', typeof badge.imageUrl);
+      
+      // Fallback 1: Construct URL from tier
+      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+      const tierName = tierNames[badge.tier] || 'Standard';
+      const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+      // Remove /api suffix if present, then add /Badges/
+      const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+      const constructedUrl = `${baseUrl}/Badges/${tierName}.webp`;
+      imageSrc = constructedUrl;
+      console.log('✅ [STORE] Constructed image URL from tier:', imageSrc);
+      
+      // Fallback 2: If we have imageData, use it instead of constructed URL
+      if (badge.imageData && badge.imageData.length > 0) {
+        // Fallback to base64 data URI for backwards compatibility
+        try {
+          // Use arrayBufferToBase64 from BadgeUI if available, otherwise manual conversion
+          if (window.BadgeUI && typeof window.BadgeUI.arrayBufferToBase64 === 'function') {
+            imageSrc = `data:image/webp;base64,${window.BadgeUI.arrayBufferToBase64(badge.imageData)}`;
+          } else {
+            // Manual conversion
+            let base64;
+            if (Array.isArray(badge.imageData)) {
+              const bytes = new Uint8Array(badge.imageData);
+              const binary = String.fromCharCode.apply(null, Array.from(bytes));
+              base64 = btoa(binary);
+            } else if (badge.imageData instanceof Uint8Array) {
+              const binary = String.fromCharCode.apply(null, Array.from(badge.imageData));
+              base64 = btoa(binary);
+            } else {
+              const binary = String.fromCharCode.apply(null, Array.from(new Uint8Array(badge.imageData)));
+              base64 = btoa(binary);
+            }
+            imageSrc = `data:image/webp;base64,${base64}`;
+          }
+          console.log('✅ [STORE] Using badge imageData (base64) instead of constructed URL');
+        } catch (error) {
+          console.warn('⚠️ [STORE] Failed to convert badge imageData, using constructed URL:', error);
+          // Keep the constructed URL as fallback
+        }
+      }
+    
+    // Construct fallback URL from tier in case image fails to load
+    const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+    const tierNameForUrl = tierNames[badge.tier] || 'Standard';
+    const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+    const fallbackUrl = `${baseUrl}/Badges/${tierNameForUrl}.webp`;
     
     // Always show badge image (use placeholder if image conversion failed)
     const badgeHTML = `
       <div class="store-badge-icon-wrapper">
         ${imageSrc 
-          ? `<img src="${imageSrc}" alt="Badge" class="store-badge-icon-image" />`
+          ? `<img src="${imageSrc}" alt="Badge" class="store-badge-icon-image" onerror="this.onerror=null; this.src='${fallbackUrl}'; console.warn('⚠️ [STORE] Image failed to load, using fallback:', '${fallbackUrl}');" />`
           : `<span class="store-badge-icon-placeholder">🎖️</span>`
         }
         <div class="store-badge-text">

@@ -145,6 +145,10 @@ function updateWalletUI(address) {
   }
 }
 
+// Track last loaded badge to prevent redundant calls
+let lastLoadedBadgeAddress = null;
+let badgeLoadInProgress = false;
+
 /**
  * Load and display badge in main menu (if player has one)
  * @param {string} walletAddress - Player's wallet address
@@ -160,8 +164,24 @@ async function loadMenuBadgeDisplay(walletAddress) {
     // No wallet connected, hide badge display
     if (!walletAddress) {
       badgeDisplay.style.display = 'none';
+      lastLoadedBadgeAddress = null;
       return;
     }
+    
+    // Prevent redundant calls: if we're already loading for this address, skip
+    if (badgeLoadInProgress && lastLoadedBadgeAddress === walletAddress) {
+      console.log('⏭️ [MENU] Badge load already in progress for this address, skipping duplicate call');
+      return;
+    }
+    
+    // If badge is already loaded for this address and display is visible, skip
+    if (lastLoadedBadgeAddress === walletAddress && badgeDisplay.style.display !== 'none' && badgeDisplay.innerHTML.trim() !== '') {
+      console.log('⏭️ [MENU] Badge already loaded for this address, skipping redundant call');
+      return;
+    }
+    
+    badgeLoadInProgress = true;
+    lastLoadedBadgeAddress = walletAddress;
 
     // Get badge data from BadgeService
     if (!window.BadgeService || !window.BadgeService.getBadge) {
@@ -257,32 +277,61 @@ async function loadMenuBadgeDisplay(walletAddress) {
       const tierName = window.BadgeService.getTierName(badge.tier);
       const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
 
-      // Use imageUrl if available (from badge.image field), otherwise fall back to imageData
+      // Use imageUrl if available (from badge.image field), otherwise fall back to constructing from tier or imageData
       let imageSrc = null;
-      if (badge.imageUrl) {
-        // Use the URL directly from the badge's image field
+      
+      // First, try to use imageUrl from badge
+      if (badge.imageUrl && typeof badge.imageUrl === 'string' && (badge.imageUrl.startsWith('http://') || badge.imageUrl.startsWith('https://'))) {
+        // Use the URL directly from the badge's image field (validate it's a real URL)
         imageSrc = badge.imageUrl;
-      } else if (badge.imageData && badge.imageData.length > 0) {
-        // Fallback to base64 data URI for backwards compatibility
-        try {
-          if (Array.isArray(badge.imageData)) {
-            const bytes = new Uint8Array(badge.imageData);
-            const binary = String.fromCharCode.apply(null, Array.from(bytes));
-            imageSrc = 'data:image/webp;base64,' + btoa(binary);
-          } else {
-            const binary = String.fromCharCode.apply(null, Array.from(badge.imageData));
-            imageSrc = 'data:image/webp;base64,' + btoa(binary);
+        console.log('✅ [MENU] Using badge imageUrl:', imageSrc);
+      } else {
+        // Log what we received for debugging
+        console.log('🔍 [MENU] Badge imageUrl value:', badge.imageUrl, 'Type:', typeof badge.imageUrl);
+        
+        // Fallback 1: Construct URL from tier
+        const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+        const tierName = tierNames[badge.tier] || 'Standard';
+        const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+        // Remove /api suffix if present, then add /Badges/
+        const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+        const constructedUrl = `${baseUrl}/Badges/${tierName}.webp`;
+        imageSrc = constructedUrl;
+        console.log('✅ [MENU] Constructed image URL from tier:', imageSrc);
+        
+        // Fallback 2: If we have imageData, use it instead
+        if (badge.imageData && badge.imageData.length > 0) {
+          try {
+            let base64;
+            if (Array.isArray(badge.imageData)) {
+              const bytes = new Uint8Array(badge.imageData);
+              const binary = String.fromCharCode.apply(null, Array.from(bytes));
+              base64 = btoa(binary);
+            } else {
+              const binary = String.fromCharCode.apply(null, Array.from(badge.imageData));
+              base64 = btoa(binary);
+            }
+            imageSrc = 'data:image/webp;base64,' + base64;
+            console.log('✅ [MENU] Using badge imageData (base64) instead of constructed URL');
+          } catch (error) {
+            console.warn('⚠️ [MENU] Failed to convert badge imageData, using constructed URL:', error);
+            // Keep the constructed URL as fallback
           }
-        } catch (error) {
-          console.warn('⚠️ [MENU] Failed to convert badge image:', error);
         }
       }
 
+      // Construct fallback URL from tier in case image fails to load
+      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+      const tierNameForUrl = tierNames[badge.tier] || 'Standard';
+      const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+      const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+      const fallbackUrl = `${baseUrl}/Badges/${tierNameForUrl}.webp`;
+      
       const badgeHTML = `
         <div class="menu-badge-info">
           <h3>🎖️ Your ${tierName} Badge</h3>
           ${imageSrc
-            ? `<img src="${imageSrc}" alt="Badge" class="menu-badge-image" />`
+            ? `<img src="${imageSrc}" alt="Badge" class="menu-badge-image" onerror="this.onerror=null; this.src='${fallbackUrl}'; console.warn('⚠️ [MENU] Image failed to load, using fallback:', '${fallbackUrl}');" />`
             : `<div class="menu-badge-placeholder">🎖️</div>`
           }
           <div class="menu-badge-details">
@@ -297,9 +346,12 @@ async function loadMenuBadgeDisplay(walletAddress) {
     }
 
     console.log('✅ [MENU] Badge displayed in main menu');
+    badgeLoadInProgress = false;
   } catch (error) {
     console.error('❌ [MENU] Error loading badge display:', error);
     badgeDisplay.style.display = 'none';
+    badgeLoadInProgress = false;
+    // Don't clear lastLoadedBadgeAddress on error - allow retry
   }
 }
 
@@ -359,6 +411,10 @@ async function initializeWalletIntegration() {
           window.BadgeService.clearBadgeCache();
           console.log('📋 [MENU] Cleared badge cache due to wallet change');
         }
+        
+        // Reset badge load tracking when wallet changes
+        lastLoadedBadgeAddress = null;
+        badgeLoadInProgress = false;
         
         const badgeDisplay = document.getElementById('menuBadgeDisplay');
         if (badgeDisplay) {
@@ -534,13 +590,19 @@ async function checkMEWSBalanceAndUpdateUI(address) {
         console.log('📋 [MENU] Cleared badge cache before loading badge for address:', address);
       }
       
-      const badgeDisplay = document.getElementById('menuBadgeDisplay');
-      if (badgeDisplay) {
-        badgeDisplay.style.display = 'none';
-        badgeDisplay.innerHTML = ''; // Clear any existing badge content
+      // Reset tracking if address changed (wallet switch)
+      if (lastLoadedBadgeAddress !== address) {
+        lastLoadedBadgeAddress = null;
+        badgeLoadInProgress = false;
+        const badgeDisplay = document.getElementById('menuBadgeDisplay');
+        if (badgeDisplay) {
+          badgeDisplay.style.display = 'none';
+          badgeDisplay.innerHTML = ''; // Clear any existing badge content
+        }
       }
       
       // Load and display badge when balance is checked (wallet is fully loaded)
+      // This is the primary place badge should be loaded when wallet connects
       await loadMenuBadgeDisplay(address);
       
       if (balanceResult.hasMinimumBalance) {
@@ -952,9 +1014,15 @@ function showMainMenu() {
   
   // Update wallet UI when menu is shown
   if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
-    updateWalletUI(window.walletAPIInstance.getAddress());
-    // Load and display badge if player has one
-    loadMenuBadgeDisplay(window.walletAPIInstance.getAddress());
+    const address = window.walletAPIInstance.getAddress();
+    updateWalletUI(address);
+    // Only load badge if it hasn't been loaded for this address yet
+    // (checkMEWSBalanceAndUpdateUI already loads it when wallet connects)
+    if (lastLoadedBadgeAddress !== address) {
+      loadMenuBadgeDisplay(address);
+    } else {
+      console.log('⏭️ [MENU] Skipping badge load in showMainMenu - already loaded for this address');
+    }
   } else {
     updateWalletUI(null);
     // Hide badge display when wallet is not connected
@@ -962,5 +1030,7 @@ function showMainMenu() {
     if (badgeDisplay) {
       badgeDisplay.style.display = 'none';
     }
+    lastLoadedBadgeAddress = null;
+    badgeLoadInProgress = false;
   }
 }
