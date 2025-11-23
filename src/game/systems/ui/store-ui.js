@@ -270,6 +270,9 @@ async function loadStoreBadgeDisplay() {
     const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
     const storeDiscount = discounts.store || 0;
     
+    // Define tierNames at function scope to avoid duplicate declarations
+    const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+    
     console.log('📋 [STORE] Badge data:', { tier: badge.tier, tierName, discounts, storeDiscount });
     
     // Convert image data to base64 using the helper function if available
@@ -286,7 +289,6 @@ async function loadStoreBadgeDisplay() {
       console.log('🔍 [STORE] Badge imageUrl value:', badge.imageUrl, 'Type:', typeof badge.imageUrl);
       
       // Fallback 1: Construct URL from tier
-      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
       const tierName = tierNames[badge.tier] || 'Standard';
       const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
       // Remove /api suffix if present, then add /Badges/
@@ -326,7 +328,6 @@ async function loadStoreBadgeDisplay() {
       }
     
     // Construct fallback URL from tier in case image fails to load
-    const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
     const tierNameForUrl = tierNames[badge.tier] || 'Standard';
     const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
     const baseUrl = apiBaseUrl.replace(/\/api$/, '');

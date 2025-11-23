@@ -652,15 +652,28 @@ export class BadgeService {
         const imageReturnValue = result3.results[0].returnValues[0] as any;
         console.log(`🔍 [BADGE LOOKUP] Raw image return value:`, JSON.stringify(imageReturnValue, null, 2));
         
-        // The return value is a String, which comes as [typeArray, valueString]
+        // The return value is a String, which comes as [byteArray, typeString]
+        // Format: [[76, 104, 116, ...], "0x1::string::String"]
         if (Array.isArray(imageReturnValue) && imageReturnValue.length >= 2) {
-          // Check if second element is a string and looks like a URL
-          const potentialUrl = imageReturnValue[1];
-          if (typeof potentialUrl === 'string' && (potentialUrl.startsWith('http://') || potentialUrl.startsWith('https://'))) {
-            imageUrl = potentialUrl;
-            console.log(`🔍 [BADGE LOOKUP] Image URL fetched from array: ${imageUrl}`);
+          const byteArray = imageReturnValue[0];
+          const typeString = imageReturnValue[1];
+          
+          // Check if first element is a byte array (array of numbers)
+          if (Array.isArray(byteArray) && byteArray.length > 0 && typeof byteArray[0] === 'number') {
+            // Convert byte array to string
+            const potentialUrl = String.fromCharCode(...byteArray);
+            if (potentialUrl.startsWith('http://') || potentialUrl.startsWith('https://')) {
+              imageUrl = potentialUrl;
+              console.log(`🔍 [BADGE LOOKUP] Image URL fetched from byte array: ${imageUrl}`);
+            } else {
+              console.warn(`⚠️ [BADGE LOOKUP] Converted string is not a valid URL:`, potentialUrl);
+            }
+          } else if (typeof byteArray === 'string' && (byteArray.startsWith('http://') || byteArray.startsWith('https://'))) {
+            // Sometimes it might already be a string
+            imageUrl = byteArray;
+            console.log(`🔍 [BADGE LOOKUP] Image URL fetched from string: ${imageUrl}`);
           } else {
-            console.warn(`⚠️ [BADGE LOOKUP] Array element is not a valid URL:`, potentialUrl);
+            console.warn(`⚠️ [BADGE LOOKUP] Unexpected byte array format:`, typeof byteArray, byteArray);
           }
         } else if (typeof imageReturnValue === 'string') {
           // Direct string value
