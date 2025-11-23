@@ -132,20 +132,47 @@ export function getConfig(): Config {
       nodeEnv: (process.env.NODE_ENV || 'development') as NodeEnv,
       corsOrigin: process.env.CORS_ORIGIN || '*', // Default to * for development (allows localhost:8000)
       // Determine API base URL:
-      // 1. Use explicit env var if set
-      // 2. If on Vercel (VERCEL env var exists) or production, default to Vercel URL
-      // 3. Otherwise default to localhost (for local development)
+      // Priority: VERCEL_URL > VERCEL env > explicit non-localhost URL > production check > localhost
       apiBaseUrl: (() => {
-        // Explicit override via environment variable
-        if (process.env.API_BASE_URL) return process.env.API_BASE_URL;
-        if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
+        // First, check if we're on Vercel (VERCEL_URL is automatically set by Vercel)
+        // Format: sui-two-shooter-backend-sui-integra.vercel.app (without https://)
+        if (process.env.VERCEL_URL) {
+          const vercelUrl = `https://${process.env.VERCEL_URL}`;
+          console.log(`[CONFIG] Using VERCEL_URL: ${vercelUrl}`);
+          return vercelUrl;
+        }
         
-        // If on Vercel or in production, use Vercel URL
-        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-          return 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+        // Check VERCEL env var (set to '1' on Vercel)
+        if (process.env.VERCEL === '1') {
+          const vercelUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+          console.log(`[CONFIG] Using VERCEL=1, defaulting to: ${vercelUrl}`);
+          return vercelUrl;
+        }
+        
+        // Check explicit environment variables
+        const explicitUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+        
+        // If explicitly set to a non-localhost URL, use it
+        if (explicitUrl && !explicitUrl.includes('localhost')) {
+          console.log(`[CONFIG] Using explicit non-localhost URL: ${explicitUrl}`);
+          return explicitUrl;
+        }
+        
+        // If in production and no explicit URL set, use Vercel URL
+        if (process.env.NODE_ENV === 'production') {
+          const vercelUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+          console.log(`[CONFIG] Production mode, defaulting to: ${vercelUrl}`);
+          return vercelUrl;
+        }
+        
+        // If explicitly set to localhost, use it (for local development)
+        if (explicitUrl && explicitUrl.includes('localhost')) {
+          console.log(`[CONFIG] Using explicit localhost URL: ${explicitUrl}`);
+          return explicitUrl;
         }
         
         // Default to localhost for local development
+        console.log(`[CONFIG] Defaulting to localhost: http://localhost:3000`);
         return 'http://localhost:3000';
       })()
     },

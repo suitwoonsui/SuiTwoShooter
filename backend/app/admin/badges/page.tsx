@@ -12,7 +12,7 @@ const getApiUrl = (path: string): string => {
 };
 
 export default function AdminBadgesPage() {
-  const [action, setAction] = useState<'mint' | 'burn'>('mint');
+  const [action, setAction] = useState<'mint' | 'burn' | 'update-image'>('mint');
   const [playerAddress, setPlayerAddress] = useState('');
   const [tier, setTier] = useState<number>(0);
   const [badgeId, setBadgeId] = useState('');
@@ -279,13 +279,13 @@ export default function AdminBadgesPage() {
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
           Action:
         </label>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
             <input
               type="radio"
               value="mint"
               checked={action === 'mint'}
-              onChange={(e) => setAction(e.target.value as 'mint' | 'burn')}
+              onChange={(e) => setAction(e.target.value as 'mint' | 'burn' | 'update-image')}
               style={{ marginRight: '0.5rem' }}
             />
             Mint Badge
@@ -295,14 +295,97 @@ export default function AdminBadgesPage() {
               type="radio"
               value="burn"
               checked={action === 'burn'}
-              onChange={(e) => setAction(e.target.value as 'mint' | 'burn')}
+              onChange={(e) => setAction(e.target.value as 'mint' | 'burn' | 'update-image')}
               style={{ marginRight: '0.5rem' }}
             />
             Burn Badge
           </label>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              value="update-image"
+              checked={action === 'update-image'}
+              onChange={(e) => setAction(e.target.value as 'mint' | 'burn' | 'update-image')}
+              style={{ marginRight: '0.5rem' }}
+            />
+            Update Image URL
+          </label>
         </div>
       </div>
 
+      {action === 'update-image' ? (
+        /* Update Image URL Section */
+        <div style={{ display: isAdminWalletConnected ? 'block' : 'none', padding: '1.5rem', background: '#f0f7ff', borderRadius: '8px', border: '1px solid #b3d9ff' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>🖼️ Update Badge Image URL</h2>
+          <p style={{ marginBottom: '1rem', color: '#666', fontSize: '0.9rem' }}>
+            Update a badge's image URL to point to the correct static file. This is useful for fixing badges that were minted with localhost URLs.
+          </p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Player Address:
+              </label>
+              <input
+                type="text"
+                value={updateImageAddress}
+                onChange={(e) => setUpdateImageAddress(e.target.value)}
+                placeholder="0x..."
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                }}
+              />
+            </div>
+            
+            <button
+              type="button"
+              onClick={handleUpdateImageUrl}
+              disabled={updateImageLoading || !updateImageAddress}
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: '1rem',
+                backgroundColor: updateImageLoading || !updateImageAddress ? '#ccc' : '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: updateImageLoading || !updateImageAddress ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold',
+              }}
+            >
+              {updateImageLoading ? 'Updating...' : 'Update Image URL'}
+            </button>
+          </div>
+
+          {updateImageResult && (
+            <div
+              style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                borderRadius: '4px',
+                backgroundColor: updateImageResult.success ? '#d4edda' : '#f8d7da',
+                color: updateImageResult.success ? '#155724' : '#721c24',
+                border: `1px solid ${updateImageResult.success ? '#c3e6cb' : '#f5c6cb'}`,
+              }}
+            >
+              {updateImageResult.success ? (
+                <div>
+                  <strong>✅ Success!</strong>
+                  <p>{updateImageResult.message}</p>
+                </div>
+              ) : (
+                <div>
+                  <strong>❌ Error:</strong>
+                  <p>{updateImageResult.error}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} style={{ display: isAdminWalletConnected ? 'flex' : 'none', flexDirection: 'column', gap: '1.5rem' }}>
         {action === 'mint' ? (
           <>
@@ -391,6 +474,7 @@ export default function AdminBadgesPage() {
           {loading ? (action === 'mint' ? 'Minting Badge...' : 'Burning Badge...') : (action === 'mint' ? 'Mint Badge' : 'Burn Badge')}
         </button>
       </form>
+      )}
 
       {result && (
         <div
@@ -421,78 +505,6 @@ export default function AdminBadgesPage() {
           )}
         </div>
       )}
-
-      {/* Update Image URL Section */}
-      <div style={{ marginTop: '3rem', padding: '1.5rem', background: '#f0f7ff', borderRadius: '8px', border: '1px solid #b3d9ff' }}>
-        <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>🖼️ Update Badge Image URL</h2>
-        <p style={{ marginBottom: '1rem', color: '#666', fontSize: '0.9rem' }}>
-          Update a badge's image URL to point to the correct static file. This is useful for fixing badges that were minted with localhost URLs.
-        </p>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-              Player Address:
-            </label>
-            <input
-              type="text"
-              value={updateImageAddress}
-              onChange={(e) => setUpdateImageAddress(e.target.value)}
-              placeholder="0x..."
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                fontSize: '1rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
-            />
-          </div>
-          
-          <button
-            type="button"
-            onClick={handleUpdateImageUrl}
-            disabled={updateImageLoading || !updateImageAddress}
-            style={{
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              backgroundColor: updateImageLoading || !updateImageAddress ? '#ccc' : '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: updateImageLoading || !updateImageAddress ? 'not-allowed' : 'pointer',
-              fontWeight: 'bold',
-            }}
-          >
-            {updateImageLoading ? 'Updating...' : 'Update Image URL'}
-          </button>
-        </div>
-
-        {updateImageResult && (
-          <div
-            style={{
-              marginTop: '1rem',
-              padding: '1rem',
-              borderRadius: '4px',
-              backgroundColor: updateImageResult.success ? '#d4edda' : '#f8d7da',
-              color: updateImageResult.success ? '#155724' : '#721c24',
-              border: `1px solid ${updateImageResult.success ? '#c3e6cb' : '#f5c6cb'}`,
-            }}
-          >
-            {updateImageResult.success ? (
-              <div>
-                <strong>✅ Success!</strong>
-                <p>{updateImageResult.message}</p>
-              </div>
-            ) : (
-              <div>
-                <strong>❌ Error:</strong>
-                <p>{updateImageResult.error}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.9rem' }}>
         <strong>🔒 Security:</strong> This page requires:

@@ -130,7 +130,11 @@ export class BadgeService {
     const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
     const tierName = tierNames[tier] || 'Standard';
     const baseUrl = this.config.server.apiBaseUrl;
-    return `${baseUrl}/Badges/${tierName}.webp`;
+    console.log(`🖼️ [BADGE IMAGE URL] Config apiBaseUrl: ${baseUrl}`);
+    console.log(`🖼️ [BADGE IMAGE URL] Environment check - VERCEL: ${process.env.VERCEL}, VERCEL_URL: ${process.env.VERCEL_URL}, NODE_ENV: ${process.env.NODE_ENV}`);
+    const imageUrl = `${baseUrl}/Badges/${tierName}.webp`;
+    console.log(`🖼️ [BADGE IMAGE URL] Final image URL: ${imageUrl}`);
+    return imageUrl;
   }
 
   /**
