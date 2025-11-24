@@ -825,6 +825,24 @@ async function initializeWalletAPI(options = {}) {
           }
         });
 
+        // Check if transaction actually succeeded on-chain
+        const status = result.effects?.status?.status;
+        if (status !== 'success') {
+          const error = result.effects?.status?.error || 'Transaction failed on-chain';
+          console.error('❌ [WALLET] Transaction failed on-chain:', error);
+          console.error('❌ [WALLET] Transaction effects:', result.effects);
+          return {
+            success: false,
+            digest: result.digest,
+            error: error,
+            effects: result.effects,
+            events: result.events
+          };
+        }
+
+        console.log('✅ [WALLET] Transaction succeeded on-chain:', result.digest);
+        console.log('✅ [WALLET] Transaction effects:', result.effects);
+
         return {
           success: true,
           digest: result.digest,
@@ -926,26 +944,29 @@ async function initializeWalletAPI(options = {}) {
           };
         }
         
-        // Check total balance (need enough for payment + gas)
-        const totalBalance = coins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
-        const requiredBalance = TOTAL_PAYMENT_MIST; // 0.1 SUI total (fee + gas)
+        // Find a coin with sufficient balance (≥0.1 SUI for fee + gas)
+        const paymentCoin = coins.data.find(c => BigInt(c.balance) >= TOTAL_PAYMENT_MIST);
         
-        if (totalBalance < requiredBalance) {
+        if (!paymentCoin) {
+          const totalBalance = coins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
           return {
             success: false,
-            error: `Insufficient SUI balance. Need ${Number(requiredBalance) / 1_000_000_000} SUI (for payment + gas), but wallet has ${Number(totalBalance) / 1_000_000_000} SUI`,
+            error: `Insufficient SUI balance. Need ${Number(TOTAL_PAYMENT_MIST) / 1_000_000_000} SUI (for payment + gas), but wallet has ${Number(totalBalance) / 1_000_000_000} SUI`,
           };
         }
         
         // Build transaction
         const txb = new Transaction();
         
-        // Use txb.gas to split payment amount (like the store does)
-        // This allows the wallet to automatically handle both payment and gas from the gas coin
-        // The wallet will use the remainder of the gas coin for gas fees
-        const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
+        // Split fee from payment coin
+        // IMPORTANT: Don't set gas payment explicitly - the wallet will automatically
+        // use the remainder of this coin (after splitting) for gas fees
+        // This avoids the "object cannot appear more than once" error
+        const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
+        const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
         
-        console.log('💰 [BADGE MINT] Using txb.gas for payment split - wallet will handle gas automatically');
+        console.log(`💰 [BADGE MINT] Splitting ${Number(feeAmount) / 1_000_000_000} SUI from coin ${paymentCoin.coinObjectId.substring(0, 10)}...`);
+        console.log(`💰 [BADGE MINT] Wallet will use remainder for gas automatically`);
         
         // Construct image URL
         const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';

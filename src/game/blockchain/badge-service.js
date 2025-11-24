@@ -342,10 +342,26 @@ async function signAndExecuteBadgeTransaction(transaction) {
     const result = await window.walletAPIInstance.signAndExecuteTransaction(transaction);
 
     if (result.success) {
-      console.log('✅ [BADGE] Transaction executed:', result.digest);
+      console.log('✅ [BADGE] Transaction executed successfully:', result.digest);
+      console.log('✅ [BADGE] Transaction effects:', result.effects);
+      console.log('✅ [BADGE] Transaction events:', result.events);
+      
       // Clear cache to force refresh
       badgeCache.data = null;
       badgeCache.timestamp = 0;
+      
+      // Wait a moment for blockchain to update, then verify badge was minted
+      setTimeout(async () => {
+        const badge = await getBadge();
+        if (badge && badge.success) {
+          console.log('✅ [BADGE] Verified badge exists after mint:', badge);
+        } else {
+          console.warn('⚠️ [BADGE] Badge not found after mint transaction. Transaction may have failed.');
+        }
+      }, 2000);
+    } else {
+      console.error('❌ [BADGE] Transaction failed:', result.error);
+      console.error('❌ [BADGE] Transaction effects:', result.effects);
     }
 
     return result;
