@@ -239,10 +239,10 @@ async function calculateMintingFee() {
 
 /**
  * Build mint badge transaction (builds in frontend using Sui SDK)
- * @param {string} paymentCoinId - Player's payment coin ID (SUI coin for minting fee)
+ * Wallet module will find the coin and calculate fee = total - gas
  * @returns {Promise<Object>} Transaction object ready for signing
  */
-async function buildMintBadgeTransaction(paymentCoinId) {
+async function buildMintBadgeTransaction() {
   const address = getPlayerAddress();
   if (!address) {
     return {
@@ -251,15 +251,8 @@ async function buildMintBadgeTransaction(paymentCoinId) {
     };
   }
 
-  if (!paymentCoinId) {
-    return {
-      success: false,
-      error: 'Payment coin ID is required',
-    };
-  }
-
   try {
-    // Get transaction data from backend
+    // Get transaction data from backend (just need contract addresses, not payment coin)
     const API_BASE_URL = getApiBaseUrl();
     const response = await fetch(`${API_BASE_URL}/badges/mint`, {
       method: 'POST',
@@ -268,7 +261,7 @@ async function buildMintBadgeTransaction(paymentCoinId) {
       },
       body: JSON.stringify({
         playerAddress: address,
-        paymentCoinId: paymentCoinId,
+        // No paymentCoinId - wallet module will find the coin
       }),
     });
 

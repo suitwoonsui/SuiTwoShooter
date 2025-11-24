@@ -55,16 +55,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!paymentCoinId) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'paymentCoinId is required' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
     // Validate address format
     if (!playerAddress.startsWith('0x') || playerAddress.length !== 66) {
       return NextResponse.json(
@@ -77,13 +67,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📥 Badge mint request received for: ${playerAddress}`);
+    if (paymentCoinId) {
+      console.log(`   Payment coin ID provided: ${paymentCoinId}`);
+    } else {
+      console.log(`   No payment coin ID - wallet module will find coin`);
+    }
 
     const badgeService = getBadgeService();
     
     // Get transaction data (frontend will build it in wallet module)
+    // paymentCoinId is optional - wallet module will find the coin if not provided
     const result = await badgeService.getMintBadgeTransactionData(
       playerAddress,
-      paymentCoinId
+      paymentCoinId || '' // Pass empty string if not provided, backend will skip validation
     );
 
     if (!result.success) {

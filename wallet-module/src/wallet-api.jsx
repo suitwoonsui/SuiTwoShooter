@@ -850,18 +850,75 @@ async function initializeWalletAPI(options = {}) {
       try {
         const txb = new Transaction();
         
-        // Split payment amount from coin
-        const paymentCoinObj = txb.object(transactionData.arguments.paymentCoinId);
-        const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [BigInt(transactionData.arguments.paymentAmount)]);
+        // Get network from walletAPIState or default to testnet
+        const network = walletAPIState.network || 'testnet';
+        const client = new SuiClient({ url: getFullnodeUrl(network) });
         
-        // Build transaction
+        // Step 1: Get gas budget first (this is the estimated gas cost)
+        const gasBudget = BigInt(transactionData.gasBudget);
+        console.log(`⛽ [WALLET] Gas budget: ${Number(gasBudget) / 1_000_000_000} SUI`);
+        
+        // Step 2: Calculate fee = total payment - gas
+        // Total payment is 0.1 SUI (100,000,000 MIST)
+        const TOTAL_PAYMENT_MIST = BigInt(100_000_000); // 0.1 SUI
+        const feeAmount = TOTAL_PAYMENT_MIST - gasBudget;
+        
+        if (feeAmount <= 0) {
+          return {
+            success: false,
+            error: `Gas estimate (${Number(gasBudget) / 1_000_000_000} SUI) exceeds total payment (0.1 SUI). Please try again.`,
+          };
+        }
+        
+        console.log(`💰 [WALLET] Fee amount: ${Number(feeAmount) / 1_000_000_000} SUI (0.1 SUI total - ${Number(gasBudget) / 1_000_000_000} SUI gas)`);
+        
+        // Step 3: Find a coin with sufficient balance for total payment (gas + fee)
+        const coins = await client.getCoins({
+          owner: playerAddress,
+          coinType: '0x2::sui::SUI',
+        });
+        
+        if (!coins.data || coins.data.length === 0) {
+          return {
+            success: false,
+            error: 'No SUI coins found in wallet',
+          };
+        }
+        
+        // Find a coin with at least total payment amount
+        const totalRequired = TOTAL_PAYMENT_MIST; // 0.1 SUI
+        const gasCoin = coins.data.find(c => BigInt(c.balance) >= totalRequired);
+        
+        if (!gasCoin) {
+          const totalBalance = coins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
+          return {
+            success: false,
+            error: `Insufficient SUI balance. Need ${Number(totalRequired) / 1_000_000_000} SUI total (for fee + gas), but wallet only has ${Number(totalBalance) / 1_000_000_000} SUI`,
+          };
+        }
+        
+        // Step 4: Use this coin for gas payment
+        txb.setGasPayment([{
+          objectId: gasCoin.coinObjectId,
+          version: gasCoin.version,
+          digest: gasCoin.digest,
+        }]);
+        
+        console.log(`✅ [WALLET] Using coin ${gasCoin.coinObjectId} (balance: ${Number(gasCoin.balance) / 1_000_000_000} SUI) for gas payment`);
+        
+        // Step 5: Split the fee amount from the gas coin
+        // The remainder will automatically be used for gas
+        const gasCoinObj = txb.object(gasCoin.coinObjectId);
+        const splitFeeCoin = txb.splitCoins(gasCoinObj, [feeAmount]);
+        
+        // Step 6: Build the transaction with the fee coin
         txb.moveCall({
           target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
           arguments: [
             txb.object(transactionData.arguments.badgeRegistry),
             txb.object(transactionData.arguments.statsRegistry),
             txb.object(transactionData.arguments.clock),
-            splitPaymentCoin,
+            splitFeeCoin, // Fee coin (0.1 SUI - gas)
             txb.object(transactionData.arguments.imageDataObjectId),
           ],
         });
@@ -869,10 +926,7 @@ async function initializeWalletAPI(options = {}) {
         txb.setSender(playerAddress);
         txb.setGasBudget(transactionData.gasBudget);
         
-        // DO NOT set gas payment - let wallet auto-select!
-        // This way wallet shows only the needed amounts, not full coin balance
-        
-        console.log('✅ [WALLET] Badge mint transaction built (wallet will auto-select gas)');
+        console.log('✅ [WALLET] Badge mint transaction built (fee calculated as: total - gas)');
         
         return {
           success: true,

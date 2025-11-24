@@ -216,23 +216,9 @@ async function handleBadgeMint() {
       return;
     }
 
-    // Calculate required minting fee
-    const feeInfo = await window.BadgeService.calculateMintingFee();
-    if (!feeInfo.success) {
-      throw new Error(feeInfo.error || 'Failed to calculate minting fee');
-    }
-
-    // Get SUI coin for payment
-    const coinResult = await window.BadgeService.getPaymentCoin(feeInfo.amountMist);
-    if (!coinResult.success) {
-      throw new Error(coinResult.error || 'Failed to get payment coin');
-    }
-
-    console.log(`💰 [BADGE] Using coin ${coinResult.coinId} for payment`);
-    console.log(`   Required: ${feeInfo.amountSui} SUI (0.10 for payment + ~0.01 for gas buffer)`);
-    
-    // Build mint transaction
-    const result = await window.BadgeService.buildMintBadgeTransaction(coinResult.coinId);
+    // Build mint transaction (wallet module will find coin and calculate fee = total - gas)
+    // Total payment is 0.1 SUI, gas is estimated first, then fee = 0.1 - gas
+    const result = await window.BadgeService.buildMintBadgeTransaction();
     
     if (!result.success) {
       throw new Error(result.error || 'Failed to build mint transaction');

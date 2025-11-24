@@ -880,42 +880,52 @@ export class BadgeService {
       // Note: Clock is a well-known shared object, we can reference it directly
       const clockId = '0x6'; // Sui Clock object ID (well-known shared object)
 
-      // Validate payment coin balance (frontend will build transaction, so we just validate)
-      console.log(`🔍 [MINT DATA] Validating payment coin for ${playerAddress}`);
-      const coins = await client.getCoins({
-        owner: playerAddress,
-        coinType: '0x2::sui::SUI',
-      });
+      // Validate payment coin balance only if paymentCoinId is provided
+      // If not provided, wallet module will find the coin
+      if (paymentCoinId && paymentCoinId.trim() !== '') {
+        console.log(`🔍 [MINT DATA] Validating payment coin for ${playerAddress}`);
+        const coins = await client.getCoins({
+          owner: playerAddress,
+          coinType: '0x2::sui::SUI',
+        });
+        
+        console.log(`💰 [MINT DATA] Found ${coins.data?.length || 0} SUI coins on ${this.config.sui.network}`);
+
+        if (!coins.data || coins.data.length === 0) {
+          return {
+            success: false,
+            error: 'No SUI coins found in wallet. Please ensure you have SUI in your wallet.',
+          };
+        }
+
+        const paymentCoin = coins.data.find(coin => coin.coinObjectId === paymentCoinId);
+        if (!paymentCoin) {
+          return {
+            success: false,
+            error: 'Payment coin not found in wallet. Please ensure the payment coin is valid.',
+          };
+        }
+
+        const paymentCoinBalance = BigInt(paymentCoin.balance);
+        const paymentAmount = BigInt(100_000_000); // 0.10 SUI for minting fee ($0.10)
+        const gasEstimate = this.config.sui.gasBudget;
+        const gasWithBuffer = Math.round(gasEstimate * 1.15);
+        const totalRequired = paymentAmount + BigInt(gasWithBuffer);
+
+        if (paymentCoinBalance < totalRequired) {
+          return {
+            success: false,
+            error: `Insufficient balance. Need ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI (0.10 for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas), but only have ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI.`,
+          };
+        }
+      } else {
+        console.log(`💰 [MINT DATA] Payment coin ID not provided - wallet module will find coin`);
+      }
       
-      console.log(`💰 [MINT DATA] Found ${coins.data?.length || 0} SUI coins on ${this.config.sui.network}`);
-
-      if (!coins.data || coins.data.length === 0) {
-        return {
-          success: false,
-          error: 'No SUI coins found in wallet. Please ensure you have SUI in your wallet.',
-        };
-      }
-
-      const paymentCoin = coins.data.find(coin => coin.coinObjectId === paymentCoinId);
-      if (!paymentCoin) {
-        return {
-          success: false,
-          error: 'Payment coin not found in wallet. Please ensure the payment coin is valid.',
-        };
-      }
-
-      const paymentCoinBalance = BigInt(paymentCoin.balance);
+      // Payment amount is still needed for transaction data (wallet module will calculate actual fee)
       const paymentAmount = BigInt(100_000_000); // 0.10 SUI for minting fee ($0.10)
       const gasEstimate = this.config.sui.gasBudget;
       const gasWithBuffer = Math.round(gasEstimate * 1.15);
-      const totalRequired = paymentAmount + BigInt(gasWithBuffer);
-
-      if (paymentCoinBalance < totalRequired) {
-        return {
-          success: false,
-          error: `Insufficient balance. Need ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI (0.10 for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas), but only have ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI.`,
-        };
-      }
 
       // Parse package ID from contract address
       const packageId = this.config.contracts.gameScore.split('::')[0];
@@ -932,8 +942,8 @@ export class BadgeService {
             badgeRegistry: this.config.contracts.badgeRegistry,
             statsRegistry: statsRegistryId,
             clock: clockId,
-            paymentCoinId,
-            paymentAmount: paymentAmount.toString(),
+            paymentCoinId: paymentCoinId || '', // Empty if not provided - wallet module will find coin
+            paymentAmount: paymentAmount.toString(), // Total payment (wallet module will calculate fee = total - gas)
             imageDataObjectId,
           },
           gasBudget: gasWithBuffer,
