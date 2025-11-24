@@ -850,10 +850,31 @@ async function initializeWalletAPI(options = {}) {
         console.log('🔍 [WALLET] Transaction status:', status);
         
         if (status !== 'success') {
-          const error = result.effects?.status?.error || 'Transaction failed on-chain';
+          // Decode the error from effects
+          const errorObj = result.effects?.status?.error;
+          let errorMessage = 'Transaction failed on-chain';
+          let errorCode = null;
+          
+          // Try to extract detailed error information
+          if (errorObj) {
+            if (typeof errorObj === 'string') {
+              errorMessage = errorObj;
+            } else if (errorObj.code) {
+              errorCode = errorObj.code;
+              errorMessage = errorObj.message || errorObj.code;
+            } else if (errorObj.error) {
+              errorMessage = errorObj.error;
+            } else {
+              errorMessage = JSON.stringify(errorObj);
+            }
+          }
+          
           console.error('❌ [WALLET] ========== TRANSACTION FAILED ==========');
           console.error('❌ [WALLET] Transaction digest:', result.digest);
-          console.error('❌ [WALLET] Error:', error);
+          console.error('❌ [WALLET] Status:', status);
+          console.error('❌ [WALLET] Error Code:', errorCode);
+          console.error('❌ [WALLET] Error Message:', errorMessage);
+          console.error('❌ [WALLET] Full error object:', JSON.stringify(errorObj, null, 2));
           console.error('❌ [WALLET] Full effects:', JSON.stringify(result.effects, null, 2));
           console.error('❌ [WALLET] Events:', result.events);
           return {
@@ -1078,26 +1099,21 @@ async function initializeWalletAPI(options = {}) {
         console.log('🔨 [BADGE MINT] Building transaction...');
         const txb = new Transaction();
         
-        // Use txb.gas to split the fee amount
-        // txb.gas is a special reference that tells the wallet to:
-        // 1. Select a gas coin (wallet will choose one with sufficient balance)
-        // 2. Split the fee from it
-        // 3. Use the remainder for gas automatically
-        // 
-        // We've already verified there's at least one coin with >= 0.1 SUI,
-        // so the wallet will select that coin (or another with sufficient balance)
-        console.log('💸 [BADGE MINT] Splitting fee from gas coin:', {
+        // Set the verified payment coin as the gas payment FIRST
+        // This ensures the wallet uses this specific coin (which we verified has enough balance)
+        txb.setGasPayment([paymentCoin.coinObjectId]);
+        
+        console.log('💸 [BADGE MINT] Gas payment set to verified coin:', {
+          coinId: paymentCoin.coinObjectId,
+          coinBalance: `${Number(paymentCoin.balance) / 1_000_000_000} SUI (${paymentCoin.balance} MIST)`,
           feeAmount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
-          method: 'txb.splitCoins(txb.gas, [feeAmount])',
-          note: 'Wallet will select a coin with sufficient balance and use remainder for gas',
-          verifiedCoinAvailable: `Found coin with ${Number(paymentCoin.balance) / 1_000_000_000} SUI (sufficient for fee + gas)`,
+          remainingForGas: `${Number(remainingAfterSplit) / 1_000_000_000} SUI (${remainingAfterSplit} MIST)`,
+          method: 'txb.setGasPayment() then txb.splitCoins(txb.gas, [feeAmount])',
+          note: 'txb.gas now references the payment coin, we split fee from it, remainder used for gas',
         });
         
-        // Split the fee from the gas coin
-        // The wallet will:
-        // - Select a coin with at least 0.1 SUI (we verified one exists)
-        // - Split 0.09 SUI for the fee
-        // - Use the remainder (at least 0.01 SUI) for gas
+        // Now split the fee from txb.gas (which references the payment coin we just set)
+        // The remainder will automatically be used for gas
         const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
         
         // Construct image URL
