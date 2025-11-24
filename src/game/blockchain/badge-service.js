@@ -238,9 +238,9 @@ async function calculateMintingFee() {
 }
 
 /**
- * Build mint badge transaction
+ * Build mint badge transaction (builds in frontend using Sui SDK)
  * @param {string} paymentCoinId - Player's payment coin ID (SUI coin for minting fee)
- * @returns {Promise<Object>} Transaction data for signing
+ * @returns {Promise<Object>} Transaction object ready for signing
  */
 async function buildMintBadgeTransaction(paymentCoinId) {
   const address = getPlayerAddress();
@@ -259,6 +259,7 @@ async function buildMintBadgeTransaction(paymentCoinId) {
   }
 
   try {
+    // Get transaction data from backend
     const API_BASE_URL = getApiBaseUrl();
     const response = await fetch(`${API_BASE_URL}/badges/mint`, {
       method: 'POST',
@@ -280,7 +281,49 @@ async function buildMintBadgeTransaction(paymentCoinId) {
     }
 
     const data = await response.json();
-    return data;
+    
+    if (!data.success || !data.transactionData) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get transaction data',
+      };
+    }
+
+    // Build transaction in frontend using Sui SDK (wallet module has it loaded)
+    // Dynamic import should work since wallet module already loaded @mysten/sui
+    const { Transaction } = await import('@mysten/sui/transactions');
+    
+    const txb = new Transaction();
+    const { transactionData } = data;
+    
+    // Split payment amount from coin
+    const paymentCoinObj = txb.object(transactionData.arguments.paymentCoinId);
+    const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [BigInt(transactionData.arguments.paymentAmount)]);
+    
+    // Build transaction
+    txb.moveCall({
+      target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
+      arguments: [
+        txb.object(transactionData.arguments.badgeRegistry),
+        txb.object(transactionData.arguments.statsRegistry),
+        txb.object(transactionData.arguments.clock),
+        splitPaymentCoin,
+        txb.object(transactionData.arguments.imageDataObjectId),
+      ],
+    });
+    
+    txb.setSender(address);
+    txb.setGasBudget(transactionData.gasBudget);
+    
+    // DO NOT set gas payment - let wallet auto-select!
+    // This way wallet shows only the needed amounts, not full coin balance
+    
+    console.log('✅ [BADGE] Transaction built in frontend (wallet will auto-select gas)');
+    
+    return {
+      success: true,
+      transaction: txb, // Return Transaction object
+    };
   } catch (error) {
     console.error('❌ [BADGE] Error building mint transaction:', error);
     return {
@@ -405,24 +448,16 @@ async function signAndExecuteBadgeTransaction(transaction) {
     };
   }
 
-  // Handle legacy transactionData object format
-  if (transaction && typeof transaction === 'object' && !(transaction instanceof Uint8Array)) {
+  if (!transaction) {
     return {
       success: false,
-      error: 'Legacy transaction format no longer supported. Please use the new API.',
-    };
-  }
-
-  if (!transaction || (typeof transaction !== 'string' && !(transaction instanceof Uint8Array))) {
-    return {
-      success: false,
-      error: 'Invalid transaction data. Expected base64 string or Uint8Array.',
+      error: 'Transaction is required',
     };
   }
 
   try {
-    // Pass base64 transaction string directly to wallet API
-    // The wallet API will handle deserialization
+    // Pass Transaction object directly to wallet API
+    // The wallet API accepts Transaction objects, base64 strings, or Uint8Array
     const result = await window.walletAPIInstance.signAndExecuteTransaction(transaction);
 
     if (result.success) {

@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
 
     const badgeService = getBadgeService();
     
-    // Build mint transaction
-    const result = await badgeService.buildMintBadgeTransaction(
+    // Get transaction data (frontend will build it in wallet module)
+    const result = await badgeService.getMintBadgeTransactionData(
       playerAddress,
       paymentCoinId
     );
@@ -90,18 +90,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: result.error || 'Failed to build mint transaction',
+          error: result.error || 'Failed to get mint transaction data',
         },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Return serialized transaction
+    // Return transaction data for frontend to build
     return NextResponse.json(
       {
         success: true,
-        transaction: result.transaction,
-        gasEstimate: result.gasEstimate,
+        transactionData: result.transactionData,
       },
       { headers: corsHeaders }
     );

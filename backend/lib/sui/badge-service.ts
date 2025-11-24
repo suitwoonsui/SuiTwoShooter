@@ -744,13 +744,29 @@ export class BadgeService {
    * NOTE: This function creates the BadgeImageData object server-side using chunked upload
    * The frontend receives the object ID to use in the transaction
    */
-  async buildMintBadgeTransaction(
+  /**
+   * Get mint badge transaction data (for frontend to build)
+   * Returns transaction data instead of built transaction so wallet can handle gas selection
+   */
+  async getMintBadgeTransactionData(
     playerAddress: string,
     paymentCoinId: string // Player's payment coin (SUI) for minting fee
   ): Promise<{
     success: boolean;
-    transaction?: string; // Serialized transaction bytes (base64)
-    gasEstimate?: string;
+    transactionData?: {
+      packageId: string;
+      module: string;
+      function: string;
+      arguments: {
+        badgeRegistry: string;
+        statsRegistry: string;
+        clock: string;
+        paymentCoinId: string;
+        paymentAmount: string; // In MIST
+        imageDataObjectId: string;
+      };
+      gasBudget: number;
+    };
     error?: string;
   }> {
     if (!this.config.contracts.badgeRegistry) {
@@ -864,21 +880,14 @@ export class BadgeService {
       // Note: Clock is a well-known shared object, we can reference it directly
       const clockId = '0x6'; // Sui Clock object ID (well-known shared object)
 
-      // Build transaction
-      const txb = new Transaction();
-      
-      // Query player's SUI coins to get the payment coin
-      // IMPORTANT: We need to split the payment coin because:
-      // 1. The payment coin will be used for gas
-      // 2. We need to split it to create a separate coin for payment (can't use same coin twice)
-      // Reuse client from validation above
-      console.log(`🔍 [MINT BUILD] Querying ${this.config.sui.network} SUI coins for ${playerAddress}`);
+      // Validate payment coin balance (frontend will build transaction, so we just validate)
+      console.log(`🔍 [MINT DATA] Validating payment coin for ${playerAddress}`);
       const coins = await client.getCoins({
         owner: playerAddress,
-        coinType: '0x2::sui::SUI', // Explicitly use SUI only
+        coinType: '0x2::sui::SUI',
       });
       
-      console.log(`💰 [MINT BUILD] Found ${coins.data?.length || 0} SUI coins on ${this.config.sui.network}`);
+      console.log(`💰 [MINT DATA] Found ${coins.data?.length || 0} SUI coins on ${this.config.sui.network}`);
 
       if (!coins.data || coins.data.length === 0) {
         return {
@@ -887,7 +896,6 @@ export class BadgeService {
         };
       }
 
-      // Find the payment coin
       const paymentCoin = coins.data.find(coin => coin.coinObjectId === paymentCoinId);
       if (!paymentCoin) {
         return {
@@ -900,9 +908,8 @@ export class BadgeService {
       const paymentAmount = BigInt(100_000_000); // 0.10 SUI for minting fee ($0.10)
       const gasEstimate = this.config.sui.gasBudget;
       const gasWithBuffer = Math.round(gasEstimate * 1.15);
-      const totalRequired = paymentAmount + BigInt(gasWithBuffer); // Payment (0.10) + gas (~0.001)
+      const totalRequired = paymentAmount + BigInt(gasWithBuffer);
 
-      // Check if payment coin has enough balance
       if (paymentCoinBalance < totalRequired) {
         return {
           success: false,
@@ -910,65 +917,103 @@ export class BadgeService {
         };
       }
 
-      // PROPER METHOD: Split ONLY the payment amount (0.10 SUI) from the coin
-      // DO NOT set gas payment - let the wallet auto-select gas coins during signing
-      // This way the wallet will show only the amounts actually being used:
-      // - 0.10 SUI for payment (the split coin)
-      // - ~0.001 SUI for gas (auto-selected by wallet)
-      // Instead of showing the full balance of a large coin
-      
-      const paymentCoinObj = txb.object(paymentCoinId);
-      
-      // Split payment amount (0.10 SUI) for the minting fee
-      const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [paymentAmount]);
-      
-      // IMPORTANT: Do NOT call setGasPayment()
-      // When we don't set gas payment, the wallet will automatically select appropriate gas coins
-      // during signing. The wallet will see the split payment coin (0.10 SUI) and select
-      // a separate coin for gas, showing only the actual amounts being used.
-      // 
-      // If we explicitly set gas payment to a coin object, the wallet shows that coin's
-      // full balance, which is confusing for users.
-      
-      console.log(`   💡 Wallet will auto-select gas coins during signing (showing only needed amounts)`);
+      // Parse package ID from contract address
+      const packageId = this.config.contracts.gameScore.split('::')[0];
 
-      // Call mint_badge function with the split payment coin
-      txb.moveCall({
-        target: `${this.config.contracts.gameScore}::badge_system::mint_badge`,
-        arguments: [
-          txb.object(this.config.contracts.badgeRegistry),
-          txb.object(statsRegistryId),
-          txb.object(clockId),
-          splitPaymentCoin, // Use the split coin for payment
-          txb.object(imageDataObjectId), // Pre-populated BadgeImageData object
-        ],
-      });
-
-      // Set sender (required for building transaction, even if not signing)
-      txb.setSender(playerAddress);
-
-      // Set gas budget
-      txb.setGasBudget(gasWithBuffer);
-      
-      console.log(`💳 [MINT BUILD] Using payment coin for gas: ${paymentCoin.coinObjectId}`);
-      console.log(`   Coin balance: ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI`);
-      console.log(`   Required: ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI total (${(Number(paymentAmount) / 1_000_000_000).toFixed(4)} for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas)`);
-      console.log(`   Splitting ${(Number(paymentAmount) / 1_000_000_000).toFixed(4)} SUI for payment, remaining for gas`);
-
-      // Build transaction (don't sign - frontend will sign)
-      // Reuse client from validation above
-      const transactionBytes = await txb.build({ client });
-
-      console.log('✅ [MINT BUILD] Transaction built successfully');
-      console.log(`   Gas estimate: ${gasWithBuffer} MIST (${(gasWithBuffer / 1_000_000_000).toFixed(4)} SUI)`);
+      console.log('✅ [MINT DATA] Transaction data prepared for frontend building');
 
       return {
         success: true,
-        transaction: Buffer.from(transactionBytes).toString('base64'),
-        gasEstimate: gasWithBuffer.toString(),
+        transactionData: {
+          packageId,
+          module: 'badge_system',
+          function: 'mint_badge',
+          arguments: {
+            badgeRegistry: this.config.contracts.badgeRegistry,
+            statsRegistry: statsRegistryId,
+            clock: clockId,
+            paymentCoinId,
+            paymentAmount: paymentAmount.toString(),
+            imageDataObjectId,
+          },
+          gasBudget: gasWithBuffer,
+        },
       };
     } catch (error) {
-      console.error('Error minting badge:', error);
+      console.error('Error getting mint badge transaction data:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Build mint badge transaction (legacy - builds on backend)
+   * @deprecated Use getMintBadgeTransactionData() instead and build in wallet module
+   */
+  async buildMintBadgeTransaction(
+    playerAddress: string,
+    paymentCoinId: string
+  ): Promise<{
+    success: boolean;
+    transaction?: string; // Serialized transaction bytes (base64)
+    gasEstimate?: string;
+    error?: string;
+  }> {
+    // For now, call the new method and build transaction here for backward compatibility
+    const data = await this.getMintBadgeTransactionData(playerAddress, paymentCoinId);
+    if (!data.success || !data.transactionData) {
+      return data as any;
+    }
+
+    try {
+      const txb = new Transaction();
+      const { transactionData } = data;
+      
+      // Split payment amount from coin
+      const paymentCoinObj = txb.object(transactionData.arguments.paymentCoinId);
+      const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [BigInt(transactionData.arguments.paymentAmount)]);
+      
+      // Build transaction
+      txb.moveCall({
+        target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
+        arguments: [
+          txb.object(transactionData.arguments.badgeRegistry),
+          txb.object(transactionData.arguments.statsRegistry),
+          txb.object(transactionData.arguments.clock),
+          splitPaymentCoin,
+          txb.object(transactionData.arguments.imageDataObjectId),
+        ],
+      });
+      
+      txb.setSender(playerAddress);
+      txb.setGasBudget(transactionData.gasBudget);
+      
+      // Need gas payment for build() to work
+      const client = this.getClient();
+      const coins = await client.getCoins({
+        owner: playerAddress,
+        coinType: '0x2::sui::SUI',
+      });
+      
+      if (coins.data && coins.data.length > 0) {
+        const gasCoin = coins.data.find(c => c.coinObjectId === transactionData.arguments.paymentCoinId) || coins.data[0];
+        txb.setGasPayment([{
+          objectId: gasCoin.coinObjectId,
+          version: gasCoin.version,
+          digest: gasCoin.digest,
+        }]);
+      }
+      
+      const transactionBytes = await txb.build({ client });
+      
+      return {
+        success: true,
+        transaction: Buffer.from(transactionBytes).toString('base64'),
+        gasEstimate: transactionData.gasBudget.toString(),
+      };
+    } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
