@@ -339,9 +339,10 @@ async function signAndExecuteBadgeTransaction(transaction) {
   console.log('🚀 [BADGE] ========== EXECUTING TRANSACTION ==========');
   console.log('🚀 [BADGE] Transaction type:', typeof transaction);
   console.log('🚀 [BADGE] Transaction object:', {
-    isTransaction: transaction instanceof Transaction,
+    isObject: transaction && typeof transaction === 'object',
     hasKind: transaction && 'kind' in transaction,
     hasBlockData: transaction && 'blockData' in transaction,
+    constructor: transaction?.constructor?.name,
   });
   
   try {

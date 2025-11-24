@@ -1035,17 +1035,65 @@ async function initializeWalletAPI(options = {}) {
           };
         }
         
+        // Find a coin with sufficient balance for BOTH fee and gas
+        // We need at least 0.1 SUI in a single coin (0.09 fee + 0.01 gas)
+        // This ensures after splitting the fee, there's enough left for gas
+        const paymentCoin = coins.data.find(c => BigInt(c.balance) >= TOTAL_PAYMENT_MIST);
+        
+        if (!paymentCoin) {
+          console.error('❌ [BADGE MINT] No single coin has sufficient balance');
+          const maxCoinBalance = coins.data.reduce((max, c) => {
+            const balance = BigInt(c.balance);
+            return balance > max ? balance : max;
+          }, BigInt(0));
+          return {
+            success: false,
+            error: `No single coin has enough balance. Need ${Number(TOTAL_PAYMENT_MIST) / 1_000_000_000} SUI in one coin (for fee + gas), but largest coin has ${Number(maxCoinBalance) / 1_000_000_000} SUI. You may need to merge coins first.`,
+          };
+        }
+        
+        const remainingAfterSplit = BigInt(paymentCoin.balance) - feeAmount;
+        console.log('✅ [BADGE MINT] Found suitable payment coin:', {
+          coinId: paymentCoin.coinObjectId,
+          balance: `${Number(paymentCoin.balance) / 1_000_000_000} SUI (${paymentCoin.balance} MIST)`,
+          willSplit: `${Number(feeAmount) / 1_000_000_000} SUI for fee`,
+          remainingForGas: `${Number(remainingAfterSplit) / 1_000_000_000} SUI (${remainingAfterSplit} MIST)`,
+          gasBudget: `${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI`,
+          hasEnoughForGas: remainingAfterSplit >= GAS_BUDGET_MIST,
+        });
+        
+        if (remainingAfterSplit < GAS_BUDGET_MIST) {
+          console.error('❌ [BADGE MINT] Coin balance insufficient after fee split');
+          return {
+            success: false,
+            error: `Coin balance insufficient. After splitting ${Number(feeAmount) / 1_000_000_000} SUI for fee, only ${Number(remainingAfterSplit) / 1_000_000_000} SUI remains, but need ${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI for gas.`,
+          };
+        }
+        
         // Build transaction
         console.log('🔨 [BADGE MINT] Building transaction...');
         const txb = new Transaction();
         
-        // Use txb.gas to split payment amount (like the store does)
-        // This allows the wallet to automatically handle both payment and gas from the gas coin
-        // The wallet will use the remainder of the gas coin for gas fees
+        // Use txb.gas to split the fee amount
+        // txb.gas is a special reference that tells the wallet to:
+        // 1. Select a gas coin (wallet will choose one with sufficient balance)
+        // 2. Split the fee from it
+        // 3. Use the remainder for gas automatically
+        // 
+        // We've already verified there's at least one coin with >= 0.1 SUI,
+        // so the wallet will select that coin (or another with sufficient balance)
         console.log('💸 [BADGE MINT] Splitting fee from gas coin:', {
           feeAmount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
           method: 'txb.splitCoins(txb.gas, [feeAmount])',
+          note: 'Wallet will select a coin with sufficient balance and use remainder for gas',
+          verifiedCoinAvailable: `Found coin with ${Number(paymentCoin.balance) / 1_000_000_000} SUI (sufficient for fee + gas)`,
         });
+        
+        // Split the fee from the gas coin
+        // The wallet will:
+        // - Select a coin with at least 0.1 SUI (we verified one exists)
+        // - Split 0.09 SUI for the fee
+        // - Use the remainder (at least 0.01 SUI) for gas
         const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
         
         // Construct image URL
@@ -1055,38 +1103,97 @@ async function initializeWalletAPI(options = {}) {
         
         console.log('🖼️ [BADGE MINT] Image URL:', imageUrl);
         
-        // Build move call
+        // Build move call to mint_badge function
+        // Contract signature:
+        // public entry fun mint_badge(
+        //   registry: &mut BadgeRegistry,
+        //   stats_registry: &StatisticsRegistry,
+        //   clock: &Clock,
+        //   payment: Coin<SUI>,
+        //   image_url: String,
+        //   ctx: &mut TxContext  // Auto-provided
+        // )
         const moveCallTarget = `${contracts.packageId}::badge_system::mint_badge`;
-        console.log('📞 [BADGE MINT] Building move call:', {
-          target: moveCallTarget,
-          arguments: {
-            badgeRegistry: contracts.badgeRegistry,
-            statisticsRegistry: contracts.statisticsRegistry,
-            clock: contracts.clock,
-            feeCoin: 'splitFeeCoin (from txb.gas)',
-            imageUrl: imageUrl,
+        
+        console.log('📞 [BADGE MINT] ========== BUILDING MINT FUNCTION CALL ==========');
+        console.log('📞 [BADGE MINT] Function Target:', moveCallTarget);
+        console.log('📞 [BADGE MINT] Function will:');
+        console.log('   1. Validate payment >= MIN_MINT_FEE_MIST');
+        console.log('   2. Transfer payment to fee recipient');
+        console.log('   3. Check player does not already have badge');
+        console.log('   4. Get player stats from StatisticsRegistry');
+        console.log('   5. Create EarlySupporterBadge with Standard tier');
+        console.log('   6. Transfer badge to player (tx_context::sender())');
+        console.log('   7. Register badge in BadgeRegistry');
+        console.log('   8. Emit BadgeMinted event');
+        
+        console.log('📞 [BADGE MINT] Function Arguments:', {
+          arg1_registry: {
+            type: '&mut BadgeRegistry',
+            value: contracts.badgeRegistry,
+            method: 'txb.object()',
+          },
+          arg2_stats_registry: {
+            type: '&StatisticsRegistry',
+            value: contracts.statisticsRegistry,
+            method: 'txb.object()',
+          },
+          arg3_clock: {
+            type: '&Clock',
+            value: contracts.clock,
+            method: 'txb.object()',
+          },
+          arg4_payment: {
+            type: 'Coin<SUI>',
+            value: 'splitFeeCoin',
+            amount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
+            note: 'Split from gas coin, will be transferred to fee recipient',
+          },
+          arg5_image_url: {
+            type: 'String',
+            value: imageUrl,
+            method: 'txb.pure.string()',
+          },
+          arg6_ctx: {
+            type: '&mut TxContext',
+            value: 'Auto-provided by Sui',
+            note: 'Contains sender (player), timestamp, etc.',
           },
         });
         
+        // Build the move call - this actually calls the mint_badge function
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
-            txb.object(contracts.badgeRegistry),
-            txb.object(contracts.statisticsRegistry),
-            txb.object(contracts.clock),
-            splitFeeCoin,
-            txb.pure.string(imageUrl),
+            txb.object(contracts.badgeRegistry),      // &mut BadgeRegistry
+            txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry
+            txb.object(contracts.clock),               // &Clock
+            splitFeeCoin,                              // Coin<SUI> - payment
+            txb.pure.string(imageUrl),                 // String - image URL
+            // ctx: &mut TxContext is automatically provided by Sui
           ],
         });
         
+        console.log('✅ [BADGE MINT] Move call added to transaction');
+        console.log('📞 [BADGE MINT] ========== MINT FUNCTION CALL COMPLETE ==========');
+        
+        // Set transaction sender (required for ctx.sender() in contract)
         txb.setSender(playerAddress);
+        console.log('👤 [BADGE MINT] Transaction sender set:', playerAddress);
+        console.log('   (This will be used as ctx.sender() in mint_badge function)');
+        
+        // Set gas budget
         txb.setGasBudget(Number(GAS_BUDGET_MIST));
+        console.log('⛽ [BADGE MINT] Gas budget set:', `${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI`);
         
         console.log('✅ [BADGE MINT] Transaction built successfully');
-        console.log('📝 [BADGE MINT] Transaction Details:', {
+        console.log('📝 [BADGE MINT] Final Transaction Summary:', {
           sender: playerAddress,
           gasBudget: `${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI`,
           moveCall: moveCallTarget,
+          paymentAmount: `${Number(feeAmount) / 1_000_000_000} SUI`,
+          imageUrl: imageUrl,
+          willExecute: 'mint_badge function will create and transfer badge to player',
         });
         console.log('🔨 [BADGE MINT] ========== TRANSACTION BUILD COMPLETE ==========');
         
