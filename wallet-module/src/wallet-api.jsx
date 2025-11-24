@@ -947,8 +947,12 @@ async function initializeWalletAPI(options = {}) {
         // Build transaction
         const txb = new Transaction();
         
+        // Get payment coin object and split fee from it
+        const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
+        const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
+        
         // If we have a separate coin for gas, use it
-        // Otherwise, we'll use the same coin but need to handle it carefully
+        // Otherwise, the wallet will automatically use the remainder of the payment coin for gas
         if (gasCoin) {
           // We have a separate coin for gas - use it
           txb.setGasPayment([{
@@ -957,20 +961,10 @@ async function initializeWalletAPI(options = {}) {
             digest: gasCoin.digest,
           }]);
           
-          // Split fee from payment coin (this coin is NOT used for gas)
-          const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
-          const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
-          
           console.log('💰 [BADGE MINT] Using separate coins: payment coin for fee, separate coin for gas');
         } else {
-          // Only one coin available - must use it for both payment and gas
-          // Strategy: Split the fee first, then let wallet use remainder for gas
+          // Only one coin available - wallet will automatically use the remainder for gas
           // We DON'T set gas payment explicitly to avoid "object used twice" error
-          const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
-          const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
-          
-          // Don't set gas payment - the wallet will automatically use the remainder
-          // of the payment coin (after splitting) for gas
           console.log('💰 [BADGE MINT] Using same coin: split fee from it, wallet will use remainder for gas');
         }
         
