@@ -23,7 +23,7 @@ canvas-manager.js:295 📐 Responsive Canvas Manager module loaded
 viewport-manager.js:239 👁️ Viewport Manager module loaded
 mobile-ui.js:779 📱 Mobile UI module loaded
 touch-input.js:516 👆 Enhanced Touch Input module loaded
-(index):551 🔍 Device Detection Test: {type: 'desktop', screen: {…}, capabilities: {…}, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWeb…KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', timestamp: 1763955634776}
+(index):551 🔍 Device Detection Test: {type: 'desktop', screen: {…}, capabilities: {…}, userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWeb…KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36', timestamp: 1763956734224}
 (index):552 📱 Mobile Utils Test: Device: desktop | Screen: 1920x1080 | Touch: Yes | WebGL: Yes
 landscape-orientation.js:29 🖥️ Desktop detected - no orientation enforcement needed
 (index):640 📦 Loading wallet module from: https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs
@@ -74,38 +74,38 @@ wallet-api.umd.cjs:318 🔍 Direct wallet checks: {window.slush?.sui: false, win
 wallet-api.umd.cjs:318 ⚠️ Wallet Standard API (navigator.wallets.get) not available
 wallet-api.umd.cjs:318 🔍 Window properties that might be wallets: (21) ['trustwallet', 'trustwalletTon', 'trustWallet', 'ethereum', 'CoinbaseWalletSDK', 'CoinbaseWalletProvider', 'WalletLink', 'WalletLinkProvider', 'coinbaseWalletRequestProvider', 'coinbaseWalletExtension', 'walletLinkExtension', 'showStoreWalletConnectModal', 'handleStoreWalletConnect', 'cancelStoreWalletConnect', 'closeStoreWalletConnectModal', 'handleConnectWallet', 'handleDisconnectWallet', 'updateWalletUI', 'initializeWalletIntegration', 'updateWalletRequirementsUI', 'WalletAPI']
 wallet-api.umd.cjs:318 ⏳ Waiting for wallet detection...
-wallet-api.umd.cjs:318 🔍 WalletHookBridge: wallets detected {wallets: Array(1), walletsType: 'object', isArray: true, walletsLength: 1, walletsKeys: Array(1)}
-wallet-api.umd.cjs:318 🔍 WalletHookBridge: State updated {walletsCount: 1, walletNames: Array(1), connected: false, address: null}
-wallet-api.umd.cjs:318 🔍 connectWallet object: {type: 'object', keys: Array(16), hasMutateAsync: true, hasMutate: true, isFunction: false}
-wallet-api.umd.cjs:318 🔍 WalletHookBridge: wallets detected {wallets: Array(1), walletsType: 'object', isArray: true, walletsLength: 1, walletsKeys: Array(1)}
-wallet-api.umd.cjs:318 🔍 WalletHookBridge: State updated {walletsCount: 1, walletNames: Array(1), connected: false, address: null}
-wallet-api.umd.cjs:318 🔍 connectWallet object: {type: 'object', keys: Array(16), hasMutateAsync: true, hasMutate: true, isFunction: false}
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-base-styles.css
 (index):716 ✅ WalletAPI loaded
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-base-styles.css
+wallet-api.umd.cjs:318 🔍 WalletHookBridge: wallets detected {wallets: Array(1), walletsType: 'object', isArray: true, walletsLength: 1, walletsKeys: Array(1)}
+wallet-api.umd.cjs:318 🔍 WalletHookBridge: State updated {walletsCount: 1, walletNames: Array(1), connected: false, address: null}
+wallet-api.umd.cjs:318 🔍 connectWallet object: {type: 'object', keys: Array(16), hasMutateAsync: true, hasMutate: true, isFunction: false}
+wallet-api.umd.cjs:318 🔍 WalletHookBridge: wallets detected {wallets: Array(1), walletsType: 'object', isArray: true, walletsLength: 1, walletsKeys: Array(1)}
+wallet-api.umd.cjs:318 🔍 WalletHookBridge: State updated {walletsCount: 1, walletNames: Array(1), connected: false, address: null}
+wallet-api.umd.cjs:318 🔍 connectWallet object: {type: 'object', keys: Array(16), hasMutateAsync: true, hasMutate: true, isFunction: false}
 css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-components.css
 css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-ui-components.css
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-ui-classes.css
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-viewport-container.css
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-front-page.css
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-main-menu.css
-wallet-api.umd.cjs:318 🔍 After wait, wallets detected: {walletsCount: 1, walletNames: Array(1), hasConnect: true}
-(index):663 ✅ Wallet API initialized: {network: 'testnet', getAddress: ƒ, isConnected: ƒ, getWallets: ƒ, connect: ƒ, …}
 (index):63 === DEVICE DETECTION VERIFICATION ===
 (index):64 Device Type: desktop
 (index):65 Screen Size: 1920x1080
 (index):66 Touch Support: false
 (index):67 User Agent Mobile: false
-(index):68 Loaded CSS Files: 10
+(index):68 Loaded CSS Files: 6
 (index):69 =====================================
+wallet-api.umd.cjs:318 🔍 After wait, wallets detected: {walletsCount: 1, walletNames: Array(1), hasConnect: true}
+(index):663 ✅ Wallet API initialized: {network: 'testnet', getAddress: ƒ, isConnected: ƒ, getWallets: ƒ, connect: ƒ, …}
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-ui-classes.css
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-viewport-container.css
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-front-page.css
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-main-menu.css
 css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-panels.css
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-typography.css
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-interactions.css
-css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-responsive.css
 menu-system.js:391 🌐 Using network from backend: testnet
 menu-system.js:403 ✅ Wallet API initialized
 menu-system.js:487 Available wallets: [{…}]
 (index):726 🔍 Wallet API Ready
 (index):727 Wallet API initialized. Available wallets: [{…}]
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-typography.css
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-interactions.css
+css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-responsive.css
 css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-gameplay.css
 css-loader.js:29 ✅ Loaded CSS: src/game/rendering/responsive/shared/shared-animations.css
 css-loader.js:99 ✅ Shared CSS modules loaded successfully!
@@ -164,23 +164,23 @@ wallet-api.umd.cjs:318 🔍 WalletHookBridge: State updated {walletsCount: 1, wa
 wallet-api.umd.cjs:318 🔍 connectWallet object: {type: 'object', keys: Array(16), hasMutateAsync: true, hasMutate: true, isFunction: false}
 menu-system.js:407 🔔 Wallet event: {type: 'connected', address: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3'}
 menu-system.js:412 📋 [MENU] Cleared badge cache due to wallet change
-wallet-api.umd.cjs:318 🔍 MEWS Balance Check (Detailed): {address: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', network: 'mainnet', tokenTypeId: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS', decimals: 6, divisor: 1000000, …}
-menu-system.js:574 🔍 Balance check result: {success: true, balance: '0', hasMinimum: false, minimum: '500,000'}
-menu-system.js:590 📋 [MENU] Cleared badge cache before loading badge for address: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
-wallet-api.umd.cjs:318 🔍 MEWS Balance Check (Detailed): {address: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', network: 'mainnet', tokenTypeId: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS', decimals: 6, divisor: 1000000, …}
-menu-system.js:574 🔍 Balance check result: {success: true, balance: '0', hasMinimum: false, minimum: '500,000'}
-menu-system.js:590 📋 [MENU] Cleared badge cache before loading badge for address: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
-menu-system.js:173 ⏭️ [MENU] Badge load already in progress for this address, skipping duplicate call
 wallet-api.umd.cjs:318 ✅ Connection process completed. Final state: {address: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', connected: true, currentWallet: 'Slush', attempts: 0}
 menu-system.js:27 ✅ Wallet connected: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
 wallet-api.umd.cjs:318 🔍 MEWS Balance Check (Detailed): {address: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', network: 'mainnet', tokenTypeId: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS', decimals: 6, divisor: 1000000, …}
 menu-system.js:574 🔍 Balance check result: {success: true, balance: '0', hasMinimum: false, minimum: '500,000'}
 menu-system.js:590 📋 [MENU] Cleared badge cache before loading badge for address: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
+wallet-api.umd.cjs:318 🔍 MEWS Balance Check (Detailed): {address: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', network: 'mainnet', tokenTypeId: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS', decimals: 6, divisor: 1000000, …}
+menu-system.js:574 🔍 Balance check result: {success: true, balance: '0', hasMinimum: false, minimum: '500,000'}
+menu-system.js:590 📋 [MENU] Cleared badge cache before loading badge for address: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
 menu-system.js:173 ⏭️ [MENU] Badge load already in progress for this address, skipping duplicate call
+wallet-api.umd.cjs:318 🔍 MEWS Balance Check (Detailed): {address: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', network: 'mainnet', tokenTypeId: '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS', decimals: 6, divisor: 1000000, …}
+menu-system.js:574 🔍 Balance check result: {success: true, balance: '0', hasMinimum: false, minimum: '500,000'}
+menu-system.js:590 📋 [MENU] Cleared badge cache before loading badge for address: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
+menu-system.js:173 ⏭️ [MENU] Badge load already in progress for this address, skipping duplicate call
+game-state-manager.js:100 ✅ [MENU] Stats updated from blockchain: {bestScore: 0, totalGames: 0}
 game-state-manager.js:100 ✅ [MENU] Stats updated from blockchain: {bestScore: 0, totalGames: 0}
 menu-system.js:203 🔄 [MENU] Player needs to migrate badge
 badge-ui.js:443 🔄 [BADGE] Showing badge migration modal: {oldBadgeId: '0xc212f3f081cdfc63c88c210784be537442761c567fc345751a750f24bc918e6b', oldTier: 5, oldGamesPlayed: 0, oldMintDate: 1763909204306, imageData: undefined}
-game-state-manager.js:100 ✅ [MENU] Stats updated from blockchain: {bestScore: 0, totalGames: 0}
 game-state-manager.js:100 ✅ [MENU] Stats updated from blockchain: {bestScore: 0, totalGames: 0}
 ui-initialization.js:13 🎯 [CLICK TRACKING] Global click detected: {tag: 'BUTTON', id: 'badgeMigrateLaterBtn', class: 'badge-btn badge-btn-secondary', onclick: null, textContent: 'Maybe Later', …}
 ui-initialization.js:26 🎯 [CLICK TRACKING] Name input modal check: {modalExists: true, isInside: false, modalVisible: false, modalHidden: true}
@@ -228,7 +228,7 @@ game-security.js:271 🔄 Calling restart()
 game-security.js:271 🔄 Game restarting - starting new game
 game-security.js:271 🧪 [DEBUG] restart() called. baseSpeed: 2.5 speedIncrement: 0.01 maxSpeed: 6
 game-security.js:271 📊 Game state before restart: {gameRunning: true, gameOver: false, paused: false, hasCanvas: true, hasCtx: true}
-game-security.js:271 🆔 [SESSION] Generated session ID: 3238446d-c24e-474c-9e62-9a888e7c3648
+game-security.js:271 🆔 [SESSION] Generated session ID: 4d056d5c-bc2f-4db8-8ba0-52f84a2ef71f
 game-security.js:271 🔄 [SECURITY] Resetting secureGame for new game
 game-security.js:271 ✅ [SECURITY] secureGame reset complete
 game-security.js:271 ✓ Security system reset for new game
@@ -247,6 +247,7 @@ game-security.js:271 Switched to Theme 5
 game-security.js:271 Music - playing layer: melody, patternKey: theme5Melody, pattern exists: true
 game-security.js:271 Music - playing layer: bass, patternKey: theme5Bass, pattern exists: true
 game-security.js:271 Music - playing layer: harmony, patternKey: theme5Harmony, pattern exists: true
+game-security.js:271 🎮 Drawing game content
 game-security.js:158 Suspicious activity detected: devtools_detected
 flagSuspiciousActivity @ game-security.js:158
 (anonymous) @ game-security.js:301
@@ -261,9 +262,8 @@ startGameInternal @ menu-system.js:777
 await in startGameInternal
 startGameTest @ menu-system.js:732
 onclick @ (index):217
-game-security.js:271 Security alert would be sent: {type: 'devtools_detected', timestamp: 1763955647161, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
-game-security.js:271 🎯 [DEBUG] FPS≈ 55 | speed: 3.0499999999999883 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 🎮 Drawing game content
+game-security.js:271 Security alert would be sent: {type: 'devtools_detected', timestamp: 1763956749442, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 🎯 [DEBUG] FPS≈ 51 | speed: 3.009999999999989 base: 2.5 inc: 0.01 max: 6
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 0 | New: 15 | Actions: 1
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=15 | Expected: 15 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -285,66 +285,8 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955648146, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956750547, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 0 | New: 15 | SecureGame score: 15
-game-security.js:271 🎮 Drawing game content
-game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 3.6499999999999755 base: 2.5 inc: 0.01 max: 6
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 15 | New: 30 | Actions: 2
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=30 | Expected: 30 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -368,62 +310,10 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955648798, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956750696, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 15 | New: 30 | SecureGame score: 30
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 3.619999999999976 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 4.229999999999963 base: 2.5 inc: 0.01 max: 6
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 30 | New: 45 | Actions: 3
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=45 | Expected: 45 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -445,65 +335,20 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955649015, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956752004, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 30 | New: 45 | SecureGame score: 45
-game-security.js:271 🎯 [DEBUG] FPS≈ 59 | speed: 4.239999999999963 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 🎮 Drawing game content
+game-security.js:271 🎮 Drawing game content
+game-security.js:271 🎯 [DEBUG] FPS≈ 59 | speed: 4.8199999999999505 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Coin collected! Streak: 1 Force field level: 0 Active: false
+game-security.js:271 Boss progress: 1001 / 5000
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 5.4299999999999375 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 🧪 [DEBUG] gameLoop entry count: 301 RAF id: 300 speed: 5.489999999999936
+game-security.js:271 🎮 Drawing game content
+game-security.js:271 🎮 Drawing game content
+game-security.js:271 Coin collected! Streak: 2 Force field level: 0 Active: false
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Coin collected! Streak: 3 Force field level: 0 Active: false
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 45 | New: 60 | Actions: 4
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=60 | Expected: 60 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -529,61 +374,11 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955650114, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956755213, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 45 | New: 60 | SecureGame score: 60
-game-security.js:271 🎮 Drawing game content
+game-security.js:271 Music - playing layer: melody, patternKey: theme5Melody, pattern exists: true
+game-security.js:271 Music - playing layer: bass, patternKey: theme5Bass, pattern exists: true
+game-security.js:271 Music - playing layer: harmony, patternKey: theme5Harmony, pattern exists: true
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 60 | New: 75 | Actions: 5
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=75 | Expected: 75 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -607,64 +402,10 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955650648, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956755578, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 60 | New: 75 | SecureGame score: 75
-game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 4.83999999999995 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 🎮 Drawing game content
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Coin collected! Streak: 4 Force field level: 0 Active: false
 game-security.js:271 🎮 Drawing game content
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 75 | New: 90 | Actions: 6
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=90 | Expected: 90 | Match: true
@@ -687,66 +428,9 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955651031, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956757012, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 75 | New: 90 | SecureGame score: 90
-game-security.js:271 Coin collected! Streak: 1 Force field level: 0 Active: false
-game-security.js:271 Boss progress: 1001 / 5000
+game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 6 base: 2.5 inc: 0.01 max: 6
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 90 | New: 105 | Actions: 7
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=105 | Expected: 105 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -772,62 +456,9 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955651681, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956757665, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 90 | New: 105 | SecureGame score: 105
-game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 5.439999999999937 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 🧪 [DEBUG] gameLoop entry count: 301 RAF id: 300 speed: 5.489999999999936
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 105 | New: 120 | Actions: 8
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=120 | Expected: 120 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -851,63 +482,11 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955652430, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956758212, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 105 | New: 120 | SecureGame score: 120
-game-security.js:271 🎯 [DEBUG] FPS≈ 59 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Coin collected! Streak: 5 Force field level: 0 Active: false
+game-security.js:271 🛡️ Force field activated! Level 1, streak: 5
+game-security.js:271 Boss progress: 2002 / 5000
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 120 | New: 135 | Actions: 9
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=135 | Expected: 135 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -933,67 +512,8 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955653047, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956758717, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 120 | New: 135 | SecureGame score: 135
-game-security.js:271 Coin collected! Streak: 2 Force field level: 0 Active: false
-game-security.js:271 Music - playing layer: melody, patternKey: theme5Melody, pattern exists: true
-game-security.js:271 Music - playing layer: bass, patternKey: theme5Bass, pattern exists: true
-game-security.js:271 Music - playing layer: harmony, patternKey: theme5Harmony, pattern exists: true
-game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 No force field protection! Player hit by projectile
-game-security.js:271 Coin collected! Streak: 1 Force field level: 0 Active: false
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 135 | New: 150 | Actions: 10
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=150 | Expected: 150 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -1021,62 +541,11 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955654230, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956758945, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 135 | New: 150 | SecureGame score: 150
-game-security.js:271 Coin collected! Streak: 2 Force field level: 0 Active: false
-game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 No force field protection! Player hit by projectile
-game-security.js:271 🎮 Drawing game content
+game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Coin collected! Streak: 6 Force field level: 1 Active: true
+game-security.js:271 🧪 [DEBUG] gameLoop entry count: 601 RAF id: 600 speed: 6
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 150 | New: 165 | Actions: 11
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=165 | Expected: 165 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -1098,67 +567,8 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955655630, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956759215, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 150 | New: 165 | SecureGame score: 165
-game-security.js:271 🎮 Drawing game content
-game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 6 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 Boss progress: 2002 / 5000
 game-security.js:271 🎮 Drawing game content
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 165 | New: 180 | Actions: 12
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=180 | Expected: 180 | Match: true
@@ -1179,70 +589,13 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955656430, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956759962, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 165 | New: 180 | SecureGame score: 180
-game-security.js:271 🎮 Drawing game content
 game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 🧪 [DEBUG] gameLoop entry count: 601 RAF id: 600 speed: 6
-game-security.js:271 Coin collected! Streak: 1 Force field level: 0 Active: false
+game-security.js:271 Force field blocked projectile! Level: 1
+game-security.js:271 Force field destroyed!
+game-security.js:271 🎯 [DEBUG] FPS≈ 59 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 No force field protection! Player hit by projectile
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 180 | New: 195 | Actions: 13
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=195 | Expected: 195 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
@@ -1266,66 +619,38 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955657363, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956761470, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📈 [SCORE] +15 points | Previous: 180 | New: 195 | SecureGame score: 195
-game-security.js:271 🎮 Drawing game content
-game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Music - playing layer: melody, patternKey: theme5Melody, pattern exists: true
+game-security.js:271 Music - playing layer: bass, patternKey: theme5Bass, pattern exists: true
+game-security.js:271 Music - playing layer: harmony, patternKey: theme5Harmony, pattern exists: true
 game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 195 | New: 210 | Actions: 14
 game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=210 | Expected: 210 | Match: true
+game-security.js:158 Suspicious activity detected: console_game_access
+flagSuspiciousActivity @ game-security.js:158
+logConsoleActivity @ game-security.js:313
+console.log @ game-security.js:270
+updateScore @ main.js:68
+checkProjectileEnemyCollision @ main.js:774
+(anonymous) @ main.js:807
+(anonymous) @ main.js:800
+(anonymous) @ main.js:799
+update @ main.js:721
+gameLoop @ main.js:1190
+requestAnimationFrame
+gameLoop @ main.js:1199
+requestAnimationFrame
+gameLoop @ main.js:1199
+requestAnimationFrame
+gameLoop @ main.js:1199
+requestAnimationFrame
+gameLoop @ main.js:1199
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956762078, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 📈 [SCORE] +15 points | Previous: 195 | New: 210 | SecureGame score: 210
+game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Coin collected! Streak: 1 Force field level: 0 Active: false
+game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 210 | New: 225 | Actions: 15
+game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=225 | Expected: 225 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
 flagSuspiciousActivity @ game-security.js:158
 logConsoleActivity @ game-security.js:313
@@ -1349,71 +674,27 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955658247, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
-game-security.js:271 📈 [SCORE] +15 points | Previous: 195 | New: 210 | SecureGame score: 210
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956762661, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 📈 [SCORE] +15 points | Previous: 210 | New: 225 | SecureGame score: 225
+game-security.js:271 Coin collected! Streak: 2 Force field level: 0 Active: false
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 Coin collected! Streak: 3 Force field level: 0 Active: false
+game-security.js:271 Boss progress: 3003 / 5000
+game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 6 base: 2.5 inc: 0.01 max: 6
 game-security.js:271 No force field protection! Player hit by projectile
-game-security.js:271 Game Over triggered!
-game-security.js:271 📊 [SCORE DEBUG] Score sources: {fromGetter: 210, fromSecureGame: 210, fromFallback: 0, hasSecureGame: true}
-game-security.js:271 Final Score: 210
-game-security.js:271 Final Coins: 5
+game-security.js:271 🧪 [DEBUG] gameLoop entry count: 901 RAF id: 900 speed: 6
+game-security.js:271 🔍 [SCORE DEBUG] incrementScore called: +15 | Old: 225 | New: 240 | Actions: 16
+game-security.js:271 🔍 [SCORE DEBUG] After setter: actualNewScore=240 | Expected: 240 | Match: true
 game-security.js:158 Suspicious activity detected: console_game_access
 flagSuspiciousActivity @ game-security.js:158
 logConsoleActivity @ game-security.js:313
 console.log @ game-security.js:270
-gameOver @ main.js:1126
-update @ main.js:922
+updateScore @ main.js:68
+checkProjectileEnemyCollision @ main.js:774
+(anonymous) @ main.js:807
+(anonymous) @ main.js:800
+(anonymous) @ main.js:799
+update @ main.js:721
 gameLoop @ main.js:1190
 requestAnimationFrame
 gameLoop @ main.js:1199
@@ -1427,79 +708,44 @@ requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956764147, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 📈 [SCORE] +15 points | Previous: 225 | New: 240 | SecureGame score: 240
+game-security.js:271 Coin collected! Streak: 1 Force field level: 0 Active: false
+game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 6 base: 2.5 inc: 0.01 max: 6
+game-security.js:271 No force field protection! Player hit by projectile
+game-security.js:271 Game Over triggered!
+game-security.js:271 📊 [SCORE DEBUG] Score sources: {fromGetter: 240, fromSecureGame: 240, fromFallback: 0, hasSecureGame: true}
+game-security.js:271 Final Score: 240
+game-security.js:271 Final Coins: 10
+game-security.js:158 Suspicious activity detected: console_game_access
+flagSuspiciousActivity @ game-security.js:158
+logConsoleActivity @ game-security.js:313
+console.log @ game-security.js:270
+gameOver @ main.js:1126
+
 requestAnimationFrame
 gameLoop @ main.js:1199
 requestAnimationFrame
 gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-requestAnimationFrame
-gameLoop @ main.js:1199
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955658277, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
-game-security.js:271 📊 [GAME OVER] Captured score before validation: 210
-game-security.js:271 Score submitted successfully: 210
-game-security.js:271 ✓ Score securely validated: 210
-game-security.js:271 📊 [GAME OVER] Captured game stats: {score: 210, distance: 2401, coins: 5, bossesDefeated: 0, enemiesDefeated: 14, …}
-game-security.js:271 🎮 [GAME OVER] Game Over - Stats object received: {score: 210, distance: 2401, coins: 5, bossesDefeated: 0, enemiesDefeated: 14, …}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956765663, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 📊 [GAME OVER] Captured score before validation: 240
+game-security.js:271 Score submitted successfully: 240
+game-security.js:271 ✓ Score securely validated: 240
+game-security.js:271 📊 [GAME OVER] Captured game stats: {score: 240, distance: 3468.5, coins: 10, bossesDefeated: 0, enemiesDefeated: 16, …}
+game-security.js:271 🎮 [GAME OVER] Game Over - Stats object received: {score: 240, distance: 3468.5, coins: 10, bossesDefeated: 0, enemiesDefeated: 16, …}
 game-security.js:271 🎮 [GAME OVER] Game container state - visible: true hidden: false
 game-security.js:271 🎮 [GAME OVER] Game over screen should now be visible
 game-security.js:271 🎮 [GAME OVER] Waiting minimum 500 ms before accepting user input...
 game-security.js:271 🎮 [GAME OVER] Event listeners added - waiting for user input
 game-security.js:271 Game over, updating particles only
 game-security.js:271 🎯 [DEBUG] FPS≈ 60 | speed: 0 base: 2.5 inc: 0.01 max: 6
-game-security.js:271 Game over, updating particles only
-game-security.js:271 Game over, updating particles only
-game-security.js:271 Game over, updating particles only
+game-security.js:271 🎬 Drawing game over screen
 game-security.js:271 🎯 [DEBUG] FPS≈ 61 | speed: 0 base: 2.5 inc: 0.01 max: 6
 game-security.js:271 🎯 [CLICK TRACKING] Global click detected: {tag: 'CANVAS', id: 'gameCanvas', class: '', onclick: null, textContent: 'N/A', …}
 game-security.js:271 🎯 [CLICK TRACKING] Name input modal check: {modalExists: true, isInside: false, modalVisible: false, modalHidden: true}
 game-security.js:271 🎯 [CLICK TRACKING] Click is OUTSIDE name input modal
 game-security.js:271 🎯 [CLICK TRACKING] Event path: (8) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
-game-security.js:271 🎮 [GAME OVER] User interaction detected: click - elapsed: 1699 ms
+game-security.js:271 🎮 [GAME OVER] User interaction detected: click - elapsed: 1520 ms
 game-security.js:271 🎮 [GAME OVER] Minimum display time passed - proceeding
 game-security.js:271 🎮 [GAME OVER] Game loop stopped - transitioning to next screen
 game-security.js:271 ⏹️ Game loop stopped - game not running and not over
@@ -1511,8 +757,8 @@ console.log @ game-security.js:270
 setTimeout
 actuallyProceed @ leaderboard-system.js:468
 handleInteraction @ leaderboard-system.js:495
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955660087, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
-game-security.js:271 🎮 [GAME OVER] Showing name input modal for score: 210
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956767286, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 🎮 [GAME OVER] Showing name input modal for score: 240
 game-security.js:158 Suspicious activity detected: console_game_access
 flagSuspiciousActivity @ game-security.js:158
 logConsoleActivity @ game-security.js:313
@@ -1522,8 +768,8 @@ showNameInput @ leaderboard-system.js:73
 setTimeout
 actuallyProceed @ leaderboard-system.js:468
 handleInteraction @ leaderboard-system.js:495
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955660088, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
-game-security.js:271 🔵 [VISIBILITY] showNameInput() called for score: 210
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956767287, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 🔵 [VISIBILITY] showNameInput() called for score: 240
 game-security.js:271 🔵 [VISIBILITY] Name input modal - was visible: false was hidden: true
 game-security.js:271 🔵 [VISIBILITY] Name input modal SHOWN
 game-security.js:271 🔵 [VISIBILITY] Game container - was visible: true was hidden: false
@@ -1559,7 +805,7 @@ game-security.js:271 🟢 [UI FLOW] Main menu shown
 game-security.js:271 🟢 [UI FLOW] Settings panel state check - visible: false hidden: true
 game-security.js:271 Closing game completely
 game-security.js:271 ⏭️ [MENU] Skipping badge load in showMainMenu - already loaded for this address
-game-security.js:271 📝 [BLOCKCHAIN] Submitting game stats to blockchain (skipped name): {score: 210, distance: 2401, coins: 5, bossesDefeated: 0, enemiesDefeated: 14, …}
+game-security.js:271 📝 [BLOCKCHAIN] Submitting game stats to blockchain (skipped name): {score: 240, distance: 3468.5, coins: 10, bossesDefeated: 0, enemiesDefeated: 16, …}
 game-security.js:158 Suspicious activity detected: console_game_access
 flagSuspiciousActivity @ game-security.js:158
 logConsoleActivity @ game-security.js:313
@@ -1567,8 +813,8 @@ console.log @ game-security.js:270
 submitScoreToBlockchain @ score-submission.js:66
 skipSave @ leaderboard-system.js:310
 onclick @ (index):1
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955661716, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
-game-security.js:271 📝 [BLOCKCHAIN] Submitting score via backend: {score: 210, distance: 2401, coins: 5, bossesDefeated: 0, enemiesDefeated: 14, …} Name: (empty)
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956769132, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 📝 [BLOCKCHAIN] Submitting score via backend: {score: 240, distance: 3468.5, coins: 10, bossesDefeated: 0, enemiesDefeated: 16, …} Name: (empty)
 game-security.js:158 Suspicious activity detected: console_game_access
 flagSuspiciousActivity @ game-security.js:158
 logConsoleActivity @ game-security.js:313
@@ -1576,7 +822,7 @@ console.log @ game-security.js:270
 submitScoreToBlockchain @ score-submission.js:100
 skipSave @ leaderboard-system.js:310
 onclick @ (index):1
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955661717, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956769132, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📤 [BLOCKCHAIN] Sending score data to backend: https://sui-two-shooter-backend-sui-integra.vercel.app/api/scores/submit
 game-security.js:271 🟡 [UI FLOW] Skip button clicked via event listener
 game-security.js:271 🟡 [UI FLOW] skipSave() called
@@ -1603,7 +849,7 @@ game-security.js:271 🟢 [UI FLOW] Main menu shown
 game-security.js:271 🟢 [UI FLOW] Settings panel state check - visible: false hidden: true
 game-security.js:271 Closing game completely
 game-security.js:271 ⏭️ [MENU] Skipping badge load in showMainMenu - already loaded for this address
-game-security.js:271 📝 [BLOCKCHAIN] Submitting game stats to blockchain (skipped name): {score: 210, distance: 2401, coins: 5, bossesDefeated: 0, enemiesDefeated: 14, …}
+game-security.js:271 📝 [BLOCKCHAIN] Submitting game stats to blockchain (skipped name): {score: 240, distance: 3468.5, coins: 10, bossesDefeated: 0, enemiesDefeated: 16, …}
 game-security.js:158 Suspicious activity detected: console_game_access
 flagSuspiciousActivity @ game-security.js:158
 logConsoleActivity @ game-security.js:313
@@ -1611,8 +857,8 @@ console.log @ game-security.js:270
 submitScoreToBlockchain @ score-submission.js:66
 skipSave @ leaderboard-system.js:310
 (anonymous) @ leaderboard-system.js:129
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955661719, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
-game-security.js:271 📝 [BLOCKCHAIN] Submitting score via backend: {score: 210, distance: 2401, coins: 5, bossesDefeated: 0, enemiesDefeated: 14, …} Name: (empty)
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956769134, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
+game-security.js:271 📝 [BLOCKCHAIN] Submitting score via backend: {score: 240, distance: 3468.5, coins: 10, bossesDefeated: 0, enemiesDefeated: 16, …} Name: (empty)
 game-security.js:158 Suspicious activity detected: console_game_access
 flagSuspiciousActivity @ game-security.js:158
 logConsoleActivity @ game-security.js:313
@@ -1620,16 +866,16 @@ console.log @ game-security.js:270
 submitScoreToBlockchain @ score-submission.js:100
 skipSave @ leaderboard-system.js:310
 (anonymous) @ leaderboard-system.js:129
-game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763955661719, sessionKey: 'c1nbh0wx27miclnbv7', gameState: {…}}
+game-security.js:271 Security alert would be sent: {type: 'console_game_access', timestamp: 1763956769135, sessionKey: 'ef8jtx1rw4micmaydz', gameState: {…}}
 game-security.js:271 📤 [BLOCKCHAIN] Sending score data to backend: https://sui-two-shooter-backend-sui-integra.vercel.app/api/scores/submit
 game-security.js:271 ✅ [MENU] Stats updated from blockchain: {bestScore: 0, totalGames: 0}
 game-security.js:271 ✅ [MENU] Stats updated from blockchain: {bestScore: 0, totalGames: 0}
-game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! {digest: 'GPKr5QKRAA2GtxSaXxkkdXccsjBDW2og5MrwfiYrmAti', playerAddress: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', gasPaidBy: 'admin_wallet', badge: {…}}
+game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! {digest: 'Ev4cgQmiLVTmEPcY43MtaM9kUu8jbMqZhJxCu1eTBrPf', playerAddress: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', gasPaidBy: 'admin_wallet', badge: {…}}
 game-security.js:271 🎖️ [BADGE] Player can mint badge
-game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! GPKr5QKRAA2GtxSaXxkkdXccsjBDW2og5MrwfiYrmAti
-game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! {digest: 'GPKr5QKRAA2GtxSaXxkkdXccsjBDW2og5MrwfiYrmAti', playerAddress: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', gasPaidBy: 'admin_wallet', badge: {…}}
+game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! Ev4cgQmiLVTmEPcY43MtaM9kUu8jbMqZhJxCu1eTBrPf
+game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! {digest: 'Ev4cgQmiLVTmEPcY43MtaM9kUu8jbMqZhJxCu1eTBrPf', playerAddress: '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3', gasPaidBy: 'admin_wallet', badge: {…}}
 game-security.js:271 🎖️ [BADGE] Player can mint badge
-game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! GPKr5QKRAA2GtxSaXxkkdXccsjBDW2og5MrwfiYrmAti
+game-security.js:271 ✅ [BLOCKCHAIN] Score submitted successfully! Ev4cgQmiLVTmEPcY43MtaM9kUu8jbMqZhJxCu1eTBrPf
 game-security.js:271 🎖️ [BADGE] Showing badge minting modal
 game-security.js:271 🎖️ [BADGE] Showing badge minting modal
 game-security.js:271 🎯 [CLICK TRACKING] Global click detected: {tag: 'BUTTON', id: 'badgeMintBtn', class: 'badge-btn badge-btn-primary', onclick: null, textContent: 'Mint Badge ($0.10)', …}
@@ -1638,20 +884,39 @@ game-security.js:271 🎯 [CLICK TRACKING] Click is OUTSIDE name input modal
 game-security.js:271 🎯 [CLICK TRACKING] Event path: (9) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
 game-security.js:271 💰 [BADGE] Using coin 0xb7da7807cdf448179e8cef185820439e0f6ebf56b9bb1fb2fbb92d1cfbbf3c2c for payment
 game-security.js:271    Required: 0.11 SUI (0.10 for payment + ~0.01 for gas buffer)
-badge-service.js:263  POST https://sui-two-shooter-backend-sui-integra.vercel.app/api/badges/mint 400 (Bad Request)
-buildMintBadgeTransaction @ badge-service.js:263
+badge-service.js:328 ❌ [BADGE] Error building mint transaction: TypeError: Failed to resolve module specifier '@mysten/sui/transactions'
+    at Object.buildMintBadgeTransaction (badge-service.js:294:29)
+    at async HTMLButtonElement.handleBadgeMint (badge-ui.js:235:20)
+buildMintBadgeTransaction @ badge-service.js:328
+await in buildMintBadgeTransaction
 handleBadgeMint @ badge-ui.js:235
-badge-ui.js:254 ❌ [BADGE] Error minting badge: Error: No valid gas coins found for the transaction.
+badge-ui.js:254 ❌ [BADGE] Error minting badge: Error: Failed to resolve module specifier '@mysten/sui/transactions'
+    at HTMLButtonElement.handleBadgeMint (badge-ui.js:238:13)
+handleBadgeMint @ badge-ui.js:254
+game-security.js:271 🎯 [CLICK TRACKING] Global click detected: {tag: 'BUTTON', id: 'badgeMintBtn', class: 'badge-btn badge-btn-primary', onclick: null, textContent: 'Mint Badge ($0.10)', …}
+game-security.js:271 🎯 [CLICK TRACKING] Name input modal check: {modalExists: true, isInside: false, modalVisible: false, modalHidden: true}
+game-security.js:271 🎯 [CLICK TRACKING] Click is OUTSIDE name input modal
+game-security.js:271 🎯 [CLICK TRACKING] Event path: (9) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+game-security.js:271 💰 [BADGE] Using coin 0xb7da7807cdf448179e8cef185820439e0f6ebf56b9bb1fb2fbb92d1cfbbf3c2c for payment
+game-security.js:271    Required: 0.11 SUI (0.10 for payment + ~0.01 for gas buffer)
+badge-service.js:328 ❌ [BADGE] Error building mint transaction: TypeError: Failed to resolve module specifier '@mysten/sui/transactions'
+    at Object.buildMintBadgeTransaction (badge-service.js:294:29)
+    at async HTMLButtonElement.handleBadgeMint (badge-ui.js:235:20)
+buildMintBadgeTransaction @ badge-service.js:328
+await in buildMintBadgeTransaction
+handleBadgeMint @ badge-ui.js:235
+badge-ui.js:254 ❌ [BADGE] Error minting badge: Error: Failed to resolve module specifier '@mysten/sui/transactions'
     at HTMLButtonElement.handleBadgeMint (badge-ui.js:238:13)
 handleBadgeMint @ badge-ui.js:254
 
-2025-11-24 03:41:06.408 [info] 📥 Badge mint request received for: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
-2025-11-24 03:41:06.420 [info] 🔍 [BADGE LOOKUP] Checking if player has badge. Address: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
-2025-11-24 03:41:06.420 [info] 🔍 [BADGE LOOKUP] BadgeRegistry ID: 0xd49058b5bfdb6c05890e68d869ad4ff98ab3b7a681593e0c5d8e6486f42917bf
-2025-11-24 03:41:06.420 [info] 🔍 [BADGE LOOKUP] Package ID: 0x66b58fb2066e41c32152148ad35ad54fe95c2d079a797199f301443725fda34b
-2025-11-24 03:41:06.421 [info] 🔍 [BADGE LOOKUP] Calling has_badge with sender: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
-2025-11-24 03:41:06.474 [info] 🔍 [BADGE LOOKUP] devInspect completed
-2025-11-24 03:41:06.474 [info] 🔍 [BADGE LOOKUP] Raw result object: {
+
+2025-11-24 03:59:44.052 [info] 📥 Badge mint request received for: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
+2025-11-24 03:59:44.060 [info] 🔍 [BADGE LOOKUP] Checking if player has badge. Address: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
+2025-11-24 03:59:44.061 [info] 🔍 [BADGE LOOKUP] BadgeRegistry ID: 0xd49058b5bfdb6c05890e68d869ad4ff98ab3b7a681593e0c5d8e6486f42917bf
+2025-11-24 03:59:44.061 [info] 🔍 [BADGE LOOKUP] Package ID: 0x66b58fb2066e41c32152148ad35ad54fe95c2d079a797199f301443725fda34b
+2025-11-24 03:59:44.061 [info] 🔍 [BADGE LOOKUP] Calling has_badge with sender: 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
+2025-11-24 03:59:44.109 [info] 🔍 [BADGE LOOKUP] devInspect completed
+2025-11-24 03:59:44.109 [info] 🔍 [BADGE LOOKUP] Raw result object: {
   effects: {
     messageVersion: 'v1',
     status: { status: 'success' },
@@ -1664,7 +929,7 @@ handleBadgeMint @ badge-ui.js:254
     },
     modifiedAtVersions: [ [Object] ],
     sharedObjects: [ [Object] ],
-    transactionDigest: 'hNHjahC4E74bT4xemaoP2i1bVQRC9v4iGF2povhkz8k',
+    transactionDigest: '3hqo4CbBjC4rohEEoccoawBGPeVsTWUrdXvnfWRBcdsf',
     mutated: [ [Object] ],
     gasObject: { owner: [Object], reference: [Object] },
     dependencies: [
@@ -1675,17 +940,17 @@ handleBadgeMint @ badge-ui.js:254
   events: [],
   results: [ { returnValues: [Array] } ]
 }
-2025-11-24 03:41:06.474 [info] 🔍 [BADGE LOOKUP] result.results: [ { returnValues: [ [Array] ] } ]
-2025-11-24 03:41:06.474 [info] 🔍 [BADGE LOOKUP] First result: { returnValues: [ [ [Array], 'bool' ] ] }
-2025-11-24 03:41:06.474 [info] 🔍 [BADGE LOOKUP] First result returnValues: [ [ [ 0 ], 'bool' ] ]
-2025-11-24 03:41:06.474 [info] 🔍 [BADGE LOOKUP] First returnValue: [ [ 0 ], 'bool' ]
-2025-11-24 03:41:06.474 [info] 🔍 [BADGE LOOKUP] First returnValue stringified: [
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] result.results: [ { returnValues: [ [Array] ] } ]
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] First result: { returnValues: [ [ [Array], 'bool' ] ] }
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] First result returnValues: [ [ [ 0 ], 'bool' ] ]
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] First returnValue: [ [ 0 ], 'bool' ]
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] First returnValue stringified: [
   [
     0
   ],
   "bool"
 ]
-2025-11-24 03:41:06.475 [info] 🔍 [BADGE LOOKUP] Full result structure: {
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] Full result structure: {
   "hasResults": true,
   "resultsLength": 1,
   "results": [
@@ -1712,38 +977,24 @@ handleBadgeMint @ badge-ui.js:254
     }
   ]
 }
-2025-11-24 03:41:06.475 [info] 🔍 [BADGE LOOKUP] Found 1 result(s)
-2025-11-24 03:41:06.475 [info] 🔍 [BADGE LOOKUP] First result details:
-2025-11-24 03:41:06.475 [info] - returnValues length: 1
-2025-11-24 03:41:06.475 [info] - mutableReferenceOutputs length: 0
-2025-11-24 03:41:06.475 [info] 🔍 [BADGE LOOKUP] Found return value:
-2025-11-24 03:41:06.475 [info] - Full returnValue: [
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] Found 1 result(s)
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] First result details:
+2025-11-24 03:59:44.110 [info] - returnValues length: 1
+2025-11-24 03:59:44.110 [info] - mutableReferenceOutputs length: 0
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] Found return value:
+2025-11-24 03:59:44.110 [info] - Full returnValue: [
   [
     0
   ],
   "bool"
 ]
-2025-11-24 03:41:06.475 [info] - returnValue is array: true
-2025-11-24 03:41:06.475 [info] - returnValue length: 2
-2025-11-24 03:41:06.475 [info] 🔍 [BADGE LOOKUP] Strategy 3: Found value in returnValue[0][0]: 0
-2025-11-24 03:41:06.475 [info] 🔍 [BADGE LOOKUP] Parsed value: false (from 0)
-2025-11-24 03:41:06.475 [info] 🔍 [BADGE LOOKUP] Final result: false
-2025-11-24 03:41:06.475 [info] 📦 Using placeholder image for tier 0 (standard)
-2025-11-24 03:41:06.475 [info] 📦 [MINT BUILD] Image is 32 bytes (≤14336 bytes), using direct upload...
-2025-11-24 03:41:06.752 [info] ✅ [MINT BUILD] Created BadgeImageData object: 0xdb7f5a736f41cc7ddb35afea996c90da2fa50eaafb16ae3be4483723055f8919
-2025-11-24 03:41:06.752 [info] 🔍 [MINT BUILD] Querying testnet SUI coins for 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
-2025-11-24 03:41:06.760 [info] 💰 [MINT BUILD] Found 1 SUI coins on testnet
-2025-11-24 03:41:06.761 [info] 💡 Wallet will auto-select gas coins during signing (showing only needed amounts)
-2025-11-24 03:41:06.761 [info] 💳 [MINT BUILD] Using payment coin for gas: 0xb7da7807cdf448179e8cef185820439e0f6ebf56b9bb1fb2fbb92d1cfbbf3c2c
-2025-11-24 03:41:06.761 [info] Coin balance: 4.3233 SUI
-2025-11-24 03:41:06.761 [info] Required: 0.1115 SUI total (0.1000 for payment + 0.0115 for gas)
-2025-11-24 03:41:06.761 [info] Splitting 0.1000 SUI for payment, remaining for gas
-2025-11-24 03:41:06.805 [error] Error minting badge: Error: No valid gas coins found for the transaction.
-    at n (.next/server/chunks/8955.js:7:47078)
-    at async (.next/server/chunks/8955.js:7:46086)
-    at async (.next/server/chunks/8955.js:7:95619)
-    at async a.t (.next/server/chunks/8955.js:7:95887)
-    at async a.s (.next/server/chunks/8955.js:7:95450)
-    at async a.build (.next/server/chunks/8955.js:7:93050)
-    at async q.buildMintBadgeTransaction (.next/server/chunks/8176.js:1:26891)
-    at async y (.next/server/app/api/badges/mint/route.js:1:1649)
+2025-11-24 03:59:44.110 [info] - returnValue is array: true
+2025-11-24 03:59:44.110 [info] - returnValue length: 2
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] Strategy 3: Found value in returnValue[0][0]: 0
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] Parsed value: false (from 0)
+2025-11-24 03:59:44.110 [info] 🔍 [BADGE LOOKUP] Final result: false
+2025-11-24 03:59:44.110 [info] 📦 [MINT BUILD] Image is 32 bytes (≤14336 bytes), using direct upload...
+2025-11-24 03:59:44.419 [info] ✅ [MINT BUILD] Created BadgeImageData object: 0xf87f5f82a3892f68583bfb50cf664d4d7312b2b83e0551ec37c8b69d54db0f12
+2025-11-24 03:59:44.419 [info] 🔍 [MINT DATA] Validating payment coin for 0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3
+2025-11-24 03:59:44.430 [info] 💰 [MINT DATA] Found 1 SUI coins on testnet
+2025-11-24 03:59:44.430 [info] ✅ [MINT DATA] Transaction data prepared for frontend building

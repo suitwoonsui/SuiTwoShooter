@@ -289,40 +289,28 @@ async function buildMintBadgeTransaction(paymentCoinId) {
       };
     }
 
-    // Build transaction in frontend using Sui SDK (wallet module has it loaded)
-    // Dynamic import should work since wallet module already loaded @mysten/sui
-    const { Transaction } = await import('@mysten/sui/transactions');
-    
-    const txb = new Transaction();
-    const { transactionData } = data;
-    
-    // Split payment amount from coin
-    const paymentCoinObj = txb.object(transactionData.arguments.paymentCoinId);
-    const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [BigInt(transactionData.arguments.paymentAmount)]);
-    
-    // Build transaction
-    txb.moveCall({
-      target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
-      arguments: [
-        txb.object(transactionData.arguments.badgeRegistry),
-        txb.object(transactionData.arguments.statsRegistry),
-        txb.object(transactionData.arguments.clock),
-        splitPaymentCoin,
-        txb.object(transactionData.arguments.imageDataObjectId),
-      ],
-    });
-    
-    txb.setSender(address);
-    txb.setGasBudget(transactionData.gasBudget);
-    
-    // DO NOT set gas payment - let wallet auto-select!
-    // This way wallet shows only the needed amounts, not full coin balance
-    
-    console.log('✅ [BADGE] Transaction built in frontend (wallet will auto-select gas)');
+    // Build transaction in wallet module (has access to Sui SDK)
+    if (!window.walletAPIInstance || !window.walletAPIInstance.buildBadgeMintTransaction) {
+      return {
+        success: false,
+        error: 'Wallet API not available or buildBadgeMintTransaction method not found',
+      };
+    }
+
+    const buildResult = await window.walletAPIInstance.buildBadgeMintTransaction(
+      data.transactionData,
+      address
+    );
+
+    if (!buildResult.success) {
+      return buildResult;
+    }
+
+    console.log('✅ [BADGE] Transaction built in wallet module (wallet will auto-select gas)');
     
     return {
       success: true,
-      transaction: txb, // Return Transaction object
+      transaction: buildResult.transaction, // Return Transaction object
     };
   } catch (error) {
     console.error('❌ [BADGE] Error building mint transaction:', error);

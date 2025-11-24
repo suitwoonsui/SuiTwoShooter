@@ -838,6 +838,53 @@ async function initializeWalletAPI(options = {}) {
           error: error.message || 'Transaction failed'
         };
       }
+    },
+
+    /**
+     * Build badge mint transaction (wallet module has access to Sui SDK)
+     * @param {Object} transactionData - Transaction data from backend
+     * @param {string} playerAddress - Player's wallet address
+     * @returns {Promise<Object>} Transaction object ready for signing
+     */
+    async buildBadgeMintTransaction(transactionData, playerAddress) {
+      try {
+        const txb = new Transaction();
+        
+        // Split payment amount from coin
+        const paymentCoinObj = txb.object(transactionData.arguments.paymentCoinId);
+        const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [BigInt(transactionData.arguments.paymentAmount)]);
+        
+        // Build transaction
+        txb.moveCall({
+          target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
+          arguments: [
+            txb.object(transactionData.arguments.badgeRegistry),
+            txb.object(transactionData.arguments.statsRegistry),
+            txb.object(transactionData.arguments.clock),
+            splitPaymentCoin,
+            txb.object(transactionData.arguments.imageDataObjectId),
+          ],
+        });
+        
+        txb.setSender(playerAddress);
+        txb.setGasBudget(transactionData.gasBudget);
+        
+        // DO NOT set gas payment - let wallet auto-select!
+        // This way wallet shows only the needed amounts, not full coin balance
+        
+        console.log('✅ [WALLET] Badge mint transaction built (wallet will auto-select gas)');
+        
+        return {
+          success: true,
+          transaction: txb, // Return Transaction object
+        };
+      } catch (error) {
+        console.error('❌ [WALLET] Error building badge mint transaction:', error);
+        return {
+          success: false,
+          error: error.message || 'Failed to build badge mint transaction',
+        };
+      }
     }
   };
   
