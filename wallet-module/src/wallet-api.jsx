@@ -846,10 +846,28 @@ async function initializeWalletAPI(options = {}) {
         });
 
         // Verify transaction actually succeeded on-chain
+        // dapp-kit returns effects.status.status as 'success' or 'failure'
+        // Some wallets may return effects in a different structure
         const status = result.effects?.status?.status;
-        console.log('🔍 [WALLET] Transaction status:', status);
+        const hasDigest = !!result.digest;
+        const hasEffects = !!result.effects;
         
-        if (status !== 'success') {
+        console.log('🔍 [WALLET] Transaction status:', status);
+        console.log('🔍 [WALLET] Has digest:', hasDigest);
+        console.log('🔍 [WALLET] Has effects:', hasEffects);
+        console.log('🔍 [WALLET] Effects structure:', {
+          hasStatus: !!result.effects?.status,
+          statusType: typeof result.effects?.status,
+          statusKeys: result.effects?.status ? Object.keys(result.effects.status) : [],
+          effectsKeys: result.effects ? Object.keys(result.effects) : [],
+        });
+        
+        // If status is undefined but we have a digest and effects, check for error field
+        // If no error field exists, assume success (some wallets don't set status explicitly)
+        const hasError = result.effects?.status?.error !== undefined;
+        const isSuccess = status === 'success' || (status === undefined && hasDigest && hasEffects && !hasError);
+        
+        if (!isSuccess) {
           // Decode the error from effects
           const errorObj = result.effects?.status?.error;
           let errorMessage = 'Transaction failed on-chain';
@@ -869,18 +887,9 @@ async function initializeWalletAPI(options = {}) {
             }
           }
           
-          // Try to decode base64 effects if they're encoded
-          let decodedEffects = result.effects;
-          if (typeof result.effects === 'string') {
-            try {
-              // If effects is a base64 string, try to decode it
-              const decoded = atob(result.effects);
-              decodedEffects = JSON.parse(decoded);
-              console.log('📦 [WALLET] Decoded base64 effects');
-            } catch (e) {
-              console.warn('⚠️ [WALLET] Could not decode effects as base64:', e);
-            }
-          }
+          // Effects from dapp-kit are already objects, not base64 strings
+          // Use effects directly - no decoding needed
+          const decodedEffects = result.effects;
           
           // Extract Move abort error if present
           if (errorMessage.includes('MoveAbort') || errorMessage.includes('move abort')) {

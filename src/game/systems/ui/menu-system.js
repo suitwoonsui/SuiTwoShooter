@@ -194,8 +194,13 @@ async function loadMenuBadgeDisplay(walletAddress) {
 
     if (!badgeData || !badgeData.success || !badgeData.hasBadge || !badgeData.badge) {
       // Player doesn't have a badge in new contract
-      // Check if they need to migrate an old badge
-      if (window.BadgeService && window.BadgeService.checkBadgeMigration) {
+      // BUT: If we just minted a badge, wait a bit longer before checking for migration
+      // This prevents showing migration modal right after a successful mint
+      const recentMintTime = window.BadgeService?._lastMintTime || 0;
+      const timeSinceMint = Date.now() - recentMintTime;
+      const shouldCheckMigration = timeSinceMint > 5000; // Wait 5 seconds after mint before checking migration
+      
+      if (shouldCheckMigration && window.BadgeService && window.BadgeService.checkBadgeMigration) {
         const migrationCheck = await window.BadgeService.checkBadgeMigration(walletAddress);
         
         if (migrationCheck.success && migrationCheck.needsMigration && migrationCheck.migrationData) {
@@ -219,6 +224,8 @@ async function loadMenuBadgeDisplay(walletAddress) {
             });
           }
         }
+      } else if (!shouldCheckMigration) {
+        console.log('⏳ [MENU] Recent badge mint detected, skipping migration check for now');
       }
       
       // Hide badge display (no badge in new contract)

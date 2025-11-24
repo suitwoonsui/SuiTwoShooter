@@ -261,6 +261,23 @@ async function handleBadgeMint() {
       window.BadgeService.clearBadgeCache();
       console.log('✅ [BADGE UI] Badge cache cleared');
       
+      // Mark that we just minted a badge (prevents migration check from running immediately)
+      if (window.BadgeService) {
+        window.BadgeService._lastMintTime = Date.now();
+      }
+      
+      // Wait for transaction to be indexed on blockchain (3 seconds)
+      console.log('⏳ [BADGE UI] Waiting for transaction to be indexed...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Reload badge display to show the new badge
+      console.log('🔄 [BADGE UI] Reloading badge display...');
+      const playerAddress = window.walletAPIInstance?.getAddress();
+      if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {
+        await loadMenuBadgeDisplay(playerAddress);
+        console.log('✅ [BADGE UI] Badge display reloaded');
+      }
+      
       console.log('✅ [BADGE UI] ========== BADGE MINTING FLOW COMPLETE ==========');
     } else {
       console.error('❌ [BADGE UI] ========== BADGE MINTING FAILED ==========');
