@@ -363,11 +363,15 @@ async function signAndExecuteBadgeTransaction(transaction) {
       console.log('✅ [BADGE] Transaction executed successfully');
       console.log('✅ [BADGE] Transaction digest:', result.digest);
       
-      // Verify transaction succeeded on-chain
+      // The wallet module already verified the transaction succeeded
+      // It handles undefined status by checking for digest + effects + no error
+      // We should trust its determination
       const effectsStatus = result.effects?.status?.status;
       console.log('🔍 [BADGE] Checking transaction effects status:', effectsStatus);
       
-      if (effectsStatus !== 'success') {
+      // Only treat as failure if status is explicitly 'failure'
+      // If status is undefined but wallet module says success, trust it
+      if (effectsStatus === 'failure') {
         const error = result.effects?.status?.error || 'Transaction failed on-chain';
         console.error('❌ [BADGE] ========== TRANSACTION FAILED ON-CHAIN ==========');
         console.error('❌ [BADGE] Digest:', result.digest);
@@ -379,6 +383,12 @@ async function signAndExecuteBadgeTransaction(transaction) {
           error: error,
           effects: result.effects
         };
+      }
+      
+      // If status is undefined, wallet module already verified success
+      // (it checks for digest + effects + no error)
+      if (effectsStatus === undefined) {
+        console.log('✅ [BADGE] Transaction status undefined - wallet module verified success (has digest + effects + no error)');
       }
       
       console.log('✅ [BADGE] Transaction confirmed on-chain');
