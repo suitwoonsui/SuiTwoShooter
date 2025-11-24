@@ -784,33 +784,33 @@ export class BadgeService {
       // Badge minting requires SUI payment only
       // Skip validation if paymentCoinId is not provided (wallet module will find coin)
       if (paymentCoinId && paymentCoinId.trim() !== '') {
-        try {
-          const coinObject = await client.getObject({
-            id: paymentCoinId,
-            options: { showType: true, showContent: true },
-          });
-          
-          if (!coinObject.data) {
-            return {
-              success: false,
-              error: 'Payment coin not found',
-            };
-          }
-          
-          // Verify it's a SUI coin (0x2::sui::SUI)
-          const coinType = coinObject.data.type;
-          if (!coinType || !coinType.includes('0x2::sui::SUI')) {
-            return {
-              success: false,
-              error: 'Invalid payment coin type. Badge minting requires SUI coins only.',
-            };
-          }
-        } catch (error) {
-          console.error('Error validating payment coin:', error);
+      try {
+        const coinObject = await client.getObject({
+          id: paymentCoinId,
+          options: { showType: true, showContent: true },
+        });
+        
+        if (!coinObject.data) {
           return {
             success: false,
-            error: 'Failed to validate payment coin. Please ensure you are using a SUI coin.',
+            error: 'Payment coin not found',
           };
+        }
+        
+        // Verify it's a SUI coin (0x2::sui::SUI)
+        const coinType = coinObject.data.type;
+        if (!coinType || !coinType.includes('0x2::sui::SUI')) {
+          return {
+            success: false,
+            error: 'Invalid payment coin type. Badge minting requires SUI coins only.',
+          };
+        }
+      } catch (error) {
+        console.error('Error validating payment coin:', error);
+        return {
+          success: false,
+          error: 'Failed to validate payment coin. Please ensure you are using a SUI coin.',
+        };
         }
       } else {
         console.log(`💰 [MINT DATA] Payment coin ID not provided - skipping validation (wallet module will find coin)`);
@@ -889,40 +889,40 @@ export class BadgeService {
       // Validate payment coin balance only if paymentCoinId is provided
       // If not provided, wallet module will find the coin
       if (paymentCoinId && paymentCoinId.trim() !== '') {
-        console.log(`🔍 [MINT DATA] Validating payment coin for ${playerAddress}`);
-        const coins = await client.getCoins({
-          owner: playerAddress,
-          coinType: '0x2::sui::SUI',
-        });
-        
-        console.log(`💰 [MINT DATA] Found ${coins.data?.length || 0} SUI coins on ${this.config.sui.network}`);
+      console.log(`🔍 [MINT DATA] Validating payment coin for ${playerAddress}`);
+      const coins = await client.getCoins({
+        owner: playerAddress,
+        coinType: '0x2::sui::SUI',
+      });
+      
+      console.log(`💰 [MINT DATA] Found ${coins.data?.length || 0} SUI coins on ${this.config.sui.network}`);
 
-        if (!coins.data || coins.data.length === 0) {
-          return {
-            success: false,
-            error: 'No SUI coins found in wallet. Please ensure you have SUI in your wallet.',
-          };
-        }
+      if (!coins.data || coins.data.length === 0) {
+        return {
+          success: false,
+          error: 'No SUI coins found in wallet. Please ensure you have SUI in your wallet.',
+        };
+      }
 
-        const paymentCoin = coins.data.find(coin => coin.coinObjectId === paymentCoinId);
-        if (!paymentCoin) {
-          return {
-            success: false,
-            error: 'Payment coin not found in wallet. Please ensure the payment coin is valid.',
-          };
-        }
+      const paymentCoin = coins.data.find(coin => coin.coinObjectId === paymentCoinId);
+      if (!paymentCoin) {
+        return {
+          success: false,
+          error: 'Payment coin not found in wallet. Please ensure the payment coin is valid.',
+        };
+      }
 
-        const paymentCoinBalance = BigInt(paymentCoin.balance);
-        const paymentAmount = BigInt(100_000_000); // 0.10 SUI for minting fee ($0.10)
-        const gasEstimate = this.config.sui.gasBudget;
-        const gasWithBuffer = Math.round(gasEstimate * 1.15);
-        const totalRequired = paymentAmount + BigInt(gasWithBuffer);
+      const paymentCoinBalance = BigInt(paymentCoin.balance);
+      const paymentAmount = BigInt(100_000_000); // 0.10 SUI for minting fee ($0.10)
+      const gasEstimate = this.config.sui.gasBudget;
+      const gasWithBuffer = Math.round(gasEstimate * 1.15);
+      const totalRequired = paymentAmount + BigInt(gasWithBuffer);
 
-        if (paymentCoinBalance < totalRequired) {
-          return {
-            success: false,
-            error: `Insufficient balance. Need ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI (0.10 for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas), but only have ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI.`,
-          };
+      if (paymentCoinBalance < totalRequired) {
+        return {
+          success: false,
+          error: `Insufficient balance. Need ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI (0.10 for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas), but only have ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI.`,
+        };
         }
       } else {
         console.log(`💰 [MINT DATA] Payment coin ID not provided - wallet module will find coin`);

@@ -814,8 +814,17 @@ async function initializeWalletAPI(options = {}) {
         const currentNetwork = walletAPIState.network || 'testnet';
         const chainId = `sui:${currentNetwork}`;
         
-        console.log(`🌐 [WALLET] Signing transaction on network: ${currentNetwork} (chain: ${chainId})`);
+        console.log('🔐 [WALLET] ========== SIGNING TRANSACTION ==========');
+        console.log('🔐 [WALLET] Network:', currentNetwork);
+        console.log('🔐 [WALLET] Chain ID:', chainId);
+        console.log('🔐 [WALLET] Transaction type:', typeof transactionToSign);
+        console.log('🔐 [WALLET] Transaction details:', {
+          isTransaction: transactionToSign instanceof Transaction,
+          hasKind: 'kind' in transactionToSign,
+          hasBlockData: 'blockData' in transactionToSign,
+        });
         
+        console.log('⏳ [WALLET] Requesting wallet signature...');
         const result = await walletAPIState._signAndExecuteTransaction.mutateAsync({
           transaction: transactionToSign,
           chain: chainId, // Explicitly set the chain to match wallet network
@@ -825,12 +834,24 @@ async function initializeWalletAPI(options = {}) {
           }
         });
 
-        // Check if transaction actually succeeded on-chain
+        console.log('📦 [WALLET] Transaction response received:', {
+          digest: result.digest,
+          hasEffects: !!result.effects,
+          hasEvents: !!result.events,
+          effectsStatus: result.effects?.status?.status,
+        });
+
+        // Verify transaction actually succeeded on-chain
         const status = result.effects?.status?.status;
+        console.log('🔍 [WALLET] Transaction status:', status);
+        
         if (status !== 'success') {
           const error = result.effects?.status?.error || 'Transaction failed on-chain';
-          console.error('❌ [WALLET] Transaction failed on-chain:', error);
-          console.error('❌ [WALLET] Transaction effects:', result.effects);
+          console.error('❌ [WALLET] ========== TRANSACTION FAILED ==========');
+          console.error('❌ [WALLET] Transaction digest:', result.digest);
+          console.error('❌ [WALLET] Error:', error);
+          console.error('❌ [WALLET] Full effects:', JSON.stringify(result.effects, null, 2));
+          console.error('❌ [WALLET] Events:', result.events);
           return {
             success: false,
             digest: result.digest,
@@ -840,8 +861,28 @@ async function initializeWalletAPI(options = {}) {
           };
         }
 
-        console.log('✅ [WALLET] Transaction succeeded on-chain:', result.digest);
-        console.log('✅ [WALLET] Transaction effects:', result.effects);
+        console.log('✅ [WALLET] ========== TRANSACTION SUCCEEDED ==========');
+        console.log('✅ [WALLET] Transaction digest:', result.digest);
+        console.log('✅ [WALLET] Gas used:', result.effects?.gasUsed);
+        console.log('✅ [WALLET] Transaction effects:', JSON.stringify(result.effects, null, 2));
+        console.log('✅ [WALLET] Transaction events:', result.events);
+        
+        // Log object changes if available
+        if (result.objectChanges) {
+          console.log('📦 [WALLET] Object changes:', result.objectChanges);
+        }
+        
+        // Log created objects
+        const createdObjects = result.objectChanges?.filter(change => change.type === 'created') || [];
+        if (createdObjects.length > 0) {
+          console.log('✨ [WALLET] Created objects:', createdObjects);
+        }
+        
+        // Log mutated objects
+        const mutatedObjects = result.objectChanges?.filter(change => change.type === 'mutated') || [];
+        if (mutatedObjects.length > 0) {
+          console.log('🔄 [WALLET] Mutated objects:', mutatedObjects);
+        }
 
         return {
           success: true,
@@ -880,9 +921,13 @@ async function initializeWalletAPI(options = {}) {
      * @returns {Promise<Object>} Transaction object ready for signing
      */
     async buildBadgeMintTransaction(playerAddress) {
+      console.log('🔨 [BADGE MINT] ========== BUILDING TRANSACTION ==========');
+      console.log('🔨 [BADGE MINT] Player Address:', playerAddress);
+      
       try {
         // Validate inputs
         if (!playerAddress || typeof playerAddress !== 'string' || !playerAddress.startsWith('0x')) {
+          console.error('❌ [BADGE MINT] Invalid player address:', playerAddress);
           return {
             success: false,
             error: 'Invalid player address',
@@ -892,15 +937,25 @@ async function initializeWalletAPI(options = {}) {
         // Get network and client
         const network = walletAPIState.network || 'testnet';
         const client = new SuiClient({ url: getFullnodeUrl(network) });
+        console.log('🌐 [BADGE MINT] Network:', network);
+        console.log('🌐 [BADGE MINT] RPC URL:', getFullnodeUrl(network));
         
         // Validate contract config
         const contracts = window.GAME_CONFIG?.CONTRACTS;
         if (!contracts) {
+          console.error('❌ [BADGE MINT] Contract configuration not found');
           return {
             success: false,
             error: 'Contract configuration not found. Please ensure contract-config.js is loaded.',
           };
         }
+
+        console.log('📋 [BADGE MINT] Contract Configuration:', {
+          packageId: contracts.packageId,
+          badgeRegistry: contracts.badgeRegistry,
+          statisticsRegistry: contracts.statisticsRegistry,
+          clock: contracts.clock,
+        });
 
         const missingFields = [];
         if (!contracts.packageId) missingFields.push('packageId');
@@ -909,6 +964,7 @@ async function initializeWalletAPI(options = {}) {
         if (!contracts.clock) missingFields.push('clock');
 
         if (missingFields.length > 0) {
+          console.error('❌ [BADGE MINT] Missing contract fields:', missingFields);
           return {
             success: false,
             error: `Missing contract configuration: ${missingFields.join(', ')}`,
@@ -922,60 +978,98 @@ async function initializeWalletAPI(options = {}) {
         // Calculate fee = total - gas
         const feeAmount = TOTAL_PAYMENT_MIST - GAS_BUDGET_MIST;
         
+        console.log('💰 [BADGE MINT] Payment Breakdown:', {
+          totalPayment: `${Number(TOTAL_PAYMENT_MIST) / 1_000_000_000} SUI (${TOTAL_PAYMENT_MIST} MIST)`,
+          gasBudget: `${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI (${GAS_BUDGET_MIST} MIST)`,
+          feeAmount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
+        });
+        
         if (feeAmount <= 0) {
+          console.error('❌ [BADGE MINT] Fee calculation error: feeAmount <= 0');
           return {
             success: false,
             error: `Gas estimate (${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI) exceeds total payment (0.1 SUI)`,
           };
         }
         
-        console.log(`💰 [BADGE MINT] Total: 0.1 SUI | Gas: ${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI | Fee: ${Number(feeAmount) / 1_000_000_000} SUI`);
-        
         // Find coin with sufficient balance
+        console.log('🔍 [BADGE MINT] Querying SUI coins for address:', playerAddress);
         const coins = await client.getCoins({
           owner: playerAddress,
           coinType: '0x2::sui::SUI',
         });
         
+        console.log('💎 [BADGE MINT] Coins found:', {
+          count: coins.data?.length || 0,
+          coins: coins.data?.map(c => ({
+            id: c.coinObjectId,
+            balance: `${Number(c.balance) / 1_000_000_000} SUI (${c.balance} MIST)`,
+            version: c.version,
+            digest: c.digest,
+          })) || [],
+        });
+        
         if (!coins.data || coins.data.length === 0) {
+          console.error('❌ [BADGE MINT] No SUI coins found in wallet');
           return {
             success: false,
             error: 'No SUI coins found in wallet. Please ensure you have SUI in your wallet.',
           };
         }
         
-        // Find a coin with sufficient balance (≥0.1 SUI for fee + gas)
-        const paymentCoin = coins.data.find(c => BigInt(c.balance) >= TOTAL_PAYMENT_MIST);
+        // Check total balance (need enough for payment + gas)
+        const totalBalance = coins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
+        const requiredBalance = TOTAL_PAYMENT_MIST; // 0.1 SUI total (fee + gas)
         
-        if (!paymentCoin) {
-          const totalBalance = coins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
+        console.log('💵 [BADGE MINT] Balance Check:', {
+          totalBalance: `${Number(totalBalance) / 1_000_000_000} SUI (${totalBalance} MIST)`,
+          requiredBalance: `${Number(requiredBalance) / 1_000_000_000} SUI (${requiredBalance} MIST)`,
+          sufficient: totalBalance >= requiredBalance,
+        });
+        
+        if (totalBalance < requiredBalance) {
+          console.error('❌ [BADGE MINT] Insufficient balance');
           return {
             success: false,
-            error: `Insufficient SUI balance. Need ${Number(TOTAL_PAYMENT_MIST) / 1_000_000_000} SUI (for payment + gas), but wallet has ${Number(totalBalance) / 1_000_000_000} SUI`,
+            error: `Insufficient SUI balance. Need ${Number(requiredBalance) / 1_000_000_000} SUI (for payment + gas), but wallet has ${Number(totalBalance) / 1_000_000_000} SUI`,
           };
         }
         
         // Build transaction
+        console.log('🔨 [BADGE MINT] Building transaction...');
         const txb = new Transaction();
         
-        // Split fee from payment coin
-        // IMPORTANT: Don't set gas payment explicitly - the wallet will automatically
-        // use the remainder of this coin (after splitting) for gas fees
-        // This avoids the "object cannot appear more than once" error
-        const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
-        const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
-        
-        console.log(`💰 [BADGE MINT] Splitting ${Number(feeAmount) / 1_000_000_000} SUI from coin ${paymentCoin.coinObjectId.substring(0, 10)}...`);
-        console.log(`💰 [BADGE MINT] Wallet will use remainder for gas automatically`);
+        // Use txb.gas to split payment amount (like the store does)
+        // This allows the wallet to automatically handle both payment and gas from the gas coin
+        // The wallet will use the remainder of the gas coin for gas fees
+        console.log('💸 [BADGE MINT] Splitting fee from gas coin:', {
+          feeAmount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
+          method: 'txb.splitCoins(txb.gas, [feeAmount])',
+        });
+        const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
         
         // Construct image URL
         const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
         const baseUrl = apiBaseUrl.replace(/\/api$/, '');
         const imageUrl = `${baseUrl}/Badges/Standard.webp`;
         
+        console.log('🖼️ [BADGE MINT] Image URL:', imageUrl);
+        
         // Build move call
+        const moveCallTarget = `${contracts.packageId}::badge_system::mint_badge`;
+        console.log('📞 [BADGE MINT] Building move call:', {
+          target: moveCallTarget,
+          arguments: {
+            badgeRegistry: contracts.badgeRegistry,
+            statisticsRegistry: contracts.statisticsRegistry,
+            clock: contracts.clock,
+            feeCoin: 'splitFeeCoin (from txb.gas)',
+            imageUrl: imageUrl,
+          },
+        });
+        
         txb.moveCall({
-          target: `${contracts.packageId}::badge_system::mint_badge`,
+          target: moveCallTarget,
           arguments: [
             txb.object(contracts.badgeRegistry),
             txb.object(contracts.statisticsRegistry),
@@ -989,6 +1083,12 @@ async function initializeWalletAPI(options = {}) {
         txb.setGasBudget(Number(GAS_BUDGET_MIST));
         
         console.log('✅ [BADGE MINT] Transaction built successfully');
+        console.log('📝 [BADGE MINT] Transaction Details:', {
+          sender: playerAddress,
+          gasBudget: `${Number(GAS_BUDGET_MIST) / 1_000_000_000} SUI`,
+          moveCall: moveCallTarget,
+        });
+        console.log('🔨 [BADGE MINT] ========== TRANSACTION BUILD COMPLETE ==========');
         
         return {
           success: true,
@@ -996,6 +1096,7 @@ async function initializeWalletAPI(options = {}) {
         };
       } catch (error) {
         console.error('❌ [BADGE MINT] Error building transaction:', error);
+        console.error('❌ [BADGE MINT] Error stack:', error.stack);
         return {
           success: false,
           error: error.message || 'Failed to build badge mint transaction',

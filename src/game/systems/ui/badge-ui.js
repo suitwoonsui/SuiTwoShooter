@@ -218,25 +218,55 @@ async function handleBadgeMint() {
 
     // Build mint transaction (fully client-side)
     // Flow: Find coin → Estimate gas → Calculate fee (0.1 SUI - gas) → Build transaction
-    console.log('🔨 [BADGE] Starting mint transaction build...');
+    console.log('🎖️ [BADGE UI] ========== BADGE MINTING FLOW START ==========');
+    console.log('🎖️ [BADGE UI] Step 1: Building mint transaction...');
     const result = await window.BadgeService.buildMintBadgeTransaction();
     
+    console.log('📋 [BADGE UI] Build result:', {
+      success: result.success,
+      hasTransaction: !!result.transaction,
+      error: result.error,
+    });
+    
     if (!result.success) {
+      console.error('❌ [BADGE UI] Transaction build failed:', result.error);
       throw new Error(result.error || 'Failed to build mint transaction');
     }
     
-    console.log('✅ [BADGE] Transaction built, requesting signature...');
+    console.log('✅ [BADGE UI] Step 1 complete: Transaction built successfully');
+    console.log('🎖️ [BADGE UI] Step 2: Requesting wallet signature...');
 
     // Sign and execute transaction (result.transaction is Transaction object)
     const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
     
+    console.log('📋 [BADGE UI] Execution result:', {
+      success: txResult.success,
+      digest: txResult.digest,
+      error: txResult.error,
+      hasEffects: !!txResult.effects,
+    });
+    
     if (txResult.success) {
-      console.log('✅ [BADGE] Badge minted successfully!');
+      console.log('✅ [BADGE UI] ========== BADGE MINTING SUCCESS ==========');
+      console.log('✅ [BADGE UI] Transaction digest:', txResult.digest);
+      console.log('✅ [BADGE UI] Showing success message to user...');
+      
       alert('🎉 Badge minted successfully!');
+      
+      console.log('🎖️ [BADGE UI] Hiding badge modal...');
       hideBadgeModal('badgeMintingModal');
+      
+      console.log('🎖️ [BADGE UI] Clearing badge cache...');
       // Clear badge cache
       window.BadgeService.clearBadgeCache();
+      console.log('✅ [BADGE UI] Badge cache cleared');
+      
+      console.log('✅ [BADGE UI] ========== BADGE MINTING FLOW COMPLETE ==========');
     } else {
+      console.error('❌ [BADGE UI] ========== BADGE MINTING FAILED ==========');
+      console.error('❌ [BADGE UI] Error:', txResult.error);
+      console.error('❌ [BADGE UI] Digest:', txResult.digest);
+      console.error('❌ [BADGE UI] Effects:', txResult.effects);
       throw new Error(txResult.error || 'Transaction failed');
     }
   } catch (error) {

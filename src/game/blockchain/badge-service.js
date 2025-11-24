@@ -336,34 +336,108 @@ async function signAndExecuteBadgeTransaction(transaction) {
     };
   }
 
+  console.log('🚀 [BADGE] ========== EXECUTING TRANSACTION ==========');
+  console.log('🚀 [BADGE] Transaction type:', typeof transaction);
+  console.log('🚀 [BADGE] Transaction object:', {
+    isTransaction: transaction instanceof Transaction,
+    hasKind: transaction && 'kind' in transaction,
+    hasBlockData: transaction && 'blockData' in transaction,
+  });
+  
   try {
     // Pass Transaction object directly to wallet API
     // The wallet API accepts Transaction objects, base64 strings, or Uint8Array
+    console.log('⏳ [BADGE] Calling wallet API signAndExecuteTransaction...');
     const result = await window.walletAPIInstance.signAndExecuteTransaction(transaction);
 
+    console.log('📥 [BADGE] Transaction result received:', {
+      success: result.success,
+      digest: result.digest,
+      hasEffects: !!result.effects,
+      hasEvents: !!result.events,
+      error: result.error,
+    });
+
     if (result.success) {
-      console.log('✅ [BADGE] Transaction executed successfully:', result.digest);
-      console.log('✅ [BADGE] Transaction effects:', result.effects);
-      console.log('✅ [BADGE] Transaction events:', result.events);
+      console.log('✅ [BADGE] Transaction executed successfully');
+      console.log('✅ [BADGE] Transaction digest:', result.digest);
+      
+      // Verify transaction succeeded on-chain
+      const effectsStatus = result.effects?.status?.status;
+      console.log('🔍 [BADGE] Checking transaction effects status:', effectsStatus);
+      
+      if (effectsStatus !== 'success') {
+        const error = result.effects?.status?.error || 'Transaction failed on-chain';
+        console.error('❌ [BADGE] ========== TRANSACTION FAILED ON-CHAIN ==========');
+        console.error('❌ [BADGE] Digest:', result.digest);
+        console.error('❌ [BADGE] Error:', error);
+        console.error('❌ [BADGE] Full effects:', JSON.stringify(result.effects, null, 2));
+        return {
+          success: false,
+          digest: result.digest,
+          error: error,
+          effects: result.effects
+        };
+      }
+      
+      console.log('✅ [BADGE] Transaction confirmed on-chain');
+      console.log('📊 [BADGE] Transaction effects summary:', {
+        status: result.effects?.status?.status,
+        gasUsed: result.effects?.gasUsed,
+        objectChanges: result.objectChanges?.length || 0,
+        events: result.events?.length || 0,
+      });
+      
+      // Wait a moment for the transaction to be indexed, then verify badge was minted
+      console.log('⏳ [BADGE] Waiting 2 seconds for transaction to be indexed...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('✅ [BADGE] Indexing wait complete');
+      
+      // Verify badge was actually minted by querying the chain
+      const playerAddress = getPlayerAddress();
+      console.log('🔍 [BADGE] Verifying badge on-chain for address:', playerAddress);
+      
+      if (playerAddress) {
+        console.log('📡 [BADGE] Querying badge from blockchain...');
+        const badge = await getBadge(playerAddress);
+        
+        console.log('📋 [BADGE] Badge query result:', {
+          found: !!badge,
+          badgeId: badge?.badgeId,
+          tier: badge?.tier,
+          gamesPlayed: badge?.gamesPlayed,
+          mintDate: badge?.mintDate,
+        });
+        
+        if (badge && badge.badgeId) {
+          console.log('✅ [BADGE] ========== BADGE VERIFIED ON-CHAIN ==========');
+          console.log('✅ [BADGE] Badge ID:', badge.badgeId);
+          console.log('✅ [BADGE] Badge tier:', badge.tier);
+          console.log('✅ [BADGE] Games played:', badge.gamesPlayed);
+          console.log('✅ [BADGE] Mint date:', badge.mintDate);
+        } else {
+          console.warn('⚠️ [BADGE] ========== BADGE NOT FOUND ==========');
+          console.warn('⚠️ [BADGE] Transaction succeeded but badge not found on-chain');
+          console.warn('⚠️ [BADGE] This may be due to:');
+          console.warn('⚠️ [BADGE]   1. Transaction not yet indexed (wait a few seconds)');
+          console.warn('⚠️ [BADGE]   2. Badge query endpoint issue');
+          console.warn('⚠️ [BADGE]   3. Transaction succeeded but badge creation failed');
+          console.warn('⚠️ [BADGE] Transaction digest:', result.digest);
+        }
+      } else {
+        console.warn('⚠️ [BADGE] Cannot verify badge: player address not available');
+      }
       
       // Clear cache to force refresh
+      console.log('🗑️ [BADGE] Clearing badge cache...');
       badgeCache.data = null;
       badgeCache.timestamp = 0;
-      
-      // Wait a moment for blockchain to update, then verify badge was minted
-      setTimeout(async () => {
-        const badge = await getBadge();
-        if (badge && badge.success) {
-          console.log('✅ [BADGE] Verified badge exists after mint:', badge);
-        } else {
-          console.warn('⚠️ [BADGE] Badge not found after mint transaction. Transaction may have failed.');
-        }
-      }, 2000);
+      console.log('✅ [BADGE] Badge cache cleared');
     } else {
-      console.error('❌ [BADGE] Transaction failed:', result.error);
-      console.error('❌ [BADGE] Transaction effects:', result.effects);
+      console.error('❌ [BADGE] Transaction execution failed:', result.error);
     }
 
+    console.log('🚀 [BADGE] ========== TRANSACTION EXECUTION COMPLETE ==========');
     return result;
   } catch (error) {
     console.error('❌ [BADGE] Error executing transaction:', error);
