@@ -1099,21 +1099,23 @@ async function initializeWalletAPI(options = {}) {
         console.log('🔨 [BADGE MINT] Building transaction...');
         const txb = new Transaction();
         
-        // Set the verified payment coin as the gas payment FIRST
-        // This ensures the wallet uses this specific coin (which we verified has enough balance)
-        txb.setGasPayment([paymentCoin.coinObjectId]);
-        
-        console.log('💸 [BADGE MINT] Gas payment set to verified coin:', {
-          coinId: paymentCoin.coinObjectId,
-          coinBalance: `${Number(paymentCoin.balance) / 1_000_000_000} SUI (${paymentCoin.balance} MIST)`,
+        // Use txb.gas to split the fee - wallet will automatically select a coin with sufficient balance
+        // We've already verified at least one coin has >= 0.1 SUI, so the wallet will find it
+        // The wallet will:
+        // 1. Select a coin with sufficient balance (we verified one exists)
+        // 2. Split the fee (0.09 SUI) from it
+        // 3. Use the remainder (>= 0.01 SUI) for gas automatically
+        console.log('💸 [BADGE MINT] Splitting fee from gas coin:', {
+          verifiedCoinId: paymentCoin.coinObjectId,
+          verifiedCoinBalance: `${Number(paymentCoin.balance) / 1_000_000_000} SUI (${paymentCoin.balance} MIST)`,
           feeAmount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
           remainingForGas: `${Number(remainingAfterSplit) / 1_000_000_000} SUI (${remainingAfterSplit} MIST)`,
-          method: 'txb.setGasPayment() then txb.splitCoins(txb.gas, [feeAmount])',
-          note: 'txb.gas now references the payment coin, we split fee from it, remainder used for gas',
+          method: 'txb.splitCoins(txb.gas, [feeAmount])',
+          note: 'Wallet will auto-select a coin with sufficient balance (we verified one exists)',
         });
         
-        // Now split the fee from txb.gas (which references the payment coin we just set)
-        // The remainder will automatically be used for gas
+        // Split the fee from the gas coin
+        // The wallet automatically selects a suitable coin and uses remainder for gas
         const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
         
         // Construct image URL
