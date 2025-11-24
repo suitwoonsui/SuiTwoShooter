@@ -228,7 +228,8 @@ async function handleBadgeMint() {
       throw new Error(coinResult.error || 'Failed to get payment coin');
     }
 
-    console.log(`💰 [BADGE] Using coin ${coinResult.coinId} for payment (${feeInfo.amountSui} SUI)`);
+    console.log(`💰 [BADGE] Using coin ${coinResult.coinId} for payment`);
+    console.log(`   Required: ${feeInfo.amountSui} SUI (0.10 for payment + ~0.01 for gas buffer)`);
     
     // Build mint transaction
     const result = await window.BadgeService.buildMintBadgeTransaction(coinResult.coinId);

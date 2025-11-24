@@ -111,8 +111,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // If we have a single coin with sufficient balance, use it
-    const sufficientCoin = coins.data.find(coin => BigInt(coin.balance) >= requiredAmountMist);
+    // Prefer smaller coins that are just enough (to avoid using large coins unnecessarily)
+    // Sort coins by balance (smallest first) and find the smallest coin with sufficient balance
+    const sortedCoins = [...coins.data].sort((a, b) => {
+      const balanceA = BigInt(a.balance);
+      const balanceB = BigInt(b.balance);
+      if (balanceA < balanceB) return -1;
+      if (balanceA > balanceB) return 1;
+      return 0;
+    });
+
+    // Find the smallest coin with sufficient balance
+    const sufficientCoin = sortedCoins.find(coin => BigInt(coin.balance) >= requiredAmountMist);
     if (sufficientCoin) {
       return NextResponse.json(
         {

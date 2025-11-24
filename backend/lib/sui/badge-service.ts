@@ -867,29 +867,10 @@ export class BadgeService {
       // Build transaction
       const txb = new Transaction();
       
-      // Call mint_badge function
-      txb.moveCall({
-        target: `${this.config.contracts.gameScore}::badge_system::mint_badge`,
-        arguments: [
-          txb.object(this.config.contracts.badgeRegistry),
-          txb.object(statsRegistryId),
-          txb.object(clockId),
-          txb.object(paymentCoinId),
-          txb.object(imageDataObjectId), // Pre-populated BadgeImageData object
-        ],
-      });
-
-      // Set sender (required for building transaction, even if not signing)
-      txb.setSender(playerAddress);
-
-      // Estimate gas (add 15% buffer)
-      const gasEstimate = this.config.sui.gasBudget;
-      const gasWithBuffer = Math.round(gasEstimate * 1.15);
-      txb.setGasBudget(gasWithBuffer);
-
       // Query player's SUI coins to get the payment coin
-      // IMPORTANT: The payment coin (0.15 SUI) includes both the minting fee AND gas
-      // We use the payment coin for gas, and the transaction will handle the payment
+      // IMPORTANT: We need to split the payment coin because:
+      // 1. The payment coin will be used for gas
+      // 2. We need to split it to create a separate coin for payment (can't use same coin twice)
       // Reuse client from validation above
       console.log(`🔍 [MINT BUILD] Querying ${this.config.sui.network} SUI coins for ${playerAddress}`);
       const coins = await client.getCoins({
@@ -906,7 +887,7 @@ export class BadgeService {
         };
       }
 
-      // Find the payment coin - this will be used for both payment and gas
+      // Find the payment coin
       const paymentCoin = coins.data.find(coin => coin.coinObjectId === paymentCoinId);
       if (!paymentCoin) {
         return {
@@ -916,29 +897,63 @@ export class BadgeService {
       }
 
       const paymentCoinBalance = BigInt(paymentCoin.balance);
-      const paymentAmount = BigInt(150_000_000); // 0.15 SUI total (includes payment + gas)
-      const totalRequired = paymentAmount; // Total payment includes gas
+      const paymentAmount = BigInt(100_000_000); // 0.10 SUI for minting fee ($0.10)
+      const gasEstimate = this.config.sui.gasBudget;
+      const gasWithBuffer = Math.round(gasEstimate * 1.15);
+      const totalRequired = paymentAmount + BigInt(gasWithBuffer); // Payment (0.10) + gas (~0.001)
 
-      // Check if payment coin has enough balance (0.15 SUI covers both payment and gas)
+      // Check if payment coin has enough balance
       if (paymentCoinBalance < totalRequired) {
         return {
           success: false,
-          error: `Insufficient balance. Need ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI (includes minting fee and gas), but only have ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI.`,
+          error: `Insufficient balance. Need ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI (0.10 for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas), but only have ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI.`,
         };
       }
 
-      // Use the payment coin for gas - the transaction will handle splitting for payment
-      // The payment coin has enough for both, so we use it for gas
-      const gasCoin = paymentCoin;
-
-      // Use the payment coin for gas - the 0.15 SUI payment includes both minting fee and gas
-      txb.setGasPayment([{
-        objectId: gasCoin.coinObjectId,
-        version: gasCoin.version,
-        digest: gasCoin.digest,
-      }]);
+      // PROPER METHOD: Split ONLY the payment amount (0.10 SUI) from the coin
+      // DO NOT set gas payment - let the wallet auto-select gas coins during signing
+      // This way the wallet will show only the amounts actually being used:
+      // - 0.10 SUI for payment (the split coin)
+      // - ~0.001 SUI for gas (auto-selected by wallet)
+      // Instead of showing the full balance of a large coin
       
-      console.log(`💳 [MINT BUILD] Using payment coin for gas: ${gasCoin.coinObjectId} (balance: ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI)`);
+      const paymentCoinObj = txb.object(paymentCoinId);
+      
+      // Split payment amount (0.10 SUI) for the minting fee
+      const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [paymentAmount]);
+      
+      // IMPORTANT: Do NOT call setGasPayment()
+      // When we don't set gas payment, the wallet will automatically select appropriate gas coins
+      // during signing. The wallet will see the split payment coin (0.10 SUI) and select
+      // a separate coin for gas, showing only the actual amounts being used.
+      // 
+      // If we explicitly set gas payment to a coin object, the wallet shows that coin's
+      // full balance, which is confusing for users.
+      
+      console.log(`   💡 Wallet will auto-select gas coins during signing (showing only needed amounts)`);
+
+      // Call mint_badge function with the split payment coin
+      txb.moveCall({
+        target: `${this.config.contracts.gameScore}::badge_system::mint_badge`,
+        arguments: [
+          txb.object(this.config.contracts.badgeRegistry),
+          txb.object(statsRegistryId),
+          txb.object(clockId),
+          splitPaymentCoin, // Use the split coin for payment
+          txb.object(imageDataObjectId), // Pre-populated BadgeImageData object
+        ],
+      });
+
+      // Set sender (required for building transaction, even if not signing)
+      txb.setSender(playerAddress);
+
+      // Set gas budget
+      txb.setGasBudget(gasWithBuffer);
+      
+      console.log(`💳 [MINT BUILD] Using payment coin for gas: ${paymentCoin.coinObjectId}`);
+      console.log(`   Coin balance: ${(Number(paymentCoinBalance) / 1_000_000_000).toFixed(4)} SUI`);
+      console.log(`   Required: ${(Number(totalRequired) / 1_000_000_000).toFixed(4)} SUI total (${(Number(paymentAmount) / 1_000_000_000).toFixed(4)} for payment + ${(Number(gasWithBuffer) / 1_000_000_000).toFixed(4)} for gas)`);
+      console.log(`   Splitting ${(Number(paymentAmount) / 1_000_000_000).toFixed(4)} SUI for payment, remaining for gas`);
 
       // Build transaction (don't sign - frontend will sign)
       // Reuse client from validation above

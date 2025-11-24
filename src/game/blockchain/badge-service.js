@@ -211,11 +211,10 @@ async function calculateMintingFee() {
       // Ignore
     }
 
-    // Default: Assume $1.00 per SUI (conservative)
-    // $0.10 / $1.00 = 0.1 SUI = 100,000,000 MIST
-    // But we'll use a higher amount to account for price fluctuations
-    // Use 0.15 SUI = 150,000,000 MIST as a safe default
-    const defaultAmountMist = 150_000_000; // 0.15 SUI (covers price up to $1.50/SUI)
+    // Default: $0.10 minting fee = 0.1 SUI = 100,000,000 MIST
+    // Add small buffer for gas (gas will come from the same coin after splitting)
+    // Use 0.11 SUI = 110,000,000 MIST (0.10 for payment + 0.01 buffer for gas)
+    const defaultAmountMist = 110_000_000; // 0.11 SUI (0.10 payment + 0.01 gas buffer)
 
     // In production, you'd fetch current SUI price and calculate:
     // const suiPrice = await getCurrentSuiPrice(); // e.g., $1.20
@@ -232,8 +231,8 @@ async function calculateMintingFee() {
     // Fallback to default
     return {
       success: true,
-      amountMist: 150_000_000, // 0.15 SUI
-      amountSui: 0.15,
+      amountMist: 110_000_000, // 0.11 SUI (0.10 payment + 0.01 gas buffer)
+      amountSui: 0.11,
     };
   }
 }
