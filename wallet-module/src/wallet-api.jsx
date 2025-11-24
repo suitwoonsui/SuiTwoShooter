@@ -1099,13 +1099,14 @@ async function initializeWalletAPI(options = {}) {
         console.log('🔨 [BADGE MINT] Building transaction...');
         const txb = new Transaction();
         
-        // Use txb.gas to split the fee - wallet will automatically select a coin with sufficient balance
-        // We've already verified at least one coin has >= 0.1 SUI, so the wallet will find it
-        // The wallet will:
-        // 1. Select a coin with sufficient balance (we verified one exists)
+        // Use txb.gas for splitting - this is the standard Sui SDK pattern
+        // The wallet will automatically:
+        // 1. Select a coin with sufficient balance (we verified one exists with >= 0.1 SUI)
         // 2. Split the fee (0.09 SUI) from it
         // 3. Use the remainder (>= 0.01 SUI) for gas automatically
-        console.log('💸 [BADGE MINT] Splitting fee from gas coin:', {
+        // 
+        // This avoids any "setGasPayment" type errors and follows Sui best practices
+        console.log('💸 [BADGE MINT] Splitting fee from gas coin (wallet auto-selects):', {
           verifiedCoinId: paymentCoin.coinObjectId,
           verifiedCoinBalance: `${Number(paymentCoin.balance) / 1_000_000_000} SUI (${paymentCoin.balance} MIST)`,
           feeAmount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
@@ -1114,8 +1115,8 @@ async function initializeWalletAPI(options = {}) {
           note: 'Wallet will auto-select a coin with sufficient balance (we verified one exists)',
         });
         
-        // Split the fee from the gas coin
-        // The wallet automatically selects a suitable coin and uses remainder for gas
+        // Split the fee from txb.gas - wallet handles coin selection automatically
+        // This is the standard Sui SDK pattern and avoids type errors
         const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
         
         // Construct image URL
