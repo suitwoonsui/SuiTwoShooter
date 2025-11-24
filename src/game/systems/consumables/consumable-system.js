@@ -125,15 +125,7 @@ const ConsumableSystem = {
       keyboardKey: 'S', // S for Slow
       mobileButton: true,
       checkAvailable: function() {
-        const available = game.slowTimePower && game.slowTimePower.usesRemaining > 0 && !game.slowTimePower.active;
-        if (!available) {
-          console.log('⏱️ [SLOW TIME] checkAvailable() returned false:', {
-            exists: !!game.slowTimePower,
-            usesRemaining: game.slowTimePower?.usesRemaining,
-            active: game.slowTimePower?.active
-          });
-        }
-        return available;
+        return game.slowTimePower && game.slowTimePower.usesRemaining > 0 && !game.slowTimePower.active;
       },
       activate: function() {
         if (typeof activateSlowTime === 'function') {
@@ -264,7 +256,6 @@ const ConsumableSystem = {
         level: level,
         speedReduction: 0.5 // 50% reduction
       };
-      console.log(`⏱️ [CONSUMABLES] Slow Time Power initialized - Level ${level}`);
     }
 
     // Destroy All Enemies
@@ -325,14 +316,6 @@ const ConsumableSystem = {
                 usesRemaining: game.coinTractorBeam?.usesRemaining,
                 active: game.coinTractorBeam?.active,
                 level: game.coinTractorBeam?.level
-              });
-            }
-            if (item.id === 'slowTime') {
-              console.log(`⌨️ [CONSUMABLES] Debug slowTime:`, {
-                exists: !!game.slowTimePower,
-                usesRemaining: game.slowTimePower?.usesRemaining,
-                active: game.slowTimePower?.active,
-                level: game.slowTimePower?.level
               });
             }
             if (item.id === 'bossKillShot') {

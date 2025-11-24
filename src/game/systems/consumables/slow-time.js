@@ -49,21 +49,15 @@ class SlowTimeParticle {
 
 // Activate slow time power
 function activateSlowTime() {
-  console.log('⏱️ [SLOW TIME] activateSlowTime() called');
-  console.log('⏱️ [SLOW TIME] game.slowTimePower:', game.slowTimePower);
-  
   if (!game.slowTimePower) {
-    console.log('⏱️ [SLOW TIME] Cannot activate - slowTimePower not initialized');
     return;
   }
   
   if (game.slowTimePower.usesRemaining <= 0) {
-    console.log('⏱️ [SLOW TIME] Cannot activate - no uses remaining');
     return;
   }
   
   if (game.slowTimePower.active) {
-    console.log('⏱️ [SLOW TIME] Cannot activate - already active');
     return;
   }
   
@@ -84,8 +78,6 @@ function activateSlowTime() {
   
   // Create activation effect (particles around screen edges)
   createSlowTimeActivationEffect();
-  
-  console.log(`⏱️ [SLOW TIME] Activated - Level ${level}, Duration: ${duration}ms`);
 }
 
 // Update slow time (called from main update loop)
@@ -131,8 +123,6 @@ function deactivateSlowTime() {
   
   // Clear particles
   slowTimeParticles = [];
-  
-  console.log('⏱️ [SLOW TIME] Deactivated');
 }
 
 // Create activation effect
