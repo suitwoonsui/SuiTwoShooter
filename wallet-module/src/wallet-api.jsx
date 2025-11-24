@@ -869,19 +869,45 @@ async function initializeWalletAPI(options = {}) {
             }
           }
           
+          // Try to decode base64 effects if they're encoded
+          let decodedEffects = result.effects;
+          if (typeof result.effects === 'string') {
+            try {
+              // If effects is a base64 string, try to decode it
+              const decoded = atob(result.effects);
+              decodedEffects = JSON.parse(decoded);
+              console.log('📦 [WALLET] Decoded base64 effects');
+            } catch (e) {
+              console.warn('⚠️ [WALLET] Could not decode effects as base64:', e);
+            }
+          }
+          
+          // Extract Move abort error if present
+          if (errorMessage.includes('MoveAbort') || errorMessage.includes('move abort')) {
+            // Move abort format: "MoveAbort(Location, code)"
+            const abortMatch = errorMessage.match(/MoveAbort\([^,]+,\s*(\d+)\)/);
+            if (abortMatch) {
+              errorCode = abortMatch[1];
+              console.error('🔍 [WALLET] Move abort code:', errorCode);
+            }
+          }
+          
           console.error('❌ [WALLET] ========== TRANSACTION FAILED ==========');
           console.error('❌ [WALLET] Transaction digest:', result.digest);
           console.error('❌ [WALLET] Status:', status);
-          console.error('❌ [WALLET] Error Code:', errorCode);
+          console.error('❌ [WALLET] Error Code:', errorCode || 'N/A');
           console.error('❌ [WALLET] Error Message:', errorMessage);
           console.error('❌ [WALLET] Full error object:', JSON.stringify(errorObj, null, 2));
-          console.error('❌ [WALLET] Full effects:', JSON.stringify(result.effects, null, 2));
+          console.error('❌ [WALLET] Full effects:', JSON.stringify(decodedEffects, null, 2));
           console.error('❌ [WALLET] Events:', result.events);
+          
+          // Return with the correct variable name (errorMessage, not error)
           return {
             success: false,
             digest: result.digest,
-            error: error,
-            effects: result.effects,
+            error: errorMessage,  // ✅ Fixed: was 'error' (undefined), now 'errorMessage'
+            errorCode: errorCode,
+            effects: decodedEffects,
             events: result.events
           };
         }
