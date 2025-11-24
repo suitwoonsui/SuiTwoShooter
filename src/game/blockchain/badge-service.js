@@ -147,99 +147,15 @@ async function hasBadge(playerAddress = null) {
 }
 
 /**
- * Get SUI coins from wallet and select/merge for payment
- * Uses backend API to avoid importing @mysten/sui/client in frontend
- * @param {number} requiredAmountMist - Required amount in MIST (1 SUI = 1,000,000,000 MIST)
- * @returns {Promise<Object>} Coin ID or error
- */
-async function getPaymentCoin(requiredAmountMist) {
-  const address = getPlayerAddress();
-  if (!address) {
-    return {
-      success: false,
-      error: 'Wallet not connected',
-    };
-  }
-
-  try {
-    // Call backend API to get payment coin
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(
-      `${API_BASE_URL}/badges/payment-coin?address=${encodeURIComponent(address)}&requiredAmount=${requiredAmountMist}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      return {
-        success: false,
-        error: errorData.error || `HTTP ${response.status}`,
-      };
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('❌ [BADGE] Error getting payment coin:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to get payment coin',
-    };
-  }
-}
-
-/**
- * Calculate required SUI amount for minting fee ($0.10 dollar-pegged)
- * @returns {Promise<Object>} Required amount in MIST
- */
-async function calculateMintingFee() {
-  try {
-    // Get current SUI price (simplified - in production, use a price oracle)
-    // For now, we'll use a conservative estimate or fetch from an API
-    const API_BASE_URL = getApiBaseUrl();
-    
-    // Try to get price from backend price converter
-    try {
-      const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/tokens/balance/${getPlayerAddress()}`);
-      // If that doesn't work, use a default
-    } catch (e) {
-      // Ignore
-    }
-
-    // Default: $0.10 minting fee = 0.1 SUI = 100,000,000 MIST
-    // Add small buffer for gas (gas will come from the same coin after splitting)
-    // Use 0.11 SUI = 110,000,000 MIST (0.10 for payment + 0.01 buffer for gas)
-    const defaultAmountMist = 110_000_000; // 0.11 SUI (0.10 payment + 0.01 gas buffer)
-
-    // In production, you'd fetch current SUI price and calculate:
-    // const suiPrice = await getCurrentSuiPrice(); // e.g., $1.20
-    // const requiredSui = 0.10 / suiPrice; // e.g., 0.0833 SUI
-    // const requiredMist = Math.ceil(requiredSui * 1_000_000_000);
-
-    return {
-      success: true,
-      amountMist: defaultAmountMist,
-      amountSui: defaultAmountMist / 1_000_000_000,
-    };
-  } catch (error) {
-    console.error('❌ [BADGE] Error calculating minting fee:', error);
-    // Fallback to default
-    return {
-      success: true,
-      amountMist: 110_000_000, // 0.11 SUI (0.10 payment + 0.01 gas buffer)
-      amountSui: 0.11,
-    };
-  }
-}
-
-/**
- * Build mint badge transaction (builds in frontend using Sui SDK)
- * Wallet module will find the coin and calculate fee = total - gas
+ * Build mint badge transaction (fully client-side, no backend needed)
+ * 
+ * Flow:
+ * 1. Wallet module finds a coin with sufficient balance (≥0.1 SUI)
+ * 2. Estimates gas budget (0.01 SUI)
+ * 3. Calculates fee = 0.1 SUI - gas
+ * 4. Splits fee from coin, uses remainder for gas
+ * 5. Builds transaction with contract addresses from config
+ * 
  * @returns {Promise<Object>} Transaction object ready for signing
  */
 async function buildMintBadgeTransaction() {
@@ -247,63 +163,47 @@ async function buildMintBadgeTransaction() {
   if (!address) {
     return {
       success: false,
-      error: 'Wallet not connected',
+      error: 'Wallet not connected. Please connect your wallet first.',
+    };
+  }
+
+  // Validate wallet API is available
+  if (!window.walletAPIInstance) {
+    return {
+      success: false,
+      error: 'Wallet API not initialized. Please wait for wallet module to load.',
+    };
+  }
+
+  if (!window.walletAPIInstance.buildBadgeMintTransaction) {
+    return {
+      success: false,
+      error: 'Badge minting not supported. Please update your wallet module.',
+    };
+  }
+
+  // Validate contract config is loaded
+  if (!window.GAME_CONFIG?.CONTRACTS) {
+    return {
+      success: false,
+      error: 'Contract configuration not loaded. Please refresh the page.',
     };
   }
 
   try {
-    // Get transaction data from backend (just need contract addresses, not payment coin)
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/badges/mint`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        playerAddress: address,
-        // No paymentCoinId - wallet module will find the coin
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      return {
-        success: false,
-        error: errorData.error || `HTTP ${response.status}`,
-      };
-    }
-
-    const data = await response.json();
+    console.log('🔨 [BADGE] Building mint transaction (client-side)...');
     
-    if (!data.success || !data.transactionData) {
-      return {
-        success: false,
-        error: data.error || 'Failed to get transaction data',
-      };
-    }
-
-    // Build transaction in wallet module (has access to Sui SDK)
-    if (!window.walletAPIInstance || !window.walletAPIInstance.buildBadgeMintTransaction) {
-      return {
-        success: false,
-        error: 'Wallet API not available or buildBadgeMintTransaction method not found',
-      };
-    }
-
-    const buildResult = await window.walletAPIInstance.buildBadgeMintTransaction(
-      data.transactionData,
-      address
-    );
+    const buildResult = await window.walletAPIInstance.buildBadgeMintTransaction(address);
 
     if (!buildResult.success) {
       return buildResult;
     }
 
-    console.log('✅ [BADGE] Transaction built in wallet module (wallet will auto-select gas)');
+    console.log('✅ [BADGE] Transaction built successfully');
     
     return {
       success: true,
-      transaction: buildResult.transaction, // Return Transaction object
+      transaction: buildResult.transaction,
     };
   } catch (error) {
     console.error('❌ [BADGE] Error building mint transaction:', error);
@@ -598,8 +498,6 @@ if (typeof window !== 'undefined') {
     getDiscountsForTier,
     getTierName,
     clearBadgeCache,
-    getPaymentCoin,
-    calculateMintingFee,
   };
 }
 

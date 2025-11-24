@@ -779,34 +779,39 @@ export class BadgeService {
     try {
       // Validate that paymentCoinId is a SUI coin (not MEWS, USDC, or other tokens)
       // Badge minting requires SUI payment only
-      const client = this.getClient();
-      try {
-        const coinObject = await client.getObject({
-          id: paymentCoinId,
-          options: { showType: true, showContent: true },
-        });
-        
-        if (!coinObject.data) {
+      // Skip validation if paymentCoinId is not provided (wallet module will find coin)
+      if (paymentCoinId && paymentCoinId.trim() !== '') {
+        const client = this.getClient();
+        try {
+          const coinObject = await client.getObject({
+            id: paymentCoinId,
+            options: { showType: true, showContent: true },
+          });
+          
+          if (!coinObject.data) {
+            return {
+              success: false,
+              error: 'Payment coin not found',
+            };
+          }
+          
+          // Verify it's a SUI coin (0x2::sui::SUI)
+          const coinType = coinObject.data.type;
+          if (!coinType || !coinType.includes('0x2::sui::SUI')) {
+            return {
+              success: false,
+              error: 'Invalid payment coin type. Badge minting requires SUI coins only.',
+            };
+          }
+        } catch (error) {
+          console.error('Error validating payment coin:', error);
           return {
             success: false,
-            error: 'Payment coin not found',
+            error: 'Failed to validate payment coin. Please ensure you are using a SUI coin.',
           };
         }
-        
-        // Verify it's a SUI coin (0x2::sui::SUI)
-        const coinType = coinObject.data.type;
-        if (!coinType || !coinType.includes('0x2::sui::SUI')) {
-          return {
-            success: false,
-            error: 'Invalid payment coin type. Badge minting requires SUI coins only.',
-          };
-        }
-      } catch (error) {
-        console.error('Error validating payment coin:', error);
-        return {
-          success: false,
-          error: 'Failed to validate payment coin. Please ensure you are using a SUI coin.',
-        };
+      } else {
+        console.log(`💰 [MINT DATA] Payment coin ID not provided - skipping validation (wallet module will find coin)`);
       }
 
       // Check if player already has badge

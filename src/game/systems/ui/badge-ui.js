@@ -216,13 +216,16 @@ async function handleBadgeMint() {
       return;
     }
 
-    // Build mint transaction (wallet module will find coin and calculate fee = total - gas)
-    // Total payment is 0.1 SUI, gas is estimated first, then fee = 0.1 - gas
+    // Build mint transaction (fully client-side)
+    // Flow: Find coin → Estimate gas → Calculate fee (0.1 SUI - gas) → Build transaction
+    console.log('🔨 [BADGE] Starting mint transaction build...');
     const result = await window.BadgeService.buildMintBadgeTransaction();
     
     if (!result.success) {
       throw new Error(result.error || 'Failed to build mint transaction');
     }
+    
+    console.log('✅ [BADGE] Transaction built, requesting signature...');
 
     // Sign and execute transaction (result.transaction is Transaction object)
     const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
