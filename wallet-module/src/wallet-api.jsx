@@ -991,7 +991,7 @@ async function initializeWalletAPI(options = {}) {
           }
           
           // Use decoded effects if we decoded them, otherwise use original
-          const decodedEffects = effectsToCheck || result.effects;
+          const decodedEffects = finalEffects || result.effects;
           
           // Extract Move abort error if present
           if (errorMessage.includes('MoveAbort') || errorMessage.includes('move abort')) {
@@ -1324,6 +1324,7 @@ async function initializeWalletAPI(options = {}) {
         });
         
         // Build the move call - this actually calls the mint_badge function
+        // Using exact same pattern as admin mint (which works)
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
@@ -1331,7 +1332,7 @@ async function initializeWalletAPI(options = {}) {
             txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry
             txb.object(contracts.clock),               // &Clock
             splitFeeCoin,                              // Coin<SUI> - payment
-            txb.pure.string(imageUrl),                 // String - image URL
+            txb.pure.string(imageUrl),                 // String - image URL (same as admin mint)
             // ctx: &mut TxContext is automatically provided by Sui
           ],
         });
