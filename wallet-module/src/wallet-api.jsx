@@ -784,7 +784,10 @@ async function initializeWalletAPI(options = {}) {
         // Based on Insomnia's implementation, it accepts string | Transaction
         if (transactionInput && typeof transactionInput === 'object') {
           // Check if it's already a Transaction object
-          if ('kind' in transactionInput || 'blockData' in transactionInput || transactionInput instanceof Transaction) {
+          // Use property checks instead of instanceof to avoid scope issues
+          const isTransactionObject = 'kind' in transactionInput || 'blockData' in transactionInput || 
+                                      (transactionInput.constructor && transactionInput.constructor.name === 'Transaction');
+          if (isTransactionObject) {
             // Already a Transaction object - pass directly
             transactionToSign = transactionInput;
             console.log('✅ [WALLET] Using provided Transaction object');
@@ -819,9 +822,10 @@ async function initializeWalletAPI(options = {}) {
         console.log('🔐 [WALLET] Chain ID:', chainId);
         console.log('🔐 [WALLET] Transaction type:', typeof transactionToSign);
         console.log('🔐 [WALLET] Transaction details:', {
-          isTransaction: transactionToSign instanceof Transaction,
+          isTransaction: typeof transactionToSign === 'object' && ('kind' in transactionToSign || 'blockData' in transactionToSign || (transactionToSign.constructor && transactionToSign.constructor.name === 'Transaction')),
           hasKind: 'kind' in transactionToSign,
           hasBlockData: 'blockData' in transactionToSign,
+          constructorName: transactionToSign?.constructor?.name,
         });
         
         console.log('⏳ [WALLET] Requesting wallet signature...');
