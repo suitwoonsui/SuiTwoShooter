@@ -777,11 +777,13 @@ export class BadgeService {
     }
 
     try {
+      // Get client for transaction execution (needed for image data creation)
+      const client = this.getClient();
+      
       // Validate that paymentCoinId is a SUI coin (not MEWS, USDC, or other tokens)
       // Badge minting requires SUI payment only
       // Skip validation if paymentCoinId is not provided (wallet module will find coin)
       if (paymentCoinId && paymentCoinId.trim() !== '') {
-        const client = this.getClient();
         try {
           const coinObject = await client.getObject({
             id: paymentCoinId,
@@ -836,7 +838,6 @@ export class BadgeService {
       } else {
         console.log(`📦 [MINT BUILD] Image is ${imageData.length} bytes (≤${CHUNK_THRESHOLD} bytes), using direct upload...`);
         // Create directly in a single transaction
-        // Reuse client from validation above
         const txbCreate = new Transaction();
         const imageDataObj = txbCreate.moveCall({
           target: `${this.config.contracts.gameScore}::badge_system::create_image_data_small`,
