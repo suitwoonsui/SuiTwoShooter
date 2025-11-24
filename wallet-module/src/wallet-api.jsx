@@ -862,14 +862,117 @@ async function initializeWalletAPI(options = {}) {
           effectsKeys: result.effects ? Object.keys(result.effects) : [],
         });
         
-        // If status is undefined but we have a digest and effects, check for error field
-        // If no error field exists, assume success (some wallets don't set status explicitly)
-        const hasError = result.effects?.status?.error !== undefined;
-        const isSuccess = status === 'success' || (status === undefined && hasDigest && hasEffects && !hasError);
+        // ALWAYS verify transaction on-chain to get definitive status
+        // The on-chain query is the source of truth - wallet responses can be inconsistent
+        let verifiedStatus = null; // null means we haven't checked yet
+        let verifiedEffects = null;
+        
+        if (result.digest) {
+          // Try to get status from on-chain query (with retries for indexing delay)
+          const maxRetries = 3;
+          let retryCount = 0;
+          
+          while (verifiedStatus === null && retryCount < maxRetries) {
+            try {
+              if (retryCount > 0) {
+                // Wait before retry (transaction might not be indexed yet)
+                const waitTime = 1000 * retryCount; // 1s, 2s, 3s
+                console.log(`⏳ [WALLET] Waiting ${waitTime}ms before retry ${retryCount}...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+              }
+              
+              console.log('🔍 [WALLET] Verifying transaction on-chain...');
+              const client = new SuiClient({ url: getFullnodeUrl(currentNetwork) });
+              const txDetails = await client.getTransactionBlock({
+                digest: result.digest,
+                options: {
+                  showEffects: true,
+                  showEvents: true,
+                  showObjectChanges: true,
+                },
+              });
+              
+              // Get status from on-chain query - this is the source of truth
+              verifiedStatus = txDetails.effects?.status?.status;
+              verifiedEffects = txDetails.effects;
+              
+              console.log('🔍 [WALLET] On-chain verification:', {
+                status: verifiedStatus,
+                statusType: typeof verifiedStatus,
+                hasError: !!txDetails.effects?.status?.error,
+                error: txDetails.effects?.status?.error,
+              });
+              
+              // If we got a status (even if undefined), we're done
+              // undefined status from on-chain means the transaction structure is unexpected
+              if (verifiedStatus !== null || verifiedEffects) {
+                break; // Got response, exit retry loop
+              }
+            } catch (verifyError) {
+              retryCount++;
+              if (retryCount >= maxRetries) {
+                console.error('❌ [WALLET] Failed to verify transaction on-chain after retries:', verifyError);
+                // If we can't verify, we can't determine success - treat as failure
+                verifiedStatus = 'unknown';
+              } else {
+                console.warn(`⚠️ [WALLET] On-chain verification failed (attempt ${retryCount}/${maxRetries}), retrying...`);
+              }
+            }
+          }
+        }
+        
+        // If on-chain query didn't return a status, check wallet's response
+        // But prioritize on-chain result
+        let finalStatus = verifiedStatus;
+        let finalEffects = verifiedEffects || result.effects;
+        
+        // If on-chain status is still null/undefined, try to get from wallet response
+        if (finalStatus === null || finalStatus === undefined) {
+          // Check if effects is a base64 string that needs decoding
+          if (typeof finalEffects === 'string') {
+            try {
+              const decoded = atob(finalEffects);
+              finalEffects = JSON.parse(decoded);
+              console.log('📦 [WALLET] Decoded base64 effects from wallet response');
+            } catch (e) {
+              console.warn('⚠️ [WALLET] Could not decode effects as base64:', e);
+            }
+          }
+          
+          // Try to get status from decoded effects
+          finalStatus = finalEffects?.status?.status;
+        }
+        
+        // If status is still undefined/null, we can't determine success
+        // This means either:
+        // 1. Transaction hasn't been indexed yet (should have been caught by retries)
+        // 2. Transaction structure is unexpected
+        // 3. Transaction actually failed but error isn't in expected format
+        if (finalStatus === null || finalStatus === undefined) {
+          console.error('❌ [WALLET] Could not determine transaction status from on-chain or wallet response');
+          console.error('❌ [WALLET] This indicates the transaction may have failed or structure is unexpected');
+          finalStatus = 'unknown';
+        }
+        
+        const hasError = finalEffects?.status?.error !== undefined;
+        
+        // Transaction succeeds ONLY if status is explicitly 'success'
+        // If status is undefined, null, 'unknown', or anything else, it's a failure
+        const isSuccess = finalStatus === 'success';
+        
+        console.log('🔍 [WALLET] Final status determination:', {
+          finalStatus,
+          source: verifiedStatus !== null ? 'on-chain' : 'wallet-response',
+          hasError,
+          hasDigest,
+          hasEffects: !!finalEffects,
+          isSuccess,
+          note: 'Transaction succeeds ONLY if status === "success"',
+        });
         
         if (!isSuccess) {
-          // Decode the error from effects
-          const errorObj = result.effects?.status?.error;
+          // Get error from final effects (prioritize on-chain, fallback to wallet)
+          const errorObj = finalEffects?.status?.error || result.effects?.status?.error;
           let errorMessage = 'Transaction failed on-chain';
           let errorCode = null;
           
@@ -887,9 +990,8 @@ async function initializeWalletAPI(options = {}) {
             }
           }
           
-          // Effects from dapp-kit are already objects, not base64 strings
-          // Use effects directly - no decoding needed
-          const decodedEffects = result.effects;
+          // Use decoded effects if we decoded them, otherwise use original
+          const decodedEffects = effectsToCheck || result.effects;
           
           // Extract Move abort error if present
           if (errorMessage.includes('MoveAbort') || errorMessage.includes('move abort')) {
@@ -903,11 +1005,12 @@ async function initializeWalletAPI(options = {}) {
           
           console.error('❌ [WALLET] ========== TRANSACTION FAILED ==========');
           console.error('❌ [WALLET] Transaction digest:', result.digest);
-          console.error('❌ [WALLET] Status:', status);
+          console.error('❌ [WALLET] Final Status:', finalStatus);
+          console.error('❌ [WALLET] Status Source:', verifiedStatus !== null ? 'on-chain (definitive)' : 'wallet-response (may be unreliable)');
           console.error('❌ [WALLET] Error Code:', errorCode || 'N/A');
           console.error('❌ [WALLET] Error Message:', errorMessage);
           console.error('❌ [WALLET] Full error object:', JSON.stringify(errorObj, null, 2));
-          console.error('❌ [WALLET] Full effects:', JSON.stringify(decodedEffects, null, 2));
+          console.error('❌ [WALLET] Full effects:', JSON.stringify(finalEffects, null, 2));
           console.error('❌ [WALLET] Events:', result.events);
           
           // Return with the correct variable name (errorMessage, not error)
@@ -916,11 +1019,12 @@ async function initializeWalletAPI(options = {}) {
             digest: result.digest,
             error: errorMessage,  // ✅ Fixed: was 'error' (undefined), now 'errorMessage'
             errorCode: errorCode,
-            effects: decodedEffects,
+            status: finalStatus, // Include the determined status
+            effects: finalEffects,
             events: result.events
           };
         }
-
+        
         console.log('✅ [WALLET] ========== TRANSACTION SUCCEEDED ==========');
         console.log('✅ [WALLET] Transaction digest:', result.digest);
         console.log('✅ [WALLET] Gas used:', result.effects?.gasUsed);
