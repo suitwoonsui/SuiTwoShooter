@@ -926,10 +926,10 @@ async function initializeWalletAPI(options = {}) {
           };
         }
         
-        // Find coin with at least 0.1 SUI
-        const gasCoin = coins.data.find(c => BigInt(c.balance) >= TOTAL_PAYMENT_MIST);
+        // Find coin with at least 0.1 SUI for payment
+        const paymentCoin = coins.data.find(c => BigInt(c.balance) >= TOTAL_PAYMENT_MIST);
         
-        if (!gasCoin) {
+        if (!paymentCoin) {
           const totalBalance = coins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
           return {
             success: false,
@@ -937,19 +937,42 @@ async function initializeWalletAPI(options = {}) {
           };
         }
         
+        // Find a separate coin for gas (prefer a different coin)
+        // Gas budget is 0.01 SUI, so we need at least that much
+        const gasCoin = coins.data.find(c => 
+          c.coinObjectId !== paymentCoin.coinObjectId && 
+          BigInt(c.balance) >= GAS_BUDGET_MIST
+        );
+        
         // Build transaction
         const txb = new Transaction();
         
-        // Set gas payment
-        txb.setGasPayment([{
-          objectId: gasCoin.coinObjectId,
-          version: gasCoin.version,
-          digest: gasCoin.digest,
-        }]);
-        
-        // Split fee from gas coin
-        const gasCoinObj = txb.object(gasCoin.coinObjectId);
-        const splitFeeCoin = txb.splitCoins(gasCoinObj, [feeAmount]);
+        // If we have a separate coin for gas, use it
+        // Otherwise, we'll use the same coin but need to handle it carefully
+        if (gasCoin) {
+          // We have a separate coin for gas - use it
+          txb.setGasPayment([{
+            objectId: gasCoin.coinObjectId,
+            version: gasCoin.version,
+            digest: gasCoin.digest,
+          }]);
+          
+          // Split fee from payment coin (this coin is NOT used for gas)
+          const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
+          const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
+          
+          console.log('💰 [BADGE MINT] Using separate coins: payment coin for fee, separate coin for gas');
+        } else {
+          // Only one coin available - must use it for both payment and gas
+          // Strategy: Split the fee first, then let wallet use remainder for gas
+          // We DON'T set gas payment explicitly to avoid "object used twice" error
+          const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
+          const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
+          
+          // Don't set gas payment - the wallet will automatically use the remainder
+          // of the payment coin (after splitting) for gas
+          console.log('💰 [BADGE MINT] Using same coin: split fee from it, wallet will use remainder for gas');
+        }
         
         // Construct image URL
         const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
