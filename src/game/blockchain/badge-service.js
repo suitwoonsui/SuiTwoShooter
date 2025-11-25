@@ -349,11 +349,15 @@ async function signAndExecuteBadgeTransaction(transaction) {
 
   console.log('🚀 [BADGE] ========== EXECUTING TRANSACTION ==========');
   console.log('🚀 [BADGE] Transaction type:', typeof transaction);
-  console.log('🚀 [BADGE] Transaction object:', {
-    isObject: transaction && typeof transaction === 'object',
-    hasKind: transaction && 'kind' in transaction,
-    hasBlockData: transaction && 'blockData' in transaction,
+  // Safe check: only use 'in' operator on objects, never on strings
+  const isObject = transaction && typeof transaction === 'object' && transaction !== null;
+  console.log('🚀 [BADGE] Transaction details:', {
+    isString: typeof transaction === 'string',
+    isObject: isObject,
+    hasKind: isObject ? ('kind' in transaction) : false,
+    hasBlockData: isObject ? ('blockData' in transaction) : false,
     constructor: transaction?.constructor?.name,
+    length: typeof transaction === 'string' ? transaction.length : 'N/A',
   });
   
   try {
