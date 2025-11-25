@@ -1337,17 +1337,19 @@ async function initializeWalletAPI(options = {}) {
         });
         
         // Build the move call
-        // Use txb.pure.string() - this is the correct method for string values
-        // The value (imageUrl) is the first argument, type is inferred
+        // NOTE: The on-chain signature appears to have image_url before payment
+        // Source code shows: registry, stats_registry, clock, payment, image_url
+        // But on-chain error suggests: registry, stats_registry, clock, image_url, payment
+        // Swapping order to match on-chain signature
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
-            txb.object(contracts.badgeRegistry),      // &mut BadgeRegistry
-            txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry
-            txb.object(contracts.clock),               // &Clock
-            splitFeeCoin,                              // Coin<SUI> - payment (split from coin)
-            txb.pure.string(imageUrl),                 // String - image URL (value is first arg, type inferred)
-            // ctx: &mut TxContext is automatically provided by Sui
+            txb.object(contracts.badgeRegistry),      // &mut BadgeRegistry (arg 0)
+            txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry (arg 1)
+            txb.object(contracts.clock),               // &Clock (arg 2)
+            txb.pure.string(imageUrl),                 // String - image URL (arg 3) - moved before payment
+            splitFeeCoin,                              // Coin<SUI> - payment (arg 4) - moved after image_url
+            // ctx: &mut TxContext is automatically provided by Sui (not in args)
           ],
         });
         
