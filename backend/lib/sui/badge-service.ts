@@ -970,66 +970,66 @@ export class BadgeService {
    */
   async buildMintBadgeTransaction(
     playerAddress: string,
-    paymentCoinId: string
+    paymentCoinId?: string
   ): Promise<{
     success: boolean;
     transaction?: string; // Serialized transaction bytes (base64)
     gasEstimate?: string;
     error?: string;
   }> {
-    // For now, call the new method and build transaction here for backward compatibility
-    const data = await this.getMintBadgeTransactionData(playerAddress, paymentCoinId);
-    if (!data.success || !data.transactionData) {
-      return data as any;
-    }
-
     try {
+      const client = this.getClient();
+      const packageId = this.config.contracts.gameScore.split('::')[0];
+      const registryId = this.config.contracts.badgeRegistry;
+      const statsRegistryId = this.config.contracts.statisticsRegistry;
+      const clockId = '0x6';
+
+      if (!packageId || !registryId || !statsRegistryId) {
+        return {
+          success: false,
+          error: 'Missing contract configuration',
+        };
+      }
+
+      // Get badge image URL (use Standard tier for player minting)
+      const imageUrl = this.getBadgeImageUrl(0); // Standard tier
+      console.log(`🖼️ [MINT BUILD] Badge image URL: ${imageUrl}`);
+
       const txb = new Transaction();
-      const { transactionData } = data;
       
-      // Split payment amount from coin
-      const paymentCoinObj = txb.object(transactionData.arguments.paymentCoinId);
-      const splitPaymentCoin = txb.splitCoins(paymentCoinObj, [BigInt(transactionData.arguments.paymentAmount)]);
+      // Split payment amount from gas coin (like store does)
+      // Use txb.gas to let wallet auto-select the coin
+      const paymentAmount = BigInt(100_000_000); // 0.10 SUI
+      const splitPaymentCoin = txb.splitCoins(txb.gas, [paymentAmount]);
       
-      // Build transaction
+      // Build move call - use image_url String, not imageDataObjectId
+      // Function signature: mint_badge(registry, stats_registry, clock, payment, image_url, ctx)
       txb.moveCall({
-        target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
+        target: `${packageId}::badge_system::mint_badge`,
         arguments: [
-          txb.object(transactionData.arguments.badgeRegistry),
-          txb.object(transactionData.arguments.statsRegistry),
-          txb.object(transactionData.arguments.clock),
-          splitPaymentCoin,
-          txb.object(transactionData.arguments.imageDataObjectId),
+          txb.object(registryId),              // &mut BadgeRegistry (arg 0)
+          txb.object(statsRegistryId),         // &StatisticsRegistry (arg 1)
+          txb.object(clockId),                  // &Clock (arg 2)
+          splitPaymentCoin,                      // Coin<SUI> - payment (arg 3)
+          txb.pure.string(imageUrl),            // String - image URL (arg 4)
         ],
       });
       
       txb.setSender(playerAddress);
-      txb.setGasBudget(transactionData.gasBudget);
+      txb.setGasBudget(this.config.sui.gasBudget);
       
-      // Need gas payment for build() to work
-      const client = this.getClient();
-      const coins = await client.getCoins({
-        owner: playerAddress,
-        coinType: '0x2::sui::SUI',
-      });
-      
-      if (coins.data && coins.data.length > 0) {
-        const gasCoin = coins.data.find(c => c.coinObjectId === transactionData.arguments.paymentCoinId) || coins.data[0];
-        txb.setGasPayment([{
-          objectId: gasCoin.coinObjectId,
-          version: gasCoin.version,
-          digest: gasCoin.digest,
-        }]);
-      }
-      
+      // Build transaction (don't set gas payment - let wallet auto-select)
       const transactionBytes = await txb.build({ client });
+      
+      console.log('✅ [MINT BUILD] Transaction built successfully');
       
       return {
         success: true,
         transaction: Buffer.from(transactionBytes).toString('base64'),
-        gasEstimate: transactionData.gasBudget.toString(),
+        gasEstimate: this.config.sui.gasBudget.toString(),
       };
     } catch (error) {
+      console.error('❌ [MINT BUILD] Error building transaction:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

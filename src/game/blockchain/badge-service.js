@@ -175,35 +175,46 @@ async function buildMintBadgeTransaction() {
     };
   }
 
-  if (!window.walletAPIInstance.buildBadgeMintTransaction) {
-    return {
-      success: false,
-      error: 'Badge minting not supported. Please update your wallet module.',
-    };
-  }
-
-  // Validate contract config is loaded
-  if (!window.GAME_CONFIG?.CONTRACTS) {
-    return {
-      success: false,
-      error: 'Contract configuration not loaded. Please refresh the page.',
-    };
-  }
-
   try {
-    console.log('🔨 [BADGE] Building mint transaction (client-side)...');
+    console.log('🔨 [BADGE] Building mint transaction (backend)...');
     
-    const buildResult = await window.walletAPIInstance.buildBadgeMintTransaction(address);
+    // Call backend to build transaction (like store does)
+    // This ensures we use the same code path as admin_mint_badge which works
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/badges/mint`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        playerAddress: address,
+        // paymentCoinId is optional - backend will use txb.gas
+      }),
+    });
 
-    if (!buildResult.success) {
-      return buildResult;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return {
+        success: false,
+        error: errorData.error || `HTTP ${response.status}`,
+      };
     }
 
-    console.log('✅ [BADGE] Transaction built successfully');
+    const data = await response.json();
+
+    if (!data.success || !data.transaction) {
+      return {
+        success: false,
+        error: data.error || 'Failed to build mint transaction',
+      };
+    }
+
+    console.log('✅ [BADGE] Transaction built successfully by backend');
     
+    // Return base64 transaction string (frontend just signs it, like store)
     return {
       success: true,
-      transaction: buildResult.transaction,
+      transaction: data.transaction, // Base64 string
     };
   } catch (error) {
     console.error('❌ [BADGE] Error building mint transaction:', error);

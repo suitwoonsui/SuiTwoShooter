@@ -75,28 +75,29 @@ export async function POST(request: NextRequest) {
 
     const badgeService = getBadgeService();
     
-    // Get transaction data (frontend will build it in wallet module)
-    // paymentCoinId is optional - wallet module will find the coin if not provided
-    const result = await badgeService.getMintBadgeTransactionData(
+    // Build full transaction on backend (like store does) - ensures consistency
+    // This uses the same code path as admin_mint_badge which works
+    const result = await badgeService.buildMintBadgeTransaction(
       playerAddress,
-      paymentCoinId || '' // Pass empty string if not provided, backend will skip validation
+      paymentCoinId // Optional - backend will find coin if not provided
     );
 
-    if (!result.success) {
+    if (!result.success || !result.transaction) {
       return NextResponse.json(
         {
           success: false,
-          error: result.error || 'Failed to get mint transaction data',
+          error: result.error || 'Failed to build mint transaction',
         },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Return transaction data for frontend to build
+    // Return built transaction as base64 (frontend just signs it, like store)
     return NextResponse.json(
       {
         success: true,
-        transactionData: result.transactionData,
+        transaction: result.transaction, // Base64 transaction bytes
+        gasEstimate: result.gasEstimate,
       },
       { headers: corsHeaders }
     );

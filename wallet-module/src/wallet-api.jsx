@@ -1337,18 +1337,16 @@ async function initializeWalletAPI(options = {}) {
         });
         
         // Build the move call
-        // NOTE: The on-chain signature appears to have image_url before payment
-        // Source code shows: registry, stats_registry, clock, payment, image_url
-        // But on-chain error suggests: registry, stats_registry, clock, image_url, payment
-        // Swapping order to match on-chain signature
+        // Function signature: mint_badge(registry, stats_registry, clock, payment, image_url, ctx)
+        // arg_idx 3 error means argument #3 (payment) expects an object, confirming original order is correct
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
             txb.object(contracts.badgeRegistry),      // &mut BadgeRegistry (arg 0)
             txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry (arg 1)
             txb.object(contracts.clock),               // &Clock (arg 2)
-            txb.pure.string(imageUrl),                 // String - image URL (arg 3) - moved before payment
-            splitFeeCoin,                              // Coin<SUI> - payment (arg 4) - moved after image_url
+            splitFeeCoin,                              // Coin<SUI> - payment (arg 3) - MUST be object
+            txb.pure.string(imageUrl),                 // String - image URL (arg 4) - MUST be pure
             // ctx: &mut TxContext is automatically provided by Sui (not in args)
           ],
         });
