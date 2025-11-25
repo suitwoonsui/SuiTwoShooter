@@ -1261,25 +1261,21 @@ async function initializeWalletAPI(options = {}) {
         
         console.log('🖼️ [BADGE MINT] Image URL:', imageUrl);
         
-        // Split the fee from the payment coin
-        // In SDK 1.44.0, we need to split from a specific coin object, not txb.gas
-        // IMPORTANT: We must set this coin as the gas payment so the remainder is used for gas
-        const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
-        const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
-        
-        // Set the payment coin as the gas payment (wallet will use remainder for gas)
-        // This ensures the same coin is used for both payment and gas without duplicate reference errors
-        txb.setGasPayment([{
-          objectId: paymentCoin.coinObjectId,
-          version: paymentCoin.version || undefined,
-          digest: paymentCoin.digest || undefined,
-        }]);
+        // Split the fee from txb.gas - wallet handles coin selection automatically
+        // This is the standard Sui SDK pattern and avoids duplicate object references
+        // The wallet will:
+        // 1. Select a coin with sufficient balance (we verified one exists with >= 0.1 SUI)
+        // 2. Split the fee (0.09 SUI) from it
+        // 3. Use the remainder (>= 0.01 SUI) for gas automatically
+        const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
         
         console.log('💸 [BADGE MINT] Split coin details:', {
-          coinId: paymentCoin.coinObjectId,
-          splitAmount: `${Number(feeAmount) / 1_000_000_000} SUI`,
-          method: 'txb.splitCoins(txb.object(coinId), [feeAmount]) + setGasPayment',
-          note: 'Split coin used for payment, remainder used for gas',
+          verifiedCoinId: paymentCoin.coinObjectId,
+          verifiedCoinBalance: `${Number(paymentCoin.balance) / 1_000_000_000} SUI (${paymentCoin.balance} MIST)`,
+          splitAmount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
+          remainingForGas: `${Number(remainingAfterSplit) / 1_000_000_000} SUI (${remainingAfterSplit} MIST)`,
+          method: 'txb.splitCoins(txb.gas, [feeAmount])',
+          note: 'Wallet will auto-select a coin with sufficient balance (we verified one exists)',
         });
         
         // Build move call to mint_badge function
