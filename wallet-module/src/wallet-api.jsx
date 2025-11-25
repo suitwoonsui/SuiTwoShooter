@@ -1337,7 +1337,8 @@ async function initializeWalletAPI(options = {}) {
         });
         
         // Build the move call
-        // Use txb.pure() for string - the SDK will infer the type
+        // Use txb.pure.string() - this is the correct method for string values
+        // The value (imageUrl) is the first argument, type is inferred
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
@@ -1345,7 +1346,7 @@ async function initializeWalletAPI(options = {}) {
             txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry
             txb.object(contracts.clock),               // &Clock
             splitFeeCoin,                              // Coin<SUI> - payment (split from coin)
-            txb.pure(imageUrl),                        // String - image URL (use txb.pure() instead of txb.pure.string())
+            txb.pure.string(imageUrl),                 // String - image URL (value is first arg, type inferred)
             // ctx: &mut TxContext is automatically provided by Sui
           ],
         });
