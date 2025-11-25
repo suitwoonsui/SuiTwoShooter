@@ -782,10 +782,16 @@ async function initializeWalletAPI(options = {}) {
         
         // dapp-kit accepts: Transaction object, base64 string, or Uint8Array
         // Based on Insomnia's implementation, it accepts string | Transaction
-        if (transactionInput && typeof transactionInput === 'object') {
+        // IMPORTANT: Check for string FIRST to avoid using 'in' operator on strings
+        if (typeof transactionInput === 'string') {
+          // Assume it's base64-encoded string - pass directly (dapp-kit accepts this)
+          transactionToSign = transactionInput;
+          console.log('✅ [WALLET] Using base64 string directly (dapp-kit accepts this format)');
+        } else if (transactionInput && typeof transactionInput === 'object' && transactionInput !== null) {
           // Check if it's already a Transaction object
           // Use property checks instead of instanceof to avoid scope issues
-          const isTransactionObject = 'kind' in transactionInput || 'blockData' in transactionInput || 
+          // IMPORTANT: Only use 'in' operator on objects, never on strings or primitives
+          const isTransactionObject = ('kind' in transactionInput || 'blockData' in transactionInput) || 
                                       (transactionInput.constructor && transactionInput.constructor.name === 'Transaction');
           if (isTransactionObject) {
             // Already a Transaction object - pass directly
@@ -805,10 +811,6 @@ async function initializeWalletAPI(options = {}) {
               throw new Error(`Invalid transaction input. Expected Transaction object, base64 string, or bytes, got: ${typeof transactionInput}`);
             }
           }
-        } else if (typeof transactionInput === 'string') {
-          // Assume it's base64-encoded string - pass directly (dapp-kit accepts this)
-          transactionToSign = transactionInput;
-          console.log('✅ [WALLET] Using base64 string directly (dapp-kit accepts this format)');
         } else {
           throw new Error(`Invalid transaction input type: ${typeof transactionInput}`);
         }
@@ -822,10 +824,12 @@ async function initializeWalletAPI(options = {}) {
         console.log('🔐 [WALLET] Chain ID:', chainId);
         console.log('🔐 [WALLET] Transaction type:', typeof transactionToSign);
         console.log('🔐 [WALLET] Transaction details:', {
-          isTransaction: typeof transactionToSign === 'object' && ('kind' in transactionToSign || 'blockData' in transactionToSign || (transactionToSign.constructor && transactionToSign.constructor.name === 'Transaction')),
-          hasKind: 'kind' in transactionToSign,
-          hasBlockData: 'blockData' in transactionToSign,
+          isTransaction: typeof transactionToSign === 'object' && transactionToSign !== null && ('kind' in transactionToSign || 'blockData' in transactionToSign || (transactionToSign.constructor && transactionToSign.constructor.name === 'Transaction')),
+          hasKind: typeof transactionToSign === 'object' && transactionToSign !== null && 'kind' in transactionToSign,
+          hasBlockData: typeof transactionToSign === 'object' && transactionToSign !== null && 'blockData' in transactionToSign,
           constructorName: transactionToSign?.constructor?.name,
+          isString: typeof transactionToSign === 'string',
+          stringLength: typeof transactionToSign === 'string' ? transactionToSign.length : null,
         });
         
         console.log('⏳ [WALLET] Requesting wallet signature...');
