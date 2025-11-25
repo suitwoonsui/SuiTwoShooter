@@ -1254,16 +1254,33 @@ async function initializeWalletAPI(options = {}) {
           note: 'Wallet will auto-select a coin with sufficient balance (we verified one exists)',
         });
         
-        // Split the fee from txb.gas - wallet handles coin selection automatically
-        // This is the standard Sui SDK pattern and avoids type errors
-        const splitFeeCoin = txb.splitCoins(txb.gas, [feeAmount]);
-        
-        // Construct image URL
+        // Construct image URL first
         const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
         const baseUrl = apiBaseUrl.replace(/\/api$/, '');
         const imageUrl = `${baseUrl}/Badges/Standard.webp`;
         
         console.log('🖼️ [BADGE MINT] Image URL:', imageUrl);
+        
+        // Split the fee from the payment coin
+        // In SDK 1.44.0, we need to split from a specific coin object, not txb.gas
+        // IMPORTANT: We must set this coin as the gas payment so the remainder is used for gas
+        const paymentCoinObj = txb.object(paymentCoin.coinObjectId);
+        const splitFeeCoin = txb.splitCoins(paymentCoinObj, [feeAmount]);
+        
+        // Set the payment coin as the gas payment (wallet will use remainder for gas)
+        // This ensures the same coin is used for both payment and gas without duplicate reference errors
+        txb.setGasPayment([{
+          objectId: paymentCoin.coinObjectId,
+          version: paymentCoin.version || undefined,
+          digest: paymentCoin.digest || undefined,
+        }]);
+        
+        console.log('💸 [BADGE MINT] Split coin details:', {
+          coinId: paymentCoin.coinObjectId,
+          splitAmount: `${Number(feeAmount) / 1_000_000_000} SUI`,
+          method: 'txb.splitCoins(txb.object(coinId), [feeAmount]) + setGasPayment',
+          note: 'Split coin used for payment, remainder used for gas',
+        });
         
         // Build move call to mint_badge function
         // Contract signature:
@@ -1307,9 +1324,9 @@ async function initializeWalletAPI(options = {}) {
           },
           arg4_payment: {
             type: 'Coin<SUI>',
-            value: 'splitFeeCoin',
+            value: 'splitFeeCoin (from splitCoins)',
             amount: `${Number(feeAmount) / 1_000_000_000} SUI (${feeAmount} MIST)`,
-            note: 'Split from gas coin, will be transferred to fee recipient',
+            note: 'Split from payment coin, will be transferred to fee recipient',
           },
           arg5_image_url: {
             type: 'String',
@@ -1323,15 +1340,14 @@ async function initializeWalletAPI(options = {}) {
           },
         });
         
-        // Build the move call - this actually calls the mint_badge function
-        // Using exact same pattern as admin mint (which works)
+        // Build the move call - matching admin mint pattern exactly
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
             txb.object(contracts.badgeRegistry),      // &mut BadgeRegistry
             txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry
             txb.object(contracts.clock),               // &Clock
-            splitFeeCoin,                              // Coin<SUI> - payment
+            splitFeeCoin,                              // Coin<SUI> - payment (split from coin)
             txb.pure.string(imageUrl),                 // String - image URL (same as admin mint)
             // ctx: &mut TxContext is automatically provided by Sui
           ],
