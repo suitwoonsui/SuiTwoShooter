@@ -1337,8 +1337,7 @@ async function initializeWalletAPI(options = {}) {
         });
         
         // Build the move call
-        // Use txb.pure.string() - same as admin mint which works
-        // Both SDK 1.0.0 and 1.44.0 support this syntax
+        // Use txb.pure() for string - the SDK will infer the type
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
@@ -1346,7 +1345,7 @@ async function initializeWalletAPI(options = {}) {
             txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry
             txb.object(contracts.clock),               // &Clock
             splitFeeCoin,                              // Coin<SUI> - payment (split from coin)
-            txb.pure.string(imageUrl),                 // String - image URL (same as admin mint)
+            txb.pure(imageUrl),                        // String - image URL (use txb.pure() instead of txb.pure.string())
             // ctx: &mut TxContext is automatically provided by Sui
           ],
         });
