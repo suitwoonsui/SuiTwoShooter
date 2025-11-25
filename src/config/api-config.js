@@ -11,53 +11,49 @@ const getConfig = () => {
   };
 
   if (typeof window !== 'undefined' && window.location) {
-    // 1. Try meta tags first (for static HTML configuration)
-    const backendMeta = document.querySelector('meta[name="backend-url"]');
-    const walletMeta = document.querySelector('meta[name="wallet-module-url"]');
-    
-    if (backendMeta) {
-      config.backendUrl = backendMeta.getAttribute('content');
-    }
-    if (walletMeta) {
-      config.walletModuleUrl = walletMeta.getAttribute('content');
-    }
-    
-    // 2. Check if we're in production (Vercel)
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
+    
+    // Check if we're running locally FIRST (before checking meta tags)
+    // This ensures localhost always uses local services, even if meta tags are set
+    const isLocalhost = hostname === 'localhost' || 
+                       hostname === '127.0.0.1' || 
+                       hostname === '0.0.0.0' ||
+                       hostname.startsWith('192.168.') ||
+                       hostname.startsWith('10.');
     
     // Production if: 
     // - vercel.app domain, OR
     // - https protocol (Vercel uses HTTPS), OR  
     // - not localhost/127.0.0.1 and not local network IPs
     const isProduction = hostname.includes('vercel.app') || 
-                        protocol === 'https:' ||
-                        (hostname !== 'localhost' && 
-                         hostname !== '127.0.0.1' && 
-                         !hostname.startsWith('192.168.') && 
-                         !hostname.startsWith('10.') &&
-                         hostname !== '0.0.0.0');
+                        (protocol === 'https:' && !isLocalhost) ||
+                        (!isLocalhost && hostname !== '127.0.0.1');
     
-    // 3. Set defaults based on environment
-    if (!config.backendUrl) {
-      // Default to Vercel backend URL (can be overridden via meta tag or localhost detection)
-      // For local development, you can add a meta tag to override this
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        // Only use localhost if explicitly running locally
-        config.backendUrl = 'http://localhost:3000/api';
-      } else {
-        // Use Vercel backend for all other cases (production, staging, etc.)
+    // 1. If localhost, ALWAYS use local services (ignore meta tags)
+    if (isLocalhost) {
+      config.backendUrl = 'http://localhost:3000/api';
+      config.walletModuleUrl = 'wallet-module/dist/wallet-api.umd.cjs';
+    } else {
+      // 2. For production, try meta tags first (for static HTML configuration)
+      const backendMeta = document.querySelector('meta[name="backend-url"]');
+      const walletMeta = document.querySelector('meta[name="wallet-module-url"]');
+      
+      if (backendMeta) {
+        config.backendUrl = backendMeta.getAttribute('content');
+      }
+      if (walletMeta) {
+        config.walletModuleUrl = walletMeta.getAttribute('content');
+      }
+      
+      // 3. Set defaults based on environment (if meta tags not set)
+      if (!config.backendUrl) {
+        // Use Vercel backend for production
         config.backendUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app/api';
       }
-    }
-    
-    if (!config.walletModuleUrl) {
-      // Default to Vercel wallet module URL (can be overridden via meta tag or localhost detection)
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        // Only use local path if explicitly running locally
-        config.walletModuleUrl = 'wallet-module/dist/wallet-api.umd.cjs';
-      } else {
-        // Use Vercel wallet module for all other cases (production, staging, etc.)
+      
+      if (!config.walletModuleUrl) {
+        // Use Vercel wallet module for production
         config.walletModuleUrl = 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs';
       }
     }

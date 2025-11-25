@@ -23,4 +23,30 @@ The game follows a clean modular architecture:
 
 ## Running the Game
 
-Open `Shooter.html` in a web browser. The game loads all modules from the `src/` directory.
+### Local Development (Recommended)
+
+For local development and testing, see **[LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md)** for complete setup instructions.
+
+**Quick Start:**
+```bash
+# Install dependencies (first time only)
+npm install
+cd backend && npm install && cd ..
+cd wallet-module && npm install && cd ..
+
+# Run all services
+npm run dev:all
+```
+
+Then open `http://localhost:8000` in your browser.
+
+### Production
+
+The game is deployed on Vercel:
+- Frontend: Auto-detects production URLs
+- Backend: Uses Vercel API endpoints
+- Wallet Module: Loads from Vercel CDN
+
+### Legacy (Static File)
+
+You can also open `index.html` directly in a browser, but this won't work with wallet integration or backend APIs.
