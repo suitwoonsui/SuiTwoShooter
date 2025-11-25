@@ -1327,7 +1327,7 @@ async function initializeWalletAPI(options = {}) {
           arg5_image_url: {
             type: 'String',
             value: imageUrl,
-            method: 'txb.pure(\'string\', imageUrl) (SDK 1.44.0 format)',
+            method: 'txb.pure.string() (same as admin mint)',
           },
           arg6_ctx: {
             type: '&mut TxContext',
@@ -1337,7 +1337,8 @@ async function initializeWalletAPI(options = {}) {
         });
         
         // Build the move call
-        // SDK 1.44.0: Try txb.pure('string', imageUrl) with explicit type parameter
+        // Use txb.pure.string() - same as admin mint which works
+        // Both SDK 1.0.0 and 1.44.0 support this syntax
         txb.moveCall({
           target: moveCallTarget,
           arguments: [
@@ -1345,7 +1346,7 @@ async function initializeWalletAPI(options = {}) {
             txb.object(contracts.statisticsRegistry),  // &StatisticsRegistry
             txb.object(contracts.clock),               // &Clock
             splitFeeCoin,                              // Coin<SUI> - payment (split from coin)
-            txb.pure('string', imageUrl),              // String - image URL (SDK 1.44.0 format with explicit type)
+            txb.pure.string(imageUrl),                 // String - image URL (same as admin mint)
             // ctx: &mut TxContext is automatically provided by Sui
           ],
         });
