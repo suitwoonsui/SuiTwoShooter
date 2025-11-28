@@ -1191,18 +1191,20 @@ export class BadgeService {
           transactionBlock: txb,
         });
         
+        const firstResult = testResult.results?.[0] as any;
+        const error = firstResult?.error as string | undefined;
         console.log('🔍 [MINT BUILD] devInspectTransactionBlock result:', {
           hasResults: !!testResult.results,
           resultsLength: testResult.results?.length || 0,
-          hasErrors: !!testResult.results?.[0]?.error,
-          error: testResult.results?.[0]?.error,
+          hasErrors: !!error,
+          error: error,
         });
         
-        if (testResult.results?.[0]?.error) {
-          console.error('❌ [MINT BUILD] Transaction test failed:', testResult.results[0].error);
+        if (error) {
+          console.error('❌ [MINT BUILD] Transaction test failed:', error);
           return {
             success: false,
-            error: `Transaction validation failed: ${testResult.results[0].error}`,
+            error: `Transaction validation failed: ${error}`,
           };
         }
       } catch (testError) {
@@ -1352,18 +1354,19 @@ export class BadgeService {
           transactionBlock: txb,
         });
         
+        const firstResult = testResult.results?.[0] as any;
         console.log('🔍 [MIGRATE BUILD] devInspectTransactionBlock result:', {
           hasResults: !!testResult.results,
           resultsLength: testResult.results?.length || 0,
-          hasErrors: !!testResult.results?.[0]?.error,
-          error: testResult.results?.[0]?.error,
+          hasErrors: !!firstResult?.error,
+          error: firstResult?.error,
         });
         
-        if (testResult.results?.[0]?.error) {
-          console.error('❌ [MIGRATE BUILD] Transaction test failed:', testResult.results[0].error);
+        if (firstResult?.error) {
+          console.error('❌ [MIGRATE BUILD] Transaction test failed:', firstResult.error);
           return {
             success: false,
-            error: `Transaction validation failed: ${testResult.results[0].error}`,
+            error: `Transaction validation failed: ${firstResult.error}`,
           };
         }
       } catch (testError) {
@@ -2476,69 +2479,23 @@ export class BadgeService {
               limit: 10,
             });
             
-            // BadgeRegistry is a shared object, so query differently
-            // Try querying by getting objects owned by the package publisher or system
-            const allObjects = await client.queryObjects({
-              filter: { StructType: registryType },
-              options: { showType: true, showOwner: true },
-            });
-            
-            if (allObjects.data && allObjects.data.length > 0) {
-              // Find the one that's a shared object
-              for (const obj of allObjects.data) {
-                if (obj.data?.owner && typeof obj.data.owner === 'object' && 'Shared' in obj.data.owner) {
-                  results.registryId = obj.data.objectId;
-                  console.log(`✅ [FIND OLD OBJECTS] Found BadgeRegistry via direct query: ${obj.data.objectId}`);
-                  break;
-                }
-              }
-            }
+            // Note: queryObjects doesn't exist in Sui SDK
+            // Shared objects must be found via events or known object IDs
           } catch (err) {
             console.warn(`⚠️ [FIND OLD OBJECTS] Error querying BadgeRegistry:`, err);
           }
         }
         
         // Try to find AdminCapability
+        // Note: queryObjects doesn't exist in Sui SDK - AdminCapability must be found via events or known object IDs
         if (!results.adminCapabilityId) {
-          try {
-            const adminCapType = `${packageId}::score_submission::AdminCapability`;
-            const objects = await client.queryObjects({
-              filter: { StructType: adminCapType },
-              options: { showType: true, showOwner: true },
-            });
-            
-            if (objects.data && objects.data.length > 0) {
-              // AdminCapability is usually owned by an address, find the first one
-              results.adminCapabilityId = objects.data[0].data?.objectId;
-              console.log(`✅ [FIND OLD OBJECTS] Found AdminCapability via direct query: ${results.adminCapabilityId}`);
-            }
-          } catch (err) {
-            console.warn(`⚠️ [FIND OLD OBJECTS] Error querying AdminCapability:`, err);
-          }
+          console.log(`⚠️ [FIND OLD OBJECTS] AdminCapability not found via events - cannot query directly`);
         }
         
         // Try to find StatisticsRegistry
+        // Note: queryObjects doesn't exist in Sui SDK - StatisticsRegistry must be found via events or known object IDs
         if (!results.statisticsRegistryId) {
-          try {
-            const statsRegType = `${packageId}::score_submission::StatisticsRegistry`;
-            const objects = await client.queryObjects({
-              filter: { StructType: statsRegType },
-              options: { showType: true, showOwner: true },
-            });
-            
-            if (objects.data && objects.data.length > 0) {
-              // StatisticsRegistry is a shared object
-              for (const obj of objects.data) {
-                if (obj.data?.owner && typeof obj.data.owner === 'object' && 'Shared' in obj.data.owner) {
-                  results.statisticsRegistryId = obj.data.objectId;
-                  console.log(`✅ [FIND OLD OBJECTS] Found StatisticsRegistry via direct query: ${results.statisticsRegistryId}`);
-                  break;
-                }
-              }
-            }
-          } catch (err) {
-            console.warn(`⚠️ [FIND OLD OBJECTS] Error querying StatisticsRegistry:`, err);
-          }
+          console.log(`⚠️ [FIND OLD OBJECTS] StatisticsRegistry not found via events - cannot query directly`);
         }
       }
 
@@ -2609,7 +2566,7 @@ export class BadgeService {
         if (objects.data && objects.data.length > 0) {
           // Check if any are shared objects
           const sharedRegistry = objects.data.find(obj => 
-            obj.data?.owner && 'Shared' in obj.data.owner
+            obj.data?.owner && typeof obj.data.owner === 'object' && 'Shared' in obj.data.owner
           );
           
           if (sharedRegistry) {
@@ -3007,17 +2964,19 @@ export class BadgeService {
         };
       }
 
-      const packageId = oldPackageId.split('::')[0];
+      // At this point, oldPackageId is guaranteed to be defined due to the check above
+      const packageId = oldPackageId!.split('::')[0];
       const client = this.getClient();
 
       // Verify all objects exist and are from the correct package
+      // At this point, oldRegistryId and oldAdminCapabilityId are guaranteed to be defined due to checks above
       const registryObj = await client.getObject({
-        id: oldRegistryId,
+        id: oldRegistryId!,
         options: { showType: true },
       });
       
       const adminCapObj = await client.getObject({
-        id: oldAdminCapabilityId,
+        id: oldAdminCapabilityId!,
         options: { showType: true },
       });
       
@@ -3050,8 +3009,8 @@ export class BadgeService {
         success: errors.length === 0,
         config: {
           oldPackageId: packageId,
-          oldRegistryId,
-          oldAdminCapabilityId,
+          oldRegistryId: oldRegistryId!,
+          oldAdminCapabilityId: oldAdminCapabilityId!,
           oldStatsRegistryId: oldStatsRegistryId || 'NOT SET',
           registryPackage,
           adminCapPackage,
@@ -3129,21 +3088,8 @@ export class BadgeService {
         }
       }
 
-      // Also check all functions
-      if (packageInfo.functions) {
-        for (const [funcName, funcInfo] of Object.entries(packageInfo.functions)) {
-          // Avoid duplicates
-          if (!functions.find(f => f.name === funcName)) {
-            functions.push({
-              name: funcName,
-              visibility: funcInfo.visibility || 'public',
-              isEntry: funcInfo.isEntry || false,
-              parameters: funcInfo.parameters || [],
-              returnTypes: funcInfo.return || [],
-            });
-          }
-        }
-      }
+      // Note: packageInfo.functions doesn't exist in SuiMoveNormalizedModule type
+      // We only have access to exposedFunctions via the normalized module API
 
       console.log(`✅ [INSPECT OLD] Found ${functions.length} functions:`);
       functions.forEach(f => {
@@ -3415,7 +3361,7 @@ export class BadgeService {
         }
         
         // Check if it's a shared object
-        if (!registryObj.data.owner || registryObj.data.owner.Shared === undefined) {
+        if (!registryObj.data.owner || typeof registryObj.data.owner !== 'object' || !('Shared' in registryObj.data.owner)) {
           console.warn(`⚠️ [ADMIN MINT OLD] Old registry may not be a shared object. Owner:`, registryObj.data.owner);
         }
       } catch (objError: any) {
