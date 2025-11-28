@@ -271,9 +271,108 @@ async function checkPendingUpgrade(playerAddress = null) {
 }
 
 /**
+ * Build upgrade badge transaction (similar to buildMintBadgeTransaction)
+ * Follows the same flow as badge minting - backend builds transaction, frontend signs it
+ * 
+ * @param {string} badgeId - Badge object ID to upgrade
+ * @param {number} newTier - New tier number
+ * @param {string} sessionId - Session ID for idempotency
+ * @returns {Promise<Object>} Transaction object ready for signing
+ */
+async function buildUpgradeBadgeTransaction(badgeId, newTier, sessionId) {
+  const address = getPlayerAddress();
+  if (!address) {
+    return {
+      success: false,
+      error: 'Wallet not connected. Please connect your wallet first.',
+    };
+  }
+
+  // Validate wallet API is available
+  if (!window.walletAPIInstance) {
+    return {
+      success: false,
+      error: 'Wallet API not initialized. Please wait for wallet module to load.',
+    };
+  }
+
+  if (!badgeId) {
+    return {
+      success: false,
+      error: 'Badge ID is required',
+    };
+  }
+
+  if (newTier === undefined || newTier === null) {
+    return {
+      success: false,
+      error: 'New tier is required',
+    };
+  }
+
+  if (!sessionId) {
+    return {
+      success: false,
+      error: 'Session ID is required',
+    };
+  }
+
+  try {
+    console.log('🔨 [BADGE] Building upgrade transaction (backend)...');
+    
+    // Call backend to build transaction (like mint does)
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/badges/upgrade`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        playerAddress: address,
+        badgeId: badgeId,
+        newTier: newTier,
+        sessionId: sessionId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      return {
+        success: false,
+        error: errorData.error || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+
+    if (!data.success || !data.transaction) {
+      return {
+        success: false,
+        error: data.error || 'Failed to build upgrade transaction',
+      };
+    }
+
+    console.log('✅ [BADGE] Upgrade transaction built successfully by backend');
+    
+    // Return base64 transaction string (frontend just signs it, like mint)
+    return {
+      success: true,
+      transaction: data.transaction, // Base64 string
+    };
+  } catch (error) {
+    console.error('❌ [BADGE] Error building upgrade transaction:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to build upgrade transaction',
+    };
+  }
+}
+
+/**
  * Check and build badge update transaction
  * @param {string} sessionId - Session ID from score submission
  * @returns {Promise<Object>} Transaction data if tier upgrade needed
+ * @deprecated Use checkPendingUpgrade + buildUpgradeBadgeTransaction instead
  */
 async function checkAndBuildBadgeUpdate(sessionId) {
   const address = getPlayerAddress();
@@ -529,12 +628,14 @@ function clearBadgeCache() {
  */
 /**
  * Migrate badge from old system to new system
- * Creates a new badge at the same tier - the backend handles everything
+ * Creates a new badge preserving old tier, games played, and mint date
  * @param {string} playerAddress - Player's wallet address
  * @param {number} oldTier - Tier from old badge (0-5)
- * @returns {Promise<{success: boolean, digest?: string, error?: string}>}
+ * @param {number} oldGamesPlayed - Games played from old badge
+ * @param {number} oldMintDate - Original mint date from old badge
+ * @returns {Promise<{success: boolean, transaction?: string, digest?: string, error?: string}>}
  */
-async function migrateBadge(playerAddress, oldTier) {
+async function migrateBadge(playerAddress, oldTier, oldGamesPlayed = 0, oldMintDate = 0) {
   try {
     // Validate inputs
     if (!playerAddress || typeof playerAddress !== 'string' || !playerAddress.startsWith('0x')) {
@@ -555,8 +656,8 @@ async function migrateBadge(playerAddress, oldTier) {
     const API_BASE_URL = getApiBaseUrl();
     
     // Call backend API to migrate badge
-    // The backend will use adminMintBadge to create a new badge at the same tier
-    // The new badge will use the current system's image URL generation automatically
+    // The backend will use migrate_badge() function to preserve old tier, games played, and mint date
+    // NO payment required (free migration)
     const response = await fetch(`${API_BASE_URL}/badges/migrate`, {
       method: 'POST',
       headers: {
@@ -565,6 +666,8 @@ async function migrateBadge(playerAddress, oldTier) {
       body: JSON.stringify({
         playerAddress,
         oldTier,
+        oldGamesPlayed: oldGamesPlayed || 0,
+        oldMintDate: oldMintDate || 0,
       }),
     });
 
@@ -585,11 +688,13 @@ async function migrateBadge(playerAddress, oldTier) {
       };
     }
 
-    // Return success with transaction digest
+    // Return success with transaction (for player to sign) or digest (if already executed)
     return {
       success: true,
-      digest: data.digest,
+      transaction: data.transaction, // Base64 transaction string for player to sign
+      digest: data.digest, // Transaction digest if already executed
       message: data.message,
+      gasEstimate: data.gasEstimate,
     };
   } catch (error) {
     console.error('❌ [BADGE] Error migrating badge:', error);
@@ -608,6 +713,7 @@ if (typeof window !== 'undefined') {
     checkBadgeMigration,
     checkPendingUpgrade,
     buildMintBadgeTransaction,
+    buildUpgradeBadgeTransaction,
     checkAndBuildBadgeUpdate,
     signAndExecuteBadgeTransaction,
     migrateBadge,

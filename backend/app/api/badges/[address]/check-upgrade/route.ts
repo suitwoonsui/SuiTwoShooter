@@ -104,21 +104,14 @@ export async function GET(
       );
     }
 
-    const transactionData = updateResult.transactionData;
-    // imageDataObjectId is already in arguments, imageData is optional (for reference)
-    const imageDataBase64 = transactionData.imageData 
-      ? Buffer.from(transactionData.imageData).toString('base64')
-      : undefined;
-
+    // Return upgrade info - frontend will call /api/badges/upgrade to build transaction
     return NextResponse.json(
       {
         success: true,
         hasPendingUpgrade: true,
         newTier: updateResult.newTier,
-        transactionData: {
-          ...transactionData,
-          ...(imageDataBase64 && { imageData: imageDataBase64 }), // Include if available
-        },
+        badgeId: updateResult.transactionData?.badgeId,
+        // Don't return transactionData - frontend will build it when user clicks upgrade
       },
       { headers: corsHeaders }
     );

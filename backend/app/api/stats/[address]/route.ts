@@ -38,8 +38,18 @@ export async function GET(
       );
     }
 
+    console.log(`📊 [STATS API] Fetching stats for address: ${address}`);
+    
     const adminWallet = getAdminWalletService();
     const stats = await adminWallet.getPlayerStats(address);
+
+    console.log(`📊 [STATS API] Stats result:`, {
+      success: stats.success,
+      hasStats: stats.hasStats,
+      totalGames: stats.totalGames,
+      bestScore: stats.bestScore,
+      error: stats.error,
+    });
 
     if (!stats.success) {
       return NextResponse.json(

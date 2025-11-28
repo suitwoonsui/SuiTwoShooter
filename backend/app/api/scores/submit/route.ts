@@ -90,10 +90,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`📥 Score submission request received:`);
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`📥 [SCORE SUBMIT] Score submission request received`);
     console.log(`   Player: ${playerAddress}`);
     console.log(`   Score: ${scoreData.score}`);
     console.log(`   Distance: ${scoreData.distance}`);
+    console.log(`   Coins: ${scoreData.coins}`);
+    console.log(`   Bosses Defeated: ${scoreData.bossesDefeated}`);
+    console.log(`   Enemies Defeated: ${scoreData.enemiesDefeated}`);
+    console.log(`   Longest Coin Streak: ${scoreData.longestCoinStreak}`);
+    console.log(`   Player Name: ${playerName || '(empty)'}`);
+    console.log(`   Session ID: ${sessionId || '(none)'}`);
+    console.log(`${'='.repeat(80)}\n`);
 
     // Get admin wallet service
     const adminWallet = getAdminWalletService();
@@ -112,26 +120,25 @@ export async function POST(request: NextRequest) {
       let badgeInfo = null;
 
       try {
-        // Check if player has badge
-        const hasBadge = await badgeService.hasBadge(playerAddress);
+        // Check if tier upgrade is needed (this will also check if badge exists)
+        // Note: If this fails, it will be added to retry queue automatically
+        // checkAndBuildBadgeUpdate will return error if no badge exists, so we can handle both cases
+        const updateResult = await badgeService.checkAndBuildBadgeUpdate(
+          playerAddress,
+          sessionId || `session_${Date.now()}`,
+          true // Add to retry queue on failure
+        );
         
-        if (!hasBadge) {
-          // First game - player can mint badge
-          // Frontend will handle minting flow
+        // If updateResult indicates no badge, player can mint
+        if (!updateResult.success && updateResult.error?.includes('does not have a badge')) {
           badgeInfo = {
             canMint: true,
             hasBadge: false,
           };
-        } else {
-          // Check if tier upgrade is needed
-          // Note: If this fails, it will be added to retry queue automatically
-          const updateResult = await badgeService.checkAndBuildBadgeUpdate(
-            playerAddress,
-            sessionId || `session_${Date.now()}`,
-            true // Add to retry queue on failure
-          );
-          
-          if (updateResult.success && updateResult.tierUpgraded) {
+        } else if (updateResult.success) {
+          // Badge exists, check if upgrade needed
+          if (updateResult.tierUpgraded) {
+            console.log('🎖️ [SCORE SUBMIT] Tier upgrade detected! New tier:', updateResult.newTier);
             badgeInfo = {
               canMint: false,
               hasBadge: true,
@@ -146,6 +153,12 @@ export async function POST(request: NextRequest) {
               tierUpgraded: false,
             };
           }
+        } else {
+          // Error checking badge (non-critical)
+          console.warn('⚠️ [SCORE SUBMIT] Badge check error (non-critical):', updateResult.error);
+          badgeInfo = {
+            error: updateResult.error || 'Badge check failed',
+          };
         }
       } catch (badgeError) {
         // Don't fail score submission if badge check fails
@@ -161,6 +174,7 @@ export async function POST(request: NextRequest) {
         playerAddress,
         gasPaidBy: 'admin_wallet',
         message: 'Score submitted successfully. Admin wallet paid gas fees.',
+        sessionId: sessionId || null, // Include sessionId in response for badge upgrade
         badge: badgeInfo,
       }, { headers: corsHeaders });
     } else {

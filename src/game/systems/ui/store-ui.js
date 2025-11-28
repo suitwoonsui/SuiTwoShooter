@@ -38,41 +38,27 @@ async function showStore() {
   // Check for pending badge upgrade BEFORE showing store
   if (window.BadgeService && window.BadgeService.checkPendingUpgrade) {
     const upgradeCheck = await window.BadgeService.checkPendingUpgrade(walletAddress);
-    if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.transactionData) {
+    if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.badgeId) {
       console.log('🎖️ [STORE] Pending badge upgrade detected - showing upgrade modal first');
       
       // Get current badge to get old tier
       const badgeData = await window.BadgeService.getBadge(walletAddress);
       if (badgeData && badgeData.success && badgeData.hasBadge && badgeData.badge) {
-        // Convert base64 imageData back to Uint8Array
-        let imageData = null;
-        if (upgradeCheck.transactionData.imageData) {
-          try {
-            const base64 = upgradeCheck.transactionData.imageData;
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-              bytes[i] = binary.charCodeAt(i);
-            }
-            imageData = bytes;
-          } catch (error) {
-            console.warn('⚠️ [STORE] Failed to convert imageData:', error);
-          }
-        }
+        const oldTier = badgeData.badge.tier;
+        const newTier = upgradeCheck.newTier || oldTier + 1;
+        const newTierName = window.BadgeService.getTierName(newTier);
+        
+        // Generate session ID for upgrade transaction
+        const sessionId = `upgrade_${walletAddress}_${Date.now()}`;
         
         // Show upgrade modal with callback to show store after upgrade
         if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
-          const oldTier = badgeData.badge.tier;
-          const newTier = upgradeCheck.newTier || oldTier + 1;
-          const newTierName = window.BadgeService.getTierName(newTier);
-          
-          // Show upgrade modal with callback to show store after upgrade completes or is declined
           window.BadgeUI.showTierUpgradeModal({
             oldTier,
             newTier,
             newTierName,
-            imageData,
-            transactionData: upgradeCheck.transactionData,
+            badgeId: upgradeCheck.badgeId,
+            sessionId: sessionId,
             onUpgradeComplete: async (upgraded) => {
               // After upgrade modal closes (whether upgraded or declined), show store
               if (upgraded) {

@@ -151,9 +151,9 @@ The script provides:
 ### Tier Calculation
 
 During migration:
-- Current `games_played` is fetched from stats registry (source of truth)
-- Tier is calculated based on current games
-- If old tier is higher than current tier, old tier is preserved (no downgrades)
+- The exact `old_tier` from the old badge is preserved
+- Tier is NOT recalculated based on games played
+- Players must use the normal upgrade process (with payment) to upgrade their tier after migration
 
 ### Image Data
 

@@ -356,10 +356,17 @@ module suitwo_game::badge_system {
         stats_registry: &StatisticsRegistry,
         clock: &Clock,
         session_id: vector<u8>,  // Session ID from score submission (for idempotency)
+        payment: Coin<SUI>,  // Upgrade fee payment ($0.10 dollar-pegged, same as minting)
         new_image_url: String,  // URL to new tier's badge image (e.g., "http://localhost:3000/Badges/Rare.webp")
         _ctx: &mut TxContext
     ) {
         let current_time = clock::timestamp_ms(clock);
+        
+        // Validate payment meets minimum fee requirement (same as minting)
+        assert!(coin::value(&payment) >= MIN_MINT_FEE_MIST, E_INSUFFICIENT_PAYMENT);
+        
+        // Transfer upgrade fee to fee recipient (same as minting)
+        transfer::public_transfer(payment, registry.fee_recipient);
         
         // Idempotency check - prevent counting same session twice
         assert!(!is_session_counted(registry, session_id), E_SESSION_ALREADY_COUNTED);
@@ -656,7 +663,7 @@ module suitwo_game::badge_system {
         stats_registry: &StatisticsRegistry,
         clock: &Clock,
         old_tier: u8,  // Tier from old badge
-        _old_games_played: u64,  // Games played from old badge (unused, kept for API compatibility)
+        old_games_played: u64,  // Games played from old badge (preserved during migration)
         old_mint_date: u64,  // Original mint date from old badge
         image_url: String,  // URL to badge image (e.g., "http://localhost:3000/Badges/Common.webp")
         ctx: &mut TxContext
@@ -676,17 +683,12 @@ module suitwo_game::badge_system {
         // After migration, the player must manually delete the old badge from their wallet.
         
         // ===== STEP 1: Create new badge =====
-        // Get current games_played from statistics registry (source of truth)
-        let (_has_stats, current_total_games, _best_score, _best_distance, _best_coins, _best_bosses_defeated, _best_enemies_defeated, _best_coin_streak, _total_score, _total_distance, _total_coins, _total_bosses_defeated, _total_enemies_defeated, _total_coin_streak, _first_game_date, _last_game_date) = score_submission::get_player_stats(stats_registry, player);
+        // Preserve old badge data exactly as it was (allows resetting stats for seasons or other reasons)
+        // Preserve exact tier from old badge - players must pay for upgrades through normal upgrade process
+        let final_tier = old_tier;
         
-        // Calculate current tier based on actual games played (may have changed since old badge)
-        let current_tier = get_badge_tier(current_total_games);
-        
-        // Use the higher of old_tier or current_tier (don't downgrade during migration)
-        let final_tier = if (current_tier > old_tier) { current_tier } else { old_tier };
-        
-        // Use current games_played (source of truth)
-        let final_games_played = current_total_games;
+        // Preserve old games_played (allows stat resets for seasons)
+        let final_games_played = old_games_played;
         
         // Preserve original mint_date
         let preserved_mint_date = old_mint_date;

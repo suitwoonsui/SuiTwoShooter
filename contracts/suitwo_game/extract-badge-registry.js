@@ -1,7 +1,7 @@
 // Extract Badge Registry ID from initialization transaction
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
-const txDigest = '484Jg77m5rKY16dK3g85fYpXZbLVkEyNzuPD5732zuKk';
+const txDigest = '5sZhsmYXTxDros3dGdWTTESUnsZG36LPHcVqrq9UKhFd';
 
 async function extractBadgeRegistry() {
   try {

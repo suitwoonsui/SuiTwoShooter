@@ -135,8 +135,23 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
         digest: result.digest,
         playerAddress: result.playerAddress,
         gasPaidBy: result.gasPaidBy,
+        sessionId: result.sessionId,
         badge: result.badge
       });
+      
+      // Log detailed badge info for debugging
+      if (result.badge) {
+        console.log('🎖️ [BADGE] ========== BADGE INFO FROM SCORE SUBMISSION ==========');
+        console.log('🎖️ [BADGE] Badge object:', JSON.stringify(result.badge, null, 2));
+        console.log('🎖️ [BADGE] canMint:', result.badge.canMint);
+        console.log('🎖️ [BADGE] hasBadge:', result.badge.hasBadge);
+        console.log('🎖️ [BADGE] tierUpgraded:', result.badge.tierUpgraded);
+        console.log('🎖️ [BADGE] newTier:', result.badge.newTier);
+        console.log('🎖️ [BADGE] error:', result.badge.error);
+        console.log('🎖️ [BADGE] ====================================================');
+      } else {
+        console.warn('⚠️ [BADGE] No badge info in score submission response');
+      }
       
       // Handle badge operations if present
       if (result.badge) {
@@ -150,58 +165,41 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
             }
           }, 1000);
         } else if (result.badge.tierUpgraded) {
-          // Tier upgraded - show upgrade notification with transaction
+          // Tier upgraded - show upgrade notification
           console.log('🎖️ [BADGE] Badge tier upgraded to:', result.badge.newTier);
+          console.log('🎖️ [BADGE] Full badge upgrade info:', result.badge);
           // Show upgrade modal after a short delay
           setTimeout(async () => {
             if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
               try {
-                // Get transaction data for tier upgrade
-                const sessionId = result.sessionId || `session_${Date.now()}`;
-                const updateResult = await window.BadgeService.checkAndBuildBadgeUpdate(sessionId);
-                
-                if (!updateResult.success || !updateResult.transactionData) {
-                  console.warn('⚠️ [BADGE] Failed to get tier upgrade transaction data');
-                  // Show modal without transaction (informational only)
-                  const badgeData = await window.BadgeService.getBadge();
-                  if (badgeData.success && badgeData.badge) {
-                    window.BadgeUI.showTierUpgradeModal({
-                      oldTier: badgeData.badge.tier - 1,
-                      newTier: result.badge.newTier,
-                      newTierName: window.BadgeService.getTierName(result.badge.newTier),
-                      imageData: badgeData.badge.imageData,
-                      // No transactionData - modal will show as informational
-                    });
-                  }
+                // Get current badge to get badgeId
+                const badgeData = await window.BadgeService.getBadge();
+                if (!badgeData.success || !badgeData.badge || !badgeData.badge.badgeId) {
+                  console.warn('⚠️ [BADGE] Failed to get badge data for upgrade');
                   return;
                 }
                 
-                // Convert imageData array to Uint8Array if needed
-                let imageData = updateResult.transactionData.imageData;
-                if (Array.isArray(imageData)) {
-                  imageData = new Uint8Array(imageData);
-                }
+                // Use sessionId from the score submission result (passed from backend)
+                // The backend uses the sessionId from the score submission, ensuring idempotency
+                const sessionId = result.sessionId || gameStats.sessionId || `session_${Date.now()}`;
+                const oldTier = badgeData.badge.tier - 1; // Previous tier (before upgrade)
+                const newTier = result.badge.newTier;
                 
-                // Get badge data to show new tier image
-                const badgeData = await window.BadgeService.getBadge();
-                if (badgeData.success && badgeData.badge) {
-                  window.BadgeUI.showTierUpgradeModal({
-                    oldTier: badgeData.badge.tier - 1, // Previous tier
-                    newTier: result.badge.newTier,
-                    newTierName: window.BadgeService.getTierName(result.badge.newTier),
-                    imageData: imageData,
-                    transactionData: updateResult.transactionData, // Pass transaction data
-                  });
-                } else {
-                  // Fallback without image
-                  window.BadgeUI.showTierUpgradeModal({
-                    oldTier: result.badge.newTier - 1,
-                    newTier: result.badge.newTier,
-                    newTierName: window.BadgeService.getTierName(result.badge.newTier),
-                    imageData: imageData,
-                    transactionData: updateResult.transactionData, // Pass transaction data
-                  });
-                }
+                console.log('🎖️ [BADGE] Showing upgrade modal with:', {
+                  oldTier,
+                  newTier,
+                  badgeId: badgeData.badge.badgeId,
+                  sessionId
+                });
+                
+                // Show upgrade modal with new flow (badgeId, newTier, sessionId)
+                window.BadgeUI.showTierUpgradeModal({
+                  oldTier: oldTier,
+                  newTier: newTier,
+                  newTierName: window.BadgeService.getTierName(newTier),
+                  badgeId: badgeData.badge.badgeId,
+                  sessionId: sessionId,
+                });
               } catch (error) {
                 console.error('❌ [BADGE] Error showing tier upgrade modal:', error);
               }

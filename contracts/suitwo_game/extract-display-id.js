@@ -1,7 +1,7 @@
 // Extract Display object ID from transaction
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
-const txDigest = '4YGJ9ak7kPcXoZc5Ti37dZPmMvMB7EaTtu7o85uPH68g';
+const txDigest = 'Gj7HWrXuoyAC5GsJPvNTvr7oBmo89tXTjCLF3eUTwBHM';
 
 async function extractDisplayId() {
   try {
@@ -50,7 +50,7 @@ async function extractDisplayId() {
       console.log(`   BADGE_DISPLAY_OBJECT_ID_TESTNET=${displayObjectId}`);
     } else {
       console.log('\n❌ Display object ID not found');
-    }
+      }
     
     return displayObjectId;
     

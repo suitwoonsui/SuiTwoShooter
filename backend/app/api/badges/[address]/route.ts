@@ -48,6 +48,16 @@ export async function GET(
     // Step 1: Extract and validate address parameter
     console.log(`\n📥 [BADGE API] Step 1: Extracting address parameter...`);
     const { address: playerAddress } = await params;
+    
+    // Step 1.5: Check for contract query parameter
+    const { searchParams } = new URL(request.url);
+    const contract = searchParams.get('contract') || 'new'; // Default to 'new'
+    const useOldContract = contract === 'old';
+    console.log(`📥 [BADGE API] ========== CONTRACT SELECTION ==========`);
+    console.log(`📥 [BADGE API] Contract parameter: ${contract}`);
+    console.log(`📥 [BADGE API] useOldContract: ${useOldContract}`);
+    console.log(`📥 [BADGE API] Will query: ${useOldContract ? 'OLD contract registry' : 'NEW contract registry'}`);
+    console.log(`📥 [BADGE API] =========================================`);
     console.log(`📥 [BADGE API] Extracted address: ${playerAddress}`);
     console.log(`📥 [BADGE API] Address length: ${playerAddress?.length || 0}`);
     console.log(`📥 [BADGE API] Address starts with 0x: ${playerAddress?.startsWith('0x') || false}`);
@@ -74,12 +84,12 @@ export async function GET(
     const badgeService = getBadgeService();
     console.log(`✅ [BADGE API] Badge service obtained`);
     
-    // Step 4: Check if player has badge
-    console.log(`\n📥 [BADGE API] Step 4: Checking if player has badge...`);
-    console.log(`📥 [BADGE API] Calling badgeService.hasBadge('${playerAddress}')...`);
-    console.log(`📥 [BADGE API] This is the SAME function used in adminMintBadge`);
+    // Step 4: Check if player has badge (in selected contract)
+    console.log(`\n📥 [BADGE API] Step 4: Checking if player has badge in ${contract} contract...`);
     
-    const hasBadge = await badgeService.hasBadge(playerAddress);
+    const hasBadge = useOldContract
+      ? await badgeService.hasBadgeOldContract(playerAddress)
+      : await badgeService.hasBadge(playerAddress);
     
     console.log(`\n📥 [BADGE API] hasBadge() returned: ${hasBadge}`);
     console.log(`📥 [BADGE API] Type: ${typeof hasBadge}, Value: ${hasBadge}`);
@@ -87,7 +97,7 @@ export async function GET(
     
     if (!hasBadge) {
       console.log(`\n📥 [BADGE API] ========== NO BADGE FOUND ==========`);
-      console.log(`📥 [BADGE API] Player does not have badge`);
+      console.log(`📥 [BADGE API] Player does not have badge in ${contract} contract`);
       console.log(`📥 [BADGE API] Returning hasBadge: false`);
       console.log(`📥 [BADGE API] =====================================\n`);
       return NextResponse.json(
@@ -99,11 +109,12 @@ export async function GET(
       );
     }
 
-    // Step 5: Get badge data
-    console.log(`\n📥 [BADGE API] Step 5: Player HAS badge - getting badge data...`);
-    console.log(`📥 [BADGE API] Calling badgeService.getBadge('${playerAddress}')...`);
+    // Step 5: Get badge data (from selected contract)
+    console.log(`\n📥 [BADGE API] Step 5: Player HAS badge - getting badge data from ${contract} contract...`);
     
-    const badge = await badgeService.getBadge(playerAddress);
+    const badge = useOldContract
+      ? await badgeService.getBadgeOldContract(playerAddress)
+      : await badgeService.getBadge(playerAddress);
     
     console.log(`\n📥 [BADGE API] getBadge() returned:`, badge ? 'Badge object' : 'null');
     if (badge) {

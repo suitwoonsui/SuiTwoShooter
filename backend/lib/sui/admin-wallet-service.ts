@@ -276,8 +276,12 @@ export class AdminWalletService {
       // Build transaction
       const txb = new Transaction();
 
+      console.log(`📊 [SCORE SUBMIT] About to call contract with stats registry: ${statisticsRegistryObjectId}`);
+      console.log(`📊 [SCORE SUBMIT] This will increment total_games in the StatisticsRegistry`);
+
       // Call submit_game_session_for_player function
       // Requires AdminCapability to prove caller is admin (prevents unauthorized submissions)
+      // NOTE: This function calls update_player_stats() which increments total_games by 1
       txb.moveCall({
         target: `${packageId}::score_submission::submit_game_session_for_player`,
         arguments: [
@@ -320,6 +324,10 @@ export class AdminWalletService {
         console.log('✅ Score submitted successfully!');
         console.log(`   Transaction Digest: ${result.digest}`);
         console.log(`   Gas paid by: Admin wallet (${this.address})`);
+        console.log(`📊 [SCORE SUBMIT] Transaction succeeded - total_games should have been incremented in StatisticsRegistry`);
+        console.log(`📊 [SCORE SUBMIT] Stats Registry ID: ${statisticsRegistryObjectId}`);
+        console.log(`📊 [SCORE SUBMIT] Player Address: ${playerAddress}`);
+        console.log(`📊 [SCORE SUBMIT] Note: If stats query returns 0, it may be an indexing delay. Query the registry directly to verify.`);
 
         return {
           success: true,
@@ -406,14 +414,15 @@ export class AdminWalletService {
     averageCoinStreak?: number;
     error?: string;
   }> {
+    const packageId = this.config.contracts.gameScore;
+    const statisticsRegistryObjectId = this.config.contracts.statisticsRegistry;
+    
     try {
-      const packageId = this.config.contracts.gameScore;
       if (!packageId || packageId === '' || packageId === '0x...') {
         const network = this.config.sui.network;
         throw new Error(`Game score contract not configured for ${network}. Please set GAME_SCORE_CONTRACT_${network.toUpperCase()} environment variable after contract deployment.`);
       }
 
-      const statisticsRegistryObjectId = this.config.contracts.statisticsRegistry;
       if (!statisticsRegistryObjectId || statisticsRegistryObjectId === '' || statisticsRegistryObjectId === '0x...') {
         const network = this.config.sui.network;
         throw new Error(`Statistics registry object ID not configured for ${network}. Please set STATISTICS_REGISTRY_OBJECT_ID_${network.toUpperCase()} environment variable after contract deployment.`);
@@ -433,31 +442,77 @@ export class AdminWalletService {
         ],
       });
 
+      console.log(`📊 [GET PLAYER STATS] Querying stats for: ${playerAddress}`);
+      console.log(`   Package ID: ${packageId}`);
+      console.log(`   Statistics Registry: ${statisticsRegistryObjectId}`);
+      console.log(`   Network: ${this.config.sui.network}`);
+
       const result = await client.devInspectTransactionBlock({
         sender: this.address,
         transactionBlock: txb,
       });
 
+      console.log(`📊 [GET PLAYER STATS] Raw result:`, {
+        hasResults: !!result.results,
+        resultsLength: result.results?.length || 0,
+        firstResult: result.results?.[0],
+      });
+
       // Parse the result
       if (result.results && result.results.length > 0) {
         const returnValues = result.results[0].returnValues;
+        console.log(`📊 [GET PLAYER STATS] Return values:`, {
+          hasReturnValues: !!returnValues,
+          returnValuesLength: returnValues?.length || 0,
+          returnValues: returnValues,
+        });
+
         if (returnValues && returnValues.length >= 16) {
           // get_player_stats returns (bool, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64)
+          // Sui returns values as [[byteArray], 'type'] tuples
           // Parse all 16 return values
-          const parseU64 = (val: any): number => {
-            if (Array.isArray(val)) {
-              // Sui returns values as [type, value] tuples
-              return parseInt(val[1] || val[0] || '0', 10);
+          const parseU64FromBytes = (byteArray: number[]): number => {
+            if (!Array.isArray(byteArray) || byteArray.length !== 8) {
+              return 0;
             }
-            return parseInt(val || '0', 10);
+            // Convert little-endian byte array to number
+            let value = 0;
+            for (let i = 0; i < 8; i++) {
+              value += byteArray[i] * Math.pow(256, i);
+            }
+            return value;
           };
 
-          // Parse boolean: Sui returns bool as [type, "0" or "1"]
-          const hasStatsValue = returnValues[0];
-          const hasStats = Array.isArray(hasStatsValue) 
-            ? (String(hasStatsValue[1]) === '1' || Number(hasStatsValue[1]) === 1)
-            : Boolean(hasStatsValue);
-          const totalGames = parseU64(returnValues[1]);
+          // Parse boolean: returnValues[0] is [[byteArray], 'bool']
+          // byteArray is [0] for false or [1] for true
+          const hasStatsByteArray = Array.isArray(returnValues[0]) && Array.isArray(returnValues[0][0]) 
+            ? returnValues[0][0] 
+            : [];
+          const hasStats = Array.isArray(hasStatsByteArray) && hasStatsByteArray.length > 0 && hasStatsByteArray[0] === 1;
+          
+          // Parse totalGames: returnValues[1] is [[byteArray], 'u64']
+          // byteArray is [53, 0, 0, 0, 0, 0, 0, 0] for 53 (little-endian)
+          const totalGamesByteArray = Array.isArray(returnValues[1]) && Array.isArray(returnValues[1][0])
+            ? returnValues[1][0]
+            : [];
+          const totalGames = parseU64FromBytes(totalGamesByteArray);
+
+          // Helper to parse u64 values (for other stats)
+          const parseU64 = (val: any): number => {
+            if (Array.isArray(val) && Array.isArray(val[0])) {
+              // Structure is [[byteArray], 'u64']
+              return parseU64FromBytes(val[0]);
+            }
+            return 0;
+          };
+
+          console.log(`📊 [GET PLAYER STATS] Parsed values:`, {
+            hasStats,
+            totalGames,
+            rawHasStats: hasStatsByteArray,
+            rawTotalGames: totalGamesByteArray,
+            rawReturnValues: returnValues.slice(0, 2),
+          });
           const bestScore = parseU64(returnValues[2]);
           const bestDistance = parseU64(returnValues[3]);
           const bestCoins = parseU64(returnValues[4]);
@@ -508,13 +563,23 @@ export class AdminWalletService {
       }
 
       // If no return values or insufficient values, player has no stats
+      console.log(`📊 [GET PLAYER STATS] No stats found (insufficient return values)`);
+      console.log(`📊 [GET PLAYER STATS] Result structure:`, JSON.stringify(result, null, 2));
       return {
         success: true,
         hasStats: false,
         totalGames: 0,
       };
     } catch (error) {
-      console.error('❌ Error querying player stats:', error);
+      console.error('❌ [GET PLAYER STATS] Error querying player stats:', error);
+      console.error('❌ [GET PLAYER STATS] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        playerAddress,
+        packageId,
+        statisticsRegistryObjectId,
+        network: this.config.sui.network,
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

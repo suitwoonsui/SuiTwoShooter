@@ -2,9 +2,24 @@
 // MENU SYSTEM (EXACT COPY FROM HTML)
 // ==========================================
 
+console.log('📦 [MENU SYSTEM] ========== SCRIPT LOADING ==========');
+console.log('📦 [MENU SYSTEM] Script file: menu-system.js');
+console.log('📦 [MENU SYSTEM] Document ready state:', document.readyState);
+console.log('📦 [MENU SYSTEM] Window object available:', typeof window !== 'undefined');
+console.log('📦 [MENU SYSTEM] Current time:', new Date().toISOString());
+
 // Wallet connection handlers
+// IMPORTANT: Connect button should NEVER be disabled by readiness checks
+// It's needed to connect wallet and load data in the first place
+
 async function handleConnectWallet() {
-  console.log('🔗 Connecting wallet...');
+  console.log('🔗 [WALLET CONNECT] ========== CONNECT WALLET CALLED ==========');
+  console.log('🔗 [WALLET CONNECT] Function handleConnectWallet called');
+  console.log('🔗 [WALLET CONNECT] Call stack:', new Error().stack?.split('\n').slice(0, 5).join('\n'));
+  console.log('🔗 [WALLET CONNECT] WalletAPI available:', typeof WalletAPI !== 'undefined');
+  console.log('🔗 [WALLET CONNECT] walletAPIInstance available:', !!window.walletAPIInstance);
+  console.log('🔗 [WALLET CONNECT] walletAPIInstance type:', typeof window.walletAPIInstance);
+  console.log('🔗 [WALLET CONNECT] window.handleConnectWallet === handleConnectWallet:', window.handleConnectWallet === handleConnectWallet);
   
   if (typeof WalletAPI === 'undefined' || !window.walletAPIInstance) {
     alert('Wallet API not initialized. Please refresh the page.');
@@ -14,7 +29,7 @@ async function handleConnectWallet() {
   const connectBtn = document.getElementById('connectWalletBtn');
   const connectBtnText = document.getElementById('connectWalletBtnText');
   
-  // Disable button during connection
+  // Disable button during connection (temporary, only during connection process)
   if (connectBtn) {
     connectBtn.disabled = true;
     if (connectBtnText) connectBtnText.textContent = 'Connecting...';
@@ -33,13 +48,7 @@ async function handleConnectWallet() {
       if (typeof updateMenuStats === 'function') {
         updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
       }
-      // Always enable test mode button if wallet is connected (bypasses gatekeeping)
-      const testBtn = document.getElementById('startGameTestBtn');
-      if (testBtn) {
-        testBtn.disabled = false;
-        testBtn.style.opacity = '1';
-        testBtn.style.cursor = 'pointer';
-      }
+      // Test button will be enabled by updateGameReadiness() after data loads
     } else {
       console.error('❌ Wallet connection failed:', result.error);
       alert(`Failed to connect wallet: ${result.error || 'Unknown error'}`);
@@ -52,13 +61,80 @@ async function handleConnectWallet() {
     updateWalletUI(null);
     disableStartGameButton();
   } finally {
-    // Re-enable button
+    // Re-enable button after connection attempt
     if (connectBtn) {
       connectBtn.disabled = false;
       if (connectBtnText) connectBtnText.textContent = 'Connect Wallet';
     }
   }
 }
+
+// Expose functions globally for onclick handlers in HTML
+// Do this immediately so it's available when HTML loads
+console.log('📦 [MENU SYSTEM] Exposing functions to window...');
+window.handleConnectWallet = handleConnectWallet;
+window.handleDisconnectWallet = handleDisconnectWallet;
+console.log('✅ [MENU SYSTEM] Functions exposed to window');
+console.log('✅ [MENU SYSTEM] window.handleConnectWallet type:', typeof window.handleConnectWallet);
+console.log('✅ [MENU SYSTEM] window.handleConnectWallet === handleConnectWallet:', window.handleConnectWallet === handleConnectWallet);
+
+// Verify it's available
+if (typeof window.handleConnectWallet === 'function') {
+  console.log('✅ [MENU SYSTEM] handleConnectWallet is available on window object');
+  console.log('✅ [MENU SYSTEM] Can call window.handleConnectWallet()');
+} else {
+  console.error('❌ [MENU SYSTEM] handleConnectWallet is NOT available on window object!');
+  console.error('❌ [MENU SYSTEM] window.handleConnectWallet value:', window.handleConnectWallet);
+}
+
+// Also check if button exists and what onclick it has
+console.log('📦 [MENU SYSTEM] Checking connect button...');
+if (typeof document !== 'undefined') {
+  // Check immediately
+  const connectBtnImmediate = document.getElementById('connectWalletBtn');
+  if (connectBtnImmediate) {
+    console.log('✅ [MENU SYSTEM] Connect button found immediately in DOM');
+    console.log('📦 [MENU SYSTEM] Button onclick attribute:', connectBtnImmediate.getAttribute('onclick'));
+    console.log('📦 [MENU SYSTEM] window.handleConnectWallet available:', typeof window.handleConnectWallet);
+  } else {
+    console.log('⏳ [MENU SYSTEM] Connect button not found immediately (DOM may not be ready)');
+  }
+  
+  // Use setTimeout to check after DOM might be ready
+  setTimeout(() => {
+    const connectBtn = document.getElementById('connectWalletBtn');
+    if (connectBtn) {
+      console.log('✅ [MENU SYSTEM] Connect button found in DOM (delayed check)');
+      console.log('📦 [MENU SYSTEM] Button onclick attribute:', connectBtn.getAttribute('onclick'));
+      console.log('📦 [MENU SYSTEM] window.handleConnectWallet available at button check:', typeof window.handleConnectWallet);
+      
+      // Check if function is callable
+      if (typeof window.handleConnectWallet === 'function') {
+        console.log('✅ [MENU SYSTEM] Function is callable from button');
+      } else {
+        console.error('❌ [MENU SYSTEM] Function is NOT callable from button!');
+        console.error('❌ [MENU SYSTEM] Available on window:', Object.keys(window).filter(k => k.includes('handle') || k.includes('Connect')));
+      }
+    } else {
+      console.log('⏳ [MENU SYSTEM] Connect button not found (delayed check)');
+    }
+  }, 100);
+  
+  // Also check on DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('📦 [MENU SYSTEM] DOMContentLoaded fired - checking button again');
+      const connectBtn = document.getElementById('connectWalletBtn');
+      if (connectBtn) {
+        console.log('✅ [MENU SYSTEM] Connect button found on DOMContentLoaded');
+        console.log('📦 [MENU SYSTEM] Button onclick:', connectBtn.getAttribute('onclick'));
+        console.log('📦 [MENU SYSTEM] window.handleConnectWallet:', typeof window.handleConnectWallet);
+      }
+    });
+  }
+}
+
+console.log('📦 [MENU SYSTEM] ========== SCRIPT LOAD COMPLETE ==========');
 
 async function handleDisconnectWallet() {
   console.log('🔓 Disconnecting wallet...');
@@ -190,25 +266,41 @@ async function loadMenuBadgeDisplay(walletAddress) {
       return;
     }
 
+    // Clear cache first to ensure we get fresh data
+    if (window.BadgeService && window.BadgeService.clearBadgeCache) {
+      window.BadgeService.clearBadgeCache();
+    }
+    
     const badgeData = await window.BadgeService.getBadge(walletAddress);
 
     if (!badgeData || !badgeData.success || !badgeData.hasBadge || !badgeData.badge) {
       // Player doesn't have a badge in new contract
-      // BUT: If we just minted a badge, wait a bit longer before checking for migration
+      // Mark data as loaded first
+      gameReadinessState.dataLoaded = true;
+      
+      // BUT: If we just minted a badge, wait longer before checking for migration
       // This prevents showing migration modal right after a successful mint
       const recentMintTime = window.BadgeService?._lastMintTime || 0;
       const timeSinceMint = Date.now() - recentMintTime;
-      const shouldCheckMigration = timeSinceMint > 5000; // Wait 5 seconds after mint before checking migration
+      const shouldCheckMigration = timeSinceMint > 10000; // Wait 10 seconds after mint before checking migration
       
       if (shouldCheckMigration && window.BadgeService && window.BadgeService.checkBadgeMigration) {
+        // Perform migration check
         const migrationCheck = await window.BadgeService.checkBadgeMigration(walletAddress);
+        
+        // Mark migration check as complete
+        gameReadinessState.migrationCheckComplete = true;
         
         if (migrationCheck.success && migrationCheck.needsMigration && migrationCheck.migrationData) {
           // Player has an old badge that needs migration
           console.log('🔄 [MENU] Player needs to migrate badge');
           
-          // Show migration modal
+          // Show migration modal - button will stay disabled until modal is closed
           if (window.BadgeUI && window.BadgeUI.showBadgeMigrationModal) {
+            // Mark migration modal as open (button stays disabled)
+            gameReadinessState.migrationModalClosed = false;
+            console.log('🔄 [GAME READINESS] Migration modal opened - button will enable when closed');
+            
             // Convert imageData array to Uint8Array if needed
             let imageData = migrationCheck.migrationData.imageData;
             if (Array.isArray(imageData)) {
@@ -223,10 +315,25 @@ async function loadMenuBadgeDisplay(walletAddress) {
               imageData: imageData,
             });
           }
+        } else {
+          // Migration check completed but no migration needed
+          // Mark modal as closed (not needed)
+          gameReadinessState.migrationModalClosed = true;
+          console.log('✅ [GAME READINESS] Migration check complete - no migration needed');
         }
-      } else if (!shouldCheckMigration) {
-        console.log('⏳ [MENU] Recent badge mint detected, skipping migration check for now');
+      } else {
+        // Skip migration check (recent mint or no check function)
+        gameReadinessState.migrationCheckComplete = true;
+        gameReadinessState.migrationModalClosed = true; // No modal needed
+        if (!shouldCheckMigration) {
+          console.log('⏳ [MENU] Recent badge mint detected, skipping migration check');
+          console.log(`⏳ [MENU] Time since mint: ${timeSinceMint}ms (need 10000ms)`);
+        }
+        console.log('✅ [GAME READINESS] Migration check skipped - button can enable');
       }
+      
+      // Update button state after migration check
+      updateGameReadiness();
       
       // Hide badge display (no badge in new contract)
       badgeDisplay.style.display = 'none';
@@ -234,41 +341,40 @@ async function loadMenuBadgeDisplay(walletAddress) {
     }
 
     // Player has a badge, display it
+    // Mark data as loaded and migration check complete (no migration needed when badge exists)
+    gameReadinessState.dataLoaded = true;
+    gameReadinessState.migrationCheckComplete = true;
+    gameReadinessState.migrationModalClosed = true; // No migration needed if badge exists
+    console.log('✅ [GAME READINESS] Data loaded - badge found, no migration needed');
+    updateGameReadiness();
+    
     // Check for pending tier upgrade
     if (window.BadgeService && window.BadgeService.checkPendingUpgrade) {
       const upgradeCheck = await window.BadgeService.checkPendingUpgrade(walletAddress);
-      if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.transactionData) {
+      if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.badgeId) {
         console.log('🎖️ [MENU] Pending badge upgrade detected');
         
-        // Convert base64 imageData back to Uint8Array
-        let imageData = null;
-        if (upgradeCheck.transactionData.imageData) {
-          try {
-            const base64 = upgradeCheck.transactionData.imageData;
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-              bytes[i] = binary.charCodeAt(i);
-            }
-            imageData = bytes;
-          } catch (error) {
-            console.warn('⚠️ [MENU] Failed to convert imageData:', error);
-          }
-        }
-        
-        // Show upgrade modal
-        if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
+        // Get current badge to get old tier and image
+        const badgeData = await window.BadgeService.getBadge(walletAddress);
+        if (badgeData && badgeData.success && badgeData.hasBadge && badgeData.badge) {
           const oldTier = badgeData.badge.tier;
           const newTier = upgradeCheck.newTier || oldTier + 1;
           const newTierName = window.BadgeService.getTierName(newTier);
           
-          window.BadgeUI.showTierUpgradeModal({
-            oldTier,
-            newTier,
-            newTierName,
-            imageData,
-            transactionData: upgradeCheck.transactionData,
-          });
+          // Generate session ID for upgrade transaction
+          const sessionId = `upgrade_${walletAddress}_${Date.now()}`;
+          
+          // Show upgrade modal with new flow (badgeId, newTier, sessionId)
+          if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
+            window.BadgeUI.showTierUpgradeModal({
+              oldTier,
+              newTier,
+              newTierName,
+              badgeId: upgradeCheck.badgeId,
+              sessionId: sessionId,
+              // No imageData needed - will be loaded from URL
+            });
+          }
         }
       }
     }
@@ -471,13 +577,7 @@ async function initializeWalletIntegration() {
         if (typeof updateMenuStats === 'function') {
           updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
         }
-        // Always enable test mode button if wallet is connected (bypasses gatekeeping)
-        const testBtn = document.getElementById('startGameTestBtn');
-        if (testBtn) {
-          testBtn.disabled = false;
-          testBtn.style.opacity = '1';
-          testBtn.style.cursor = 'pointer';
-        }
+        // Test button will be enabled by updateGameReadiness() after data loads
       } else {
         // Show requirements when wallet not connected
         updateWalletRequirementsUI(false, false);
@@ -608,47 +708,29 @@ async function checkMEWSBalanceAndUpdateUI(address) {
         }
       }
       
+      // Reset readiness state when loading new data
+      // NOTE: Connect button is NEVER disabled - it's needed to load data
+      gameReadinessState.dataLoaded = false;
+      gameReadinessState.migrationCheckComplete = false;
+      gameReadinessState.migrationModalClosed = true; // Start as true, will be set to false if modal opens
+      disableStartGameButton(); // Keep START buttons disabled until all checks complete
+      
       // Load and display badge when balance is checked (wallet is fully loaded)
       // This is the primary place badge should be loaded when wallet connects
+      // loadMenuBadgeDisplay will update readiness state when complete
       await loadMenuBadgeDisplay(address);
       
-      if (balanceResult.hasMinimumBalance) {
-        // Only enable button if balance is sufficient
-        enableStartGameButton();
-        const walletStatusText = document.getElementById('walletStatusText');
-        if (walletStatusText) {
-          walletStatusText.innerHTML = '<span class="wallet-icon">✅</span><span>Wallet connected • Ready to play!</span>';
-        }
-      } else {
-        // Keep button disabled if insufficient balance
-        disableStartGameButton();
-        const walletStatusText = document.getElementById('walletStatusText');
-        if (walletStatusText) {
-          walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Insufficient $MEWS. Need ${balanceResult.formattedMinimum} $MEWS (You have ${balanceResult.formattedBalance})</span>`;
-        }
-      }
-      
-      // Always enable test mode button if wallet is connected (bypasses gatekeeping)
-      const testBtn = document.getElementById('startGameTestBtn');
-      if (testBtn && address) {
-        testBtn.disabled = false;
-        testBtn.style.opacity = '1';
-        testBtn.style.cursor = 'pointer';
-      }
-    } else {
-      console.error('❌ Failed to check balance:', balanceResult.error);
-      // Keep button disabled on error
-      disableStartGameButton();
-      updateBalanceUI(null, false);
-      updateWalletRequirementsUI(true, false);
-      // Hide badge display on balance check error
-      const badgeDisplay = document.getElementById('menuBadgeDisplay');
-      if (badgeDisplay) {
-        badgeDisplay.style.display = 'none';
-      }
+      // Button will be enabled by updateGameReadiness() after loadMenuBadgeDisplay completes
       const walletStatusText = document.getElementById('walletStatusText');
       if (walletStatusText) {
-        walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Failed to check balance: ${balanceResult.error || 'Unknown error'}</span>`;
+        walletStatusText.innerHTML = '<span class="wallet-icon">✅</span><span>Wallet connected • Ready to play!</span>';
+      }
+    } else {
+      // Keep button disabled if insufficient balance
+      disableStartGameButton();
+      const walletStatusText = document.getElementById('walletStatusText');
+      if (walletStatusText) {
+        walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Insufficient $MEWS. Need ${balanceResult.formattedMinimum} $MEWS (You have ${balanceResult.formattedBalance})</span>`;
       }
     }
   } catch (error) {
@@ -705,6 +787,49 @@ function updateBalanceUI(balance, hasMinimum) {
   }
 }
 
+function updateGameReadiness() {
+  // Update both start button and test button based on readiness
+  if (isGameReady()) {
+    // Enable test button (bypasses balance check)
+    const testBtn = document.getElementById('startGameTestBtn');
+    if (testBtn && window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+      testBtn.disabled = false;
+      testBtn.style.opacity = '1';
+      testBtn.style.cursor = 'pointer';
+      console.log('✅ [GAME READINESS] Test button enabled - all checks complete');
+    }
+    
+    // Enable regular start button if balance is sufficient
+    if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+      const balanceStatus = window.walletAPIInstance.getBalanceStatus();
+      if (balanceStatus.hasMinimumBalance) {
+        enableStartGameButton();
+        console.log('✅ [GAME READINESS] Start button enabled - all checks complete');
+      } else {
+        disableStartGameButton();
+        console.log('⏳ [GAME READINESS] Start button disabled - insufficient balance');
+      }
+    } else {
+      disableStartGameButton();
+      console.log('⏳ [GAME READINESS] Start button disabled - wallet not connected');
+    }
+  } else {
+    // Disable both buttons until ready
+    disableStartGameButton();
+    const testBtn = document.getElementById('startGameTestBtn');
+    if (testBtn) {
+      testBtn.disabled = true;
+      testBtn.style.opacity = '0.5';
+      testBtn.style.cursor = 'not-allowed';
+    }
+    console.log('⏳ [GAME READINESS] Buttons disabled - waiting for:', {
+      dataLoaded: gameReadinessState.dataLoaded,
+      migrationCheckComplete: gameReadinessState.migrationCheckComplete,
+      migrationModalClosed: gameReadinessState.migrationModalClosed,
+    });
+  }
+}
+
 function enableStartGameButton() {
   const startGameBtn = document.getElementById('startGameBtn');
   if (startGameBtn) {
@@ -729,6 +854,13 @@ function disableStartGameButton() {
 function startGameTest() {
   console.log('🧪 [TEST MODE] startGameTest() called - Bypassing gatekeeping');
   
+  // Still require data to be loaded and migration check complete
+  if (!isGameReady()) {
+    console.log('⏳ [TEST MODE] Waiting for data to load and migration check to complete...');
+    alert('Please wait for game data to finish loading before starting.');
+    return;
+  }
+  
   // Still require wallet connection (for blockchain features)
   if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) {
     alert('Please connect your wallet first. (Required for blockchain features)');
@@ -737,6 +869,23 @@ function startGameTest() {
   
   // Bypass balance check and start game directly
   startGameInternal();
+}
+
+// Track game readiness state
+const gameReadinessState = {
+  dataLoaded: false,
+  migrationCheckComplete: false,
+  migrationModalClosed: true, // Start as true (no modal needed)
+};
+
+function isGameReady() {
+  // Game is ready if:
+  // 1. Data is loaded
+  // 2. Migration check is complete
+  // 3. Migration modal is closed (or was never needed)
+  return gameReadinessState.dataLoaded && 
+         gameReadinessState.migrationCheckComplete &&
+         gameReadinessState.migrationModalClosed;
 }
 
 function startGame() {
@@ -1041,3 +1190,7 @@ function showMainMenu() {
     badgeLoadInProgress = false;
   }
 }
+
+// Expose functions globally (defined later in file)
+window.showSettings = showSettings;
+window.showInstructions = showInstructions;

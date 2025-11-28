@@ -25,6 +25,11 @@ async function showBadgeMintingModal(badgePreview = null) {
 
   // Get tier name
   const tierName = window.BadgeService ? window.BadgeService.getTierName(0) : 'Standard';
+  
+  // Construct badge image URL for Standard tier (tier 0)
+  const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+  const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+  const badgeImageUrl = `${baseUrl}/Badges/Standard.webp`;
 
   modal.innerHTML = `
     <div class="badge-modal-content">
@@ -37,7 +42,8 @@ async function showBadgeMintingModal(badgePreview = null) {
         <div class="badge-preview-container">
           ${badgePreview && badgePreview.imageData 
             ? `<img src="data:image/webp;base64,${arrayBufferToBase64(badgePreview.imageData)}" alt="Badge Preview" class="badge-preview-image" />`
-            : `<div class="badge-preview-placeholder">🎖️</div>`
+            : `<img src="${badgeImageUrl}" alt="${tierName} Badge" class="badge-preview-image" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='block';" />
+               <div class="badge-preview-placeholder" style="display: none;">🎖️</div>`
           }
           <p class="badge-tier-name">${tierName} Badge</p>
         </div>
@@ -110,10 +116,11 @@ async function showTierUpgradeModal(upgradeData) {
   modal.className = 'badge-modal badge-modal-visible';
   modal.id = 'badgeUpgradeModal';
 
-  const { oldTier, newTier, newTierName, imageData, transactionData, onUpgradeComplete } = upgradeData;
+  const { oldTier, newTier, newTierName, imageData, transactionData, badgeId, sessionId, onUpgradeComplete } = upgradeData;
   const oldTierName = window.BadgeService ? window.BadgeService.getTierName(oldTier) : 'Unknown';
   const discounts = window.BadgeService ? window.BadgeService.getDiscountsForTier(newTier) : { store: 0, gameplay: 0 };
-  const needsTransaction = !!transactionData;
+  // Need transaction if we have badgeId, newTier, and sessionId (new flow) or transactionData (old flow)
+  const needsTransaction = !!(badgeId && newTier !== undefined && sessionId) || !!transactionData;
 
   modal.innerHTML = `
     <div class="badge-modal-content">
@@ -124,10 +131,20 @@ async function showTierUpgradeModal(upgradeData) {
       
       <div class="badge-modal-body">
         <div class="badge-preview-container">
-          ${imageData 
-            ? `<img src="data:image/webp;base64,${arrayBufferToBase64(imageData)}" alt="Badge Preview" class="badge-preview-image" />`
-            : `<div class="badge-preview-placeholder">🎖️</div>`
-          }
+          ${(() => {
+            // Try to show badge image from URL (new flow) or base64 (old flow)
+            if (imageData) {
+              // Old flow: base64 image data
+              return `<img src="data:image/webp;base64,${arrayBufferToBase64(imageData)}" alt="Badge Preview" class="badge-preview-image" />`;
+            } else {
+              // New flow: construct image URL from tier name
+              const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+              const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+              const imageUrl = `${baseUrl}/Badges/${newTierName}.webp`;
+              const fallbackUrl = `${baseUrl}/Badges/Standard.webp`;
+              return `<img src="${imageUrl}" alt="Badge Preview" class="badge-preview-image" onerror="this.onerror=null; this.src='${fallbackUrl}';" />`;
+            }
+          })()}
           <p class="badge-tier-name">${newTierName} Badge</p>
         </div>
         
@@ -142,9 +159,8 @@ async function showTierUpgradeModal(upgradeData) {
           
           ${needsTransaction ? `
             <div class="badge-cost-info">
-              <p><strong>Gas Fee:</strong> ~$0.001-0.01 USD (paid in SUI)</p>
-              <p class="badge-cost-note">You'll need to sign a transaction to upgrade your badge</p>
-              <p class="badge-cost-note" style="font-size: 0.85em; margin-top: 0.5rem;">⚠️ Make sure you have at least 0.002 SUI in your wallet for gas fees</p>
+              <p><strong>Upgrade Fee:</strong> $0.10 USD (paid in SUI)</p>
+              <p class="badge-cost-note">Plus network gas fees (~$0.01)</p>
             </div>
           ` : ''}
         </div>
@@ -153,7 +169,7 @@ async function showTierUpgradeModal(upgradeData) {
       <div class="badge-modal-actions">
         ${needsTransaction ? `
           <button id="badgeUpgradeBtn" class="badge-btn badge-btn-primary">
-            Upgrade Badge
+            Upgrade Badge ($0.10)
           </button>
           <button id="badgeUpgradeLaterBtn" class="badge-btn badge-btn-secondary">
             Maybe Later
@@ -177,7 +193,18 @@ async function showTierUpgradeModal(upgradeData) {
 
   // Add event listeners
   if (needsTransaction) {
-    document.getElementById('badgeUpgradeBtn').addEventListener('click', () => handleBadgeUpgrade(transactionData, onUpgradeComplete));
+    document.getElementById('badgeUpgradeBtn').addEventListener('click', () => {
+      // Use new flow if badgeId, newTier, and sessionId are available
+      if (badgeId && newTier !== undefined && sessionId) {
+        handleBadgeUpgrade({ badgeId, newTier, sessionId }, onUpgradeComplete);
+      } else if (transactionData) {
+        // Fallback to old flow for backward compatibility
+        handleBadgeUpgrade(transactionData, onUpgradeComplete);
+      } else {
+        console.error('❌ [BADGE] Missing upgrade data:', { badgeId, newTier, sessionId, transactionData });
+        showUpgradeError('Missing upgrade data. Please try again.');
+      }
+    });
     document.getElementById('badgeUpgradeLaterBtn').addEventListener('click', () => {
       hideBadgeModal('badgeUpgradeModal');
       // If callback provided and user declined, we can still call it (e.g., to show store)
@@ -264,11 +291,23 @@ async function handleBadgeMint() {
       // Mark that we just minted a badge (prevents migration check from running immediately)
       if (window.BadgeService) {
         window.BadgeService._lastMintTime = Date.now();
+        console.log('✅ [BADGE UI] Set _lastMintTime to prevent migration check');
+      }
+      
+      // Hide any existing migration modal (in case it was shown before mint)
+      const migrationModal = document.getElementById('badgeMigrationModal');
+      if (migrationModal) {
+        console.log('🔄 [BADGE UI] Hiding migration modal after successful mint');
+        hideBadgeModal('badgeMigrationModal');
       }
       
       // Wait for transaction to be indexed on blockchain (3 seconds)
       console.log('⏳ [BADGE UI] Waiting for transaction to be indexed...');
       await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Clear cache again before reloading to ensure fresh data
+      window.BadgeService.clearBadgeCache();
+      console.log('🗑️ [BADGE UI] Cleared badge cache before reload');
       
       // Reload badge display to show the new badge
       console.log('🔄 [BADGE UI] Reloading badge display...');
@@ -310,7 +349,7 @@ function handleBadgeMaybeLater() {
  * @param {Object} transactionData - Transaction data from backend
  * @param {Function} onComplete - Optional callback when upgrade completes
  */
-async function handleBadgeUpgrade(transactionData, onComplete = null) {
+async function handleBadgeUpgrade(upgradeData, onComplete = null) {
   const btn = document.getElementById('badgeUpgradeBtn');
   const errorMessage = document.getElementById('badgeUpgradeError');
   
@@ -322,7 +361,7 @@ async function handleBadgeUpgrade(transactionData, onComplete = null) {
   
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Checking balance...';
+    btn.textContent = 'Upgrading...';
   }
 
   try {
@@ -336,54 +375,51 @@ async function handleBadgeUpgrade(transactionData, onComplete = null) {
       return;
     }
 
-    const walletAddress = window.walletAPIInstance.getAddress();
-    const network = window.GAME_CONFIG?.SUI_NETWORK || 'testnet';
+    // Extract upgrade data
+    const { badgeId, newTier, sessionId } = upgradeData;
+    if (!badgeId || newTier === undefined || !sessionId) {
+      showUpgradeError('Missing upgrade data. Please try again.');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Upgrade Badge';
+      }
+      return;
+    }
+
+    // Build upgrade transaction (fully client-side, like mint)
+    // Flow: Backend builds transaction → Frontend signs it
+    console.log('🎖️ [BADGE UI] ========== BADGE UPGRADE FLOW START ==========');
+    console.log('🎖️ [BADGE UI] Step 1: Building upgrade transaction...');
+    const result = await window.BadgeService.buildUpgradeBadgeTransaction(badgeId, newTier, sessionId);
     
-    // Check SUI balance before attempting transaction
-    if (window.walletAPIInstance.checkSUIBalance) {
-      btn.textContent = 'Checking gas balance...';
-      const balanceResult = await window.walletAPIInstance.checkSUIBalance(walletAddress, network);
-      
-      if (!balanceResult.success) {
-        showUpgradeError(`Failed to check balance: ${balanceResult.error || 'Unknown error'}`);
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Upgrade Badge';
-        }
-        return;
-      }
-      
-      // Check if balance is sufficient (need at least 0.002 SUI for gas)
-      const minRequiredSUI = 0.002;
-      const balanceInSUI = balanceResult.balanceInSUI || parseFloat(balanceResult.formattedBalance?.replace(/,/g, '') || '0');
-      
-      if (balanceInSUI < minRequiredSUI) {
-        const shortfall = minRequiredSUI - balanceInSUI;
-        showUpgradeError(
-          `Insufficient SUI for gas fees.\n\n` +
-          `Required: ${minRequiredSUI} SUI\n` +
-          `You have: ${balanceResult.formattedBalance || '0'} SUI\n` +
-          `Shortfall: ${shortfall.toFixed(4)} SUI\n\n` +
-          `Please add more SUI to your wallet to cover gas fees.`
-        );
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Upgrade Badge';
-        }
-        return;
-      }
+    console.log('📋 [BADGE UI] Build result:', {
+      success: result.success,
+      hasTransaction: !!result.transaction,
+      error: result.error,
+    });
+    
+    if (!result.success) {
+      console.error('❌ [BADGE UI] Transaction build failed:', result.error);
+      throw new Error(result.error || 'Failed to build upgrade transaction');
     }
+    
+    console.log('✅ [BADGE UI] Step 1 complete: Transaction built successfully');
+    console.log('🎖️ [BADGE UI] Step 2: Requesting wallet signature...');
 
-    // Balance check passed, proceed with transaction
-    if (btn) {
-      btn.textContent = 'Signing transaction...';
-    }
-
-    // Sign and execute transaction
-    const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(transactionData);
+    // Sign and execute transaction (result.transaction is base64 string, like mint)
+    const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
+    
+    console.log('📋 [BADGE UI] Execution result:', {
+      success: txResult.success,
+      digest: txResult.digest,
+      error: txResult.error,
+      hasEffects: !!txResult.effects,
+    });
     
     if (txResult.success) {
-      console.log('✅ [BADGE] Badge upgraded successfully!');
+      console.log('✅ [BADGE UI] ========== BADGE UPGRADE SUCCESS ==========');
+      console.log('✅ [BADGE UI] Transaction digest:', txResult.digest);
+      console.log('✅ [BADGE UI] Showing success message to user...');
       
       // Show success message in modal before closing
       if (errorMessage) {
@@ -395,9 +431,31 @@ async function handleBadgeUpgrade(transactionData, onComplete = null) {
       // Wait a moment to show success message
       await new Promise(resolve => setTimeout(resolve, 1500));
       
+      console.log('🎖️ [BADGE UI] Hiding badge modal...');
       hideBadgeModal('badgeUpgradeModal');
+      
+      console.log('🎖️ [BADGE UI] Clearing badge cache...');
       // Clear badge cache
       window.BadgeService.clearBadgeCache();
+      console.log('✅ [BADGE UI] Badge cache cleared');
+      
+      // Wait for transaction to be indexed on blockchain (3 seconds)
+      console.log('⏳ [BADGE UI] Waiting for transaction to be indexed...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Clear cache again before reloading to ensure fresh data
+      window.BadgeService.clearBadgeCache();
+      console.log('🗑️ [BADGE UI] Cleared badge cache before reload');
+      
+      // Reload badge display to show the upgraded badge
+      console.log('🔄 [BADGE UI] Reloading badge display...');
+      const playerAddress = window.walletAPIInstance?.getAddress();
+      if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {
+        await loadMenuBadgeDisplay(playerAddress);
+        console.log('✅ [BADGE UI] Badge display reloaded');
+      }
+      
+      console.log('✅ [BADGE UI] ========== BADGE UPGRADE FLOW COMPLETE ==========');
       
       // Call callback if provided
       if (onComplete && typeof onComplete === 'function') {
@@ -493,6 +551,13 @@ async function showBadgeMigrationModal(migrationData) {
 
   const { oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData } = migrationData;
   const oldTierName = window.BadgeService ? window.BadgeService.getTierName(oldTier) : 'Unknown';
+  
+  // Construct badge image URL for the old tier
+  const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+  const tierNameForUrl = tierNames[oldTier] || 'Standard';
+  const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+  const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+  const badgeImageUrl = `${baseUrl}/Badges/${tierNameForUrl}.webp`;
 
   modal.innerHTML = `
     <div class="badge-modal-content">
@@ -505,7 +570,8 @@ async function showBadgeMigrationModal(migrationData) {
         <div class="badge-preview-container">
           ${imageData 
             ? `<img src="data:image/webp;base64,${arrayBufferToBase64(imageData)}" alt="Badge Preview" class="badge-preview-image" />`
-            : `<div class="badge-preview-placeholder">🎖️</div>`
+            : `<img src="${badgeImageUrl}" alt="${oldTierName} Badge" class="badge-preview-image" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='block';" />
+               <div class="badge-preview-placeholder" style="display: none;">🎖️</div>`
           }
           <p class="badge-tier-name">${oldTierName} Badge</p>
         </div>
@@ -575,59 +641,103 @@ async function handleBadgeMigration(migrationData) {
       return;
     }
 
-    const { oldTier } = migrationData;
+    const { oldTier, oldGamesPlayed = 0, oldMintDate = 0 } = migrationData;
     const playerAddress = window.walletAPIInstance?.getAddress?.();
 
     if (!playerAddress) {
       throw new Error('Wallet not connected');
     }
 
-    // Simply call the migration API - backend handles everything
-    // The backend will create a new badge at the same tier using adminMintBadge
-    // The new badge will use the current system's image URL generation automatically
-    const result = await window.BadgeService.migrateBadge(playerAddress, oldTier);
-
+    // Build migration transaction (backend returns transaction for player to sign)
+    console.log('🎖️ [BADGE UI] ========== BADGE MIGRATION FLOW START ==========');
+    console.log('🎖️ [BADGE UI] Step 1: Building migration transaction...');
+    console.log('🎖️ [BADGE UI] Migration data:', { oldTier, oldGamesPlayed, oldMintDate });
+    const result = await window.BadgeService.migrateBadge(
+      playerAddress, 
+      oldTier, 
+      oldGamesPlayed, 
+      oldMintDate
+    );
+    
+    console.log('📋 [BADGE UI] Build result:', {
+      success: result.success,
+      hasTransaction: !!result.transaction,
+      error: result.error,
+    });
+    
     if (!result.success) {
+      console.error('❌ [BADGE UI] Migration failed:', result.error);
       throw new Error(result.error || 'Failed to migrate badge');
     }
     
-    console.log('✅ [BADGE] Badge migrated successfully! Transaction:', result.digest);
-    alert('🎉 Badge migrated successfully!');
-    hideBadgeModal('badgeMigrationModal');
-    
-    // Clear badge cache
-    window.BadgeService.clearBadgeCache();
-    
-    // Reload badge display in menu after migration
-    // Wait a moment for the transaction to be processed on-chain
-    setTimeout(async () => {
-      const playerAddress = window.walletAPIInstance?.getAddress?.();
-      if (playerAddress) {
-        // Dispatch a custom event to trigger badge reload
-        // The menu system or other components can listen for this event
-        if (window.dispatchEvent) {
-          window.dispatchEvent(new CustomEvent('badgeMigrated', { 
-            detail: { 
-              address: playerAddress,
-              digest: result.digest 
-            } 
-          }));
-        }
-        
-        // Also try to directly reload badge if loadMenuBadgeDisplay is accessible
-        // This function is defined in menu-system.js and should be in the same scope
-        // We'll try to call it directly, or trigger through checkMEWSBalanceAndUpdateUI
-        if (typeof checkMEWSBalanceAndUpdateUI === 'function') {
-          // This function loads the badge as part of its process
-          await checkMEWSBalanceAndUpdateUI(playerAddress);
-        } else if (typeof loadMenuBadgeDisplay === 'function') {
-          // Direct call if function is accessible
-          await loadMenuBadgeDisplay(playerAddress);
-        } else {
-          console.log('⚠️ [BADGE] Could not find badge reload function. Badge will reload on next menu open.');
-        }
+    // If transaction is returned, player needs to sign it
+    if (result.transaction) {
+      console.log('✅ [BADGE UI] Step 1 complete: Transaction built successfully');
+      console.log('🎖️ [BADGE UI] Step 2: Requesting wallet signature...');
+      
+      // Sign and execute transaction
+      const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
+      
+      console.log('📋 [BADGE UI] Execution result:', {
+        success: txResult.success,
+        digest: txResult.digest,
+        error: txResult.error,
+      });
+      
+      if (!txResult.success) {
+        console.error('❌ [BADGE UI] Transaction execution failed:', txResult.error);
+        throw new Error(txResult.error || 'Transaction failed');
       }
-    }, 2000); // Wait 2 seconds for transaction to be processed on-chain
+      
+      console.log('✅ [BADGE UI] ========== BADGE MIGRATION SUCCESS ==========');
+      console.log('✅ [BADGE UI] Transaction digest:', txResult.digest);
+      console.log('✅ [BADGE UI] Showing success message to user...');
+      
+      alert('🎉 Badge migrated successfully!');
+      
+      console.log('🎖️ [BADGE UI] Hiding badge modal...');
+      hideBadgeModal('badgeMigrationModal');
+      
+      console.log('🎖️ [BADGE UI] Clearing badge cache...');
+      // Clear badge cache
+      window.BadgeService.clearBadgeCache();
+      console.log('✅ [BADGE UI] Badge cache cleared');
+      
+      // Wait for transaction to be indexed on blockchain (3 seconds)
+      console.log('⏳ [BADGE UI] Waiting for transaction to be indexed...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Clear cache again before reloading to ensure fresh data
+      window.BadgeService.clearBadgeCache();
+      console.log('🗑️ [BADGE UI] Cleared badge cache before reload');
+      
+      // Reload badge display to show the migrated badge
+      console.log('🔄 [BADGE UI] Reloading badge display...');
+      if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {
+        await loadMenuBadgeDisplay(playerAddress);
+        console.log('✅ [BADGE UI] Badge display reloaded');
+      }
+      
+      console.log('✅ [BADGE UI] ========== BADGE MIGRATION FLOW COMPLETE ==========');
+    } else if (result.digest) {
+      // Legacy: If digest is returned (already executed), just reload
+      console.log('✅ [BADGE UI] Badge migrated successfully! Transaction:', result.digest);
+      alert('🎉 Badge migrated successfully!');
+      hideBadgeModal('badgeMigrationModal');
+      
+      // Clear badge cache
+      window.BadgeService.clearBadgeCache();
+      
+      // Wait for transaction to be indexed
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Clear cache again and reload
+      window.BadgeService.clearBadgeCache();
+      const playerAddress = window.walletAPIInstance?.getAddress?.();
+      if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {
+        await loadMenuBadgeDisplay(playerAddress);
+      }
+    }
   } catch (error) {
     console.error('❌ [BADGE] Error migrating badge:', error);
     alert(`Failed to migrate badge: ${error.message}`);
@@ -646,6 +756,20 @@ function hideBadgeModal(modalId) {
   if (modal) {
     modal.classList.remove('badge-modal-visible');
     modal.classList.add('badge-modal-hidden');
+    
+    // Track migration modal closure for game readiness
+    if (modalId === 'badgeMigrationModal') {
+      // Check if gameReadinessState exists (from menu-system.js)
+      if (typeof gameReadinessState !== 'undefined') {
+        gameReadinessState.migrationModalClosed = true;
+        console.log('✅ [GAME READINESS] Migration modal closed - button can now enable');
+        
+        // Update game readiness (if function exists)
+        if (typeof updateGameReadiness === 'function') {
+          updateGameReadiness();
+        }
+      }
+    }
   }
 }
 

@@ -35,27 +35,65 @@ export async function GET(
     const badgeService = getBadgeService();
     
     // Check if player has badge in new contract
-    const hasNewBadge = await badgeService.hasBadge(address);
+    // First check registry, then verify the badge object actually exists
+    // (Registry entry might exist even if badge was burned)
+    console.log(`🔍 [BADGE MIGRATION] Step 1: Checking if player has badge in new contract registry...`);
+    const hasNewBadgeRegistry = await badgeService.hasBadge(address);
+    console.log(`🔍 [BADGE MIGRATION] hasNewBadgeRegistry result: ${hasNewBadgeRegistry}`);
     
-    if (hasNewBadge) {
-      // Player already has badge in new contract, no migration needed
-      return NextResponse.json(
-        {
-          success: true,
-          needsMigration: false,
-          message: 'Player already has badge in new contract',
-        },
-        { headers: corsHeaders }
-      );
+    if (hasNewBadgeRegistry) {
+      // Registry says player has badge - verify the badge object actually exists
+      console.log(`🔄 [BADGE MIGRATION] Registry shows badge exists, verifying badge object...`);
+      const newBadge = await badgeService.getBadge(address);
+      
+      if (newBadge && newBadge.badgeId) {
+        // Badge object exists and is valid - no migration needed
+        console.log(`✅ [BADGE MIGRATION] Player has valid badge in new contract (ID: ${newBadge.badgeId}), no migration needed`);
+        return NextResponse.json(
+          {
+            success: true,
+            needsMigration: false,
+            message: 'Player already has badge in new contract',
+          },
+          { headers: corsHeaders }
+        );
+      } else {
+        // Registry entry exists but badge object doesn't (was burned)
+        // This is an orphaned registry entry - clean it up automatically
+        console.log(`⚠️ [BADGE MIGRATION] Registry entry exists but badge object not found (orphaned entry), cleaning up...`);
+        try {
+          const cleanupResult = await badgeService.adminCleanupOrphanedEntry(address);
+          if (cleanupResult.success) {
+            console.log(`✅ [BADGE MIGRATION] Orphaned registry entry cleaned up successfully`);
+          } else {
+            console.warn(`⚠️ [BADGE MIGRATION] Failed to clean up orphaned entry: ${cleanupResult.error}`);
+            // Continue anyway - will check for old badge
+          }
+        } catch (error) {
+          console.warn(`⚠️ [BADGE MIGRATION] Error cleaning up orphaned entry:`, error);
+          // Continue anyway - will check for old badge
+        }
+        // Proceed to check for old badge after cleanup
+        console.log(`🔄 [BADGE MIGRATION] Proceeding to check for old badge...`);
+      }
+    } else {
+      console.log(`ℹ️ [BADGE MIGRATION] No badge found in new contract registry, proceeding to check for old badge...`);
     }
 
     // Check for old badge
     // Get old contract IDs from environment
+    console.log(`🔍 [BADGE MIGRATION] Step 2: Checking for old badge...`);
     const oldPackageId = process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || process.env.OLD_GAME_SCORE_CONTRACT;
     const oldRegistryId = process.env.OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_BADGE_REGISTRY_OBJECT_ID;
 
+    console.log(`🔍 [BADGE MIGRATION] Old contract config:`, {
+      oldPackageId: oldPackageId ? `${oldPackageId.substring(0, 10)}...` : 'NOT SET',
+      oldRegistryId: oldRegistryId ? `${oldRegistryId.substring(0, 10)}...` : 'NOT SET',
+    });
+
     if (!oldPackageId || !oldRegistryId) {
       // Old contract IDs not configured, can't check for old badges
+      console.log(`⚠️ [BADGE MIGRATION] Old contract IDs not configured - cannot check for old badges`);
       return NextResponse.json(
         {
           success: true,
@@ -76,6 +114,7 @@ export async function GET(
 
     // Query BadgeMinted events from old contract to find badge ID
     // Note: Filter by sender is no longer supported in queryEvents, so we fetch and filter manually
+    console.log(`🔍 [BADGE MIGRATION] Step 3: Querying events from old contract (package: ${oldPackageId.substring(0, 10)}...)...`);
     const events = await client.queryEvents({
       query: {
         MoveModule: {
@@ -87,6 +126,8 @@ export async function GET(
       order: 'descending',
     });
 
+    console.log(`🔍 [BADGE MIGRATION] Found ${events.data.length} events from old contract`);
+
     // Find the most recent badge for this player
     // Filter by owner address in the event data
     let oldBadgeId = null;
@@ -96,6 +137,7 @@ export async function GET(
         // Check if this event is for the requested address
         if (eventData.owner === address && eventData.badge_id) {
           oldBadgeId = eventData.badge_id;
+          console.log(`✅ [BADGE MIGRATION] Found old badge ID in events: ${oldBadgeId}`);
           break;
         }
       }
@@ -103,6 +145,7 @@ export async function GET(
 
     if (!oldBadgeId) {
       // No old badge found
+      console.log(`ℹ️ [BADGE MIGRATION] No old badge found in events for address ${address}`);
       return NextResponse.json(
         {
           success: true,
@@ -114,6 +157,7 @@ export async function GET(
     }
 
     // Read old badge data
+    console.log(`🔍 [BADGE MIGRATION] Step 4: Reading old badge object (ID: ${oldBadgeId})...`);
     try {
       const badgeObject = await client.getObject({
         id: oldBadgeId,
@@ -124,12 +168,23 @@ export async function GET(
         },
       });
 
+      console.log(`🔍 [BADGE MIGRATION] Badge object read result:`, {
+        hasData: !!badgeObject.data,
+        hasContent: !!badgeObject.data?.content,
+        type: badgeObject.data?.type,
+        error: badgeObject.error,
+      });
+
       if (!badgeObject.data || !badgeObject.data.content) {
+        console.log(`⚠️ [BADGE MIGRATION] Old badge object not found (was burned/deleted)`);
+        // Badge was burned - nothing to migrate
+        // Event history will always show the badge was minted, but if the object is gone,
+        // there's nothing to migrate
         return NextResponse.json(
           {
             success: true,
             needsMigration: false,
-            message: 'Old badge object not found',
+            message: 'Old badge was burned - nothing to migrate',
           },
           { headers: corsHeaders }
         );

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { playerAddress, oldTier } = body;
+    const { playerAddress, oldTier, oldGamesPlayed, oldMintDate } = body;
 
     // Validate required fields
     if (!playerAddress || typeof playerAddress !== 'string' || !playerAddress.startsWith('0x')) {
@@ -72,25 +72,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // oldGamesPlayed and oldMintDate are optional (default to 0 if not provided)
+    const gamesPlayed = oldGamesPlayed !== undefined && oldGamesPlayed !== null ? Number(oldGamesPlayed) : 0;
+    const mintDate = oldMintDate !== undefined && oldMintDate !== null ? Number(oldMintDate) : 0;
+
     console.log(`📥 [MIGRATION] Badge migration request received`);
     console.log(`   Player address: ${playerAddress}`);
     console.log(`   Old tier: ${oldTier}`);
+    console.log(`   Old games played: ${gamesPlayed}`);
+    console.log(`   Old mint date: ${mintDate}`);
 
     const badgeService = getBadgeService();
     
-    // Simply create a new badge at the same tier using adminMintBadge
-    // This will use the current system's image URL generation automatically
-    // The adminMintBadge function handles all the complexity
-    const result = await badgeService.adminMintBadge(playerAddress, oldTier);
+    // Use migrate_badge function to preserve old tier, games played, and mint date
+    // NO payment required (free migration)
+    // Soulbound NFTs must be created in the player's wallet (cannot be transferred)
+    // This builds a transaction for the player to sign
+    const result = await badgeService.buildMigrateBadgeTransaction(
+      playerAddress,
+      oldTier,
+      gamesPlayed,
+      mintDate
+    );
 
     if (result.success) {
-      console.log(`✅ [MIGRATION] Badge migrated successfully`);
-      console.log(`   Transaction digest: ${result.digest}`);
+      console.log(`✅ [MIGRATION] Badge migration transaction built successfully`);
+      console.log(`   Transaction ready for player to sign`);
+      console.log(`   Badge will be created at tier ${oldTier} (preserved from old badge)`);
       return NextResponse.json(
         {
           success: true,
-          digest: result.digest,
-          message: `Successfully migrated badge to tier ${oldTier}`,
+          transaction: result.transaction,
+          gasEstimate: result.gasEstimate,
+          message: `Badge migration transaction ready. Badge will be created at tier ${oldTier} with preserved data.`,
         },
         { headers: corsHeaders }
       );
@@ -99,7 +113,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: result.error || 'Failed to migrate badge',
+          error: result.error || 'Failed to build badge migration transaction',
         },
         { status: 500, headers: corsHeaders }
       );

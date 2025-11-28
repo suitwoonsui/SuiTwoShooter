@@ -6,7 +6,7 @@ import { getApiBaseUrl } from '@/lib/api-base-url';
 type Tab = 'items' | 'badges' | 'migration' | 'score-migration';
 
 // Helper function to get full API URL
-// ALWAYS uses Vercel URL - no localhost fallback
+// Uses localhost when running locally, otherwise uses configured base URL
 const getApiUrl = (path: string): string => {
   const baseUrl = getApiBaseUrl();
   console.log('[ADMIN-PAGE] getApiUrl called:', { path, baseUrl, envVar: process.env.NEXT_PUBLIC_API_BASE_URL });
@@ -14,9 +14,23 @@ const getApiUrl = (path: string): string => {
   // Remove leading slash from path if baseUrl is provided (to avoid double slashes)
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
   
-  // FORCE Vercel URL if baseUrl is empty or localhost
-  const vercelBaseUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
-  const finalBaseUrl = (!baseUrl || baseUrl.includes('localhost')) ? vercelBaseUrl : baseUrl;
+  // Use localhost when running locally, otherwise use configured base URL
+  let finalBaseUrl: string;
+  if (typeof window !== 'undefined') {
+    // Client-side: check if we're on localhost
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      finalBaseUrl = 'http://localhost:3000';
+    } else if (baseUrl && !baseUrl.includes('localhost')) {
+      finalBaseUrl = baseUrl;
+    } else {
+      // Fallback to Vercel URL only if not localhost and no baseUrl configured
+      finalBaseUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app';
+    }
+  } else {
+    // Server-side: use baseUrl or fallback
+    finalBaseUrl = baseUrl || 'http://localhost:3000';
+  }
   
   const fullUrl = `${finalBaseUrl}/${cleanPath}`;
   console.log('[ADMIN-PAGE] Final URL:', fullUrl);
@@ -40,7 +54,8 @@ export default function AdminPage() {
   const [itemsResult, setItemsResult] = useState<{ success: boolean; message?: string; error?: string; digest?: string } | null>(null);
 
   // Badges state
-  const [badgeAction, setBadgeAction] = useState<'mint' | 'burn' | 'update-image'>('mint');
+  const [badgeAction, setBadgeAction] = useState<'mint' | 'burn' | 'cleanup' | 'update-image'>('mint');
+  const [badgeContract, setBadgeContract] = useState<'new' | 'old'>('new');
   const [badgePlayerAddress, setBadgePlayerAddress] = useState('');
   const [tier, setTier] = useState<number>(0);
   const [badgeId, setBadgeId] = useState('');
@@ -659,7 +674,7 @@ export default function AdminPage() {
 
       // Step 2: Call API
       console.log(`\n🔍 [FRONTEND LOOKUP] Step 2: Calling API...`);
-      const apiUrl = getApiUrl(`api/badges/${lookupAddress}`);
+      const apiUrl = getApiUrl(`api/badges/${lookupAddress}?contract=${badgeContract}`);
       console.log(`🔍 [FRONTEND LOOKUP] API URL: ${apiUrl}`);
       console.log(`🔍 [FRONTEND LOOKUP] Making fetch request...`);
       
@@ -798,7 +813,10 @@ export default function AdminPage() {
         },
         body: JSON.stringify({
           action: badgeAction,
-          ...(badgeAction === 'mint' ? { playerAddress: badgePlayerAddress, tier } : { badgeId }),
+          contract: badgeContract,
+          ...(badgeAction === 'mint' || badgeAction === 'cleanup' ? { playerAddress: badgePlayerAddress } : {}),
+          ...(badgeAction === 'mint' ? { tier } : {}),
+          ...(badgeAction === 'burn' ? { badgeId } : {}),
           adminWalletAddress: connectedAddress,
         }),
       });
@@ -811,9 +829,11 @@ export default function AdminPage() {
           message: data.message,
           digest: data.digest,
         });
-        if (badgeAction === 'mint') {
+        if (badgeAction === 'mint' || badgeAction === 'cleanup') {
           setBadgePlayerAddress('');
-          setTier(0);
+          if (badgeAction === 'mint') {
+            setTier(0);
+          }
         } else {
           setBadgeId('');
         }
@@ -1107,7 +1127,7 @@ export default function AdminPage() {
                   type="radio"
                   value="mint"
                   checked={badgeAction === 'mint'}
-                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'update-image')}
+                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'cleanup' | 'update-image')}
                   style={{ marginRight: '0.5rem' }}
                 />
                 Mint Badge
@@ -1117,7 +1137,7 @@ export default function AdminPage() {
                   type="radio"
                   value="burn"
                   checked={badgeAction === 'burn'}
-                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'update-image')}
+                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'cleanup' | 'update-image')}
                   style={{ marginRight: '0.5rem' }}
                 />
                 Burn Badge
@@ -1125,14 +1145,65 @@ export default function AdminPage() {
               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                 <input
                   type="radio"
+                  value="cleanup"
+                  checked={badgeAction === 'cleanup'}
+                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'cleanup' | 'update-image')}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Cleanup Orphaned Entry
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
                   value="update-image"
                   checked={badgeAction === 'update-image'}
-                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'update-image')}
+                  onChange={(e) => setBadgeAction(e.target.value as 'mint' | 'burn' | 'cleanup' | 'update-image')}
                   style={{ marginRight: '0.5rem' }}
                 />
                 Update Image URL
               </label>
             </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Contract:
+            </label>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="new"
+                  checked={badgeContract === 'new'}
+                  onChange={(e) => {
+                    setBadgeContract(e.target.value as 'new' | 'old');
+                    setLookupResult(null); // Clear lookup result when switching contracts
+                    setBadgeId(''); // Clear badge ID when switching contracts
+                  }}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                New Contract
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value="old"
+                  checked={badgeContract === 'old'}
+                  onChange={(e) => {
+                    setBadgeContract(e.target.value as 'new' | 'old');
+                    setLookupResult(null); // Clear lookup result when switching contracts
+                    setBadgeId(''); // Clear badge ID when switching contracts
+                  }}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                Old Contract
+              </label>
+            </div>
+            {badgeContract === 'old' && (
+              <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666', fontStyle: 'italic' }}>
+                ⚠️ Make sure OLD_GAME_SCORE_CONTRACT_TESTNET and OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET are configured in environment variables.
+              </p>
+            )}
           </div>
 
           {badgeAction === 'update-image' ? (
@@ -1206,6 +1277,29 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+          ) : badgeAction === 'cleanup' ? (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Player Address:
+              </label>
+              <input
+                type="text"
+                value={badgePlayerAddress}
+                onChange={(e) => setBadgePlayerAddress(e.target.value)}
+                placeholder="0x..."
+                required
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                }}
+              />
+              <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
+                Removes orphaned registry entry if badge object doesn't exist. Useful for cleaning up after badge deletion.
+              </p>
+            </div>
           ) : badgeAction === 'mint' ? (
             <>
               <div>
@@ -1255,6 +1349,9 @@ export default function AdminPage() {
             <div>
               <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
                 <strong>🔍 Lookup Badge ID by Player Address:</strong>
+                <p style={{ marginTop: '0.5rem', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666', fontStyle: 'italic' }}>
+                  Querying: <strong>{badgeContract === 'old' ? 'OLD' : 'NEW'} Contract</strong>
+                </p>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <input
                     type="text"
@@ -1326,11 +1423,11 @@ export default function AdminPage() {
 
           <button
             type="submit"
-            disabled={badgesLoading || !isAdminWalletConnected || (badgeAction === 'mint' ? !badgePlayerAddress : badgeAction === 'burn' ? !badgeId : false)}
+            disabled={badgesLoading || !isAdminWalletConnected || (badgeAction === 'mint' || badgeAction === 'cleanup' ? !badgePlayerAddress : badgeAction === 'burn' ? !badgeId : false)}
             style={{
               padding: '1rem',
               fontSize: '1.1rem',
-              backgroundColor: badgesLoading || !isAdminWalletConnected ? '#ccc' : (badgeAction === 'mint' ? '#2196F3' : '#f44336'),
+              backgroundColor: badgesLoading || !isAdminWalletConnected ? '#ccc' : (badgeAction === 'mint' ? '#2196F3' : badgeAction === 'burn' ? '#f44336' : '#FF9800'),
               color: 'white',
               border: 'none',
               borderRadius: '4px',
@@ -1339,7 +1436,9 @@ export default function AdminPage() {
               display: badgeAction === 'update-image' ? 'none' : 'block',
             }}
           >
-            {badgesLoading ? (badgeAction === 'mint' ? 'Minting Badge...' : 'Burning Badge...') : (badgeAction === 'mint' ? 'Mint Badge' : 'Burn Badge')}
+            {badgesLoading 
+              ? (badgeAction === 'mint' ? 'Minting Badge...' : badgeAction === 'burn' ? 'Burning Badge...' : 'Cleaning up...')
+              : (badgeAction === 'mint' ? 'Mint Badge' : badgeAction === 'burn' ? 'Burn Badge' : 'Cleanup Orphaned Entry')}
           </button>
         </form>
       )}
