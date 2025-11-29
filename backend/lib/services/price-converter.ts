@@ -3,14 +3,23 @@
 // Converts USD prices to SUI, MEWS, and USDC using CoinGecko API
 // ==========================================
 
+import { getConfig } from '@/config/config';
+
 interface TokenPrices {
   sui: number;
   mews: number;
   usdc: number; // USDC is always $1.00, but we'll include it for consistency
 }
 
+interface PriceSources {
+  sui: 'coingecko' | 'cache' | 'env' | 'default';
+  mews: 'coingecko' | 'geckoterminal' | 'env' | 'default';
+  usdc: 'fixed'; // USDC is always $1.00
+}
+
 interface PriceCache {
   price: TokenPrices;
+  sources: PriceSources;
   timestamp: number;
 }
 
@@ -38,6 +47,7 @@ export class PriceConverter {
   async getTokenPrices(): Promise<{
     success: boolean;
     prices?: TokenPrices;
+    sources?: PriceSources;
     error?: string;
     timestamp?: number;
   }> {
@@ -51,6 +61,7 @@ export class PriceConverter {
         return {
           success: true,
           prices: cached.price,
+          sources: cached.sources,
           timestamp: cached.timestamp,
         };
       }
@@ -85,6 +96,7 @@ export class PriceConverter {
           return {
             success: true,
             prices: cached.price,
+            sources: cached.sources,
             timestamp: cached.timestamp,
           };
         }
@@ -99,13 +111,20 @@ export class PriceConverter {
             mews: mewsPriceEnv ? parseFloat(mewsPriceEnv) : 0.00001885,
             usdc: 1.0
           };
+          const fallbackSources: PriceSources = {
+            sui: suiPriceEnv ? 'env' : 'default',
+            mews: mewsPriceEnv ? 'env' : 'default',
+            usdc: 'fixed',
+          };
           this.cache.set(cacheKey, {
             price: fallbackPrices,
+            sources: fallbackSources,
             timestamp: Date.now(),
           });
           return {
             success: true,
             prices: fallbackPrices,
+            sources: fallbackSources,
             timestamp: Date.now(),
           };
         }
@@ -124,6 +143,7 @@ export class PriceConverter {
             return {
               success: true,
               prices: cached.price,
+              sources: cached.sources,
               timestamp: cached.timestamp,
             };
           }
@@ -143,9 +163,16 @@ export class PriceConverter {
               usdc: 1.0
             };
             
+            const fallbackSources: PriceSources = {
+              sui: suiPriceEnv ? 'env' : 'default',
+              mews: mewsPriceEnv ? 'env' : 'default',
+              usdc: 'fixed',
+            };
+            
             // Cache the fallback prices
             this.cache.set(cacheKey, {
               price: fallbackPrices,
+              sources: fallbackSources,
               timestamp: Date.now(),
             });
             
@@ -154,6 +181,7 @@ export class PriceConverter {
             return {
               success: true,
               prices: fallbackPrices,
+              sources: fallbackSources,
               timestamp: Date.now(),
             };
           }
@@ -165,6 +193,7 @@ export class PriceConverter {
           return {
             success: true,
             prices: cached.price,
+            sources: cached.sources,
             timestamp: cached.timestamp,
           };
         }
@@ -182,9 +211,16 @@ export class PriceConverter {
             usdc: 1.0
           };
           
+          const fallbackSources: PriceSources = {
+            sui: suiPriceEnv ? 'env' : 'default',
+            mews: mewsPriceEnv ? 'env' : 'default',
+            usdc: 'fixed',
+          };
+          
           // Cache the fallback prices
           this.cache.set(cacheKey, {
             price: fallbackPrices,
+            sources: fallbackSources,
             timestamp: Date.now(),
           });
           
@@ -193,6 +229,7 @@ export class PriceConverter {
           return {
             success: true,
             prices: fallbackPrices,
+            sources: fallbackSources,
             timestamp: Date.now(),
           };
         }
@@ -202,6 +239,7 @@ export class PriceConverter {
 
       const suiData = await suiResponse.json();
       const suiPrice = suiData.sui?.usd;
+      let suiSource: PriceSources['sui'] = 'coingecko';
 
       if (!suiPrice || typeof suiPrice !== 'number') {
         throw new Error('Invalid SUI price response from CoinGecko');
@@ -210,6 +248,8 @@ export class PriceConverter {
       // MEWS: Try multiple sources (CoinGecko, GeckoTerminal, then environment variable)
       // Note: MEWS may be on GeckoTerminal (DEX data) rather than CoinGecko main API
       let mewsPrice: number = 0; // Initialized for TypeScript - will be overwritten by real logic
+      let mewsSource: PriceSources['mews'] = 'default';
+      
       try {
         let mewsFetched = false;
         
@@ -219,95 +259,274 @@ export class PriceConverter {
         
         for (const coinId of possibleIds) {
           try {
-            const mewsResponse = await fetch(
-              `${this.coinGeckoBaseUrl}/simple/price?ids=${coinId}&vs_currencies=usd`,
-              {
-                headers: {
-                  'Accept': 'application/json',
-                },
-              }
-            );
+            const coinGeckoUrl = `${this.coinGeckoBaseUrl}/simple/price?ids=${coinId}&vs_currencies=usd`;
+            console.log(`🔍 [PRICE] Trying CoinGecko ID: ${coinId}`);
+            const mewsResponse = await fetch(coinGeckoUrl, {
+              headers: {
+                'Accept': 'application/json',
+              },
+            });
 
             if (mewsResponse.ok) {
               const mewsData = await mewsResponse.json();
+              console.log(`🔍 [PRICE] CoinGecko response for ${coinId}:`, JSON.stringify(mewsData).substring(0, 200));
               const fetchedPrice = mewsData[coinId]?.usd;
               
               if (fetchedPrice && typeof fetchedPrice === 'number' && fetchedPrice > 0) {
                 mewsPrice = fetchedPrice;
-                console.log(`📊 [PRICE] MEWS price fetched from CoinGecko (ID: ${coinId}): $${mewsPrice}`);
+                mewsSource = 'coingecko';
+                console.log(`✅ [PRICE] MEWS price fetched from CoinGecko (ID: ${coinId}): $${mewsPrice}`);
                 mewsFetched = true;
                 break; // Success, exit loop
+              } else {
+                console.log(`⚠️ [PRICE] CoinGecko ID "${coinId}" returned no valid price`);
               }
+            } else {
+              console.log(`⚠️ [PRICE] CoinGecko API returned status ${mewsResponse.status} for ID "${coinId}"`);
             }
           } catch (fetchError) {
+            console.error(`❌ [PRICE] Error fetching CoinGecko ID "${coinId}":`, fetchError instanceof Error ? fetchError.message : String(fetchError));
             // Try next ID
             continue;
           }
         }
 
         // Method 2: Try GeckoTerminal API (for DEX-only tokens)
-        // GeckoTerminal uses pool addresses to get prices
+        // GeckoTerminal supports both token address and pool address endpoints
         if (!mewsFetched) {
-          const geckoTerminalPoolId = process.env.MEWS_GECKOTERMINAL_POOL_ID || '0x4febe18cc3fd99c29c7c1ff26b33776ace91c35d8047e70193733513b9d88c29';
-          try {
-            // GeckoTerminal API endpoint for pool data
-            // Format: /api/v2/networks/{network}/pools/{pool_address}
-            const geckoTerminalResponse = await fetch(
-              `https://api.geckoterminal.com/api/v2/networks/sui/pools/${geckoTerminalPoolId}`,
-              {
+          // First, try token address endpoint (simpler and more direct)
+          // Get token address from config or environment
+          const config = getConfig();
+          const mewsTokenTypeId = config.token.mewsTokenTypeId;
+          const mewsTokenAddress = process.env.MEWS_TOKEN_ADDRESS || 
+                                  (mewsTokenTypeId.includes('::') ? mewsTokenTypeId.split('::')[0] : mewsTokenTypeId);
+          
+          if (mewsTokenAddress) {
+            try {
+              const tokenPriceUrl = `https://api.geckoterminal.com/api/v2/simple/networks/sui/token_price/${mewsTokenAddress}`;
+              console.log(`🔍 [PRICE] Trying GeckoTerminal token price endpoint: ${tokenPriceUrl}`);
+              
+              const tokenPriceResponse = await fetch(tokenPriceUrl, {
                 headers: {
                   'Accept': 'application/json',
                 },
-              }
-            );
-
-            if (geckoTerminalResponse.ok) {
-              const geckoTerminalData = await geckoTerminalResponse.json();
-              // GeckoTerminal returns: { data: { attributes: { base_token_price_usd: ... } } }
-              const baseTokenPrice = geckoTerminalData?.data?.attributes?.base_token_price_usd;
+              });
               
-              if (baseTokenPrice && typeof baseTokenPrice === 'number' && baseTokenPrice > 0) {
-                mewsPrice = baseTokenPrice;
-                console.log(`📊 [PRICE] MEWS price fetched from GeckoTerminal: $${mewsPrice}`);
-                mewsFetched = true;
-              } else {
-                // Try alternative structure: token_price_usd or price_usd
-                const altPrice = geckoTerminalData?.data?.attributes?.token_price_usd ||
-                                geckoTerminalData?.data?.attributes?.price_usd;
-                if (altPrice && typeof altPrice === 'number' && altPrice > 0) {
-                  mewsPrice = altPrice;
-                  console.log(`📊 [PRICE] MEWS price fetched from GeckoTerminal (alt): $${mewsPrice}`);
+              if (tokenPriceResponse.ok) {
+                const tokenPriceData = await tokenPriceResponse.json();
+                console.log('🔍 [PRICE] GeckoTerminal token price response:', JSON.stringify(tokenPriceData).substring(0, 500));
+                
+                // GeckoTerminal token_price endpoint returns: { "data": { "token_address": { "usd": price } } }
+                // Try different possible response structures
+                const price = tokenPriceData?.data?.[mewsTokenAddress.toLowerCase()]?.usd || 
+                             tokenPriceData?.data?.[mewsTokenAddress]?.usd ||
+                             tokenPriceData?.data?.usd ||
+                             tokenPriceData?.usd;
+                
+                if (price && typeof price === 'number' && price > 0) {
+                  mewsPrice = price;
+                  mewsSource = 'geckoterminal';
+                  console.log(`✅ [PRICE] MEWS price fetched from GeckoTerminal token endpoint: $${mewsPrice}`);
                   mewsFetched = true;
+                } else {
+                  console.log(`⚠️ [PRICE] GeckoTerminal token price endpoint returned data but no valid price found`);
+                }
+              } else {
+                const errorText = await tokenPriceResponse.text().catch(() => '');
+                console.log(`⚠️ [PRICE] GeckoTerminal token price endpoint returned ${tokenPriceResponse.status}`);
+                if (errorText) {
+                  console.log(`⚠️ [PRICE] Error response: ${errorText.substring(0, 200)}`);
                 }
               }
+            } catch (tokenPriceError) {
+              console.log(`⚠️ [PRICE] GeckoTerminal token price endpoint error:`, tokenPriceError instanceof Error ? tokenPriceError.message : String(tokenPriceError));
             }
-          } catch (geckoTerminalError) {
-            // GeckoTerminal failed, continue to fallback
-            console.log('⚠️ [PRICE] GeckoTerminal fetch failed, trying fallback');
+          }
+          
+          // If token address endpoint didn't work, try pool endpoint
+          if (!mewsFetched) {
+            const geckoTerminalPoolId = process.env.MEWS_GECKOTERMINAL_POOL_ID || '0x4febe18cc3fd99c29c7c1ff26b33776ace91c35d8047e70193733513b9d88c29';
+            console.log(`🔍 [PRICE] Trying GeckoTerminal pool endpoint: ${geckoTerminalPoolId}`);
+            try {
+              // GeckoTerminal API endpoint for pool data
+              // Optimized: Try known working format first (sui-network with original pool ID)
+              // Only try other variants if the first attempt fails
+              const networkVariants = ['sui-network', 'sui', 'sui_mainnet'];
+              const poolIdVariants = [
+                geckoTerminalPoolId, // Original format (most likely to work)
+                geckoTerminalPoolId.toLowerCase(),
+                geckoTerminalPoolId.toUpperCase(),
+                geckoTerminalPoolId.startsWith('0x') ? geckoTerminalPoolId.substring(2) : `0x${geckoTerminalPoolId}`,
+              ];
+              
+              let geckoTerminalResponse: Response | null = null;
+              let geckoTerminalUrl = '';
+              let successfulUrl = '';
+              
+              // Try known working format first (sui-network with original pool ID)
+              const primaryUrl = `https://api.geckoterminal.com/api/v2/networks/sui-network/pools/${geckoTerminalPoolId}`;
+              console.log(`🔍 [PRICE] Trying GeckoTerminal URL (primary): ${primaryUrl}`);
+              
+              try {
+                geckoTerminalResponse = await fetch(primaryUrl, {
+                  headers: {
+                    'Accept': 'application/json',
+                  },
+                });
+                
+                if (geckoTerminalResponse.ok) {
+                  successfulUrl = primaryUrl;
+                  console.log(`✅ [PRICE] GeckoTerminal API responded with status ${geckoTerminalResponse.status}`);
+                  console.log(`✅ [PRICE] Successful URL: ${successfulUrl}`);
+                }
+              } catch (fetchError) {
+                console.log(`⚠️ [PRICE] Primary URL failed:`, fetchError instanceof Error ? fetchError.message : String(fetchError));
+              }
+              
+              // If primary failed, try other combinations
+              if (!geckoTerminalResponse || !geckoTerminalResponse.ok) {
+                console.log(`⚠️ [PRICE] Primary URL failed, trying alternative formats...`);
+                outerLoop: for (const network of networkVariants) {
+                  for (const poolId of poolIdVariants) {
+                    // Skip the primary combination we already tried
+                    if (network === 'sui-network' && poolId === geckoTerminalPoolId) {
+                      continue;
+                    }
+                    
+                    geckoTerminalUrl = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${poolId}`;
+                    console.log(`🔍 [PRICE] Trying GeckoTerminal URL: ${geckoTerminalUrl}`);
+                  
+                    try {
+                      geckoTerminalResponse = await fetch(geckoTerminalUrl, {
+                        headers: {
+                          'Accept': 'application/json',
+                        },
+                      });
+                      
+                      if (geckoTerminalResponse.ok) {
+                        successfulUrl = geckoTerminalUrl;
+                        console.log(`✅ [PRICE] GeckoTerminal API responded with status ${geckoTerminalResponse.status}`);
+                        console.log(`✅ [PRICE] Successful URL: ${successfulUrl}`);
+                        break outerLoop; // Success, exit both loops
+                      } else {
+                        const statusText = await geckoTerminalResponse.text().catch(() => '');
+                        console.log(`⚠️ [PRICE] GeckoTerminal returned ${geckoTerminalResponse.status} for ${network}/${poolId}`);
+                        if (statusText) {
+                          console.log(`⚠️ [PRICE] Response: ${statusText.substring(0, 100)}`);
+                        }
+                      }
+                    } catch (fetchError) {
+                      console.log(`⚠️ [PRICE] Error fetching with "${network}/${poolId}":`, fetchError instanceof Error ? fetchError.message : String(fetchError));
+                      continue; // Try next combination
+                    }
+                  }
+                }
+              }
+              
+              if (!geckoTerminalResponse || !geckoTerminalResponse.ok) {
+                throw new Error('All GeckoTerminal URL variants failed');
+              }
+
+              if (geckoTerminalResponse.ok) {
+                const geckoTerminalData = await geckoTerminalResponse.json();
+                
+                // Log the response structure for debugging
+                console.log('🔍 [PRICE] GeckoTerminal response structure:', JSON.stringify(geckoTerminalData).substring(0, 500));
+                
+                // GeckoTerminal API v2 structure - try multiple paths
+                // Based on GeckoTerminal docs: data.data.attributes.base_token_price_usd
+                let baseTokenPrice: number | null = null;
+                
+                // Try different possible response structures
+                // Standard structure: { data: { attributes: { base_token_price_usd: ... } } }
+                // Note: GeckoTerminal returns prices as strings, so we need to parse them
+                let rawPrice: string | number | null = null;
+                
+                if (geckoTerminalData?.data?.attributes?.base_token_price_usd) {
+                  rawPrice = geckoTerminalData.data.attributes.base_token_price_usd;
+                  console.log(`✅ [PRICE] Found price at data.attributes.base_token_price_usd: ${rawPrice}`);
+                } 
+                // Nested structure: { data: { data: { attributes: { base_token_price_usd: ... } } } }
+                else if (geckoTerminalData?.data?.data?.attributes?.base_token_price_usd) {
+                  rawPrice = geckoTerminalData.data.data.attributes.base_token_price_usd;
+                  console.log(`✅ [PRICE] Found price at data.data.attributes.base_token_price_usd: ${rawPrice}`);
+                }
+                // Alternative field names
+                else if (geckoTerminalData?.data?.attributes?.token_price_usd) {
+                  rawPrice = geckoTerminalData.data.attributes.token_price_usd;
+                  console.log(`✅ [PRICE] Found price at data.attributes.token_price_usd: ${rawPrice}`);
+                } else if (geckoTerminalData?.data?.attributes?.price_usd) {
+                  rawPrice = geckoTerminalData.data.attributes.price_usd;
+                  console.log(`✅ [PRICE] Found price at data.attributes.price_usd: ${rawPrice}`);
+                } else if (geckoTerminalData?.data?.attributes?.quote_token_price_usd) {
+                  rawPrice = geckoTerminalData.data.attributes.quote_token_price_usd;
+                  console.log(`✅ [PRICE] Found price at data.attributes.quote_token_price_usd: ${rawPrice}`);
+                } 
+                // Array response structure
+                else if (geckoTerminalData?.data?.[0]?.attributes?.base_token_price_usd) {
+                  rawPrice = geckoTerminalData.data[0].attributes.base_token_price_usd;
+                  console.log(`✅ [PRICE] Found price at data[0].attributes.base_token_price_usd: ${rawPrice}`);
+                } else if (geckoTerminalData?.included?.[0]?.attributes?.price_usd) {
+                  rawPrice = geckoTerminalData.included[0].attributes.price_usd;
+                  console.log(`✅ [PRICE] Found price at included[0].attributes.price_usd: ${rawPrice}`);
+                }
+                
+                // Parse the price (handles both string and number formats)
+                if (rawPrice !== null) {
+                  baseTokenPrice = typeof rawPrice === 'string' ? parseFloat(rawPrice) : rawPrice;
+                }
+                
+                if (baseTokenPrice && typeof baseTokenPrice === 'number' && baseTokenPrice > 0 && !isNaN(baseTokenPrice)) {
+                  mewsPrice = baseTokenPrice;
+                  mewsSource = 'geckoterminal';
+                  console.log(`📊 [PRICE] MEWS price fetched from GeckoTerminal: $${mewsPrice}`);
+                  mewsFetched = true;
+                } else {
+                  console.warn('⚠️ [PRICE] GeckoTerminal response received but price not found in expected structure');
+                  console.warn('⚠️ [PRICE] Full response keys:', Object.keys(geckoTerminalData || {}));
+                }
+              } else {
+                const responseText = await geckoTerminalResponse.text().catch(() => 'Unable to read response');
+                console.warn(`⚠️ [PRICE] GeckoTerminal API returned status ${geckoTerminalResponse.status}`);
+                console.warn(`⚠️ [PRICE] GeckoTerminal response: ${responseText.substring(0, 200)}`);
+              }
+            } catch (geckoTerminalError) {
+              // GeckoTerminal failed, continue to fallback
+              console.error('❌ [PRICE] GeckoTerminal fetch error:', geckoTerminalError instanceof Error ? geckoTerminalError.message : String(geckoTerminalError));
+            }
           }
         }
 
         if (!mewsFetched) {
+          const geckoTerminalPoolId = process.env.MEWS_GECKOTERMINAL_POOL_ID || '0x4febe18cc3fd99c29c7c1ff26b33776ace91c35d8047e70193733513b9d88c29';
+          console.warn('⚠️ [PRICE] MEWS not found on CoinGecko or GeckoTerminal');
+          console.warn('⚠️ [PRICE] CoinGecko IDs tried:', possibleIds.join(', '));
+          console.warn('⚠️ [PRICE] GeckoTerminal pool ID used:', geckoTerminalPoolId);
           throw new Error(`MEWS not found on CoinGecko or GeckoTerminal`);
         }
       } catch (coinGeckoError) {
         // MEWS not on CoinGecko or GeckoTerminal, try environment variable
+        console.warn('⚠️ [PRICE] CoinGecko/GeckoTerminal lookup failed:', coinGeckoError instanceof Error ? coinGeckoError.message : String(coinGeckoError));
         const mewsPriceEnv = process.env.MEWS_PRICE_USD;
         if (mewsPriceEnv) {
           mewsPrice = parseFloat(mewsPriceEnv);
+          mewsSource = 'env';
           if (isNaN(mewsPrice) || mewsPrice <= 0) {
             throw new Error('Invalid MEWS_PRICE_USD environment variable');
           }
-          console.log(`📊 [PRICE] Using MEWS price from environment: $${mewsPrice}`);
+          console.log(`📊 [PRICE] Using MEWS price from environment variable: $${mewsPrice}`);
+          console.log(`📊 [PRICE] To use CoinGecko/GeckoTerminal, ensure MEWS is listed or set correct pool ID`);
         } else {
           // Final fallback: use default placeholder
           mewsPrice = 0.00001885; // Default placeholder matching .env value
+          mewsSource = 'default';
           console.warn('⚠️ [PRICE] MEWS price not found on CoinGecko/GeckoTerminal and MEWS_PRICE_USD not set. Using default placeholder ($0.00001885). Set MEWS_PRICE_USD environment variable to override.');
         }
       }
 
       // USDC is always $1.00
       const usdcPrice = 1.0;
+      const usdcSource: PriceSources['usdc'] = 'fixed';
 
       const prices: TokenPrices = {
         sui: suiPrice,
@@ -315,10 +534,17 @@ export class PriceConverter {
         usdc: usdcPrice,
       };
 
+      const sources: PriceSources = {
+        sui: suiSource,
+        mews: mewsSource,
+        usdc: usdcSource,
+      };
+
       // Update cache
       const now = Date.now();
       this.cache.set(cacheKey, {
         price: prices,
+        sources: sources,
         timestamp: now,
       });
 
@@ -331,6 +557,7 @@ export class PriceConverter {
       return {
         success: true,
         prices,
+        sources,
         timestamp: now,
       };
     } catch (error) {
@@ -459,17 +686,20 @@ export class PriceConverter {
 
       for (const item of items) {
         let tokenPrice: number;
-        const decimals = item.token === 'USDC' ? 6 : 9;
+        let decimals: number;
         
         switch (item.token) {
           case 'SUI':
             tokenPrice = prices.sui;
+            decimals = 9; // SUI uses 9 decimals
             break;
           case 'MEWS':
             tokenPrice = prices.mews;
+            decimals = 6; // MEWS mainnet uses 6 decimals
             break;
           case 'USDC':
             tokenPrice = prices.usdc;
+            decimals = 6; // USDC uses 6 decimals
             break;
           default:
             return {
@@ -504,6 +734,153 @@ export class PriceConverter {
       };
     } catch (error) {
       console.error('❌ [PRICE] Error converting multiple USD amounts:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Convert item level USD price to token amounts for all supported tokens
+   * Helper method for converting item prices
+   * 
+   * @param usdPrice - USD price of the item level
+   * @param prices - Optional token prices. If not provided, will fetch them.
+   * @returns Token amounts for SUI, MEWS, and USDC
+   */
+  async convertItemPriceToTokens(
+    usdPrice: number,
+    prices?: TokenPrices
+  ): Promise<{
+    success: boolean;
+    prices?: {
+      sui: { amount: string; display: string };
+      mews: { amount: string; display: string };
+      usdc: { amount: string; display: string };
+    };
+    error?: string;
+  }> {
+    try {
+      // Use provided prices or fetch them if not provided
+      let tokenPrices: TokenPrices;
+      if (prices) {
+        tokenPrices = prices;
+      } else {
+        const pricesResult = await this.getTokenPrices();
+        
+        if (!pricesResult.success || !pricesResult.prices) {
+          return {
+            success: false,
+            error: pricesResult.error || 'Failed to get token prices',
+          };
+        }
+        tokenPrices = pricesResult.prices;
+      }
+
+      // Convert to SUI (9 decimals)
+      const suiAmount = (usdPrice / tokenPrices.sui) * 1_000_000_000;
+      const suiRounded = Math.round(suiAmount);
+
+      // Convert to MEWS (6 decimals for mainnet)
+      const mewsAmount = (usdPrice / tokenPrices.mews) * 1_000_000;
+      const mewsRounded = Math.round(mewsAmount);
+
+      // Convert to USDC (6 decimals)
+      const usdcAmount = (usdPrice / tokenPrices.usdc) * 1_000_000;
+      const usdcRounded = Math.round(usdcAmount);
+
+      return {
+        success: true,
+        prices: {
+          sui: {
+            amount: suiRounded.toString(),
+            display: (suiAmount / 1_000_000_000).toFixed(6),
+          },
+          mews: {
+            amount: mewsRounded.toString(),
+            display: (mewsAmount / 1_000_000).toFixed(6),
+          },
+          usdc: {
+            amount: usdcRounded.toString(),
+            display: (usdcAmount / 1_000_000).toFixed(2),
+          },
+        },
+      };
+    } catch (error) {
+      console.error('❌ [PRICE] Error converting item price to tokens:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Convert multiple item prices to tokens in batch (optimized)
+   * Fetches prices once and converts all items
+   * 
+   * @param usdPrices - Array of USD prices to convert
+   * @returns Array of conversion results
+   */
+  async convertItemPricesToTokensBatch(
+    usdPrices: number[]
+  ): Promise<{
+    success: boolean;
+    results?: Array<{
+      sui: { amount: string; display: string };
+      mews: { amount: string; display: string };
+      usdc: { amount: string; display: string };
+    }>;
+    error?: string;
+  }> {
+    try {
+      // Fetch prices once for all conversions
+      const pricesResult = await this.getTokenPrices();
+      
+      if (!pricesResult.success || !pricesResult.prices) {
+        return {
+          success: false,
+          error: pricesResult.error || 'Failed to get token prices',
+        };
+      }
+
+      const prices = pricesResult.prices;
+      const results = usdPrices.map((usdPrice) => {
+        // Convert to SUI (9 decimals)
+        const suiAmount = (usdPrice / prices.sui) * 1_000_000_000;
+        const suiRounded = Math.round(suiAmount);
+
+        // Convert to MEWS (6 decimals for mainnet)
+        const mewsAmount = (usdPrice / prices.mews) * 1_000_000;
+        const mewsRounded = Math.round(mewsAmount);
+
+        // Convert to USDC (6 decimals)
+        const usdcAmount = (usdPrice / prices.usdc) * 1_000_000;
+        const usdcRounded = Math.round(usdcAmount);
+
+        return {
+          sui: {
+            amount: suiRounded.toString(),
+            display: (suiAmount / 1_000_000_000).toFixed(6),
+          },
+          mews: {
+            amount: mewsRounded.toString(),
+            display: (mewsAmount / 1_000_000).toFixed(6),
+          },
+          usdc: {
+            amount: usdcRounded.toString(),
+            display: (usdcAmount / 1_000_000).toFixed(2),
+          },
+        };
+      });
+
+      return {
+        success: true,
+        results,
+      };
+    } catch (error) {
+      console.error('❌ [PRICE] Error converting item prices batch:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

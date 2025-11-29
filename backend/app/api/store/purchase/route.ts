@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { storeService } from '@/lib/sui/store-service';
 import { priceConverter } from '@/lib/services/price-converter';
+import { calculateTotalUSD } from '@/lib/services/item-catalog';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -86,30 +87,15 @@ export async function POST(request: NextRequest) {
     console.log(`   Items: ${items.length}`);
     console.log(`   Payment token: ${paymentToken}`);
 
-    // Calculate total USD price
-    // We'll need to get USD prices from the item catalog
-    // For now, we'll use a simplified approach - in production, load from catalog
-    const ITEM_USD_PRICES: Record<string, Record<number, number>> = {
-      extraLives: { 1: 0.50, 2: 1.25, 3: 2.50 },
-      forceField: { 1: 1.00, 2: 2.00, 3: 3.00 },
-      orbLevel: { 1: 0.75, 2: 1.50, 3: 2.25 },
-      coinTractorBeam: { 1: 1.00, 2: 1.50, 3: 2.00 },
-      slowTime: { 1: 1.50, 2: 2.25, 3: 3.00 },
-      destroyAll: { 1: 2.50 },
-      bossKillShot: { 1: 3.75 },
-    };
-
-    let totalUSD = 0;
-    for (const item of items) {
-      const itemPrice = ITEM_USD_PRICES[item.itemId]?.[item.level];
-      if (!itemPrice) {
-        return NextResponse.json(
-          { success: false, error: `Invalid item or level: ${item.itemId} level ${item.level}` },
-          { status: 400, headers: corsHeaders }
-        );
-      }
-      totalUSD += itemPrice * item.quantity;
+    // Calculate total USD price using shared catalog
+    const priceResult = calculateTotalUSD(items);
+    if (!priceResult.success || priceResult.totalUSD === undefined) {
+      return NextResponse.json(
+        { success: false, error: priceResult.error || 'Failed to calculate total price' },
+        { status: 400, headers: corsHeaders }
+      );
     }
+    const totalUSD = priceResult.totalUSD;
 
     // Convert USD to token amount
     const conversionResult = await priceConverter.convertUSDToToken(

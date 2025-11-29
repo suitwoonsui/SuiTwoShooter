@@ -5,6 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
 import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
 
 /**
  * GET /api/badges/[address]
@@ -62,22 +65,32 @@ export async function GET(
     console.log(`📥 [BADGE API] Address length: ${playerAddress?.length || 0}`);
     console.log(`📥 [BADGE API] Address starts with 0x: ${playerAddress?.startsWith('0x') || false}`);
 
-    // Validate address format
-    console.log(`\n📥 [BADGE API] Step 2: Validating address format...`);
-    if (!playerAddress || !playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      console.error(`❌ [BADGE API] Invalid address format`);
-      console.error(`   - Address: ${playerAddress}`);
-      console.error(`   - Starts with 0x: ${playerAddress?.startsWith('0x') || false}`);
-      console.error(`   - Length: ${playerAddress?.length || 0} (expected 66)`);
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'Invalid player address format. Must be a valid Sui address (0x followed by 64 hex characters)' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
+    // Validate address format using BadgeValidators
+    try {
+      if (!playerAddress) {
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_ADDRESS,
+          'Address parameter is required'
+        );
+      }
+      BadgeValidators.validateAddress(playerAddress);
+    } catch (validationError) {
+      if (validationError instanceof BadgeError) {
+        BadgeLogger.error('Invalid address format', {
+          address: playerAddress,
+          error: validationError.message,
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: validationError.message,
+            code: validationError.code,
+          },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      throw validationError;
     }
-    console.log(`✅ [BADGE API] Address format valid: ${playerAddress}`);
 
     // Step 3: Get badge service
     console.log(`\n📥 [BADGE API] Step 3: Getting badge service instance...`);
@@ -175,21 +188,20 @@ export async function GET(
       { headers: corsHeaders }
     );
   } catch (error) {
-    console.error(`\n❌ [BADGE API] ========== ERROR ==========`);
-    console.error(`❌ [BADGE API] Exception caught during badge query`);
-    console.error(`❌ [BADGE API] Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
-    console.error(`❌ [BADGE API] Error message: ${error instanceof Error ? error.message : String(error)}`);
-    if (error instanceof Error && error.stack) {
-      console.error(`❌ [BADGE API] Stack trace:`, error.stack);
-    }
-    console.error(`❌ [BADGE API] Player address: ${await params.then(p => p.address).catch(() => 'unknown')}`);
-    console.error(`❌ [BADGE API] =============================\n`);
+    const badgeError = BadgeError.fromUnknown(error, 'Failed to query badge');
+    const playerAddress = await params.then(p => p.address).catch(() => 'unknown');
+    
+    BadgeLogger.error('Error during badge query', {
+      error: badgeError,
+      playerAddress,
+    });
     
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to query badge',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        error: badgeError.message,
+        code: badgeError.code,
+        ...(badgeError.details && { details: badgeError.details }),
       },
       { status: 500, headers: corsHeaders }
     );

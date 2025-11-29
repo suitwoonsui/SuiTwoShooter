@@ -5,6 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
 import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
 
 /**
  * POST /api/badges/mint
@@ -44,34 +47,34 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { playerAddress, paymentCoinId } = body;
 
-    // Validate required fields
-    if (!playerAddress) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'playerAddress is required' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
+    // Validate required fields and format using BadgeValidators
+    try {
+      if (!playerAddress) {
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_ADDRESS,
+          'playerAddress is required'
+        );
+      }
+      BadgeValidators.validateAddress(playerAddress);
+      BadgeValidators.validatePaymentCoinId(paymentCoinId);
+    } catch (validationError) {
+      if (validationError instanceof BadgeError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: validationError.message,
+            code: validationError.code,
+          },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      throw validationError;
     }
 
-    // Validate address format
-    if (!playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'Invalid player address format. Must be a valid Sui address (0x followed by 64 hex characters)' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    console.log(`📥 Badge mint request received for: ${playerAddress}`);
-    if (paymentCoinId) {
-      console.log(`   Payment coin ID provided: ${paymentCoinId}`);
-    } else {
-      console.log(`   No payment coin ID - wallet module will find coin`);
-    }
+    BadgeLogger.info('Badge mint request received', {
+      playerAddress,
+      hasPaymentCoinId: !!paymentCoinId,
+    });
 
     const badgeService = getBadgeService();
     
@@ -83,10 +86,15 @@ export async function POST(request: NextRequest) {
     );
 
     if (!result.success || !result.transaction) {
+      const errorMessage = result.error || 'Failed to build mint transaction';
+      BadgeLogger.error('Failed to build mint transaction', {
+        playerAddress,
+        error: errorMessage,
+      });
       return NextResponse.json(
         {
           success: false,
-          error: result.error || 'Failed to build mint transaction',
+          error: errorMessage,
         },
         { status: 400, headers: corsHeaders }
       );
@@ -102,12 +110,15 @@ export async function POST(request: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (error) {
-    console.error('❌ Error building mint transaction:', error);
+    const badgeError = BadgeError.fromUnknown(error, 'Failed to build mint transaction');
+    BadgeLogger.error('Error building mint transaction', badgeError);
+    
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to build mint transaction',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        error: badgeError.message,
+        code: badgeError.code,
+        ...(badgeError.details && { details: badgeError.details }),
       },
       { status: 500, headers: corsHeaders }
     );

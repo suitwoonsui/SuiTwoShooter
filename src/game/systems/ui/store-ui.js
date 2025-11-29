@@ -522,7 +522,11 @@ function hideStore() {
 
 /**
  * Convert USD price to token amount
- * Uses prices from backend API
+ * Uses prices from backend API (should always be available)
+ * 
+ * @param {number} usdPrice - Price in USD
+ * @param {string} tokenType - 'sui', 'mews', or 'usdc'
+ * @returns {Object} { amount: number, formatted: string, error?: string }
  */
 function convertUsdToToken(usdPrice, tokenType) {
   // Use prices from backend API if available
@@ -531,34 +535,38 @@ function convertUsdToToken(usdPrice, tokenType) {
     let rate;
     
     if (tokenType === 'sui') {
-      rate = prices.sui || 2.0; // Fallback to $2.0
+      rate = prices.sui;
     } else if (tokenType === 'mews') {
-      rate = prices.mews || 0.000002; // Fallback
+      rate = prices.mews;
     } else {
       rate = prices.usdc || 1.0; // USDC is always $1.0
     }
     
-    const tokenAmount = usdPrice / rate;
-    
+    // If rate is missing or invalid, return error
+    if (!rate || rate <= 0) {
+      console.warn(`⚠️ [STORE] Missing or invalid ${tokenType} price from backend`);
     return {
-      amount: tokenAmount,
-      formatted: formatTokenAmount(tokenAmount, tokenType)
-    };
-  }
-  
-  // Fallback to placeholder rates if backend prices not loaded
-  const conversionRates = {
-    mews: 0.000002,
-    sui: 2.17,
-    usdc: 1.0
-  };
-  
-  const rate = conversionRates[tokenType] || conversionRates.mews;
+        amount: 0,
+        formatted: 'N/A',
+        error: 'Price unavailable'
+      };
+    }
+    
   const tokenAmount = usdPrice / rate;
   
   return {
     amount: tokenAmount,
     formatted: formatTokenAmount(tokenAmount, tokenType)
+    };
+  }
+  
+  // If backend prices not loaded, this is an error condition
+  // Prices should always be fetched from backend before showing store
+  console.error('❌ [STORE] Token prices not loaded from backend');
+  return {
+    amount: 0,
+    formatted: 'N/A',
+    error: 'Prices not loaded'
   };
 }
 
