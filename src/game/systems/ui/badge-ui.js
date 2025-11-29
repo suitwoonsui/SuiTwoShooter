@@ -9,6 +9,11 @@
  */
 async function showBadgeMintingModal(badgePreview = null) {
   console.log('🎖️ [BADGE] Showing badge minting modal');
+  
+  // Notify flow controller
+  if (typeof GameDataFlow !== 'undefined') {
+    GameDataFlow.onBadgeModalShown();
+  }
 
   // Check if modal already exists
   let modal = document.getElementById('badgeMintingModal');
@@ -102,6 +107,11 @@ async function showBadgeMintingModal(badgePreview = null) {
  */
 async function showTierUpgradeModal(upgradeData) {
   console.log('🎖️ [BADGE] Showing tier upgrade modal:', upgradeData);
+  
+  // Notify flow controller
+  if (typeof GameDataFlow !== 'undefined') {
+    GameDataFlow.onBadgeModalShown();
+  }
 
   // Check if modal already exists
   let modal = document.getElementById('badgeUpgradeModal');
@@ -206,6 +216,11 @@ async function showTierUpgradeModal(upgradeData) {
       }
     });
     document.getElementById('badgeUpgradeLaterBtn').addEventListener('click', () => {
+      // Set flag to skip upgrade check on next reload
+      if (typeof GameDataState !== 'undefined' && GameDataState.setSkipUpgradeCheck) {
+        GameDataState.setSkipUpgradeCheck(true);
+        console.log('⏭️ [BADGE] User clicked "Maybe Later" - will skip upgrade check on next reload');
+      }
       hideBadgeModal('badgeUpgradeModal');
       // If callback provided and user declined, we can still call it (e.g., to show store)
       if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
@@ -214,6 +229,11 @@ async function showTierUpgradeModal(upgradeData) {
     });
   } else {
     document.getElementById('badgeUpgradeCloseBtn').addEventListener('click', () => {
+      // Set flag to skip upgrade check on next reload
+      if (typeof GameDataState !== 'undefined' && GameDataState.setSkipUpgradeCheck) {
+        GameDataState.setSkipUpgradeCheck(true);
+        console.log('⏭️ [BADGE] User closed upgrade modal - will skip upgrade check on next reload');
+      }
       hideBadgeModal('badgeUpgradeModal');
       if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
         onUpgradeComplete(false);
@@ -302,6 +322,10 @@ async function handleBadgeMint() {
       }
       
       // Wait for transaction to be indexed on blockchain (3 seconds)
+      // Show loading modal during this wait and badge reload
+      if (typeof showLoadingModal === 'function') {
+        showLoadingModal('Waiting for transaction to be indexed... Please wait', 'gameDataLoadingModal');
+      }
       console.log('⏳ [BADGE UI] Waiting for transaction to be indexed...');
       await new Promise(resolve => setTimeout(resolve, 3000));
       
@@ -309,13 +333,22 @@ async function handleBadgeMint() {
       window.BadgeService.clearBadgeCache();
       console.log('🗑️ [BADGE UI] Cleared badge cache before reload');
       
+      // Update loading message for badge reload
+      if (typeof updateLoadingModalMessage === 'function') {
+        updateLoadingModalMessage('Loading badge data... Please wait', 'gameDataLoadingModal');
+      }
+      
       // Reload badge display to show the new badge
-      console.log('🔄 [BADGE UI] Reloading badge display...');
+      // This fetches fresh badge data from the blockchain (not from cache)
+      // loadMenuBadgeDisplay() will call BadgeService.getBadge() which queries the blockchain
+      console.log('🔄 [BADGE UI] Reloading badge display with fresh data from blockchain...');
       const playerAddress = window.walletAPIInstance?.getAddress();
       if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {
         await loadMenuBadgeDisplay(playerAddress);
-        console.log('✅ [BADGE UI] Badge display reloaded');
+        console.log('✅ [BADGE UI] Badge display reloaded with fresh data');
       }
+      
+      // Loading modal will be hidden by loadMenuBadgeDisplay() when complete
       
       console.log('✅ [BADGE UI] ========== BADGE MINTING FLOW COMPLETE ==========');
     } else {
@@ -327,6 +360,12 @@ async function handleBadgeMint() {
     }
   } catch (error) {
     console.error('❌ [BADGE] Error minting badge:', error);
+    
+    // Hide loading modal on error
+    if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('gameDataLoadingModal');
+    }
+    
     alert(`Failed to mint badge: ${error.message}`);
     if (btn) {
       btn.disabled = false;
@@ -340,6 +379,13 @@ async function handleBadgeMint() {
  */
 function handleBadgeMaybeLater() {
   console.log('🎖️ [BADGE] User chose "Maybe Later"');
+  
+  // Mark data as loaded so game can proceed
+  if (typeof GameDataState !== 'undefined') {
+    GameDataState.markDataLoaded();
+    console.log('⏭️ [BADGE] User clicked "Maybe Later" - data marked as loaded, will prompt again on next game completion');
+  }
+  
   hideBadgeModal('badgeMintingModal');
   // Note: Will prompt again on next game completion
 }
@@ -407,7 +453,23 @@ async function handleBadgeUpgrade(upgradeData, onComplete = null) {
     console.log('🎖️ [BADGE UI] Step 2: Requesting wallet signature...');
 
     // Sign and execute transaction (result.transaction is base64 string, like mint)
-    const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
+    let txResult;
+    try {
+      txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
+    } catch (error) {
+      console.error('❌ [BADGE UI] Transaction execution error:', error);
+      // Reset button state on error
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Upgrade Badge ($0.10)';
+      }
+      if (errorMessage) {
+        errorMessage.style.display = 'block';
+        errorMessage.style.color = '#ff4444';
+        errorMessage.textContent = `❌ Error: ${error.message || 'Transaction failed'}`;
+      }
+      throw error;
+    }
     
     console.log('📋 [BADGE UI] Execution result:', {
       success: txResult.success,
@@ -416,6 +478,8 @@ async function handleBadgeUpgrade(upgradeData, onComplete = null) {
       hasEffects: !!txResult.effects,
     });
     
+    // Even if verification fails, if transaction succeeded, treat as success
+    // Verification failure is usually just indexing delay
     if (txResult.success) {
       console.log('✅ [BADGE UI] ========== BADGE UPGRADE SUCCESS ==========');
       console.log('✅ [BADGE UI] Transaction digest:', txResult.digest);
@@ -439,21 +503,86 @@ async function handleBadgeUpgrade(upgradeData, onComplete = null) {
       window.BadgeService.clearBadgeCache();
       console.log('✅ [BADGE UI] Badge cache cleared');
       
-      // Wait for transaction to be indexed on blockchain (3 seconds)
+      // Wait for transaction to be indexed on blockchain
+      // Show loading modal during this wait and badge reload
+      if (typeof showLoadingModal === 'function') {
+        showLoadingModal('Waiting for transaction to be indexed... Please wait', 'gameDataLoadingModal');
+      }
       console.log('⏳ [BADGE UI] Waiting for transaction to be indexed...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Wait longer for indexing - badge tier updates can take time
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Increased to 5 seconds
       
       // Clear cache again before reloading to ensure fresh data
       window.BadgeService.clearBadgeCache();
       console.log('🗑️ [BADGE UI] Cleared badge cache before reload');
       
-      // Reload badge display to show the upgraded badge
-      console.log('🔄 [BADGE UI] Reloading badge display...');
+      // Skip upgrade check on next load since we just completed an upgrade
+      // This prevents the upgrade modal from showing again immediately
+      if (typeof GameDataState !== 'undefined' && GameDataState.setSkipUpgradeCheck) {
+        GameDataState.setSkipUpgradeCheck(true);
+        console.log('⏭️ [BADGE UI] Set skip upgrade check flag to prevent immediate re-check');
+      }
+      
+      // Update loading message for badge reload
+      if (typeof updateLoadingModalMessage === 'function') {
+        updateLoadingModalMessage('Loading badge data... Please wait', 'gameDataLoadingModal');
+      }
+      
+      // Retry badge reload up to 3 times to ensure we get the updated tier
+      // Blockchain indexing can be slow, so we retry with delays
+      console.log('🔄 [BADGE UI] Reloading badge display with fresh data from blockchain...');
       const playerAddress = window.walletAPIInstance?.getAddress();
       if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {
-        await loadMenuBadgeDisplay(playerAddress);
-        console.log('✅ [BADGE UI] Badge display reloaded');
+        let reloadAttempts = 0;
+        const maxReloadAttempts = 3;
+        
+        while (reloadAttempts < maxReloadAttempts) {
+          reloadAttempts++;
+          if (reloadAttempts > 1) {
+            console.log(`🔄 [BADGE UI] Retry ${reloadAttempts}/${maxReloadAttempts} - waiting for badge tier to update...`);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s between retries
+            window.BadgeService.clearBadgeCache(); // Clear cache before each retry
+          }
+          
+          await loadMenuBadgeDisplay(playerAddress);
+          
+          // Check if badge tier was updated by checking GameDataState or badge data
+          let currentTier = null;
+          if (typeof GameDataState !== 'undefined' && GameDataState.badge && GameDataState.badge.badge) {
+            currentTier = GameDataState.badge.badge.tier;
+          } else {
+            // Fallback: try to get badge data directly
+            try {
+              const badgeData = await window.BadgeService.getBadge(playerAddress);
+              if (badgeData && badgeData.success && badgeData.badge) {
+                currentTier = badgeData.badge.tier;
+              }
+            } catch (error) {
+              console.warn('⚠️ [BADGE UI] Could not check badge tier:', error);
+            }
+          }
+          
+          // If tier is still 0 and we expected it to be upgraded, retry
+          if (currentTier !== null && currentTier === 0 && newTier > 0) {
+            if (reloadAttempts < maxReloadAttempts) {
+              console.log(`⚠️ [BADGE UI] Badge tier still ${currentTier} (expected ${newTier}), retrying (attempt ${reloadAttempts + 1}/${maxReloadAttempts})...`);
+              continue;
+            } else {
+              console.warn(`⚠️ [BADGE UI] Badge tier may not be updated yet (still ${currentTier}, expected ${newTier}) - blockchain indexing may take longer`);
+              console.warn('⚠️ [BADGE UI] The badge will refresh automatically on next page load or manual refresh');
+            }
+          } else if (currentTier !== null && currentTier === newTier) {
+            console.log(`✅ [BADGE UI] Badge tier successfully updated to ${newTier}!`);
+          }
+          
+          break; // Success or max attempts reached
+        }
+        
+        console.log('✅ [BADGE UI] Badge display reloaded with fresh data');
       }
+      
+      // Loading modal will be hidden by loadMenuBadgeDisplay() when complete
       
       console.log('✅ [BADGE UI] ========== BADGE UPGRADE FLOW COMPLETE ==========');
       
@@ -475,20 +604,32 @@ async function handleBadgeUpgrade(upgradeData, onComplete = null) {
         userFriendlyError = 'Transaction timed out. Please check your network connection and try again.';
       }
       
+      // Reset button state before showing error
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Upgrade Badge ($0.10)';
+      }
+      
       showUpgradeError(userFriendlyError);
       throw new Error(userFriendlyError);
     }
   } catch (error) {
     console.error('❌ [BADGE] Error upgrading badge:', error);
     
+    // Reset button state on error (always reset, even if already reset)
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Upgrade Badge ($0.10)';
+    }
+    
+    // Hide loading modal on error
+    if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('gameDataLoadingModal');
+    }
+    
     // Show error in modal (already shown by showUpgradeError if it was called)
     if (!errorMessage || errorMessage.style.display === 'none') {
       showUpgradeError(`Failed to upgrade badge: ${error.message || 'Unknown error'}`);
-    }
-    
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = 'Upgrade Badge';
     }
     
     // Don't call callback on error - keep modal open so user can retry
@@ -535,6 +676,11 @@ function showUpgradeError(message) {
  */
 async function showBadgeMigrationModal(migrationData) {
   console.log('🔄 [BADGE] Showing badge migration modal:', migrationData);
+  
+  // Notify flow controller
+  if (typeof GameDataFlow !== 'undefined') {
+    GameDataFlow.onBadgeModalShown();
+  }
 
   // Check if modal already exists
   let modal = document.getElementById('badgeMigrationModal');
@@ -616,7 +762,15 @@ async function showBadgeMigrationModal(migrationData) {
 
   // Add event listeners
   document.getElementById('badgeMigrateBtn').addEventListener('click', () => handleBadgeMigration(migrationData));
-  document.getElementById('badgeMigrateLaterBtn').addEventListener('click', () => hideBadgeModal('badgeMigrationModal'));
+  document.getElementById('badgeMigrateLaterBtn').addEventListener('click', () => {
+    // Set flag to skip migration check and mark data as loaded
+    if (typeof GameDataState !== 'undefined') {
+      GameDataState.migrationModalClosed = true;
+      GameDataState.markDataLoaded();
+      console.log('⏭️ [BADGE] User clicked "Maybe Later" - migration check skipped, data marked as loaded');
+    }
+    hideBadgeModal('badgeMigrationModal');
+  });
 }
 
 /**
@@ -704,6 +858,10 @@ async function handleBadgeMigration(migrationData) {
       console.log('✅ [BADGE UI] Badge cache cleared');
       
       // Wait for transaction to be indexed on blockchain (3 seconds)
+      // Show loading modal during this wait and badge reload
+      if (typeof showLoadingModal === 'function') {
+        showLoadingModal('Waiting for transaction to be indexed... Please wait', 'gameDataLoadingModal');
+      }
       console.log('⏳ [BADGE UI] Waiting for transaction to be indexed...');
       await new Promise(resolve => setTimeout(resolve, 3000));
       
@@ -711,12 +869,21 @@ async function handleBadgeMigration(migrationData) {
       window.BadgeService.clearBadgeCache();
       console.log('🗑️ [BADGE UI] Cleared badge cache before reload');
       
+      // Update loading message for badge reload
+      if (typeof updateLoadingModalMessage === 'function') {
+        updateLoadingModalMessage('Loading badge data... Please wait', 'gameDataLoadingModal');
+      }
+      
       // Reload badge display to show the migrated badge
-      console.log('🔄 [BADGE UI] Reloading badge display...');
+      // This fetches fresh badge data from the blockchain (not from cache)
+      // loadMenuBadgeDisplay() will call BadgeService.getBadge() which queries the blockchain
+      console.log('🔄 [BADGE UI] Reloading badge display with fresh data from blockchain...');
       if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {
         await loadMenuBadgeDisplay(playerAddress);
-        console.log('✅ [BADGE UI] Badge display reloaded');
+        console.log('✅ [BADGE UI] Badge display reloaded with fresh data');
       }
+      
+      // Loading modal will be hidden by loadMenuBadgeDisplay() when complete
       
       console.log('✅ [BADGE UI] ========== BADGE MIGRATION FLOW COMPLETE ==========');
     } else if (result.digest) {
@@ -740,6 +907,12 @@ async function handleBadgeMigration(migrationData) {
     }
   } catch (error) {
     console.error('❌ [BADGE] Error migrating badge:', error);
+    
+    // Hide loading modal on error
+    if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('gameDataLoadingModal');
+    }
+    
     alert(`Failed to migrate badge: ${error.message}`);
     if (btn) {
       btn.disabled = false;
@@ -757,18 +930,48 @@ function hideBadgeModal(modalId) {
     modal.classList.remove('badge-modal-visible');
     modal.classList.add('badge-modal-hidden');
     
-    // Track migration modal closure for game readiness
+    // Notify flow controller
+    if (typeof GameDataFlow !== 'undefined') {
+      GameDataFlow.onBadgeModalHidden();
+    }
+    
+    // Track migration modal closure for game readiness (backward compatibility)
     if (modalId === 'badgeMigrationModal') {
-      // Check if gameReadinessState exists (from menu-system.js)
+      // Set flag in GameDataState to exit the loop
+      if (typeof GameDataState !== 'undefined') {
+        GameDataState.migrationModalClosed = true;
+        // If migration check is complete and modal is closed, mark data as loaded
+        if (GameDataState.migrationCheckComplete && !GameDataState.dataLoaded) {
+          GameDataState.markDataLoaded();
+          console.log('✅ [BADGE] Migration modal closed - data marked as loaded');
+        }
+      }
+      
+      // Also update gameReadinessState for backward compatibility
       if (typeof gameReadinessState !== 'undefined') {
         gameReadinessState.migrationModalClosed = true;
         console.log('✅ [GAME READINESS] Migration modal closed - button can now enable');
         
-        // Update game readiness (if function exists)
         if (typeof updateGameReadiness === 'function') {
           updateGameReadiness();
         }
       }
+    }
+    
+    // Track minting modal closure - mark data as loaded so game can proceed
+    if (modalId === 'badgeMintingModal') {
+      if (typeof GameDataState !== 'undefined') {
+        // Mark data as loaded so game can proceed
+        if (!GameDataState.dataLoaded) {
+          GameDataState.markDataLoaded();
+          console.log('✅ [BADGE] Minting modal closed - data marked as loaded');
+        }
+      }
+    }
+    
+    // GameDataFlow is required - if not available, log error
+    if (typeof GameDataFlow === 'undefined') {
+      console.error('❌ [BADGE UI] GameDataFlow not available - this should not happen');
     }
   }
 }
@@ -789,11 +992,44 @@ function arrayBufferToBase64(buffer) {
 }
 
 /**
+ * Fetch total games from statistics registry
+ * @param {string} walletAddress - Wallet address
+ * @returns {Promise<number>} Total games from registry
+ */
+async function fetchRegistryGames(walletAddress) {
+  if (!walletAddress) {
+    return 0;
+  }
+  
+  try {
+    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const response = await fetch(`${API_BASE_URL}/stats/${walletAddress}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.hasStats) {
+        return data.totalGames || 0;
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [BADGE UI] Error fetching registry games:', error);
+  }
+  
+  return 0;
+}
+
+/**
  * Display badge in UI (for store, menu, etc.)
  * @param {HTMLElement} container - Container element to display badge in
  * @param {Object} badgeData - Badge data from API
+ * @param {string} walletAddress - Optional wallet address for fetching registry games
  */
-function displayBadgeInUI(container, badgeData) {
+async function displayBadgeInUI(container, badgeData, walletAddress = null) {
   if (!badgeData || !badgeData.hasBadge) {
     return;
   }
@@ -801,6 +1037,18 @@ function displayBadgeInUI(container, badgeData) {
   const { badge } = badgeData;
   const tierName = window.BadgeService ? window.BadgeService.getTierName(badge.tier) : 'Unknown';
   const discounts = window.BadgeService ? window.BadgeService.getDiscountsForTier(badge.tier) : { store: 0, gameplay: 0 };
+  
+  // Get wallet address if not provided
+  if (!walletAddress) {
+    if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+      walletAddress = window.walletAPIInstance.getAddress();
+    } else if (typeof GameDataState !== 'undefined' && GameDataState.walletAddress) {
+      walletAddress = GameDataState.walletAddress;
+    }
+  }
+  
+  // Fetch total games from registry (source of truth)
+  const totalGames = await fetchRegistryGames(walletAddress);
 
   // Use imageUrl if available (from badge.image field), otherwise fall back to constructing from tier or imageData
   let imageSrc = null;
@@ -851,7 +1099,7 @@ function displayBadgeInUI(container, badgeData) {
         }
         <div class="badge-display-info">
           <p class="badge-display-tier"><strong>${tierName}</strong></p>
-          <p class="badge-display-games">Games: ${badge.gamesPlayed || 0}</p>
+          <p class="badge-display-games">Games: ${totalGames}</p>
           ${discounts.store > 0 ? `<p class="badge-display-discount">Store: ${discounts.store}% off</p>` : ''}
           ${discounts.gameplay > 0 ? `<p class="badge-display-discount">Gameplay: ${discounts.gameplay}% off</p>` : ''}
         </div>

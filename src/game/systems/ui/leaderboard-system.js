@@ -186,6 +186,16 @@ async function saveScore() {
   // Mark as submitting to prevent duplicate calls
   saveScore._submitting = true;
   
+  // Show loading modal while saving score
+  // Use LoadingManager if available, otherwise fallback to showLoadingModal
+  if (typeof LoadingManager !== 'undefined' && LoadingManager.show) {
+    LoadingManager.show('Saving score... Please wait');
+  } else if (typeof showLoadingModal === 'function') {
+    showLoadingModal('Saving score... Please wait', 'saveScoreLoadingModal');
+  } else {
+    console.warn('⚠️ [SCORE] Loading modal functions not available');
+  }
+  
   try {
     // Use currentGameScore directly instead of parsing display
     const score = currentGameScore;
@@ -215,13 +225,9 @@ async function saveScore() {
       playSuccessSound();
     }
     
-    // Close modal immediately after saving to localStorage
-    // Don't wait for blockchain submission
+    // Close name input modal
     hideNameInput();
-    showMainMenu();
     
-    // Submit to blockchain if wallet is connected and contract is deployed
-    // Do this AFTER closing the modal so user isn't blocked
     // Use currentGameStats if available, otherwise fallback to reading from window.game
     const statsToSubmit = currentGameStats || {
       score: score,
@@ -233,18 +239,28 @@ async function saveScore() {
       sessionId: window.game?.sessionId || null
     };
     
+    // Submit to blockchain if wallet is connected and contract is deployed
+    // Now we wait for this to complete before hiding loading modal
     if (typeof window.submitScoreToBlockchain === 'function' && 
         window.walletAPIInstance && 
         window.walletAPIInstance.isConnected()) {
       
       console.log('📝 [BLOCKCHAIN] Submitting game stats to blockchain:', statsToSubmit);
       
-      // Submit in background (don't block UI)
-      window.submitScoreToBlockchain(statsToSubmit, name || '')
-        .then(result => {
+      try {
+        // Update loading message for blockchain submission
+        if (typeof LoadingManager !== 'undefined' && LoadingManager.update) {
+          LoadingManager.update('Saving score to blockchain... Please wait');
+        } else if (typeof updateLoadingModalMessage === 'function') {
+          updateLoadingModalMessage('Saving score to blockchain... Please wait', 'saveScoreLoadingModal');
+        }
+        
+        // Wait for blockchain submission to complete
+        const result = await window.submitScoreToBlockchain(statsToSubmit, name || '');
+        
           if (result.success) {
             console.log('✅ [BLOCKCHAIN] Score submitted successfully!', result.digest);
-            // Show success toast (optional, can be silent)
+          // Show success toast
             if (typeof window.showToast === 'function') {
               window.showToast('Score saved to blockchain!', 'success');
             }
@@ -255,14 +271,13 @@ async function saveScore() {
               window.showToast('Failed to save score to blockchain. Your score was saved locally.', 'error');
           }
           }
-        })
-        .catch(error => {
+      } catch (error) {
           console.error('❌ [BLOCKCHAIN] Error submitting score:', error);
           // Show error toast
           if (typeof window.showToast === 'function') {
             window.showToast('Error saving score. Please try again later.', 'error');
         }
-        });
+      }
     } else {
       console.log('📝 [BLOCKCHAIN] Skipping blockchain submission:', {
         hasSubmitFunction: typeof window.submitScoreToBlockchain === 'function',
@@ -270,6 +285,26 @@ async function saveScore() {
         isConnected: window.walletAPIInstance?.isConnected()
       });
     }
+    
+    // Hide loading modal and show main menu after saving is complete
+    if (typeof LoadingManager !== 'undefined' && LoadingManager.hide) {
+      LoadingManager.hide();
+    } else if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('saveScoreLoadingModal');
+    }
+    showMainMenu();
+    
+  } catch (error) {
+    console.error('❌ [LEADERBOARD] Error saving score:', error);
+    // Hide loading modal even on error
+    if (typeof LoadingManager !== 'undefined' && LoadingManager.hide) {
+      LoadingManager.hide();
+    } else if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('saveScoreLoadingModal');
+    }
+    // Show error message
+    alert('Error saving score. Please try again.');
+    showMainMenu();
   } finally {
     // Reset submission flag after a delay to allow for async operations
     setTimeout(() => {
@@ -577,11 +612,23 @@ async function showLeaderboard() {
   leaderboardModal.appendChild(leaderboardContent);
   viewportContainer.appendChild(leaderboardModal);
   
+  // Show loading modal while fetching leaderboard
+  if (typeof showLoadingModal === 'function') {
+    showLoadingModal('Loading leaderboard... Please wait', 'leaderboardLoadingModal');
+  }
+  
+  try {
   // Fetch leaderboard data from blockchain
   await fetchBlockchainLeaderboard();
   
   // Display leaderboard in modal
   displayLeaderboardModal();
+  } finally {
+    // Hide loading modal when leaderboard is loaded
+    if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('leaderboardLoadingModal');
+    }
+  }
 }
 
 function hideLeaderboard() {
@@ -991,6 +1038,11 @@ async function fetchBlockchainLeaderboard(limit = null) {
 async function refreshLeaderboard() {
   console.log('🔄 [LEADERBOARD] Refreshing leaderboard...');
   
+  // Show loading modal while refreshing
+  if (typeof showLoadingModal === 'function') {
+    showLoadingModal('Refreshing leaderboard... Please wait', 'leaderboardLoadingModal');
+  }
+  
   const refreshBtn = document.getElementById('leaderboardRefreshBtn');
   if (refreshBtn) {
     const originalText = refreshBtn.innerHTML;
@@ -1003,10 +1055,22 @@ async function refreshLeaderboard() {
       // Reset button state
       refreshBtn.innerHTML = originalText;
       refreshBtn.disabled = false;
+      
+      // Hide loading modal when refresh is complete
+      if (typeof hideLoadingModal === 'function') {
+        hideLoadingModal('leaderboardLoadingModal');
+      }
     }
   } else {
     // If button not found, just fetch directly
+    try {
     await fetchBlockchainLeaderboard();
+    } finally {
+      // Hide loading modal when refresh is complete
+      if (typeof hideLoadingModal === 'function') {
+        hideLoadingModal('leaderboardLoadingModal');
+      }
+    }
   }
 }
 

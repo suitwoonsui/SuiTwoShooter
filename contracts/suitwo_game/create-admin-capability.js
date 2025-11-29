@@ -12,7 +12,7 @@ const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4
 const packageId = process.env.GAME_SCORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef'; // Latest package
+                  '0x10666e8f2da2023c89e5d3b5259fa6e091a10ddd862536afdd1eedad4e53591b'; // Latest package
 
 function decodePrivateKey(privateKey) {
   if (privateKey.startsWith('suiprivkey1')) {

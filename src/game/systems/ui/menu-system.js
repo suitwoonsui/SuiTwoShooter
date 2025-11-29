@@ -41,13 +41,11 @@ async function handleConnectWallet() {
     if (result.success) {
       console.log('✅ Wallet connected:', result.address);
       updateWalletUI(result.address);
-      // Check balance first, then enable/disable button based on result
-      // Don't enable button immediately - wait for balance check
-      await checkMEWSBalanceAndUpdateUI(result.address);
-      // Update menu stats from blockchain when wallet connects
-      if (typeof updateMenuStats === 'function') {
-        updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
-      }
+      // Don't call checkMEWSBalanceAndUpdateUI here - the wallet event listener (line 627)
+      // will handle it when the 'connected' event fires. This prevents duplicate calls.
+      // The event listener will:
+      // 1. Call checkMEWSBalanceAndUpdateUI(event.address)
+      // 2. Call updateMenuStats()
       // Test button will be enabled by updateGameReadiness() after data loads
     } else {
       console.error('❌ Wallet connection failed:', result.error);
@@ -222,249 +220,39 @@ function updateWalletUI(address) {
 }
 
 // Track last loaded badge to prevent redundant calls
-let lastLoadedBadgeAddress = null;
-let badgeLoadInProgress = false;
+// Old tracking variables removed - now handled by GameDataFlow
 
 /**
  * Load and display badge in main menu (if player has one)
  * @param {string} walletAddress - Player's wallet address
  */
+// Load menu badge display
+// NOW USES GameDataFlow - refactored architecture
 async function loadMenuBadgeDisplay(walletAddress) {
-  const badgeDisplay = document.getElementById('menuBadgeDisplay');
-  if (!badgeDisplay) {
-    console.warn('⚠️ [MENU] Badge display container not found');
+  // Use new flow controller - GameDataFlow is required
+  if (typeof GameDataFlow === 'undefined' || !GameDataFlow.load) {
+    console.error('❌ [MENU] GameDataFlow not available - this should not happen');
     return;
   }
 
+  console.log('✅ [MENU] Using NEW REFACTORED SYSTEM (GameDataFlow) for badge load');
   try {
-    // No wallet connected, hide badge display
-    if (!walletAddress) {
-      badgeDisplay.style.display = 'none';
-      lastLoadedBadgeAddress = null;
-      return;
-    }
-    
-    // Prevent redundant calls: if we're already loading for this address, skip
-    if (badgeLoadInProgress && lastLoadedBadgeAddress === walletAddress) {
-      console.log('⏭️ [MENU] Badge load already in progress for this address, skipping duplicate call');
-      return;
-    }
-    
-    // If badge is already loaded for this address and display is visible, skip
-    if (lastLoadedBadgeAddress === walletAddress && badgeDisplay.style.display !== 'none' && badgeDisplay.innerHTML.trim() !== '') {
-      console.log('⏭️ [MENU] Badge already loaded for this address, skipping redundant call');
-      return;
-    }
-    
-    badgeLoadInProgress = true;
-    lastLoadedBadgeAddress = walletAddress;
+    await GameDataFlow.load(walletAddress, { skipBalance: true });
 
-    // Get badge data from BadgeService
-    if (!window.BadgeService || !window.BadgeService.getBadge) {
-      console.warn('⚠️ [MENU] BadgeService not available');
-      badgeDisplay.style.display = 'none';
-      return;
-    }
-
-    // Clear cache first to ensure we get fresh data
-    if (window.BadgeService && window.BadgeService.clearBadgeCache) {
-      window.BadgeService.clearBadgeCache();
-    }
-    
-    const badgeData = await window.BadgeService.getBadge(walletAddress);
-
-    if (!badgeData || !badgeData.success || !badgeData.hasBadge || !badgeData.badge) {
-      // Player doesn't have a badge in new contract
-      // Mark data as loaded first
-      gameReadinessState.dataLoaded = true;
-      
-      // BUT: If we just minted a badge, wait longer before checking for migration
-      // This prevents showing migration modal right after a successful mint
-      const recentMintTime = window.BadgeService?._lastMintTime || 0;
-      const timeSinceMint = Date.now() - recentMintTime;
-      const shouldCheckMigration = timeSinceMint > 10000; // Wait 10 seconds after mint before checking migration
-      
-      if (shouldCheckMigration && window.BadgeService && window.BadgeService.checkBadgeMigration) {
-        // Perform migration check
-        const migrationCheck = await window.BadgeService.checkBadgeMigration(walletAddress);
-        
-        // Mark migration check as complete
-        gameReadinessState.migrationCheckComplete = true;
-        
-        if (migrationCheck.success && migrationCheck.needsMigration && migrationCheck.migrationData) {
-          // Player has an old badge that needs migration
-          console.log('🔄 [MENU] Player needs to migrate badge');
-          
-          // Show migration modal - button will stay disabled until modal is closed
-          if (window.BadgeUI && window.BadgeUI.showBadgeMigrationModal) {
-            // Mark migration modal as open (button stays disabled)
-            gameReadinessState.migrationModalClosed = false;
-            console.log('🔄 [GAME READINESS] Migration modal opened - button will enable when closed');
-            
-            // Convert imageData array to Uint8Array if needed
-            let imageData = migrationCheck.migrationData.imageData;
-            if (Array.isArray(imageData)) {
-              imageData = new Uint8Array(imageData);
-            }
-            
-            window.BadgeUI.showBadgeMigrationModal({
-              oldBadgeId: migrationCheck.migrationData.oldBadgeId,
-              oldTier: migrationCheck.migrationData.oldTier,
-              oldGamesPlayed: migrationCheck.migrationData.oldGamesPlayed,
-              oldMintDate: migrationCheck.migrationData.oldMintDate,
-              imageData: imageData,
-            });
+    // Update game readiness state from GameDataState
+    if (typeof GameDataState !== 'undefined') {
+      const readiness = GameDataState.getReadinessState();
+      gameReadinessState.dataLoaded = readiness.dataLoaded;
+      gameReadinessState.migrationCheckComplete = readiness.migrationCheckComplete;
+      gameReadinessState.migrationModalClosed = readiness.migrationModalClosed;
           }
-        } else {
-          // Migration check completed but no migration needed
-          // Mark modal as closed (not needed)
-          gameReadinessState.migrationModalClosed = true;
-          console.log('✅ [GAME READINESS] Migration check complete - no migration needed');
-        }
-      } else {
-        // Skip migration check (recent mint or no check function)
-        gameReadinessState.migrationCheckComplete = true;
-        gameReadinessState.migrationModalClosed = true; // No modal needed
-        if (!shouldCheckMigration) {
-          console.log('⏳ [MENU] Recent badge mint detected, skipping migration check');
-          console.log(`⏳ [MENU] Time since mint: ${timeSinceMint}ms (need 10000ms)`);
-        }
-        console.log('✅ [GAME READINESS] Migration check skipped - button can enable');
-      }
-      
-      // Update button state after migration check
+    
+    // Update game readiness UI
+    if (typeof updateGameReadiness === 'function') {
       updateGameReadiness();
-      
-      // Hide badge display (no badge in new contract)
-      badgeDisplay.style.display = 'none';
-      return;
     }
-
-    // Player has a badge, display it
-    // Mark data as loaded and migration check complete (no migration needed when badge exists)
-    gameReadinessState.dataLoaded = true;
-    gameReadinessState.migrationCheckComplete = true;
-    gameReadinessState.migrationModalClosed = true; // No migration needed if badge exists
-    console.log('✅ [GAME READINESS] Data loaded - badge found, no migration needed');
-    updateGameReadiness();
-    
-    // Check for pending tier upgrade
-    if (window.BadgeService && window.BadgeService.checkPendingUpgrade) {
-      const upgradeCheck = await window.BadgeService.checkPendingUpgrade(walletAddress);
-      if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.badgeId) {
-        console.log('🎖️ [MENU] Pending badge upgrade detected');
-        
-        // Get current badge to get old tier and image
-        const badgeData = await window.BadgeService.getBadge(walletAddress);
-        if (badgeData && badgeData.success && badgeData.hasBadge && badgeData.badge) {
-          const oldTier = badgeData.badge.tier;
-          const newTier = upgradeCheck.newTier || oldTier + 1;
-          const newTierName = window.BadgeService.getTierName(newTier);
-          
-          // Generate session ID for upgrade transaction
-          const sessionId = `upgrade_${walletAddress}_${Date.now()}`;
-          
-          // Show upgrade modal with new flow (badgeId, newTier, sessionId)
-          if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
-            window.BadgeUI.showTierUpgradeModal({
-              oldTier,
-              newTier,
-              newTierName,
-              badgeId: upgradeCheck.badgeId,
-              sessionId: sessionId,
-              // No imageData needed - will be loaded from URL
-            });
-          }
-        }
-      }
-    }
-    
-    // Use BadgeUI.displayBadgeInUI if available, otherwise create custom display
-    if (window.BadgeUI && typeof window.BadgeUI.displayBadgeInUI === 'function') {
-      // Use the existing BadgeUI function for consistency
-      window.BadgeUI.displayBadgeInUI(badgeDisplay, badgeData);
-      badgeDisplay.style.display = 'block';
-    } else {
-      // Fallback: create custom display
-      const { badge } = badgeData;
-      const tierName = window.BadgeService.getTierName(badge.tier);
-      const discounts = window.BadgeService.getDiscountsForTier(badge.tier);
-
-      // Use imageUrl if available (from badge.image field), otherwise fall back to constructing from tier or imageData
-      let imageSrc = null;
-      
-      // First, try to use imageUrl from badge
-      if (badge.imageUrl && typeof badge.imageUrl === 'string' && (badge.imageUrl.startsWith('http://') || badge.imageUrl.startsWith('https://'))) {
-        // Use the URL directly from the badge's image field (validate it's a real URL)
-        imageSrc = badge.imageUrl;
-        console.log('✅ [MENU] Using badge imageUrl:', imageSrc);
-      } else {
-        // Log what we received for debugging
-        console.log('🔍 [MENU] Badge imageUrl value:', badge.imageUrl, 'Type:', typeof badge.imageUrl);
-        
-        // Fallback 1: Construct URL from tier
-        const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
-        const tierName = tierNames[badge.tier] || 'Standard';
-        const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-        // Remove /api suffix if present, then add /Badges/
-        const baseUrl = apiBaseUrl.replace(/\/api$/, '');
-        const constructedUrl = `${baseUrl}/Badges/${tierName}.webp`;
-        imageSrc = constructedUrl;
-        console.log('✅ [MENU] Constructed image URL from tier:', imageSrc);
-        
-        // Fallback 2: If we have imageData, use it instead
-        if (badge.imageData && badge.imageData.length > 0) {
-          try {
-            let base64;
-            if (Array.isArray(badge.imageData)) {
-              const bytes = new Uint8Array(badge.imageData);
-              const binary = String.fromCharCode.apply(null, Array.from(bytes));
-              base64 = btoa(binary);
-            } else {
-              const binary = String.fromCharCode.apply(null, Array.from(badge.imageData));
-              base64 = btoa(binary);
-            }
-            imageSrc = 'data:image/webp;base64,' + base64;
-            console.log('✅ [MENU] Using badge imageData (base64) instead of constructed URL');
           } catch (error) {
-            console.warn('⚠️ [MENU] Failed to convert badge imageData, using constructed URL:', error);
-            // Keep the constructed URL as fallback
-          }
-        }
-      }
-
-      // Construct fallback URL from tier in case image fails to load
-      const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
-      const tierNameForUrl = tierNames[badge.tier] || 'Standard';
-      const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      const baseUrl = apiBaseUrl.replace(/\/api$/, '');
-      const fallbackUrl = `${baseUrl}/Badges/${tierNameForUrl}.webp`;
-      
-      const badgeHTML = `
-        <div class="menu-badge-info">
-          <h3>🎖️ Your ${tierName} Badge</h3>
-          ${imageSrc
-            ? `<img src="${imageSrc}" alt="Badge" class="menu-badge-image" onerror="this.onerror=null; this.src='${fallbackUrl}'; console.warn('⚠️ [MENU] Image failed to load, using fallback:', '${fallbackUrl}');" />`
-            : `<div class="menu-badge-placeholder">🎖️</div>`
-          }
-          <div class="menu-badge-details">
-            <p>Games Played: ${badge.gamesPlayed || 0}</p>
-            ${discounts.store > 0 ? `<p>Store: ${discounts.store}% off</p>` : ''}
-            ${discounts.gameplay > 0 ? `<p>Gameplay: ${discounts.gameplay}% off</p>` : ''}
-          </div>
-        </div>
-      `;
-      badgeDisplay.innerHTML = badgeHTML;
-      badgeDisplay.style.display = 'block';
-    }
-
-    console.log('✅ [MENU] Badge displayed in main menu');
-    badgeLoadInProgress = false;
-  } catch (error) {
-    console.error('❌ [MENU] Error loading badge display:', error);
-    badgeDisplay.style.display = 'none';
-    badgeLoadInProgress = false;
-    // Don't clear lastLoadedBadgeAddress on error - allow retry
+    console.error('❌ Error loading badge:', error);
   }
 }
 
@@ -483,6 +271,11 @@ function disableStartGameButton() {
 }
 
 // Initialize wallet connection on page load
+// Track last processed wallet event to prevent duplicates
+let lastWalletEvent = null;
+let lastWalletEventTime = 0;
+const WALLET_EVENT_DEBOUNCE_MS = 500; // Ignore duplicate events within 500ms
+
 async function initializeWalletIntegration() {
   // Wait a bit for React and WalletAPI to load
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -519,51 +312,53 @@ async function initializeWalletIntegration() {
       api.on(async (event) => {
         console.log('🔔 Wallet event:', event);
         
-        // Clear badge cache and display immediately when wallet changes (disconnect or new connect)
-        if (window.BadgeService && typeof window.BadgeService.clearBadgeCache === 'function') {
-          window.BadgeService.clearBadgeCache();
-          console.log('📋 [MENU] Cleared badge cache due to wallet change');
+        // Deduplicate events - check if this is a duplicate of the last event
+        const eventKey = `${event.type}_${event.address || 'null'}`;
+        const now = Date.now();
+        const timeSinceLastEvent = now - lastWalletEventTime;
+        
+        if (lastWalletEvent === eventKey && timeSinceLastEvent < WALLET_EVENT_DEBOUNCE_MS) {
+          console.log(`⏭️ [MENU] Duplicate wallet event detected (${timeSinceLastEvent}ms ago) - skipping:`, event);
+          return; // Skip duplicate event
         }
         
-        // Reset badge load tracking when wallet changes
-        lastLoadedBadgeAddress = null;
-        badgeLoadInProgress = false;
+        // Record this event
+        lastWalletEvent = eventKey;
+        lastWalletEventTime = now;
+        console.log('✅ [MENU] Processing wallet event:', event);
         
-        const badgeDisplay = document.getElementById('menuBadgeDisplay');
-        if (badgeDisplay) {
-          badgeDisplay.style.display = 'none';
-          badgeDisplay.innerHTML = ''; // Clear any existing badge content
-        }
-        
-        updateWalletUI(event.address);
-        
+        // Use new flow controller for wallet events
+        if (typeof GameDataFlow !== 'undefined') {
+          console.log('✅ [MENU] Using NEW REFACTORED SYSTEM (GameDataFlow) for wallet event');
         if (event.type === 'connected' && event.address) {
-          // Check MEWS balance when wallet connects (this will also load badge for new wallet)
-          await checkMEWSBalanceAndUpdateUI(event.address);
+            GameDataFlow.onWalletConnected(event.address);
           // Update menu stats from blockchain when wallet connects
           if (typeof updateMenuStats === 'function') {
             updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
           }
         } else if (event.type === 'disconnected') {
+            GameDataFlow.onWalletDisconnected();
+            if (typeof disableStartGameButton === 'function') {
           disableStartGameButton();
+            }
           updateBalanceUI(null, false);
           updateWalletRequirementsUI(false, false);
-          // Badge already cleared above
           const walletStatusText = document.getElementById('walletStatusText');
           if (walletStatusText) {
             walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect Sui wallet to play</span>';
           }
-          // Clear menu stats (show "--") when wallet disconnects
           if (typeof updateMenuStats === 'function') {
             updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
           }
-          // Disable test button on disconnect
           const testBtn = document.getElementById('startGameTestBtn');
           if (testBtn) {
             testBtn.disabled = true;
             testBtn.style.opacity = '0.5';
             testBtn.style.cursor = 'not-allowed';
           }
+          }
+        } else {
+          console.error('❌ [MENU] GameDataFlow not available - this should not happen');
         }
       });
       
@@ -663,91 +458,41 @@ function updateWalletRequirementsUI(walletConnected, hasMinimumBalance) {
 }
 
 // Check MEWS balance and update UI
+// NOTE: This function is now a wrapper around GameDataFlow.load() for backward compatibility
+// All new code should use GameDataFlow.load() directly
 async function checkMEWSBalanceAndUpdateUI(address) {
   if (!window.walletAPIInstance) {
     console.warn('⚠️ Wallet API not available');
-    // Disable button if API not available
     disableStartGameButton();
     return;
   }
   
-  // Disable button while checking balance (prevent race condition)
+  // Use new flow controller - GameDataFlow is required
+  if (typeof GameDataFlow === 'undefined' || !GameDataFlow.load) {
+    console.error('❌ [MENU] GameDataFlow not available - this should not happen');
   disableStartGameButton();
+    return;
+  }
   
+  console.log('✅ [MENU] Using NEW REFACTORED SYSTEM (GameDataFlow) for balance check');
   try {
-    // Check balance on mainnet (gatekeeping uses mainnet)
-    const balanceResult = await window.walletAPIInstance.checkMEWSBalance(address, 'mainnet');
+    await GameDataFlow.load(address);
+      
+    // Update game readiness state from GameDataState
+    if (typeof GameDataState !== 'undefined') {
+      const readiness = GameDataState.getReadinessState();
+      gameReadinessState.dataLoaded = readiness.dataLoaded;
+      gameReadinessState.migrationCheckComplete = readiness.migrationCheckComplete;
+      gameReadinessState.migrationModalClosed = readiness.migrationModalClosed;
+    }
     
-    console.log('🔍 Balance check result:', {
-      success: balanceResult.success,
-      balance: balanceResult.formattedBalance,
-      hasMinimum: balanceResult.hasMinimumBalance,
-      minimum: balanceResult.formattedMinimum
-    });
-    
-    if (balanceResult.success) {
-      updateBalanceUI(balanceResult.formattedBalance, balanceResult.hasMinimumBalance);
-      
-      // Update requirements UI
-      updateWalletRequirementsUI(true, balanceResult.hasMinimumBalance);
-      
-      // Clear badge cache and display first (in case of wallet switch), then load new badge
-      if (window.BadgeService && typeof window.BadgeService.clearBadgeCache === 'function') {
-        window.BadgeService.clearBadgeCache();
-        console.log('📋 [MENU] Cleared badge cache before loading badge for address:', address);
-      }
-      
-      // Reset tracking if address changed (wallet switch)
-      if (lastLoadedBadgeAddress !== address) {
-        lastLoadedBadgeAddress = null;
-        badgeLoadInProgress = false;
-        const badgeDisplay = document.getElementById('menuBadgeDisplay');
-        if (badgeDisplay) {
-          badgeDisplay.style.display = 'none';
-          badgeDisplay.innerHTML = ''; // Clear any existing badge content
-        }
-      }
-      
-      // Reset readiness state when loading new data
-      // NOTE: Connect button is NEVER disabled - it's needed to load data
-      gameReadinessState.dataLoaded = false;
-      gameReadinessState.migrationCheckComplete = false;
-      gameReadinessState.migrationModalClosed = true; // Start as true, will be set to false if modal opens
-      disableStartGameButton(); // Keep START buttons disabled until all checks complete
-      
-      // Load and display badge when balance is checked (wallet is fully loaded)
-      // This is the primary place badge should be loaded when wallet connects
-      // loadMenuBadgeDisplay will update readiness state when complete
-      await loadMenuBadgeDisplay(address);
-      
-      // Button will be enabled by updateGameReadiness() after loadMenuBadgeDisplay completes
-      const walletStatusText = document.getElementById('walletStatusText');
-      if (walletStatusText) {
-        walletStatusText.innerHTML = '<span class="wallet-icon">✅</span><span>Wallet connected • Ready to play!</span>';
-      }
-    } else {
-      // Keep button disabled if insufficient balance
-      disableStartGameButton();
-      const walletStatusText = document.getElementById('walletStatusText');
-      if (walletStatusText) {
-        walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Insufficient $MEWS. Need ${balanceResult.formattedMinimum} $MEWS (You have ${balanceResult.formattedBalance})</span>`;
-      }
+    // Update game readiness UI
+    if (typeof updateGameReadiness === 'function') {
+      updateGameReadiness();
     }
   } catch (error) {
-    console.error('❌ Error checking balance:', error);
-    // Keep button disabled on error
+    console.error('❌ Error loading game data:', error);
     disableStartGameButton();
-    updateBalanceUI(null, false);
-    updateWalletRequirementsUI(true, false);
-    // Hide badge display on error
-    const badgeDisplay = document.getElementById('menuBadgeDisplay');
-    if (badgeDisplay) {
-      badgeDisplay.style.display = 'none';
-    }
-    const walletStatusText = document.getElementById('walletStatusText');
-    if (walletStatusText) {
-      walletStatusText.innerHTML = `<span class="wallet-icon">⚠️</span><span>Error checking balance: ${error.message || 'Unknown error'}</span>`;
-    }
   }
 }
 
@@ -1172,22 +917,26 @@ function showMainMenu() {
   if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
     const address = window.walletAPIInstance.getAddress();
     updateWalletUI(address);
-    // Only load badge if it hasn't been loaded for this address yet
-    // (checkMEWSBalanceAndUpdateUI already loads it when wallet connects)
-    if (lastLoadedBadgeAddress !== address) {
-      loadMenuBadgeDisplay(address);
-    } else {
-      console.log('⏭️ [MENU] Skipping badge load in showMainMenu - already loaded for this address');
+    
+    // Use new flow controller - GameDataFlow is required
+    if (typeof GameDataFlow === 'undefined' || !GameDataFlow.onReturnToMenu) {
+      console.error('❌ [MENU] GameDataFlow not available - this should not happen');
+      return;
     }
+    
+    console.log('✅ [MENU] Using NEW REFACTORED SYSTEM (GameDataFlow) for return to menu');
+    GameDataFlow.onReturnToMenu();
   } else {
     updateWalletUI(null);
-    // Hide badge display when wallet is not connected
     const badgeDisplay = document.getElementById('menuBadgeDisplay');
     if (badgeDisplay) {
       badgeDisplay.style.display = 'none';
     }
-    lastLoadedBadgeAddress = null;
-    badgeLoadInProgress = false;
+    if (typeof GameDataFlow !== 'undefined' && GameDataFlow.onWalletDisconnected) {
+      GameDataFlow.onWalletDisconnected();
+    } else {
+      console.error('❌ [MENU] GameDataFlow not available - this should not happen');
+    }
   }
 }
 

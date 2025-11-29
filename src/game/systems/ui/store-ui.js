@@ -105,13 +105,29 @@ async function showStoreInternal() {
     // Modal already exists, just show it and refresh inventory
     storeModal.classList.add('store-modal-visible');
     storeModal.classList.remove('store-modal-hidden');
+    // Show loading modal while refreshing
+    if (typeof showLoadingModal === 'function') {
+      showLoadingModal('Refreshing store... Please wait', 'storeLoadingModal');
+    }
     // Wait for cards to exist, then load inventory and balance
     setTimeout(async () => {
+      try {
       await loadInventoryDisplay();
       await updateStoreBalance();
       await updateStoreUI();
+      } finally {
+        // Hide loading modal when refresh is complete
+        if (typeof hideLoadingModal === 'function') {
+          hideLoadingModal('storeLoadingModal');
+        }
+      }
     }, 100);
     return;
+  }
+  
+  // Show loading modal while store is loading
+  if (typeof showLoadingModal === 'function') {
+    showLoadingModal('Loading store... Please wait', 'storeLoadingModal');
   }
   
   // Create new store modal
@@ -190,6 +206,7 @@ async function showStoreInternal() {
   storeModal.appendChild(storeContent);
   viewportContainer.appendChild(storeModal);
   
+  try {
   // Load store items
   await loadStoreItems();
   
@@ -204,6 +221,12 @@ async function showStoreInternal() {
   
   // Update UI (including prices with badge discount)
   await updateStoreUI();
+  } finally {
+    // Hide loading modal when store is fully loaded
+    if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('storeLoadingModal');
+    }
+  }
 }
 
 /**

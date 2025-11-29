@@ -1136,6 +1136,50 @@ export class BadgeService {
         };
       }
 
+      // Check if player already has a badge in the registry
+      // This prevents minting if player already has a valid badge
+      console.log('🔍 [MINT BUILD] Checking if player already has badge in registry...');
+      try {
+        const hasBadgeRegistry = await this.hasBadge(playerAddress);
+        console.log(`🔍 [MINT BUILD] hasBadgeRegistry result: ${hasBadgeRegistry}`);
+        
+        if (hasBadgeRegistry) {
+          // Registry says player has badge - verify the badge object actually exists
+          console.log(`🔄 [MINT BUILD] Registry shows badge exists, verifying badge object...`);
+          const existingBadge = await this.getBadge(playerAddress);
+          
+          if (existingBadge && existingBadge.badgeId) {
+            // Badge object exists and is valid - minting not needed
+            console.log(`✅ [MINT BUILD] Player already has valid badge (ID: ${existingBadge.badgeId}), minting not needed`);
+            return {
+              success: false,
+              error: 'Player already has a badge. Minting is not needed.',
+            };
+          } else {
+            // Registry entry exists but badge object doesn't (orphaned entry)
+            // Clean it up automatically before proceeding with minting
+            console.log(`⚠️ [MINT BUILD] Registry entry exists but badge object not found (orphaned entry), cleaning up...`);
+            try {
+              const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
+              if (cleanupResult.success) {
+                console.log(`✅ [MINT BUILD] Orphaned registry entry cleaned up successfully, proceeding with minting...`);
+              } else {
+                console.warn(`⚠️ [MINT BUILD] Failed to clean up orphaned entry: ${cleanupResult.error}`);
+                // Continue anyway - the Move contract will handle the check
+              }
+            } catch (cleanupError) {
+              console.warn(`⚠️ [MINT BUILD] Error cleaning up orphaned entry:`, cleanupError);
+              // Continue anyway - the Move contract will handle the check
+            }
+          }
+        } else {
+          console.log(`ℹ️ [MINT BUILD] No badge found in registry, proceeding with minting...`);
+        }
+      } catch (checkError) {
+        console.warn(`⚠️ [MINT BUILD] Error checking for existing badge (non-fatal):`, checkError);
+        // Continue anyway - the Move contract will handle the check
+      }
+
       // Get badge image URL (use Standard tier for player minting)
       const imageUrl = this.getBadgeImageUrl(0); // Standard tier
       console.log(`🖼️ [MINT BUILD] Badge image URL: ${imageUrl}`);
@@ -1300,6 +1344,50 @@ export class BadgeService {
           success: false,
           error: `Invalid image URL: ${imageUrl}. Must be a valid HTTP/HTTPS URL. Check server.apiBaseUrl configuration.`,
         };
+      }
+
+      // Check if player already has a badge in the new registry
+      // This prevents migration if player already has a valid badge
+      console.log('🔍 [MIGRATE BUILD] Checking if player already has badge in new registry...');
+      try {
+        const hasNewBadgeRegistry = await this.hasBadge(playerAddress);
+        console.log(`🔍 [MIGRATE BUILD] hasNewBadgeRegistry result: ${hasNewBadgeRegistry}`);
+        
+        if (hasNewBadgeRegistry) {
+          // Registry says player has badge - verify the badge object actually exists
+          console.log(`🔄 [MIGRATE BUILD] Registry shows badge exists, verifying badge object...`);
+          const newBadge = await this.getBadge(playerAddress);
+          
+          if (newBadge && newBadge.badgeId) {
+            // Badge object exists and is valid - migration not needed
+            console.log(`✅ [MIGRATE BUILD] Player already has valid badge in new contract (ID: ${newBadge.badgeId}), migration not needed`);
+            return {
+              success: false,
+              error: 'Player already has a badge in the new contract. Migration is not needed.',
+            };
+          } else {
+            // Registry entry exists but badge object doesn't (orphaned entry)
+            // Clean it up automatically before proceeding with migration
+            console.log(`⚠️ [MIGRATE BUILD] Registry entry exists but badge object not found (orphaned entry), cleaning up...`);
+            try {
+              const cleanupResult = await this.adminCleanupOrphanedEntry(playerAddress);
+              if (cleanupResult.success) {
+                console.log(`✅ [MIGRATE BUILD] Orphaned registry entry cleaned up successfully, proceeding with migration...`);
+              } else {
+                console.warn(`⚠️ [MIGRATE BUILD] Failed to clean up orphaned entry: ${cleanupResult.error}`);
+                // Continue anyway - the Move contract will handle the check
+              }
+            } catch (cleanupError) {
+              console.warn(`⚠️ [MIGRATE BUILD] Error cleaning up orphaned entry:`, cleanupError);
+              // Continue anyway - the Move contract will handle the check
+            }
+          }
+        } else {
+          console.log(`ℹ️ [MIGRATE BUILD] No badge found in new contract registry, proceeding with migration...`);
+        }
+      } catch (checkError) {
+        console.warn(`⚠️ [MIGRATE BUILD] Error checking for existing badge (non-fatal):`, checkError);
+        // Continue anyway - the Move contract will handle the check
       }
 
       const txb = new Transaction();
@@ -1667,20 +1755,18 @@ export class BadgeService {
         badgeTier: badge.tier
       });
 
-      // If stats show 0 but badge has games, stats might not be indexed yet
-      // Use badge's games_played as fallback (it should match stats after indexing)
-      // But add 1 to account for the game that was just submitted
-      if (totalGames === 0 && badge.gamesPlayed > 0) {
-        console.warn('⚠️ [BADGE UPDATE] Stats show 0 but badge shows games. Stats may not be indexed yet.');
-        console.warn('⚠️ [BADGE UPDATE] Using badge games_played + 1 as fallback:', badge.gamesPlayed + 1);
-        totalGames = badge.gamesPlayed + 1; // Add 1 for the game just submitted
-      }
+      // Use game registry totalGames as the source of truth for tier calculation
+      // The game has already been submitted to the registry, so use totalGames directly
+      // (No need to add 1 - the registry already includes the latest game)
+      const registryGamesForTier = totalGames;
 
-      // Calculate new tier from stats (source of truth, or fallback to badge)
-      const newTier = this.calculateTierFromGames(totalGames);
+      // Calculate new tier from registry games (registry games are the source of truth)
+      const newTier = this.calculateTierFromGames(registryGamesForTier);
       const currentTier = badge.tier;
 
       console.log('🎖️ [BADGE UPDATE] Tier calculation:', {
+        badgeGamesPlayed: badge.gamesPlayed,
+        registryGamesForTier,
         totalGames,
         newTier,
         currentTier,
@@ -1701,7 +1787,7 @@ export class BadgeService {
           reason: newTier <= currentTier ? 'newTier <= currentTier' : 'unknown',
           newTier,
           currentTier,
-          totalGames
+          registryGamesForTier
         });
         return {
           success: true,

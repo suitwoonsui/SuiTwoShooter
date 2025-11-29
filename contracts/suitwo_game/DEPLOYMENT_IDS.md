@@ -2,8 +2,8 @@
 
 **⚠️ THIS IS THE ONLY FILE YOU NEED FOR CONTRACT IDs**
 
-**Latest Deployment Date:** 2025-01-26  
-**Transaction Digest:** EUB1sJcRHB5RY6G1zZstbLRkagWrfesUUM5XZz91ZaQT
+**Latest Deployment Date:** 2025-11-29  
+**Transaction Digest:** 51j6wKCrvqN7y4af2hmNjZ9wFuqq55MNAT5VtFSpC5vc
 
 ---
 
@@ -13,56 +13,53 @@
 # ==========================================
 # Main Package ID (contains all modules: score_submission, premium_store, badge_system)
 # ==========================================
-GAME_SCORE_CONTRACT_TESTNET=0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef
-OLD_GAME_SCORE_CONTRACT_TESTNET=0x8fd0510821f3cd408347bb6f851a358ae9db80d93c4f5b580d65d0304b60c4cb
+GAME_SCORE_CONTRACT_TESTNET=0x7b109d8d984b8eb98ea4d7062e9096a2215f38931c4948379cc9d4bb405deb2a
+OLD_GAME_SCORE_CONTRACT_TESTNET=0xa3ffec0c56b0dce661b42b1fec391d5d148bb6975d6e3fb2ce9dbb7239fb2aed
 
 # ==========================================
 # Score Submission Module
 # ==========================================
-SESSION_REGISTRY_OBJECT_ID_TESTNET=0xd47befcce5fecdfee07673f2c7734cd7b1464634a5aa1af9b3a09a9681d41a9a
-STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0xec99393d654d7f42e36ab32a13341d509a25122ae24a877fb23feb969848d375
-ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x0add1b03d29bc65e0a918d78a4d099f4dbcc39f1d61a88214122332756b4c036
-OLD_SESSION_REGISTRY_OBJECT_ID_TESTNET=0xbbfd7df1f2a6725cf7c4ef5c67720406af9017defcc4aa14009c0ce7c9dbf271
-OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0x108a3ef03abb4f0df7398d90c5fd438964f6a3b07a6d406d8f9d3a40de896a8e
-OLD_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0xf1cd916e102e90bd26121c8600045d463aff8cce6c526518a7529251a2d2695e
+SESSION_REGISTRY_OBJECT_ID_TESTNET=0xb485b5ad10150938c10c231f964d4bcc8593b35d1647b5f13c3fd89d504ec014
+STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0x44283e1d2fab3c8c66ef46ff0d8024fdd077fa45ccf15d5a3ef657144d83426c
+ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x131f1cb551bea1cff12a0d3db9c3a9422aa60dfc00d773cbe43c0362d442648f
+OLD_SESSION_REGISTRY_OBJECT_ID_TESTNET=0x1010db249420f842e9dc7c6d2c76e19e23b7486e8833fdfd3199b9713f99dfba
+OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0xbb4e4c42aefc7cfcc0bc7bc3e83124318fbe99f788e183ee240077fd463ad37e
+OLD_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0xc4e5d0122be95d7d1b2fb3200c0006b4c0b8f56b7e501f43d9406b2c0b1c8bfd
 
 # ==========================================
 # Premium Store Module
 # ==========================================
-PREMIUM_STORE_CONTRACT_TESTNET=0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef
-PREMIUM_STORE_OBJECT_ID_TESTNET=0xd3a948cd7d554772e09d6b9bd784ec7d8e918efc85541fb672a249ccdea0b91f
-PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x9909c65221c382bd069a30c6cd4c21bef029e75df855d5275273cfef5af549d8
-OLD_PREMIUM_STORE_CONTRACT_TESTNET=0x8fd0510821f3cd408347bb6f851a358ae9db80d93c4f5b580d65d0304b60c4cb
-OLD_PREMIUM_STORE_OBJECT_ID_TESTNET=0x93e692aa93d9a7fee30ed1fc83755d4fd1d714a6707c535f1f719231c3689e10
-OLD_PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x4cbc508ecc71184c3463ff0af46e5d378c2e278c3f9809a39bf02def9c0585ca
+PREMIUM_STORE_CONTRACT_TESTNET=0x7b109d8d984b8eb98ea4d7062e9096a2215f38931c4948379cc9d4bb405deb2a
+PREMIUM_STORE_OBJECT_ID_TESTNET=0x3f75df2b72d776a6f0a8fd6dcf145cbbd0f7a8158a969fc91c842c188344fcc9
+PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x5d91bf04a5eebbe8d99b014b5ea1d885bdb8e2690eecbf073f1d7f6bff230909
+OLD_PREMIUM_STORE_CONTRACT_TESTNET=0xa3ffec0c56b0dce661b42b1fec391d5d148bb6975d6e3fb2ce9dbb7239fb2aed
+OLD_PREMIUM_STORE_OBJECT_ID_TESTNET=0x1f566ccc883e126d822f3f457ec377198b5b8e1ca96e92f623e864950a6ba1bc
+OLD_PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0xe8dbc5cfcb3f21ec35dd1a9162c64adc0fc7ede15d91ab99a605477f2a1639fb
 
 # ==========================================
 # Badge System Module
 # ==========================================
-BADGE_REGISTRY_OBJECT_ID_TESTNET=0x1a28f8d090c0928715a3312bfbf31b8c9f28135548013069f505ce31bf5fb440
-BADGE_PUBLISHER_OBJECT_ID_TESTNET=0x7dccb138da53e59128e22637a0e75924e91a463e3d0ce537b22a8bda347ae4cc
-BADGE_DISPLAY_OBJECT_ID_TESTNET=0x01f70eb796181735963e70a7c2f6236173554a556995d2d0fbfa387bbee12f49
-OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET=0x06e307ebb1d29d76902a7a3bb488ffe5c74cfe044bab74b71932f006be506c8d
-OLD_BADGE_PUBLISHER_OBJECT_ID_TESTNET=0xf493721449c4ca62576c7171a2904a5ff4ca4e8fa937c58689c3c46e8ee209ae
-OLD_BADGE_DISPLAY_OBJECT_ID_TESTNET=0xe2ebc5c46d0e84a6b757826f8e80a446cc6faa8ebe4f76d684606d83f37be572
+BADGE_REGISTRY_OBJECT_ID_TESTNET=0x1e84e8028c34082de5a7dcd786f70bdaeb596cd82059cf3093e29b6399f8cd3b
+BADGE_PUBLISHER_OBJECT_ID_TESTNET=0xab4b373c78eae42c2c0455fabc72cbbd358a083c6b1649e4bc274b069296df72
+BADGE_DISPLAY_OBJECT_ID_TESTNET=0x4ce1ed3df4d00755eb4c59a75647648eb3c0910520232b797aa5c007d5a3b0f3
+OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET=0x3505946853a6f673adc02a3004fc501fdadc7ab8eb2da6a08943a7f101ede851
+OLD_BADGE_PUBLISHER_OBJECT_ID_TESTNET=0x6e45666d306b38ae992bb697f34fa3a86bdd1f6afc9727c38c54e9438b4e938d
+OLD_BADGE_DISPLAY_OBJECT_ID_TESTNET=0x9d00893d78de798aaddeb2db702e95458c84b48764ed4d6c5fe428b605d8bc20
 ```
 
 ---
 
 ## 🔗 Transaction Links
 
-- **Latest Deployment:** https://suiexplorer.com/txblock/EUB1sJcRHB5RY6G1zZstbLRkagWrfesUUM5XZz91ZaQT?network=testnet
-- **Badge Registry Init:** https://suiexplorer.com/txblock/5sZhsmYXTxDros3dGdWTTESUnsZG36LPHcVqrq9UKhFd?network=testnet
-- **Badge Display Creation:** https://suiexplorer.com/txblock/Gj7HWrXuoyAC5GsJPvNTvr7oBmo89tXTjCLF3eUTwBHM?network=testnet
-- **Score Admin Capability:** https://suiexplorer.com/txblock/6ETn3ZZefGvPmkAESmsZqRzkScii8B6rsKb3SFnjsoR4?network=testnet
-- **Premium Store Admin Capability:** https://suiexplorer.com/txblock/AugiqZCPQ5tCHReno7EeNt5eurqQevErE9LpPUSNpCEP?network=testnet
-- **Package:** https://suiexplorer.com/object/0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef?network=testnet
+- **Latest Deployment:** https://suiexplorer.com/txblock/51j6wKCrvqN7y4af2hmNjZ9wFuqq55MNAT5VtFSpC5vc?network=testnet
+- **Package:** https://suiexplorer.com/object/0x7b109d8d984b8eb98ea4d7062e9096a2215f38931c4948379cc9d4bb405deb2a?network=testnet
+- **Note:** Specific initialization transactions (Badge Registry, Display, Admin Capabilities) can be found by examining the object creation transactions on Sui Explorer
 
 ---
 
 ## ✅ Verification Checklist
 
-- ✅ Package deployed: `0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef`
+- ✅ Package deployed: `0x7b109d8d984b8eb98ea4d7062e9096a2215f38931c4948379cc9d4bb405deb2a`
 - ✅ Session Registry initialized
 - ✅ Statistics Registry initialized
 - ✅ Premium Store initialized
@@ -76,24 +73,39 @@ OLD_BADGE_DISPLAY_OBJECT_ID_TESTNET=0xe2ebc5c46d0e84a6b757826f8e80a446cc6faa8ebe
 
 All deployments in reverse chronological order (newest to oldest) - **Verified by blockchain timestamps**:
 
-### 1. Current Deployment (2025-11-26)
-**Package ID:** `0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef`  
-**Transaction:** `EUB1sJcRHB5RY6G1zZstbLRkagWrfesUUM5XZz91ZaQT`  
+### 1. Current Deployment (2025-11-29 02:08:00 UTC) ⭐ **ACTIVE**
+**Package ID:** `0x7b109d8d984b8eb98ea4d7062e9096a2215f38931c4948379cc9d4bb405deb2a`  
+**Transaction:** `51j6wKCrvqN7y4af2hmNjZ9wFuqq55MNAT5VtFSpC5vc`  
 **Status:** ✅ Active
 
-### 2. Previous Deployment (2025-11-26 13:20:31 UTC) ⭐ **OLD_ VALUES SOURCE**
-**Package ID:** `0x8fd0510821f3cd408347bb6f851a358ae9db80d93c4f5b580d65d0304b60c4cb`  
-**Transaction:** `2LZ3PRuGAgN45icUpbMgj18NtpWKN1kv5Ab6EuFGvKxD`  
+### 2. Previous Deployment (2025-11-29 00:09:42 UTC) ⭐ **OLD_ VALUES SOURCE**
+**Package ID:** `0xa3ffec0c56b0dce661b42b1fec391d5d148bb6975d6e3fb2ce9dbb7239fb2aed`  
+**Transaction:** `zngPr8tHgTgYs3cjTiBCXBuokKe8fbL64nyfZg6sgEQ`  
 **Status:** ⚠️ Deprecated  
 **Note:** ✅ **All `OLD_` prefixed IDs in the config above are from this deployment**
 
-### 3. Earlier Deployment (2025-11-25 21:19:52 UTC)
+### 3. Unused Deployment (2025-11-29 02:46:06 UTC)
+**Package ID:** `0x10666e8f2da2023c89e5d3b5259fa6e091a10ddd862536afdd1eedad4e53591b`  
+**Transaction:** `ACuUuNH4f3aa3m3eQw2DGQMCGzbcvkScTPHN2bcYTHki`  
+**Status:** ⚠️ Not in use (Deployment process not suitable - reverted)  
+**Note:** This was deployed after the current deployment but was reverted
+
+### 4. Earlier Deployment (2025-11-26)
+**Package ID:** `0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef`  
+**Transaction:** `EUB1sJcRHB5RY6G1zZstbLRkagWrfesUUM5XZz91ZaQT`  
+**Status:** ⚠️ Deprecated
+
+### 4. Earlier Deployment (2025-11-26 13:20:31 UTC)
+**Package ID:** `0x8fd0510821f3cd408347bb6f851a358ae9db80d93c4f5b580d65d0304b60c4cb`  
+**Transaction:** `2LZ3PRuGAgN45icUpbMgj18NtpWKN1kv5Ab6EuFGvKxD`  
+**Status:** ⚠️ Deprecated
+
+### 5. Earlier Deployment (2025-11-25 21:19:52 UTC)
 **Package ID:** `0x5a4d10695a27145386b510797c2305bf0de82e2dc94e0c19c9717f490d40f110`  
 **Transaction:** `5T5W2rcT2sGGRpFcczkkZR2T8m3CJ1a2vTry9FBHRZyu`  
-**Status:** ⚠️ Deprecated (Most recent previous deployment)  
-**Note:** ✅ **All `OLD_` prefixed IDs in the config above are from this deployment** - Verified
+**Status:** ⚠️ Deprecated
 
-### 4. Earlier Deployment (2025-11-23 15:47:22 UTC) - **COMPLETE BADGE SYSTEM**
+### 6. Earlier Deployment (2025-11-23 15:47:22 UTC) - **COMPLETE BADGE SYSTEM**
 **Package ID:** `0x66b58fb2066e41c32152148ad35ad54fe95c2d079a797199f301443725fda34b`  
 **Transaction:** `28Pt6vgDgpvm8ocKibmbigEj6nJhPsv4nrfPvQdoC2Hb`  
 **Status:** ⚠️ Deprecated  
@@ -133,6 +145,7 @@ All deployments in reverse chronological order (newest to oldest) - **Verified b
 1. **This is the ONLY file with current deployment IDs** - All other files are outdated
 2. **Copy the entire `.env` section above** to your `backend/.env.local`
 3. **Restart your backend server** after updating the `.env` file
-4. **All `OLD_` prefixed IDs are from the 2025-11-25 deployment** (`0x5a4d10695a27145386b510797c2305bf0de82e2dc94e0c19c9717f490d40f110`) - Verified ✅
-5. **Deployment History:** Use the section above to reference any previous deployment package ID if needed
+4. **All `OLD_` prefixed IDs are from the previous deployment** (`0xa3ffec0c56b0dce661b42b1fec391d5d148bb6975d6e3fb2ce9dbb7239fb2aed`) - The deployment before the current active deployment
+5. **Deployment `0x10666e8f2da2023c89e5d3b5259fa6e091a10ddd862536afdd1eedad4e53591b` is not in use** - It was deployed but reverted due to process incompatibility
+6. **Deployment History:** Use the section above to reference any previous deployment package ID if needed
 

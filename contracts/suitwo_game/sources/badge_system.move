@@ -308,8 +308,12 @@ module suitwo_game::badge_system {
         assert!(!has_badge(registry, player), E_PLAYER_ALREADY_HAS_BADGE);
         
         // Get player's total_games from statistics registry
-        // If player has no stats yet, they have 0 games (will be Standard tier)
+        // Player must have played at least 1 game to unlock badge minting
         let (has_stats, total_games, _best_score, _best_distance, _best_coins, _best_bosses_defeated, _best_enemies_defeated, _best_coin_streak, _total_score, _total_distance, _total_coins, _total_bosses_defeated, _total_enemies_defeated, _total_coin_streak, _first_game_date, _last_game_date) = score_submission::get_player_stats(stats_registry, player);
+        
+        // Use game registry total_games as the source of truth
+        // The registry already tracks the game count, so use it directly (no need to add 1)
+        let initial_games_played = if (has_stats) { total_games } else { 0 };
         
         // Create badge with Standard tier (tier 0) for first-time players
         // Badge is created directly in player's wallet (no transfer needed - truly soulbound)
@@ -317,7 +321,7 @@ module suitwo_game::badge_system {
             id: object::new(ctx),
             owner: player,
             tier: TIER_STANDARD,  // Always start at Standard tier when minting
-            games_played: if (has_stats) { total_games } else { 0 },
+            games_played: initial_games_played,  // Use registry total_games directly (registry already has the count)
             mint_date: current_time,
             last_updated: current_time,
             image: image_url,  // URL to static Standard tier badge image
@@ -556,6 +560,10 @@ module suitwo_game::badge_system {
         // Get player's total_games from statistics registry
         let (has_stats, total_games, _best_score, _best_distance, _best_coins, _best_bosses_defeated, _best_enemies_defeated, _best_coin_streak, _total_score, _total_distance, _total_coins, _total_bosses_defeated, _total_enemies_defeated, _total_coin_streak, _first_game_date, _last_game_date) = score_submission::get_player_stats(stats_registry, player);
         
+        // Use game registry total_games as the source of truth
+        // The registry already tracks the game count, so use it directly (no need to add 1)
+        let initial_games_played = if (has_stats) { total_games } else { 0 };
+        
         // Create badge with specified tier
         // NOTE: Badge is created in admin's wallet (tx_context::sender()), but owner field is set to player
         // This is for testing only - in production, players mint their own badges
@@ -563,7 +571,7 @@ module suitwo_game::badge_system {
             id: object::new(ctx),
             owner: player,  // Set player as owner (metadata)
             tier,
-            games_played: if (has_stats) { total_games } else { 0 },
+            games_played: initial_games_played,  // Use registry total_games directly (registry already has the count)
             mint_date: current_time,
             last_updated: current_time,
             image: image_url,  // URL to static badge image

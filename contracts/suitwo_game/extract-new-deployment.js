@@ -2,8 +2,8 @@
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 const path = require('path');
 
-const txDigest = 'EUB1sJcRHB5RY6G1zZstbLRkagWrfesUUM5XZz91ZaQT';
-const packageId = '0x93bef2e0ab5e8ea8df5a210e47204a68083d1d437966dc4121cd048bda6358ef';
+const txDigest = 'ACuUuNH4f3aa3m3eQw2DGQMCGzbcvkScTPHN2bcYTHki';
+const packageId = '0x10666e8f2da2023c89e5d3b5259fa6e091a10ddd862536afdd1eedad4e53591b';
 const deployerAddress = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
 
 async function extractAll() {
