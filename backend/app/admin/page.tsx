@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getApiBaseUrl } from '@/lib/api-base-url';
 
-type Tab = 'items' | 'badges' | 'migration' | 'score-migration';
+type Tab = 'items' | 'badges' | 'migration' | 'score-migration' | 'sound-test';
 
 // Helper function to get full API URL
 // Uses localhost when running locally, otherwise uses configured base URL
@@ -36,6 +36,373 @@ const getApiUrl = (path: string): string => {
   console.log('[ADMIN-PAGE] Final URL:', fullUrl);
   return fullUrl;
 };
+
+// Sound Test Tab Component
+function SoundTestTab() {
+  const [audioLoaded, setAudioLoaded] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioStats, setAudioStats] = useState<any>(null);
+
+  // Load audio scripts dynamically
+  useEffect(() => {
+    if (audioLoaded) return;
+
+    const loadAudioScripts = async () => {
+      // Audio scripts are now in the Next.js public directory
+      // Files are accessible at /src/game/audio/... from the public folder
+      // Add cache-busting query parameter to ensure latest version loads
+      const cacheBuster = `?v=${Date.now()}`;
+      const scripts = [
+        `/src/game/audio/core/audio-context.js${cacheBuster}`,
+        `/src/game/audio/settings/audio-settings.js${cacheBuster}`,
+        `/src/game/audio/music/music-patterns.js${cacheBuster}`,
+        `/src/game/audio/music/music-composer.js${cacheBuster}`,
+        `/src/game/audio/music/music-manager.js${cacheBuster}`,
+        `/src/game/audio/effects/sound-effects.js${cacheBuster}`,
+        `/src/game/audio/audio-manager.js${cacheBuster}`,
+        `/src/game/audio/audio-integration.js${cacheBuster}`,
+      ];
+
+      try {
+        for (const src of scripts) {
+          await new Promise<void>((resolve, reject) => {
+            // Extract base path without cache-buster for checking
+            const basePath = src.split('?')[0];
+            // Check if script is already loaded (by base path, ignoring cache-buster)
+            const existingScript = Array.from(document.querySelectorAll('script[src]')).find(
+              (s) => (s as HTMLScriptElement).src.includes(basePath)
+            ) as HTMLScriptElement | undefined;
+            if (existingScript) {
+              // Remove old script and reload with new cache-buster
+              existingScript.remove();
+            }
+
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${src}`));
+            document.head.appendChild(script);
+          });
+        }
+
+        // Wait a bit for initialization
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Check if audio system is available
+        if (typeof window !== 'undefined' && (window as any).getGameAudio) {
+          const gameAudio = (window as any).getGameAudio();
+          if (gameAudio) {
+            setAudioLoaded(true);
+          } else {
+            // Try to initialize
+            if (typeof (window as any).initGameAudio === 'function') {
+              (window as any).initGameAudio();
+              setTimeout(() => {
+                const audio = (window as any).getGameAudio();
+                if (audio) {
+                  setAudioLoaded(true);
+                } else {
+                  setAudioError('Audio system initialized but not available');
+                }
+              }, 500);
+            } else {
+              setAudioError('Audio initialization function not found');
+            }
+          }
+        } else {
+          setAudioError('Audio system not available. Make sure the game audio scripts are accessible.');
+        }
+      } catch (error) {
+        setAudioError(error instanceof Error ? error.message : 'Failed to load audio scripts');
+      }
+    };
+
+    loadAudioScripts();
+  }, [audioLoaded]);
+
+  const getGameAudio = () => {
+    if (typeof window !== 'undefined' && (window as any).getGameAudio) {
+      return (window as any).getGameAudio();
+    }
+    return null;
+  };
+
+  const testSound = (soundName: string) => {
+    const audio = getGameAudio();
+    if (audio && typeof audio.playSound === 'function') {
+      if (soundName === 'shoot') {
+        // Special case for shoot sound
+        if (typeof (window as any).playShootSound === 'function') {
+          (window as any).playShootSound();
+        } else {
+          audio.playSound(soundName);
+        }
+      } else {
+        audio.playSound(soundName);
+      }
+    } else {
+      alert(`Audio system not loaded. Please wait for scripts to load.`);
+    }
+  };
+
+  const testForceFieldSound = (type: string) => {
+    const audio = getGameAudio();
+    if (audio) {
+      switch (type) {
+        case 'activate':
+          if (typeof audio.playForceFieldActivate === 'function') audio.playForceFieldActivate();
+          break;
+        case 'powerUp':
+          if (typeof audio.playForceFieldPowerUp === 'function') audio.playForceFieldPowerUp();
+          break;
+        case 'powerDown':
+          if (typeof audio.playForceFieldPowerDown === 'function') audio.playForceFieldPowerDown();
+          break;
+        case 'destroyed':
+          if (typeof audio.playForceFieldDestroyed === 'function') audio.playForceFieldDestroyed();
+          break;
+      }
+    }
+  };
+
+  const testSequence = (type: string) => {
+    const audio = getGameAudio();
+    if (audio) {
+      switch (type) {
+        case 'ascending':
+          if (typeof audio.playAscendingSequence === 'function') audio.playAscendingSequence();
+          break;
+        case 'descending':
+          if (typeof audio.playDescendingSequence === 'function') audio.playDescendingSequence();
+          break;
+        case 'destruction':
+          if (typeof audio.playDestructionSequence === 'function') audio.playDestructionSequence();
+          break;
+      }
+    }
+  };
+
+  const testGameplayMusic = () => {
+    const audio = getGameAudio();
+    if (audio && typeof audio.playGameplayMusic === 'function') {
+      audio.playGameplayMusic();
+    }
+  };
+
+  const testBossMusic = () => {
+    const audio = getGameAudio();
+    if (audio && typeof audio.playBossMusic === 'function') {
+      audio.playBossMusic();
+    }
+  };
+
+  const stopBackgroundMusic = () => {
+    const audio = getGameAudio();
+    if (audio && typeof audio.stopBackgroundMusic === 'function') {
+      audio.stopBackgroundMusic();
+    }
+  };
+
+  const testTheme = (themeNumber: number) => {
+    const audio = getGameAudio();
+    if (audio && typeof audio.testTheme === 'function') {
+      audio.testTheme(themeNumber);
+    }
+  };
+
+  const testInstrument = (instrument: string) => {
+    const audio = getGameAudio();
+    if (audio && typeof audio.testInstrument === 'function') {
+      audio.testInstrument(instrument);
+    }
+  };
+
+  const showAudioStats = () => {
+    const audio = getGameAudio();
+    if (audio && typeof audio.getAudioStats === 'function') {
+      const stats = audio.getAudioStats();
+      setAudioStats(stats);
+      alert(`Audio System Stats:\n\n` +
+        `Initialized: ${stats.isInitialized}\n` +
+        `Master Volume: ${Math.round(stats.masterVolume * 100)}%\n` +
+        `Sound Effects: ${stats.soundEffectsEnabled ? 'ON' : 'OFF'}\n` +
+        `Background Music: ${stats.backgroundMusicEnabled ? 'ON' : 'OFF'}\n` +
+        `Active Sounds: ${stats.activeSounds}/${stats.maxConcurrentSounds}\n` +
+        `Audio Context: ${stats.audioContextState}`);
+    } else {
+      alert('Audio system not initialized. Audio scripts are loaded when you start the game.');
+    }
+  };
+
+  const testAllSounds = () => {
+    const audio = getGameAudio();
+    if (audio && audio.soundEffects) {
+      const soundNames = Object.keys(audio.soundEffects);
+      let delay = 0;
+      
+      soundNames.forEach(soundName => {
+        setTimeout(() => {
+          audio.playSound(soundName);
+        }, delay);
+        delay += 200;
+      });
+      
+      alert(`Testing ${soundNames.length} sounds with ${delay}ms total duration`);
+    } else {
+      alert('Audio system not initialized (audio scripts not loaded yet)');
+    }
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    padding: '0.75rem 1rem',
+    margin: '0.25rem',
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+  };
+
+  const sectionStyle: React.CSSProperties = {
+    marginBottom: '2rem',
+    padding: '1rem',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '8px',
+  };
+
+  if (!audioLoaded && !audioError) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <p>Loading audio system...</p>
+      </div>
+    );
+  }
+
+  if (audioError) {
+    return (
+      <div style={{ padding: '2rem', backgroundColor: '#f8d7da', borderRadius: '8px', color: '#721c24' }}>
+        <strong>❌ Error loading audio system:</strong>
+        <p>{audioError}</p>
+        <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+          Note: The sound test requires access to the game's audio scripts. Make sure the game files are accessible from this page.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ padding: '1rem', backgroundColor: '#e3f2fd', borderRadius: '4px' }}>
+        <strong>🔊 Sound Test</strong>
+        <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+          Test all game sounds and music. Audio system is loaded and ready.
+        </p>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0 }}>🎵 Game Sounds</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={() => testSound('shoot')}>🔫 Shoot</button>
+          <button style={buttonStyle} onClick={() => testSound('enemyHit')}>💥 Enemy Hit</button>
+          <button style={buttonStyle} onClick={() => testSound('enemyDestroyed')}>💀 Enemy Destroyed</button>
+          <button style={buttonStyle} onClick={() => testSound('coinCollect')}>🪙 Coin Collect</button>
+          <button style={buttonStyle} onClick={() => testSound('powerupCollect')}>⚡ Power Up</button>
+          <button style={buttonStyle} onClick={() => testSound('powerupNegative')}>⚠️ Power Down</button>
+          <button style={buttonStyle} onClick={() => testSound('bossHit')}>🎯 Boss Hit</button>
+          <button style={buttonStyle} onClick={() => testSound('bossDestroyed')}>💀 Boss Destroyed</button>
+          <button style={buttonStyle} onClick={() => testSound('gameOver')}>💀 Game Over</button>
+          <button style={buttonStyle} onClick={() => testSound('levelUp')}>📈 Level Up</button>
+          <button style={buttonStyle} onClick={() => testSound('playerHit')}>💢 Player Hit</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0 }}>🛡️ Force Field Sounds</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={() => testForceFieldSound('activate')}>🟢 Force Field Activate</button>
+          <button style={buttonStyle} onClick={() => testForceFieldSound('powerUp')}>🔵 Force Field Power Up</button>
+          <button style={buttonStyle} onClick={() => testForceFieldSound('powerDown')}>🟡 Force Field Power Down</button>
+          <button style={buttonStyle} onClick={() => testForceFieldSound('destroyed')}>🔴 Force Field Destroyed</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0 }}>🎼 Musical Sequences</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={() => testSequence('ascending')}>📈 Ascending Sequence</button>
+          <button style={buttonStyle} onClick={() => testSequence('descending')}>📉 Descending Sequence</button>
+          <button style={buttonStyle} onClick={() => testSequence('destruction')}>💥 Destruction Sequence</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0 }}>🎵 Gameplay Music</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={testGameplayMusic}>🎶 Play Gameplay Music</button>
+          <button style={buttonStyle} onClick={testBossMusic}>👹 Play Boss Music</button>
+          <button style={buttonStyle} onClick={stopBackgroundMusic}>⏹️ Stop Music</button>
+        </div>
+
+        <h4 style={{ marginTop: '1.5rem' }}>🎵 Theme Testing</h4>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={() => testTheme(1)}>🌌 Theme 1: Atmospheric</button>
+          <button style={buttonStyle} onClick={() => testTheme(2)}>⚡ Theme 2: Driving Action</button>
+          <button style={buttonStyle} onClick={() => testTheme(3)}>🔇 Theme 3: Minimalist</button>
+          <button style={buttonStyle} onClick={() => testTheme(4)}>🕹️ Theme 4: Retro Sci-Fi</button>
+          <button style={buttonStyle} onClick={() => testTheme(5)}>🚀 Theme 5: Action Packed</button>
+          <button style={buttonStyle} onClick={() => testTheme(6)}>🎖️ Theme 6: Militaristic</button>
+          <button style={buttonStyle} onClick={() => testTheme(7)}>⚡ Theme 7: High Energy</button>
+          <button style={buttonStyle} onClick={() => testTheme(8)}>💥 Theme 8: Aggressive</button>
+        </div>
+
+        <h4 style={{ marginTop: '1.5rem' }}>🌙 Menu Themes (Soothing)</h4>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={() => testTheme(9)}>🌸 Theme 9: Gentle Ambient</button>
+          <button style={buttonStyle} onClick={() => testTheme(10)}>🕊️ Theme 10: Peaceful Melody</button>
+          <button style={buttonStyle} onClick={() => testTheme(11)}>✨ Theme 11: Soft Harmony</button>
+          <button style={buttonStyle} onClick={() => testTheme(12)}>🌌 Theme 12: Tranquil Space</button>
+        </div>
+
+        <h4 style={{ marginTop: '1.5rem' }}>🎼 Instrument Testing</h4>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={() => testInstrument('sine')}>🔔 Sine Wave (Pure)</button>
+          <button style={buttonStyle} onClick={() => testInstrument('square')}>📦 Square Wave (Digital)</button>
+          <button style={buttonStyle} onClick={() => testInstrument('sawtooth')}>🔺 Sawtooth Wave (Buzzy)</button>
+          <button style={buttonStyle} onClick={() => testInstrument('triangle')}>🔺 Triangle Wave (Soft)</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0 }}>🎮 UI & Feedback Sounds</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={() => testSound('menuClick')}>🖱️ Menu Click</button>
+          <button style={buttonStyle} onClick={() => testSound('menuHover')}>👆 Menu Hover</button>
+          <button style={buttonStyle} onClick={() => testSound('achievement')}>🏆 Achievement</button>
+          <button style={buttonStyle} onClick={() => testSound('warning')}>⚠️ Warning</button>
+          <button style={buttonStyle} onClick={() => testSound('success')}>✅ Success</button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0 }}>🔧 Audio Debug</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button style={buttonStyle} onClick={showAudioStats}>📊 Audio Stats</button>
+          <button style={buttonStyle} onClick={testAllSounds}>🎵 Test All Sounds</button>
+        </div>
+        {audioStats && (
+          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#e8f5e9', borderRadius: '4px', fontSize: '0.9rem' }}>
+            <strong>Audio Stats:</strong>
+            <pre style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>
+              {JSON.stringify(audioStats, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<Tab>('items');
@@ -983,6 +1350,22 @@ export default function AdminPage() {
             }}
           >
             📊 Stats Migration
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('sound-test')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: activeTab === 'sound-test' ? '#2196F3' : 'transparent',
+              color: activeTab === 'sound-test' ? 'white' : '#2196F3',
+              border: 'none',
+              borderBottom: activeTab === 'sound-test' ? '3px solid #2196F3' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+            }}
+          >
+            🔊 Sound Test
           </button>
         </div>
       </div>
@@ -1987,8 +2370,13 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Sound Test Tab */}
+      {activeTab === 'sound-test' && (
+        <SoundTestTab />
+      )}
+
       {/* Results Display */}
-      {(itemsResult || badgesResult) && activeTab !== 'migration' && activeTab !== 'score-migration' && (
+      {(itemsResult || badgesResult) && activeTab !== 'migration' && activeTab !== 'score-migration' && activeTab !== 'sound-test' && (
         <div
           style={{
             marginTop: '2rem',
