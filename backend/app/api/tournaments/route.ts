@@ -14,18 +14,35 @@ export async function OPTIONS(request: NextRequest) {
 
 export const GET = withApiHandler(
   async (request: NextRequest) => {
-    const tournamentService = getTournamentService();
-    
     // Get player address from query parameter (optional)
     const { searchParams } = new URL(request.url);
     const playerAddress = searchParams.get('playerAddress');
     const forceRefresh = searchParams.has('_refresh'); // Cache-busting parameter
     
     // Get tournaments (uses cache to reduce RPC calls, unless forceRefresh is set)
-    const tournaments = await tournamentService.getActiveTournaments(forceRefresh);
+    // Handle missing configuration gracefully
+    let tournaments = [];
+    try {
+      const tournamentService = getTournamentService();
+      tournaments = await tournamentService.getActiveTournaments(forceRefresh);
+    } catch (error) {
+      // If tournament registry is not configured, return empty array instead of error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('Tournament registry not configured') || 
+          errorMessage.includes('not configured')) {
+        console.warn('Tournament registry not configured, returning empty tournaments list');
+        return {
+          success: true,
+          tournaments: [],
+          ...(playerAddress && { playerTicketCount: 0 }),
+        };
+      }
+      // Re-throw other errors to be handled by withApiHandler
+      throw error;
+    }
 
     // If player address is provided, enrich tournaments with player-specific data
-    if (playerAddress) {
+    if (playerAddress && tournaments.length > 0) {
       const { getGamePassService } = await import('@/lib/sui/game-pass-service');
       const gamePassService = getGamePassService();
       
@@ -41,6 +58,7 @@ export const GET = withApiHandler(
 
       // Enrich tournaments with player data
       // Use Promise.allSettled to handle individual failures gracefully (e.g., rate limits)
+      const tournamentService = getTournamentService();
       const enrichedTournaments = await Promise.allSettled(
         tournaments.map(async (tournament) => {
           try {

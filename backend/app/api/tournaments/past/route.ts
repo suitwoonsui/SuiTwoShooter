@@ -14,8 +14,6 @@ export async function OPTIONS(request: NextRequest) {
 
 export const GET = withApiHandler(
   async (request: NextRequest) => {
-    const tournamentService = getTournamentService();
-    
     // Get player address from query parameter (optional)
     const { searchParams } = new URL(request.url);
     const playerAddress = searchParams.get('playerAddress');
@@ -23,10 +21,29 @@ export const GET = withApiHandler(
     const limit = limitParam ? parseInt(limitParam, 10) : 50;
     
     // Get past tournaments (ended tournaments)
-    const tournaments = await tournamentService.getPastTournaments(limit);
+    // Handle missing configuration gracefully
+    let tournaments = [];
+    try {
+      const tournamentService = getTournamentService();
+      tournaments = await tournamentService.getPastTournaments(limit);
+    } catch (error) {
+      // If tournament registry is not configured, return empty array instead of error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('Tournament registry not configured') || 
+          errorMessage.includes('not configured')) {
+        console.warn('Tournament registry not configured, returning empty past tournaments list');
+        return {
+          success: true,
+          tournaments: [],
+          ...(playerAddress && { playerTicketCount: 0 }),
+        };
+      }
+      // Re-throw other errors to be handled by withApiHandler
+      throw error;
+    }
 
     // If player address is provided, enrich tournaments with player-specific data
-    if (playerAddress) {
+    if (playerAddress && tournaments.length > 0) {
       const { getGamePassService } = await import('@/lib/sui/game-pass-service');
       const gamePassService = getGamePassService();
       
@@ -40,6 +57,7 @@ export const GET = withApiHandler(
       }
 
       // Enrich tournaments with player data
+      const tournamentService = getTournamentService();
       const enrichedTournaments = await Promise.allSettled(
         tournaments.map(async (tournament) => {
           try {
