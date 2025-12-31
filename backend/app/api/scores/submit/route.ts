@@ -3,10 +3,14 @@
 // Admin wallet signs and pays gas fees
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
 
 /**
  * POST /api/scores/submit
@@ -33,75 +37,79 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const body = await request.json();
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
+    const body = await getRequestBody<{
+      playerAddress: string;
+      playerName?: string;
+      sessionId?: string;
+      scoreData: {
+        score: number;
+        distance: number;
+        coins: number;
+        bossesDefeated: number;
+        enemiesDefeated: number;
+        longestCoinStreak: number;
+      };
+    }>(request);
     const { playerAddress, playerName, sessionId, scoreData } = body;
 
     // Validate required fields
     if (!playerAddress) {
-      return NextResponse.json(
-        { error: 'playerAddress is required' },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'playerAddress is required'
       );
     }
 
     if (!scoreData) {
-      return NextResponse.json(
-        { error: 'scoreData is required' },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'scoreData is required'
       );
     }
 
     // Validate player address format
-    if (!playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      return NextResponse.json(
-        { error: 'Invalid player address format. Must be a valid Sui address (0x followed by 64 hex characters)' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    BadgeValidators.validateAddress(playerAddress);
 
     // Validate score data structure
-    const requiredFields = ['score', 'distance', 'coins', 'bossesDefeated', 'enemiesDefeated', 'longestCoinStreak'];
+    const requiredFields: Array<keyof typeof scoreData> = ['score', 'distance', 'coins', 'bossesDefeated', 'enemiesDefeated', 'longestCoinStreak'];
     for (const field of requiredFields) {
       if (scoreData[field] === undefined || scoreData[field] === null) {
-        return NextResponse.json(
-          { error: `Missing required field: ${field}` },
-          { status: 400, headers: corsHeaders }
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_ADDRESS,
+          `Missing required field: ${field}`
         );
       }
       
       // Validate numeric types
       if (typeof scoreData[field] !== 'number' || isNaN(scoreData[field])) {
-        return NextResponse.json(
-          { error: `Invalid ${field}: must be a number` },
-          { status: 400, headers: corsHeaders }
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_ADDRESS,
+          `Invalid ${field}: must be a number`
         );
       }
       
       // Validate non-negative
       if (scoreData[field] < 0) {
-        return NextResponse.json(
-          { error: `Invalid ${field}: must be non-negative` },
-          { status: 400, headers: corsHeaders }
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_ADDRESS,
+          `Invalid ${field}: must be non-negative`
         );
       }
     }
 
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`📥 [SCORE SUBMIT] Score submission request received`);
-    console.log(`   Player: ${playerAddress}`);
-    console.log(`   Score: ${scoreData.score}`);
-    console.log(`   Distance: ${scoreData.distance}`);
-    console.log(`   Coins: ${scoreData.coins}`);
-    console.log(`   Bosses Defeated: ${scoreData.bossesDefeated}`);
-    console.log(`   Enemies Defeated: ${scoreData.enemiesDefeated}`);
-    console.log(`   Longest Coin Streak: ${scoreData.longestCoinStreak}`);
-    console.log(`   Player Name: ${playerName || '(empty)'}`);
-    console.log(`   Session ID: ${sessionId || '(none)'}`);
-    console.log(`${'='.repeat(80)}\n`);
+    BadgeLogger.info('Score submission request received', {
+      playerAddress,
+      score: scoreData.score,
+      distance: scoreData.distance,
+      coins: scoreData.coins,
+      bossesDefeated: scoreData.bossesDefeated,
+      enemiesDefeated: scoreData.enemiesDefeated,
+      longestCoinStreak: scoreData.longestCoinStreak,
+      playerName: playerName || '(empty)',
+      sessionId: sessionId || '(none)',
+    });
 
     // Get admin wallet service
     const adminWallet = getAdminWalletService();
@@ -114,88 +122,74 @@ export async function POST(request: NextRequest) {
       sessionId || null  // Session ID (null if not provided)
     );
 
-    if (result.success) {
-      // After successful score submission, check if badge operations are needed
-      const badgeService = getBadgeService();
-      let badgeInfo = null;
-
-      try {
-        // Check if tier upgrade is needed (this will also check if badge exists)
-        // Note: If this fails, it will be added to retry queue automatically
-        // checkAndBuildBadgeUpdate will return error if no badge exists, so we can handle both cases
-        const updateResult = await badgeService.checkAndBuildBadgeUpdate(
-          playerAddress,
-          sessionId || `session_${Date.now()}`,
-          true // Add to retry queue on failure
-        );
-        
-        // If updateResult indicates no badge, player can mint
-        if (!updateResult.success && updateResult.error?.includes('does not have a badge')) {
-          badgeInfo = {
-            canMint: true,
-            hasBadge: false,
-          };
-        } else if (updateResult.success) {
-          // Badge exists, check if upgrade needed
-          if (updateResult.tierUpgraded) {
-            console.log('🎖️ [SCORE SUBMIT] Tier upgrade detected! New tier:', updateResult.newTier);
-            badgeInfo = {
-              canMint: false,
-              hasBadge: true,
-              tierUpgraded: true,
-              newTier: updateResult.newTier,
-              // Frontend will handle tier upgrade transaction
-            };
-          } else {
-            badgeInfo = {
-              canMint: false,
-              hasBadge: true,
-              tierUpgraded: false,
-            };
-          }
-        } else {
-          // Error checking badge (non-critical)
-          console.warn('⚠️ [SCORE SUBMIT] Badge check error (non-critical):', updateResult.error);
-          badgeInfo = {
-            error: updateResult.error || 'Badge check failed',
-          };
-        }
-      } catch (badgeError) {
-        // Don't fail score submission if badge check fails
-        console.warn('⚠️ Badge check failed (non-critical):', badgeError);
-        badgeInfo = {
-          error: 'Badge check failed',
-        };
-      }
-
-      return NextResponse.json({
-        success: true,
-        digest: result.digest,
-        playerAddress,
-        gasPaidBy: 'admin_wallet',
-        message: 'Score submitted successfully. Admin wallet paid gas fees.',
-        sessionId: sessionId || null, // Include sessionId in response for badge upgrade
-        badge: badgeInfo,
-      }, { headers: corsHeaders });
-    } else {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: result.error || 'Score submission failed' 
-        },
-        { status: 500, headers: corsHeaders }
+    if (!result.success) {
+      throw new BadgeError(
+        BadgeErrorCode.TRANSACTION_FAILED,
+        result.error || 'Score submission failed'
       );
     }
-  } catch (error) {
-    console.error('❌ Error in score submission endpoint:', error);
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500, headers: corsHeaders }
-    );
+
+    // After successful score submission, check if badge operations are needed
+    const badgeService = getBadgeService();
+    let badgeInfo = null;
+
+    try {
+      // Check if player has badge (read-only, no transaction building)
+      const hasBadge = await badgeService.hasBadge(playerAddress);
+      
+      if (!hasBadge) {
+        // Player doesn't have badge - can mint
+        badgeInfo = {
+          canMint: true,
+          hasBadge: false,
+        };
+      } else {
+        // Player has badge - check if upgrade is available (read-only)
+        const upgradeCheck = await badgeService.checkBadgeUpgrade(playerAddress);
+        
+        if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade) {
+          BadgeLogger.info('Tier upgrade available', {
+            playerAddress,
+            newTier: upgradeCheck.newTier,
+          });
+          badgeInfo = {
+            canMint: false,
+            hasBadge: true,
+            tierUpgraded: true,
+            newTier: upgradeCheck.newTier,
+            // Frontend will handle tier upgrade transaction
+          };
+        } else {
+          badgeInfo = {
+            canMint: false,
+            hasBadge: true,
+            tierUpgraded: false,
+          };
+        }
+      }
+    } catch (badgeError) {
+      // Don't fail score submission if badge check fails
+      BadgeLogger.warn('Badge check failed (non-critical)', {
+        playerAddress,
+        error: badgeError,
+      });
+      badgeInfo = {
+        error: 'Badge check failed',
+      };
+    }
+
+    return {
+      success: true,
+      digest: result.digest,
+      playerAddress,
+      gasPaidBy: 'admin_wallet',
+      message: 'Score submitted successfully. Admin wallet paid gas fees.',
+      sessionId: sessionId || null, // Include sessionId in response for badge upgrade
+      badge: badgeInfo,
+    };
+  },
+  {
+    logRequest: true,
   }
-}
+);
 

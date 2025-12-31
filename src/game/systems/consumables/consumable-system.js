@@ -62,6 +62,13 @@ async function consumeItemsFromBlockchain(items) {
     if (data.success) {
       console.log(`✅ [CONSUMPTION] Consumed ${items.length} items from blockchain in single transaction`);
       console.log(`   Transaction: ${data.digest}`);
+      
+      // Invalidate API request cache for item consumption
+      if (window.apiRequestCache && walletAddress) {
+        window.apiRequestCache.recordTransaction(walletAddress, data.digest, 'item_consume');
+        console.log('✅ [CONSUMPTION] API cache invalidated for item consumption');
+      }
+      
       return { success: true, digest: data.digest };
     } else {
       console.error('❌ [CONSUMPTION] Consume API returned error:', data.error);
@@ -287,6 +294,17 @@ const ConsumableSystem = {
     }
 
     document.addEventListener('keydown', (e) => {
+      // Don't trigger if game is over
+      if (game.gameOver) {
+        return;
+      }
+      
+      // Don't trigger if name input modal is visible
+      const nameInputModal = document.getElementById('nameInputModal');
+      if (nameInputModal && nameInputModal.classList.contains('name-input-modal-visible')) {
+        return;
+      }
+      
       // Don't trigger if typing in an input field
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         return;

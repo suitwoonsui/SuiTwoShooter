@@ -14,14 +14,14 @@ function createExplosionEffect(x, y) {
   createParticleEffect(x, y, '#FF4500', 10);
 }
 
-// Create force field hit effect
+// Create force field hit effect (reduced particle count for performance)
 function createForceFieldHitEffect(x, y) {
-  createParticleEffect(x, y, '#FF6B35', 15);
+  createParticleEffect(x, y, '#FF6B35', 10); // Reduced from 15 to 10
 }
 
-// Create coin collection effect
+// Create coin collection effect (reduced particle count for performance)
 function createCoinCollectionEffect(x, y) {
-  createParticleEffect(x, y, '#FFD700', 30);
+  createParticleEffect(x, y, '#FFD700', 20); // Reduced from 30 to 20
 }
 
 // Create power-up collection effect

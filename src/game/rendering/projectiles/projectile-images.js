@@ -8,13 +8,22 @@
 // ==========================================
 
 // Projectile images (moved from utils/helpers.js)
-const blueOrbShotImage = new Image();
-blueOrbShotImage.src = 'assets/Blue_Orb_Shot.webp';
+// Helper function to get image from preloader or create new one
+function getProjectileImage(key, src) {
+  if (typeof window !== 'undefined' && window.getGameImage) {
+    const image = window.getGameImage(key);
+    if (image) return image;
+  }
+  // Fallback to direct loading
+  const img = new Image();
+  img.src = src;
+  return img;
+}
 
-const bossArrowImage = new Image();
-bossArrowImage.src = 'assets/Boss_Arrow_Bolt.webp';
+const blueOrbShotImage = getProjectileImage('projectile_blue_orb', 'assets/Blue_Orb_Shot.webp');
 
-const enemyCandleImage = new Image();
-enemyCandleImage.src = 'assets/Enemy_Red_Candle.webp';
+const bossArrowImage = getProjectileImage('projectile_boss_arrow', 'assets/Boss_Arrow_Bolt.webp');
+
+const enemyCandleImage = getProjectileImage('projectile_enemy_candle', 'assets/Enemy_Red_Candle.webp');
 
 

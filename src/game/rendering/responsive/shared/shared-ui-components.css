@@ -166,7 +166,7 @@
 /* PANEL COMPONENTS */
 /* ========================================== */
 
-/* Base Panel Styles */
+/* Base Panel Styles - Hidden by default */
 .settings-panel,
 .instructions-panel {
   position: fixed;
@@ -175,12 +175,33 @@
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.9);
-  display: none;
+  display: none !important; /* Force hidden by default */
   align-items: center;
   justify-content: center;
   z-index: 3000;
   backdrop-filter: blur(15px);
   animation: panelFadeIn 0.3s ease-out;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Only show when explicitly marked as visible */
+.settings-panel.settings-panel-visible,
+.instructions-panel.instructions-panel-visible {
+  display: flex !important;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Ensure hidden state is enforced */
+.settings-panel.settings-panel-hidden,
+.instructions-panel.instructions-panel-hidden {
+  display: none !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 @keyframes panelFadeIn {
@@ -223,17 +244,26 @@
   justify-content: center;
   z-index: 1000;
   backdrop-filter: blur(10px);
-  display: none; /* Hidden by default */
+  display: none !important; /* Force hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Name Input Modal - Visible when active */
 .name-input-modal.name-input-modal-visible {
-  display: flex;
+  display: flex !important;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 /* Name Input Modal - Hidden when has -hidden class */
 .name-input-modal.name-input-modal-hidden {
-  display: none;
+  display: none !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .name-input-content {

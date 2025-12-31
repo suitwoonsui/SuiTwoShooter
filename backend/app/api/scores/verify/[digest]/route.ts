@@ -2,9 +2,10 @@
 // Verify Score Submission on Blockchain
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { withApiHandler, getDigestParam } from '@/lib/api/api-handler';
 
 // Type guard for created object changes
 // SuiObjectChange is a union type, we need to check for the 'created' variant
@@ -59,21 +60,12 @@ export async function OPTIONS(request: NextRequest) {
  * GET /api/scores/verify/[digest]
  * Verify a score submission transaction on the blockchain
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ digest: string }> }
-) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const { digest } = await params;
-
-    if (!digest) {
-      return NextResponse.json(
-        { error: 'Transaction digest is required' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+export const GET = withApiHandler(
+  async (
+    request: NextRequest,
+    context: { params: Promise<{ digest: string }> }
+  ) => {
+    const digest = await getDigestParam(context.params);
 
     // Initialize Sui client for testnet
     const client = new SuiClient({ url: getFullnodeUrl('testnet') });
@@ -103,13 +95,7 @@ export async function GET(
     );
 
     if (!gameSessionChange && !scoreEvent) {
-      return NextResponse.json(
-        { 
-          error: 'No game session data found in transaction',
-          transaction: tx
-        },
-        { status: 404, headers: corsHeaders }
-      );
+      throw new Error('No game session data found in transaction');
     }
 
     // Parse event data if available
@@ -130,7 +116,7 @@ export async function GET(
       return '';
     };
 
-    return NextResponse.json({
+    return {
       success: true,
       transaction: {
         digest,
@@ -159,18 +145,7 @@ export async function GET(
         },
       } : null,
       explorerUrl: `https://suiexplorer.com/txblock/${digest}?network=testnet`,
-    }, { headers: corsHeaders });
-
-  } catch (error) {
-    console.error('❌ Error verifying transaction:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to verify transaction',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    };
   }
-}
+);
 

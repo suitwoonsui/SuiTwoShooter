@@ -2,10 +2,13 @@
 // Get Payment Coin API Route
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { NextRequest } from 'next/server';
+import { handleCorsPreflight } from '@/lib/cors';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import { getConfig } from '@/config/config';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getAddressParam } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
 
 /**
  * GET /api/badges/payment-coin?address={address}&requiredAmount={amount}
@@ -29,49 +32,38 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function GET(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const address = searchParams.get('address');
     const requiredAmountParam = searchParams.get('requiredAmount');
 
     // Validate required fields
     if (!address) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'address query parameter is required' 
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'address query parameter is required'
       );
     }
 
     if (!requiredAmountParam) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'requiredAmount query parameter is required' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error('requiredAmount query parameter is required');
     }
 
     // Validate address format
     if (!address.startsWith('0x') || address.length !== 66) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'Invalid address format. Must be a valid Sui address (0x followed by 64 hex characters)' 
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'Invalid address format. Must be a valid Sui address (0x followed by 64 hex characters)'
       );
     }
 
     const requiredAmountMist = BigInt(requiredAmountParam);
 
-    console.log(`📥 Payment coin request for address: ${address}, required: ${requiredAmountMist} MIST`);
+    BadgeLogger.info('Payment coin request', {
+      address,
+      requiredAmountMist: requiredAmountMist.toString(),
+    });
 
     // Get Sui client
     const config = getConfig();
@@ -84,13 +76,10 @@ export async function GET(request: NextRequest) {
     });
 
     if (!coins.data || coins.data.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'No SUI coins found in wallet',
-        },
-        { headers: corsHeaders }
-      );
+      return {
+        success: false,
+        error: 'No SUI coins found in wallet',
+      };
     }
 
     // Calculate total balance
@@ -102,13 +91,10 @@ export async function GET(request: NextRequest) {
     // Check if balance is sufficient
     if (totalBalance < requiredAmountMist) {
       const requiredSui = Number(requiredAmountMist) / 1_000_000_000;
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Insufficient SUI balance. Required: ${requiredSui} SUI`,
-        },
-        { headers: corsHeaders }
-      );
+      return {
+        success: false,
+        error: `Insufficient SUI balance. Required: ${requiredSui} SUI`,
+      };
     }
 
     // Prefer smaller coins that are just enough (to avoid using large coins unnecessarily)
@@ -124,35 +110,19 @@ export async function GET(request: NextRequest) {
     // Find the smallest coin with sufficient balance
     const sufficientCoin = sortedCoins.find(coin => BigInt(coin.balance) >= requiredAmountMist);
     if (sufficientCoin) {
-      return NextResponse.json(
-        {
-          success: true,
-          coinId: sufficientCoin.coinObjectId,
-        },
-        { headers: corsHeaders }
-      );
+      return {
+        success: true,
+        coinId: sufficientCoin.coinObjectId,
+      };
     }
 
     // Otherwise, we need to merge coins
     // For now, we'll use the first coin and let the transaction handle merging
-    return NextResponse.json(
-      {
-        success: true,
-        coinId: coins.data[0].coinObjectId,
-        needsMerge: true,
-      },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ Error getting payment coin:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to get payment coin',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    return {
+      success: true,
+      coinId: coins.data[0].coinObjectId,
+      needsMerge: true,
+    };
   }
-}
+);
 

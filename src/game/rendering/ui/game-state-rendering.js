@@ -20,12 +20,19 @@ function renderMenuOverlay(ctx) {
 // Render game over screen
 function renderGameOverScreen(ctx) {
   // Animated dark background with pulsing effect
-  const pulseAlpha = 0.7 + 0.3 * Math.sin(Date.now() * 0.005);
+  // Use performance.now() for better performance and precision
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const pulseAlpha = 0.7 + 0.3 * Math.sin(now * 0.005);
   ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha})`;
   ctx.fillRect(0, 0, game.width, game.height);
   
   // End particles
-  game.particles.forEach(p => p.draw(ctx));
+  // Optimized: Use for loop instead of forEach for better performance
+  const particles = game.particles;
+  const particlesLength = particles.length;
+  for (let i = 0; i < particlesLength; i++) {
+    particles[i].draw(ctx);
+  }
   
   // Enhanced GAME OVER title with glow effect - properly positioned
   ctx.save();
@@ -44,6 +51,30 @@ function renderGameOverScreen(ctx) {
   ctx.restore();
   
   // Enhanced final score display
+  // Priority: _finalScore > secureGame.score > _fallbackScore > game.score getter
+  let displayScore = 0;
+  
+  // First check _finalScore (set by gameOver() function)
+  if (game._finalScore !== undefined && game._finalScore !== null && game._finalScore > 0) {
+    displayScore = game._finalScore;
+  } 
+  // Then check secureGame directly (from window.secureGame)
+  else if (typeof window !== 'undefined' && window.secureGame && window.secureGame.score !== undefined && window.secureGame.score !== null && window.secureGame.score > 0) {
+    displayScore = window.secureGame.score;
+  }
+  // Then check game._secureGame (if set via setSecureGame)
+  else if (game._secureGame && game._secureGame.score !== undefined && game._secureGame.score !== null && game._secureGame.score > 0) {
+    displayScore = game._secureGame.score;
+  }
+  // Then check fallback score
+  else if (game._fallbackScore !== undefined && game._fallbackScore !== null && game._fallbackScore > 0) {
+    displayScore = game._fallbackScore;
+  }
+  // Finally use game.score getter
+  else {
+    const getterScore = game.score;
+    displayScore = (getterScore !== undefined && getterScore !== null && getterScore > 0) ? getterScore : 0;
+  }
   ctx.save();
   ctx.shadowColor = '#39ff14';
   ctx.shadowBlur = 15;
@@ -51,8 +82,8 @@ function renderGameOverScreen(ctx) {
   ctx.strokeStyle = '#4DA2FF';
   ctx.lineWidth = 3;
   ctx.font = 'bold 36px Arial'; // Reduced font size
-  ctx.strokeText(`Final Score: ${game.score.toLocaleString()}`, centerX, centerY + 40);
-  ctx.fillText(`Final Score: ${game.score.toLocaleString()}`, centerX, centerY + 40);
+  ctx.strokeText(`Final Score: ${displayScore.toLocaleString()}`, centerX, centerY + 40);
+  ctx.fillText(`Final Score: ${displayScore.toLocaleString()}`, centerX, centerY + 40);
   ctx.restore();
   
   // Stats display - organized in two columns for better layout
@@ -99,7 +130,8 @@ function renderGameOverScreen(ctx) {
   
   // Enhanced return to menu instructions with animation
   ctx.textAlign = 'center';
-  const blinkAlpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
+  // Use cached 'now' value from above
+  const blinkAlpha = 0.5 + 0.5 * Math.sin(now * 0.01);
   ctx.fillStyle = `rgba(170, 170, 170, ${blinkAlpha})`;
   ctx.font = 'bold 22px Arial'; // Reduced font size
   ctx.fillText('Press any key to return to menu', centerX, centerY + 200);
@@ -159,7 +191,9 @@ function toggleMobilePauseOverlay(show) {
 // Render pause overlay
 function renderPauseOverlay(ctx) {
   // Animated semi-transparent overlay
-  const pulseAlpha = 0.6 + 0.2 * Math.sin(Date.now() * 0.008);
+  // Use performance.now() for better performance and precision
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const pulseAlpha = 0.6 + 0.2 * Math.sin(now * 0.008);
   ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha})`;
   ctx.fillRect(0, 0, game.width, game.height);
   
@@ -185,6 +219,8 @@ function renderMobilePauseOverlay(ctx) {
   const centerX = game.width / 2;
   const centerY = game.height / 2;
   
+  // Use performance.now() for better performance
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
   // Calculate responsive sizes based on canvas dimensions
   // Assume game.width is 800 for base calculations, scale proportionally
   const baseWidth = 800;
@@ -212,7 +248,7 @@ function renderMobilePauseOverlay(ctx) {
   // Instructions with animation - responsive sizing, BELOW the button
   ctx.save();
   ctx.textAlign = 'center';
-  const blinkAlpha = 0.6 + 0.4 * Math.sin(Date.now() * 0.012);
+  const blinkAlpha = 0.6 + 0.4 * Math.sin(now * 0.012);
   ctx.fillStyle = `rgba(204, 204, 204, ${blinkAlpha})`;
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 2 * scale;
@@ -229,6 +265,9 @@ function renderDesktopPauseOverlay(ctx) {
   const centerX = game.width / 2;
   const centerY = game.height / 2 - 60;
   
+  // Use performance.now() for better performance
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  
   // Enhanced PAUSED text with glow
   ctx.save();
   ctx.shadowColor = '#4DA2FF';
@@ -244,7 +283,7 @@ function renderDesktopPauseOverlay(ctx) {
   ctx.restore();
   
   // Enhanced instructions with animation
-  const blinkAlpha = 0.6 + 0.4 * Math.sin(Date.now() * 0.012);
+  const blinkAlpha = 0.6 + 0.4 * Math.sin(now * 0.012);
   ctx.fillStyle = `rgba(204, 204, 204, ${blinkAlpha})`;
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 2;
@@ -261,7 +300,9 @@ function renderDesktopPauseOverlay(ctx) {
 // Render boss victory screen
 function renderBossVictory(ctx) {
   // Pulsing effect
-  const alpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
+  // Use performance.now() for better performance and precision
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const alpha = 0.5 + 0.5 * Math.sin(now * 0.01);
   ctx.save();
   ctx.fillStyle = `rgba(0, 255, 0, ${alpha * 0.2})`;
   ctx.fillRect(0, 0, game.width, game.height);
@@ -294,7 +335,9 @@ function renderBossVictory(ctx) {
 // Render boss warning
 function renderBossWarning(ctx) {
   // Pulsing effect
-  const alpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
+  // Use performance.now() for better performance and precision
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const alpha = 0.5 + 0.5 * Math.sin(now * 0.01);
   ctx.save();
   ctx.fillStyle = `rgba(255, 0, 0, ${alpha * 0.3})`;
   ctx.fillRect(0, 0, game.width, game.height);

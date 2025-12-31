@@ -4,6 +4,22 @@
 // Handles item selection and consumption before game start
 // Enforces "one item type per game" rule
 
+// Use FrontendLogger if available, fallback to console
+// Use var to allow redeclaration when multiple scripts are loaded
+var log = (typeof window !== 'undefined' && window.FrontendLogger) 
+  ? {
+      debug: (cat, msg, data) => window.FrontendLogger.debug(cat, msg, data),
+      info: (cat, msg, data) => window.FrontendLogger.info(cat, msg, data),
+      warn: (cat, msg, data) => window.FrontendLogger.warn(cat, msg, data),
+      error: (cat, msg, data) => window.FrontendLogger.error(cat, msg, data),
+    }
+  : {
+      debug: () => {},
+      info: (cat, msg, data) => console.log(`[${cat}] ${msg}`, data || ''),
+      warn: (cat, msg, data) => console.warn(`[${cat}] ${msg}`, data || ''),
+      error: (cat, msg, data) => console.error(`[${cat}] ${msg}`, data || ''),
+    };
+
 // Game item selection state (for consumption, not purchase)
 // Format: { itemId: level } or { itemId: true } for single-level items
 let gameItemSelection = {
@@ -19,10 +35,14 @@ let gameItemSelection = {
 /**
  * Show item consumption/selection modal before game start
  * Returns a promise that resolves when user confirms or cancels
+ * @param {Object} options - Optional configuration
+ * @param {boolean} options.isTournamentMode - Whether this is for a tournament game (gold theme)
  */
-async function showItemConsumptionModal() {
+async function showItemConsumptionModal(options = {}) {
+  const isTournamentMode = options.isTournamentMode || false;
+  
   return new Promise(async (resolve) => {
-    console.log('🎮 [CONSUMPTION] Showing item consumption modal');
+    log.debug('CONSUMPTION', 'Showing item consumption modal');
     
     // Reset item selection state for new game
     // This ensures selections from previous games don't carry over
@@ -35,15 +55,12 @@ async function showItemConsumptionModal() {
       bossKillShot: false,
       coinTractorBeam: null
     };
-    console.log('🧹 [CONSUMPTION] Reset item selection state for new game');
     
     // Also clear game.selectedItems if it exists (from previous game)
     if (typeof game !== 'undefined' && game.selectedItems) {
-      console.log('🧹 [CONSUMPTION] Clearing game.selectedItems from previous game:', game.selectedItems);
       game.selectedItems = null;
     }
     if (typeof game !== 'undefined' && game.checkedOutItems) {
-      console.log('🧹 [CONSUMPTION] Clearing game.checkedOutItems from previous game:', game.checkedOutItems);
       game.checkedOutItems = null;
     }
     
@@ -56,34 +73,68 @@ async function showItemConsumptionModal() {
     }
     
     if (!walletAddress) {
-      console.log('⚠️ [CONSUMPTION] No wallet connected, skipping item selection');
+      log.warn('CONSUMPTION', 'No wallet connected, skipping item selection');
       resolve({ confirmed: true, items: {} });
       return;
     }
     
-    // Get inventory from blockchain API (not localStorage)
+    // Update loading message (if loading modal is visible)
+    if (typeof updateLoadingModalMessage === 'function') {
+      updateLoadingModalMessage('Loading inventory... Please wait', 'gameStartLoadingModal');
+    }
+    
+    // Get inventory from blockchain API (not localStorage) - LOAD FIRST
+    // Use cache if available
     let inventory = {};
     try {
       const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
       
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.inventory) {
-          inventory = data.inventory;
-          console.log('✅ [CONSUMPTION] Loaded inventory from blockchain:', inventory);
-        } else {
-          console.warn('⚠️ [CONSUMPTION] Failed to load inventory from blockchain:', data.error);
-        }
+      if (window.apiRequestCache) {
+        // Use cache with 30 second TTL
+        inventory = await window.apiRequestCache.get(
+          `inventory:${walletAddress}`,
+          async () => {
+            const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
+            
+            if (!response.ok) {
+              throw new Error(`Failed to load inventory: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (!data.success || !data.inventory) {
+              throw new Error(data.error || 'Invalid response from server');
+            }
+            
+            return data.inventory || {};
+          },
+          {
+            ttl: 30000, // 30 seconds
+            walletAddress: walletAddress
+          }
+        );
+        log.debug('CONSUMPTION', 'Loaded inventory from blockchain (cached)', inventory);
       } else {
-        console.warn('⚠️ [CONSUMPTION] Inventory API error:', response.status);
+        // Fallback to direct fetch if cache not available
+        const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.inventory) {
+            inventory = data.inventory;
+            log.debug('CONSUMPTION', 'Loaded inventory from blockchain', inventory);
+          } else {
+            log.warn('CONSUMPTION', 'Failed to load inventory from blockchain', data.error);
+          }
+        } else {
+          log.warn('CONSUMPTION', 'Inventory API error', response.status);
+        }
       }
     } catch (error) {
-      console.error('❌ [CONSUMPTION] Error loading inventory from blockchain:', error);
+      log.error('CONSUMPTION', 'Error loading inventory from blockchain', error);
       // Fall back to localStorage if blockchain query fails
       if (typeof getAllInventoryItems !== 'undefined') {
         inventory = getAllInventoryItems(walletAddress);
-        console.log('⚠️ [CONSUMPTION] Using localStorage inventory as fallback');
+        log.warn('CONSUMPTION', 'Using localStorage inventory as fallback');
       }
     }
     
@@ -91,15 +142,20 @@ async function showItemConsumptionModal() {
     
     // If no items in inventory, skip modal
     if (!hasItems) {
-      console.log('📦 [CONSUMPTION] No items in inventory, skipping selection');
+      log.debug('CONSUMPTION', 'No items in inventory, skipping selection');
       resolve({ confirmed: true, items: {} });
       return;
     }
     
-    // Create modal
+    // Update loading message
+    if (typeof updateLoadingModalMessage === 'function') {
+      updateLoadingModalMessage('Preparing item selection... Please wait', 'gameStartLoadingModal');
+    }
+    
+    // Create modal structure but keep it hidden until ready
     const viewportContainer = document.querySelector('.viewport-container');
     if (!viewportContainer) {
-      console.error('❌ [CONSUMPTION] Viewport container not found');
+      log.error('CONSUMPTION', 'Viewport container not found');
       resolve({ confirmed: false, items: {} });
       return;
     }
@@ -110,43 +166,63 @@ async function showItemConsumptionModal() {
       modal.remove();
     }
     
-    // Create modal
+    // Create modal (hidden initially)
     modal = document.createElement('div');
-    modal.className = 'item-consumption-modal item-consumption-modal-visible';
+    // Add tournament mode class for gold styling
+    const tournamentClass = isTournamentMode ? ' item-consumption-tournament' : '';
+    modal.className = `item-consumption-modal item-consumption-modal-hidden${tournamentClass}`; // Start hidden
     modal.setAttribute('id', 'itemConsumptionModal');
     
     // Build items HTML
     const itemsHTML = buildConsumptionItemsHTML(inventory);
     
+    // Title varies for tournament mode
+    const headerTitle = isTournamentMode ? '🏆 Select Items for Tournament Game' : '🎮 Select Items for This Game';
+    const headerSubtitle = isTournamentMode 
+      ? 'Choose items from your inventory to use in this tournament game'
+      : 'Choose items from your inventory to use in this game session';
+    
     modal.innerHTML = `
       <div class="item-consumption-content">
         <div class="item-consumption-header">
-          <h2>🎮 Select Items for This Game</h2>
-          <p class="item-consumption-subtitle">Choose items from your inventory to use in this game session</p>
+          <h2>${headerTitle}</h2>
+          <p class="item-consumption-subtitle">${headerSubtitle}</p>
         </div>
         
         <div class="item-consumption-items" id="consumptionItemsList">
           ${itemsHTML}
         </div>
         
-        <div class="item-consumption-actions">
-          <button class="menu-btn" onclick="cancelItemConsumption()">
-            <span class="btn-icon">←</span> Cancel
-          </button>
-          <button class="menu-btn primary" onclick="confirmItemConsumption()" id="confirmConsumptionBtn">
-            <span class="btn-icon">▶️</span> Start Game
-          </button>
+        <div class="item-consumption-footer">
+          <div class="item-consumption-actions">
+            <button class="menu-btn" onclick="cancelItemConsumption()">
+              <span class="btn-icon">←</span> Cancel
+            </button>
+            <button class="menu-btn primary" onclick="confirmItemConsumption()" id="confirmConsumptionBtn">
+              <span class="btn-icon">▶️</span> Start Game
+            </button>
+          </div>
         </div>
       </div>
     `;
     
+    // Append to DOM but keep hidden
     viewportContainer.appendChild(modal);
-    
-    // Store resolve function for later
-    window._consumptionResolve = resolve;
     
     // Update UI
     updateConsumptionUI();
+    
+    // Hide loading modal now that inventory is loaded and modal is ready
+    if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('gameStartLoadingModal');
+    }
+    
+    // Now show the modal (after everything is loaded)
+    modal.classList.remove('item-consumption-modal-hidden');
+    modal.classList.add('item-consumption-modal-visible');
+    
+    // Store resolve function for later
+    window._consumptionResolve = resolve;
   });
 }
 
@@ -233,7 +309,7 @@ function buildConsumptionItemsHTML(inventory) {
  * Select item for consumption (enforces one type per game rule)
  */
 function selectConsumptionItem(itemId, level) {
-  console.log('🎯 [CONSUMPTION] Selecting item:', itemId, 'level:', level);
+  log.debug('CONSUMPTION', 'Selecting item', { itemId, level });
   
   // Handle single-level items
   if (itemId === 'destroyAll' || itemId === 'bossKillShot') {
@@ -285,8 +361,7 @@ function updateConsumptionUI() {
  * Confirm item consumption and start game
  */
 async function confirmItemConsumption() {
-  console.log('✅ [CONSUMPTION] Confirming item consumption');
-  console.log('Selected items:', gameItemSelection);
+  log.debug('CONSUMPTION', 'Confirming item consumption', gameItemSelection);
   
   // Get wallet address
   let walletAddress = null;
@@ -297,19 +372,44 @@ async function confirmItemConsumption() {
   }
   
   // Fetch inventory from blockchain for validation
+  // Use cache if available
   let blockchainInventory = {};
   if (walletAddress) {
     try {
       const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.inventory) {
-          blockchainInventory = data.inventory;
+      
+      if (window.apiRequestCache) {
+        // Use cache with 30 second TTL
+        blockchainInventory = await window.apiRequestCache.get(
+          `inventory:${walletAddress}`,
+          async () => {
+            const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
+            if (!response.ok) {
+              throw new Error(`Failed to load inventory: ${response.status}`);
+            }
+            const data = await response.json();
+            if (!data.success || !data.inventory) {
+              throw new Error(data.error || 'Invalid response');
+            }
+            return data.inventory || {};
+          },
+          {
+            ttl: 30000,
+            walletAddress: walletAddress
+          }
+        );
+      } else {
+        // Fallback to direct fetch
+        const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.inventory) {
+            blockchainInventory = data.inventory;
+          }
         }
       }
     } catch (error) {
-      console.warn('⚠️ [CONSUMPTION] Error fetching inventory for validation:', error);
+      log.warn('CONSUMPTION', 'Error fetching inventory for validation', error);
     }
   }
   
@@ -317,16 +417,11 @@ async function confirmItemConsumption() {
   const itemsToConsume = {};
   const errors = [];
   
-  console.log('🔍 [CONSUMPTION] Validating items from gameItemSelection:', gameItemSelection);
-  console.log('🔍 [CONSUMPTION] Current blockchain inventory:', blockchainInventory);
-  
   for (const [itemId, level] of Object.entries(gameItemSelection)) {
     // Only validate items that are actually selected (not null, not false)
     if (level !== null && level !== false) {
       const actualLevel = level === true ? 1 : level;
       const itemKey = `${itemId}_${actualLevel}`;
-      
-      console.log(`🔍 [CONSUMPTION] Validating ${itemId} level ${actualLevel} (key: ${itemKey})`);
       
       // Check if item exists in blockchain inventory
       let count = blockchainInventory[itemKey] || 0;
@@ -334,22 +429,16 @@ async function confirmItemConsumption() {
       // Fallback to localStorage if blockchain check failed
       if (count === 0 && typeof getItemCount === 'function') {
         count = getItemCount(itemId, actualLevel, walletAddress);
-        console.log(`🔍 [CONSUMPTION] Fallback to localStorage: ${itemId} level ${actualLevel} = ${count}`);
       }
-      
-      console.log(`🔍 [CONSUMPTION] ${itemId} level ${actualLevel}: Found ${count} in inventory`);
       
       if (count <= 0) {
         const errorMsg = `${getItemName(itemId)} Level ${actualLevel} not in inventory`;
-        console.error(`❌ [CONSUMPTION] ${errorMsg}`);
+        log.error('CONSUMPTION', errorMsg);
         errors.push(errorMsg);
         continue;
       }
       
       itemsToConsume[itemId] = actualLevel;
-      console.log(`✅ [CONSUMPTION] ${itemId} level ${actualLevel} validated and added to consume list`);
-    } else {
-      console.log(`⏭️ [CONSUMPTION] Skipping ${itemId} (not selected: ${level})`);
     }
   }
   
@@ -368,7 +457,7 @@ async function confirmItemConsumption() {
   if (typeof game !== 'undefined') {
     game.selectedItems = itemsToConsume;
     game.checkedOutItems = itemsToConsume; // Track checked-out items separately
-    console.log('💾 [CONSUMPTION] Checked out items for game (not consumed yet):', game.selectedItems);
+    log.debug('CONSUMPTION', 'Checked out items for game', game.selectedItems);
     
     // Initialize consumable system after selectedItems is set
     if (typeof ConsumableSystem !== 'undefined' && ConsumableSystem.initializeConsumables) {
@@ -378,6 +467,14 @@ async function confirmItemConsumption() {
   
   // Hide modal
   hideItemConsumptionModal();
+  
+  // Show loading modal again for game initialization (with progress message)
+  if (typeof showLoadingModal === 'function') {
+    showLoadingModal('Preparing game with selected items... Please wait', 'gameStartLoadingModal');
+  } else if (typeof updateLoadingModalMessage === 'function') {
+    // If modal is already visible, just update the message
+    updateLoadingModalMessage('Preparing game with selected items... Please wait', 'gameStartLoadingModal');
+  }
   
   // Resolve promise
   if (window._consumptionResolve) {
@@ -390,7 +487,7 @@ async function confirmItemConsumption() {
  * Cancel item consumption
  */
 function cancelItemConsumption() {
-  console.log('❌ [CONSUMPTION] Cancelled item consumption');
+  log.debug('CONSUMPTION', 'Cancelled item consumption');
   
   // Reset selection
   gameItemSelection = {
@@ -405,6 +502,11 @@ function cancelItemConsumption() {
   
   // Hide modal
   hideItemConsumptionModal();
+  
+  // Hide loading modal on cancel (game won't start)
+  if (typeof hideLoadingModal === 'function') {
+    hideLoadingModal('gameStartLoadingModal');
+  }
   
   // Resolve promise with cancelled
   if (window._consumptionResolve) {

@@ -130,6 +130,21 @@
   gap: 2vw; /* Pure viewport-based gap */
 }
 
+/* Images inside h1 should not inherit text-fill-color - use proper specificity */
+.game-title h1 img,
+.game-title h1 .title-profile-image {
+  /* Reset text-fill-color - images should be visible */
+  -webkit-text-fill-color: initial;
+  /* Reset background clipping - images need their own background */
+  background: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+  /* Ensure image is visible */
+  opacity: 1;
+  display: block;
+  visibility: visible;
+}
+
 .title-profile-image {
   width: 8vw; /* Pure viewport-based width */
   height: 8vw; /* Pure viewport-based height */
@@ -176,10 +191,10 @@
   animation: badgePulse 2s ease-in-out infinite;
 }
 
-/* Ensure version-badge in main menu is white */
+/* Ensure version-badge in main menu is white (higher specificity than base .version-badge) */
 .main-menu-overlay .game-title .version-badge {
-  color: white !important;
-  -webkit-text-fill-color: white !important;
+  color: white;
+  -webkit-text-fill-color: white;
 }
 
 @keyframes badgePulse {
@@ -722,6 +737,46 @@
 }
 
 /* Icon size now governed by global `.btn-icon` */
+
+/* ========================================== */
+/* CLAIM BADGE - Notification count on buttons */
+/* ========================================== */
+
+.claim-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: linear-gradient(135deg, #f1c40f 0%, #e67e22 100%);
+  color: #1a1a2e;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(241, 196, 15, 0.5);
+  animation: badgePulse 2s ease-in-out infinite;
+  z-index: 10;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(241, 196, 15, 0.5);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(241, 196, 15, 0.7);
+  }
+}
+
+/* Override overflow:hidden on leaderboard button to allow badge visibility */
+#leaderboardMenuBtn {
+  overflow: visible;
+}
 
 .menu-footer {
   border-top: 1px solid rgba(77, 162, 255, 0.2);

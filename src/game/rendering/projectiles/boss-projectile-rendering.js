@@ -7,7 +7,11 @@ function renderBossProjectiles(ctx) {
   ctx.fillStyle = '#FF4444'; 
   ctx.strokeStyle = '#FF0000'; 
   ctx.lineWidth = 2;
-  game.bossProjectiles.forEach(b => {
+  // Optimized: Use for loop instead of forEach for better performance
+  const bossProjectiles = game.bossProjectiles;
+  const bossProjectilesLength = bossProjectiles.length;
+  for (let i = 0; i < bossProjectilesLength; i++) {
+    const b = bossProjectiles[i];
     ctx.save();
     ctx.translate(b.x, b.y);
     
@@ -27,5 +31,5 @@ function renderBossProjectiles(ctx) {
     }
     
     ctx.restore();
-  });
+  }
 }

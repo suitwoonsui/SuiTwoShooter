@@ -57,27 +57,28 @@ function renderEnemy(ctx, enemy, enemyX) {
   }
 }
 
-// Render tiles and obstacles
+// Render tiles and enemies
 function renderTiles(ctx) {
-  tiles.forEach(tile => {
-    // Only render tiles that are visible on screen
-    if (tile.x > -100 && tile.x < game.width + 100) {
-      // Obstacles (monsters) - only render if before tier 4
-      if (typeof shouldUseSeparateEnemies === 'function' && !shouldUseSeparateEnemies()) {
-        tile.obstacles.forEach(obs => {
-          const ox = tile.x + ENEMY_X_OFFSET;
-          renderEnemy(ctx, obs, ox);
-        });
-      }
-    }
-  });
+  // Don't render enemies during boss warning or boss battle
+  const game = (typeof window !== 'undefined' && window.gameState) ? window.gameState : 
+               (typeof window !== 'undefined' && window.game) ? window.game : null;
   
-  // Render separate enemies (after tier 4)
-  if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
-    enemies.forEach(enemy => {
-      if (enemy.x > -100 && enemy.x < game.width + 100) {
-        renderEnemy(ctx, enemy, enemy.x);
-      }
-    });
+  if (game && (game.bossWarning || game.bossActive)) {
+    // Skip enemy rendering during boss fights - only render collectibles if needed
+    // (Tiles might still contain coins/power-ups, but enemies should not be visible)
+    return;
+  }
+  
+  // ALWAYS render enemies from enemies[] array - enemies are never in tile.obstacles anymore
+  const enemiesArray = (typeof window !== 'undefined' && window.enemies) ? window.enemies : 
+                       (typeof enemies !== 'undefined' ? enemies : []);
+  
+  // Optimized: Use for loop instead of forEach for better performance
+  const enemiesLength = enemiesArray.length;
+  for (let i = 0; i < enemiesLength; i++) {
+    const enemy = enemiesArray[i];
+    if (enemy.x > -100 && enemy.x < game.width + 100) {
+      renderEnemy(ctx, enemy, enemy.x);
+    }
   }
 }

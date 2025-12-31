@@ -2,9 +2,13 @@
 // Badge Reconciliation API Route
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBadgeReconciliation } from '@/lib/sui/badge-reconciliation';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
 
 /**
  * POST /api/badges/reconcile
@@ -28,57 +32,28 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const body = await request.json();
-    const { playerAddress } = body;
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
+    const body = await getRequestBody<{ playerAddress: string }>(request);
+    const playerAddress = body.playerAddress;
 
     // Validate required fields
     if (!playerAddress) {
-      return NextResponse.json(
-        { 
-          success: false,
-          updated: false,
-          error: 'playerAddress is required' 
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'playerAddress is required'
       );
     }
 
     // Validate address format
-    if (!playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      return NextResponse.json(
-        { 
-          success: false,
-          updated: false,
-          error: 'Invalid player address format. Must be a valid Sui address (0x followed by 64 hex characters)' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    BadgeValidators.validateAddress(playerAddress);
 
-    console.log(`🔄 Reconciliation request received for: ${playerAddress}`);
+    BadgeLogger.info('Reconciliation request received', { playerAddress });
 
     const reconciliation = getBadgeReconciliation();
     const result = await reconciliation.reconcilePlayer(playerAddress);
 
-    return NextResponse.json(
-      result,
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ Error during reconciliation:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        updated: false,
-        error: 'Failed to reconcile badge',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    return result;
   }
-}
+);
 

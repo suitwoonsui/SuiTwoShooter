@@ -1,67 +1,73 @@
-// Find Publisher Object ID
+// Find the Publisher object for the new package
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 
-const packageId = process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
-                  process.env.PREMIUM_STORE_CONTRACT || 
-                  '0xf4ebdb147f861f925a2129f39f983867b34fa64575b7e9245189407a78f475ed'; // New package with Publisher
-
-const publisherAddress = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
+const packageId = '0x5c747e8ba3e93a028c3c35a2a997ab0ad6d86d5a373497f6be71439ff1e1fe71';
+const deployerAddress = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
 
 async function findPublisher() {
   try {
     const client = new SuiClient({ url: getFullnodeUrl('testnet') });
     
-    console.log('🔍 Searching for Publisher object...');
-    console.log('   Package ID:', packageId);
-    console.log('   Publisher Address:', publisherAddress);
+    console.log('🔍 Searching for Publisher object for package:', packageId);
+    console.log('   Deployer address:', deployerAddress);
     console.log('');
     
-    // Get all objects owned by the publisher address
+    // Get package info to find the publisher address
+    const packageInfo = await client.getObject({
+      id: packageId,
+      options: {
+        showContent: true,
+        showOwner: true,
+      },
+    });
+
+    if (!packageInfo || !packageInfo.data) {
+      console.log('❌ Package not found');
+      return;
+    }
+
+    const publisherAddress = packageInfo.data.owner?.AddressOwner;
+    console.log('📦 Package owner (Publisher address):', publisherAddress);
+    console.log('');
+
+    if (!publisherAddress) {
+      console.log('❌ Could not find publisher address from package');
+      return;
+    }
+
+    // Search for Publisher objects owned by the publisher address
     const objects = await client.getOwnedObjects({
       owner: publisherAddress,
+      filter: {
+        StructType: `${packageId}::badge_system::Publisher`,
+      },
       options: {
         showType: true,
         showOwner: true,
-        showContent: false,
       },
     });
-    
-    console.log(`📦 Found ${objects.data?.length || 0} objects owned by publisher\n`);
-    
-    let publisherFound = false;
-    
-    if (objects.data) {
+
+    if (objects.data && objects.data.length > 0) {
+      console.log(`✅ Found ${objects.data.length} Publisher object(s):\n`);
       for (const obj of objects.data) {
-        const objectType = obj.data?.type || '';
-        const objectId = obj.data?.objectId || '';
-        
-        // Look for Publisher object
-        if (objectType.includes('Publisher')) {
-          console.log('✅ Found Publisher Object!');
-          console.log('   Object ID:', objectId);
-          console.log('   Type:', objectType);
-          console.log('');
-          console.log('📝 Use this to create the Display object:');
-          console.log(`   node create-badge-display.js ${objectId}`);
-          console.log(`   OR: node setup-badge-system.js ${objectId}`);
-          publisherFound = true;
-          break;
-        }
+        const objId = obj.data?.objectId;
+        const objType = obj.data?.type;
+        console.log(`   Publisher ID: ${objId}`);
+        console.log(`   Type: ${objType}`);
+        console.log('');
       }
-    }
-    
-    if (!publisherFound) {
-      console.log('⚠️  Publisher object not found in owned objects');
+      
+      const publisherId = objects.data[0].data?.objectId;
+      console.log('📝 Use this Publisher ID:');
+      console.log(`   BADGE_PUBLISHER_OBJECT_ID_TESTNET=${publisherId}`);
+      return publisherId;
+    } else {
+      console.log('❌ No Publisher object found');
       console.log('');
-      console.log('💡 Alternative methods to find Publisher:');
-      console.log('   1. Check your deployment transaction on Sui Explorer');
-      console.log('   2. Look for an object with type containing "Publisher"');
-      console.log('   3. The Publisher might be in a different wallet');
-      console.log('');
-      console.log('🔗 Check deployment transaction:');
-      console.log(`   https://suiexplorer.com/object/${packageId}?network=testnet`);
+      console.log('💡 The Publisher should have been created during package deployment.');
+      console.log('   Check the deployment transaction for a Publisher object.');
+      return null;
     }
-    
   } catch (error) {
     console.error('❌ Error:', error.message);
     if (error.stack) {
@@ -71,4 +77,3 @@ async function findPublisher() {
 }
 
 findPublisher();
-

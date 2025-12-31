@@ -3,31 +3,24 @@
 // Returns detailed price conversion information for debugging
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { NextRequest } from 'next/server';
+import { handleCorsPreflight } from '@/lib/cors';
 import { priceConverter } from '@/lib/services/price-converter';
 import { getItemPrice, ITEM_CATALOG } from '@/lib/services/item-catalog';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function GET(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
     // Get current token prices
     const pricesResult = await priceConverter.getTokenPrices();
     
     if (!pricesResult.success || !pricesResult.prices) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: pricesResult.error || 'Failed to fetch token prices',
-        },
-        { status: 503, headers: corsHeaders }
-      );
+      throw new Error(pricesResult.error || 'Failed to fetch token prices');
     }
 
     const prices = pricesResult.prices;
@@ -104,49 +97,36 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    return NextResponse.json(
-      {
-        success: true,
-        timestamp: pricesResult.timestamp,
-        currentPrices: {
-          sui: {
-            price: prices.sui,
-            source: pricesResult.sources?.sui || 'unknown',
-            description: getSourceDescription(pricesResult.sources?.sui || 'unknown', 'SUI'),
-          },
-          mews: {
-            price: prices.mews,
-            source: pricesResult.sources?.mews || 'unknown',
-            description: getSourceDescription(pricesResult.sources?.mews || 'unknown', 'MEWS'),
-          },
-          usdc: {
-            price: prices.usdc,
-            source: pricesResult.sources?.usdc || 'fixed',
-            description: 'Fixed at $1.00 (stablecoin)',
-          },
+    return {
+      success: true,
+      timestamp: pricesResult.timestamp,
+      currentPrices: {
+        sui: {
+          price: prices.sui,
+          source: pricesResult.sources?.sui || 'unknown',
+          description: getSourceDescription(pricesResult.sources?.sui || 'unknown', 'SUI'),
         },
-        conversionTests,
-        itemTests,
-        decimalHandling: {
-          sui: { decimals: 9, divisor: '1_000_000_000' },
-          mews: { decimals: 6, divisor: '1_000_000' },
-          usdc: { decimals: 6, divisor: '1_000_000' },
+        mews: {
+          price: prices.mews,
+          source: pricesResult.sources?.mews || 'unknown',
+          description: getSourceDescription(pricesResult.sources?.mews || 'unknown', 'MEWS'),
+        },
+        usdc: {
+          price: prices.usdc,
+          source: pricesResult.sources?.usdc || 'fixed',
+          description: 'Fixed at $1.00 (stablecoin)',
         },
       },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ Error in price verification endpoint:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
+      conversionTests,
+      itemTests,
+      decimalHandling: {
+        sui: { decimals: 9, divisor: '1_000_000_000' },
+        mews: { decimals: 6, divisor: '1_000_000' },
+        usdc: { decimals: 6, divisor: '1_000_000' },
       },
-      { status: 500, headers: corsHeaders }
-    );
+    };
   }
-}
+);
 
 function getSourceDescription(source: string, token: string): string {
   switch (source) {

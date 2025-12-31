@@ -2,16 +2,20 @@
 // Badge Query API Route
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
 import { BadgeValidators } from '@/lib/sui/badge-validators';
 import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
 import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getAddressParam } from '@/lib/api/api-handler';
 
 /**
  * GET /api/badges/[address]
  * Query player's badge information
+ * 
+ * Query params:
+ *   ?contract=new|old  (default: new)
  * 
  * Returns:
  * {
@@ -36,175 +40,105 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ address: string }> }
-) {
-  console.log(`\n📥 [BADGE API] ========== BADGE QUERY REQUEST ==========`);
-  console.log(`📥 [BADGE API] Timestamp: ${new Date().toISOString()}`);
-  console.log(`📥 [BADGE API] Request URL: ${request.url}`);
-  console.log(`📥 [BADGE API] Request method: ${request.method}`);
-  
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    // Step 1: Extract and validate address parameter
-    console.log(`\n📥 [BADGE API] Step 1: Extracting address parameter...`);
-    const { address: playerAddress } = await params;
+export const GET = withApiHandler(
+  async (
+    request: NextRequest,
+    context: { params: Promise<{ address: string }> }
+  ) => {
+    // Extract and validate address parameter
+    const playerAddress = await getAddressParam(context.params);
     
-    // Step 1.5: Check for contract query parameter
+    // Check for contract query parameter
     const { searchParams } = new URL(request.url);
     const contract = searchParams.get('contract') || 'new'; // Default to 'new'
     const useOldContract = contract === 'old';
-    console.log(`📥 [BADGE API] ========== CONTRACT SELECTION ==========`);
-    console.log(`📥 [BADGE API] Contract parameter: ${contract}`);
-    console.log(`📥 [BADGE API] useOldContract: ${useOldContract}`);
-    console.log(`📥 [BADGE API] Will query: ${useOldContract ? 'OLD contract registry' : 'NEW contract registry'}`);
-    console.log(`📥 [BADGE API] =========================================`);
-    console.log(`📥 [BADGE API] Extracted address: ${playerAddress}`);
-    console.log(`📥 [BADGE API] Address length: ${playerAddress?.length || 0}`);
-    console.log(`📥 [BADGE API] Address starts with 0x: ${playerAddress?.startsWith('0x') || false}`);
+    
+    BadgeLogger.debug('Badge query request', {
+      playerAddress,
+      contract,
+      useOldContract,
+    });
 
     // Validate address format using BadgeValidators
-    try {
-      if (!playerAddress) {
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
-          'Address parameter is required'
-        );
-      }
-      BadgeValidators.validateAddress(playerAddress);
-    } catch (validationError) {
-      if (validationError instanceof BadgeError) {
-        BadgeLogger.error('Invalid address format', {
-          address: playerAddress,
-          error: validationError.message,
-        });
-        return NextResponse.json(
-          {
-            success: false,
-            error: validationError.message,
-            code: validationError.code,
-          },
-          { status: 400, headers: corsHeaders }
-        );
-      }
-      throw validationError;
+    if (!playerAddress) {
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'Address parameter is required'
+      );
     }
+    BadgeValidators.validateAddress(playerAddress);
 
-    // Step 3: Get badge service
-    console.log(`\n📥 [BADGE API] Step 3: Getting badge service instance...`);
+    // Get badge service
     const badgeService = getBadgeService();
-    console.log(`✅ [BADGE API] Badge service obtained`);
     
-    // Step 4: Check if player has badge (in selected contract)
-    console.log(`\n📥 [BADGE API] Step 4: Checking if player has badge in ${contract} contract...`);
+    // Check if player has badge (in selected contract)
+    BadgeLogger.debug('Checking if player has badge', { playerAddress, contract });
     
     const hasBadge = useOldContract
       ? await badgeService.hasBadgeOldContract(playerAddress)
       : await badgeService.hasBadge(playerAddress);
     
-    console.log(`\n📥 [BADGE API] hasBadge() returned: ${hasBadge}`);
-    console.log(`📥 [BADGE API] Type: ${typeof hasBadge}, Value: ${hasBadge}`);
-    console.log(`📥 [BADGE API] Boolean conversion: ${Boolean(hasBadge)}`);
+    BadgeLogger.debug('hasBadge check result', { hasBadge, playerAddress, contract });
     
     if (!hasBadge) {
-      console.log(`\n📥 [BADGE API] ========== NO BADGE FOUND ==========`);
-      console.log(`📥 [BADGE API] Player does not have badge in ${contract} contract`);
-      console.log(`📥 [BADGE API] Returning hasBadge: false`);
-      console.log(`📥 [BADGE API] =====================================\n`);
-      return NextResponse.json(
-        {
-          success: true,
-          hasBadge: false,
-        },
-        { headers: corsHeaders }
-      );
+      BadgeLogger.debug('Player does not have badge', { playerAddress, contract });
+      return {
+        success: true,
+        hasBadge: false,
+      };
     }
 
-    // Step 5: Get badge data (from selected contract)
-    console.log(`\n📥 [BADGE API] Step 5: Player HAS badge - getting badge data from ${contract} contract...`);
+    // Get badge data (from selected contract)
+    BadgeLogger.debug('Player has badge - getting badge data', { playerAddress, contract });
     
     const badge = useOldContract
       ? await badgeService.getBadgeOldContract(playerAddress)
       : await badgeService.getBadge(playerAddress);
     
-    console.log(`\n📥 [BADGE API] getBadge() returned:`, badge ? 'Badge object' : 'null');
-    if (badge) {
-      console.log(`📥 [BADGE API] Badge details:`);
-      console.log(`   - badgeId: ${badge.badgeId}`);
-      console.log(`   - tier: ${badge.tier}`);
-      console.log(`   - gamesPlayed: ${badge.gamesPlayed}`);
-      console.log(`   - mintDate: ${badge.mintDate}`);
-      console.log(`   - lastUpdated: ${badge.lastUpdated}`);
-    } else {
-      console.log(`⚠️ [BADGE API] getBadge returned null even though hasBadge was true`);
-      console.log(`⚠️ [BADGE API] This indicates an INCONSISTENCY:`);
-      console.log(`   - hasBadge() returned: true`);
-      console.log(`   - getBadge() returned: null`);
-      console.log(`⚠️ [BADGE API] This might indicate an orphaned registry entry`);
-    }
-    
-    if (!badge) {
-      console.log(`\n📥 [BADGE API] ========== INCONSISTENT STATE ==========`);
-      console.log(`📥 [BADGE API] Registry says player has badge, but getBadge returned null`);
-      console.log(`📥 [BADGE API] Returning hasBadge: false (inconsistent state)`);
-      console.log(`📥 [BADGE API] =========================================\n`);
-      return NextResponse.json(
-        {
-          success: true,
-          hasBadge: false,
-        },
-        { headers: corsHeaders }
-      );
-    }
-
-    // Step 6: Get discounts for tier
-    console.log(`\n📥 [BADGE API] Step 6: Getting discounts for tier ${badge.tier}...`);
-    const discounts = badgeService.getDiscounts(badge.tier);
-    console.log(`📥 [BADGE API] Discounts:`, JSON.stringify(discounts, null, 2));
-
-    // Step 7: Return success response
-    console.log(`\n📥 [BADGE API] ========== BADGE FOUND ==========`);
-    console.log(`📥 [BADGE API] Successfully retrieved badge data`);
-    console.log(`📥 [BADGE API] Badge ID: ${badge.badgeId}`);
-    console.log(`📥 [BADGE API] Tier: ${badge.tier}`);
-    console.log(`📥 [BADGE API] ==================================\n`);
-
-    return NextResponse.json(
-      {
-        success: true,
-        hasBadge: true,
-        badge: {
-          badgeId: badge.badgeId,
-          tier: badge.tier,
-          gamesPlayed: badge.gamesPlayed,
-          mintDate: badge.mintDate,
-          lastUpdated: badge.lastUpdated,
-          imageUrl: badge.imageUrl, // Include image URL from badge object
-          discounts,
-        },
-      },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    const badgeError = BadgeError.fromUnknown(error, 'Failed to query badge');
-    const playerAddress = await params.then(p => p.address).catch(() => 'unknown');
-    
-    BadgeLogger.error('Error during badge query', {
-      error: badgeError,
-      playerAddress,
+    BadgeLogger.debug('getBadge result', { 
+      playerAddress, 
+      hasBadge: !!badge,
+      badgeId: badge?.badgeId,
+      tier: badge?.tier,
     });
     
-    return NextResponse.json(
-      {
-        success: false,
-        error: badgeError.message,
-        code: badgeError.code,
-        ...(badgeError.details && { details: badgeError.details }),
+    if (!badge) {
+      BadgeLogger.warn('Inconsistent state - hasBadge=true but getBadge returned null', {
+        playerAddress,
+        contract,
+        note: 'This might indicate an orphaned registry entry',
+      });
+      return {
+        success: true,
+        hasBadge: false,
+      };
+    }
+
+    // Get discounts for tier
+    const discounts = badgeService.getDiscounts(badge.tier);
+    BadgeLogger.debug('Retrieved badge with discounts', {
+      playerAddress,
+      tier: badge.tier,
+      discounts,
+    });
+
+    // Return success response
+    return {
+      success: true,
+      hasBadge: true,
+      badge: {
+        badgeId: badge.badgeId,
+        tier: badge.tier,
+        gamesPlayed: badge.gamesPlayed,
+        mintDate: badge.mintDate,
+        lastUpdated: badge.lastUpdated,
+        imageUrl: badge.imageUrl,
+        discounts,
       },
-      { status: 500, headers: corsHeaders }
-    );
+    };
+  },
+  {
+    logRequest: true,
   }
-}
+);
 

@@ -20,6 +20,7 @@ interface SuiConfig {
 
 interface TokenConfig {
   mewsTokenTypeId: string;
+  usdcTokenTypeId: string;
   minTokenBalance: number;
 }
 
@@ -38,6 +39,17 @@ interface ContractsConfig {
   premiumStoreAdminCapability: string; // Premium store admin capability object ID (separate from score submission)
   oldPremiumStorePackageId: string; // Old premium store package ID (for migration from old contract)
   oldPremiumStoreObjectId: string; // Old premium store object ID (for migration from old contract)
+  gamePass: string;          // Game pass package ID
+  gamePassSystem: string;     // Game pass system object ID (from init function)
+  tournamentRegistry: string; // Tournament registry object ID (from tournaments::init function)
+  tournamentAdminCap: string; // Tournament admin capability object ID
+  mewsTreasuryCap: string;   // MEWS TreasuryCap object ID (for minting tokens)
+  mewsPackageId: string;     // MEWS package ID (for minting tokens)
+  achievementRegistry: string; // Achievement registry object ID (from achievement_system::init function)
+  achievementAdminCap: string; // Achievement admin capability object ID
+  oldAchievementPackageId?: string; // Old achievement package ID (for migration from old contract)
+  oldAchievementRegistryId?: string; // Old achievement registry object ID (for migration from old contract)
+  oldAchievementAdminCapId?: string; // Old achievement admin capability object ID (for migration from old contract)
 }
 
 interface SecurityConfig {
@@ -171,9 +183,14 @@ export function getConfig(): Config {
       gasBudget: parseInt(process.env.SUI_GAS_BUDGET || '10000000', 10)
     },
     token: {
+      // For testnet: ONLY use MEWS_TOKEN_TYPE_ID_TESTNET (never generic to avoid mainnet conflicts)
+      // For mainnet: Use MEWS_TOKEN_TYPE_ID_MAINNET or fallback to generic MEWS_TOKEN_TYPE_ID
       mewsTokenTypeId: network === 'testnet'
-        ? (process.env.MEWS_TOKEN_TYPE_ID_TESTNET || process.env.MEWS_TOKEN_TYPE_ID || '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS')
-        : (process.env.MEWS_TOKEN_TYPE_ID_MAINNET || process.env.MEWS_TOKEN_TYPE_ID || '0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS'),
+        ? (process.env.MEWS_TOKEN_TYPE_ID_TESTNET || '')
+        : (process.env.MEWS_TOKEN_TYPE_ID_MAINNET || process.env.MEWS_TOKEN_TYPE_ID || ''),
+      usdcTokenTypeId: network === 'testnet'
+        ? (process.env.USDC_TOKEN_TYPE_ID_TESTNET || process.env.USDC_TOKEN_TYPE_ID || '')
+        : (process.env.USDC_TOKEN_TYPE_ID_MAINNET || process.env.USDC_TOKEN_TYPE_ID || ''),
       minTokenBalance: parseInt(process.env.MIN_TOKEN_BALANCE || '500000000', 10) // 500,000 with 9 decimals
     },
     contracts: {
@@ -242,7 +259,48 @@ export function getConfig(): Config {
         : (process.env.OLD_PREMIUM_STORE_CONTRACT_MAINNET || process.env.OLD_PREMIUM_STORE_PACKAGE_ID_MAINNET || process.env.OLD_PREMIUM_STORE_PACKAGE_ID || process.env.OLD_PREMIUM_STORE_CONTRACT || ''),
       oldPremiumStoreObjectId: network === 'testnet'
         ? (process.env.OLD_PREMIUM_STORE_OBJECT_ID_TESTNET || process.env.OLD_PREMIUM_STORE_OBJECT_ID || '')
-        : (process.env.OLD_PREMIUM_STORE_OBJECT_ID_MAINNET || process.env.OLD_PREMIUM_STORE_OBJECT_ID || '')
+        : (process.env.OLD_PREMIUM_STORE_OBJECT_ID_MAINNET || process.env.OLD_PREMIUM_STORE_OBJECT_ID || ''),
+      // Support network-specific game pass addresses
+      gamePass: network === 'testnet'
+        ? (process.env.GAME_PASS_CONTRACT_TESTNET || process.env.GAME_PASS_CONTRACT || '')
+        : (process.env.GAME_PASS_CONTRACT_MAINNET || process.env.GAME_PASS_CONTRACT || ''),
+      gamePassSystem: network === 'testnet'
+        ? (process.env.GAME_PASS_SYSTEM_OBJECT_ID_TESTNET || process.env.GAME_PASS_SYSTEM_OBJECT_ID || '')
+        : (process.env.GAME_PASS_SYSTEM_OBJECT_ID_MAINNET || process.env.GAME_PASS_SYSTEM_OBJECT_ID || ''),
+      tournamentRegistry: network === 'testnet'
+        ? (process.env.TOURNAMENT_REGISTRY_OBJECT_ID_TESTNET || process.env.TOURNAMENT_REGISTRY_OBJECT_ID || '')
+        : (process.env.TOURNAMENT_REGISTRY_OBJECT_ID_MAINNET || process.env.TOURNAMENT_REGISTRY_OBJECT_ID || ''),
+      tournamentAdminCap: network === 'testnet'
+        ? (process.env.TOURNAMENT_ADMIN_CAPABILITY_OBJECT_ID_TESTNET || process.env.TOURNAMENT_ADMIN_CAPABILITY_OBJECT_ID || '')
+        : (process.env.TOURNAMENT_ADMIN_CAPABILITY_OBJECT_ID_MAINNET || process.env.TOURNAMENT_ADMIN_CAPABILITY_OBJECT_ID || ''),
+      mewsTreasuryCap: network === 'testnet'
+        ? (process.env.MEWS_TREASURY_CAP_OBJECT_ID_TESTNET || process.env.MEWS_TREASURY_CAP_OBJECT_ID || '')
+        : (process.env.MEWS_TREASURY_CAP_OBJECT_ID_MAINNET || process.env.MEWS_TREASURY_CAP_OBJECT_ID || ''),
+      mewsPackageId: network === 'testnet'
+        ? (process.env.MEWS_PACKAGE_ID_TESTNET || process.env.MEWS_PACKAGE_ID || '')
+        : (process.env.MEWS_PACKAGE_ID_MAINNET || process.env.MEWS_PACKAGE_ID || ''),
+      achievementRegistry: network === 'testnet'
+        ? (process.env.ACHIEVEMENT_REGISTRY_OBJECT_ID_TESTNET || process.env.ACHIEVEMENT_REGISTRY_OBJECT_ID || '')
+        : (process.env.ACHIEVEMENT_REGISTRY_OBJECT_ID_MAINNET || process.env.ACHIEVEMENT_REGISTRY_OBJECT_ID || ''),
+      achievementAdminCap: network === 'testnet'
+        ? (process.env.ACHIEVEMENT_ADMIN_CAP_OBJECT_ID_TESTNET || 
+           process.env.ACHIEVEMENT_ADMIN_CAPABILITY_OBJECT_ID_TESTNET || 
+           process.env.ACHIEVEMENT_ADMIN_CAP_OBJECT_ID ||
+           process.env.ACHIEVEMENT_ADMIN_CAPABILITY_OBJECT_ID || '')
+        : (process.env.ACHIEVEMENT_ADMIN_CAP_OBJECT_ID_MAINNET || 
+           process.env.ACHIEVEMENT_ADMIN_CAPABILITY_OBJECT_ID_MAINNET || 
+           process.env.ACHIEVEMENT_ADMIN_CAP_OBJECT_ID ||
+           process.env.ACHIEVEMENT_ADMIN_CAPABILITY_OBJECT_ID || ''),
+      // Old achievement system IDs for migration (optional - can be provided in API request instead)
+      oldAchievementPackageId: network === 'testnet'
+        ? (process.env.OLD_ACHIEVEMENT_PACKAGE_ID_TESTNET || process.env.OLD_ACHIEVEMENT_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || process.env.OLD_GAME_SCORE_CONTRACT || '')
+        : (process.env.OLD_ACHIEVEMENT_PACKAGE_ID_MAINNET || process.env.OLD_ACHIEVEMENT_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT_MAINNET || process.env.OLD_GAME_SCORE_CONTRACT || ''),
+      oldAchievementRegistryId: network === 'testnet'
+        ? (process.env.OLD_ACHIEVEMENT_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_ACHIEVEMENT_REGISTRY_OBJECT_ID || '')
+        : (process.env.OLD_ACHIEVEMENT_REGISTRY_OBJECT_ID_MAINNET || process.env.OLD_ACHIEVEMENT_REGISTRY_OBJECT_ID || ''),
+      oldAchievementAdminCapId: network === 'testnet'
+        ? (process.env.OLD_ACHIEVEMENT_ADMIN_CAP_OBJECT_ID_TESTNET || process.env.OLD_ACHIEVEMENT_ADMIN_CAP_OBJECT_ID || '')
+        : (process.env.OLD_ACHIEVEMENT_ADMIN_CAP_OBJECT_ID_MAINNET || process.env.OLD_ACHIEVEMENT_ADMIN_CAP_OBJECT_ID || ''),
     },
     security: {
       apiKey: process.env.API_KEY || '',

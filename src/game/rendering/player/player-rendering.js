@@ -42,7 +42,9 @@ function renderPlayer(ctx) {
   // Apply invulnerability effect
   if (game.invulnerabilityTime > 0) {
     // Flashing effect during invulnerability
-    const flashAlpha = 0.3 + 0.4 * Math.sin(Date.now() * 0.02); // Fast flashing
+    // Use performance.now() for better performance and precision
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const flashAlpha = 0.3 + 0.4 * Math.sin(now * 0.02); // Fast flashing
     ctx.save();
     ctx.globalAlpha = flashAlpha;
   }
@@ -74,14 +76,17 @@ function renderForceField(ctx) {
     const fieldAlpha = 0.3 + (game.forceField.level * 0.1);
     
     // Animated pulsing effect (stronger pulse for higher levels)
+    // Use performance.now() instead of Date.now() for better performance
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const pulseIntensity = game.forceField.level === 3 ? 0.15 : 0.1;
-    const pulseScale = 1 + pulseIntensity * Math.sin(Date.now() * 0.01);
+    const pulseScale = 1 + pulseIntensity * Math.sin(now * 0.01);
     const pulseRadius = fieldRadius * pulseScale;
     
     const pcx = player.x + player.width/2;
     const pcy = player.y + player.height/2;
     
-    // Create gradient for force field
+    // Create gradient for force field (gradients are context-specific, can't cache effectively)
+    // But we can optimize by using simpler gradient for lower levels
     const fieldGrad = ctx.createRadialGradient(pcx, pcy, 0, pcx, pcy, pulseRadius);
     fieldGrad.addColorStop(0, `rgba(255,255,255,${fieldAlpha * 0.5})`);
     fieldGrad.addColorStop(0.7, fieldColor + Math.floor(fieldAlpha * 255).toString(16).padStart(2, '0'));
@@ -106,7 +111,7 @@ function renderForceField(ctx) {
       if (game.forceField.level === 3) {
         // Level 3: Atomic model - orbiting particles around player
         const orbitRadius = pulseRadius * 0.7; // Orbit slightly inside the force field
-        const orbitSpeed = Date.now() * 0.003; // Rotation speed
+        const orbitSpeed = now * 0.003; // Rotation speed (use cached 'now' value)
         const particleCount = 12;
         const particleSize = 3;
         ctx.globalAlpha = 0.9;
@@ -136,10 +141,10 @@ function renderForceField(ctx) {
           }
         });
       } else {
-        // Level 2: Static sparkles
+        // Level 2: Static sparkles (use cached 'now' value)
         ctx.globalAlpha = 0.6;
         for (let i = 0; i < 8; i++) {
-          const angle = (Date.now() * 0.002 + i * Math.PI / 4) % (Math.PI * 2);
+          const angle = (now * 0.002 + i * Math.PI / 4) % (Math.PI * 2);
           const sparkleX = pcx + Math.cos(angle) * (pulseRadius * 0.8);
           const sparkleY = pcy + Math.sin(angle) * (pulseRadius * 0.8);
           

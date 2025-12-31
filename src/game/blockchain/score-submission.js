@@ -65,6 +65,65 @@ function validateGameStats(gameStats) {
 async function submitScoreToBlockchain(gameStats, playerName = '') {
   console.log('📝 [BLOCKCHAIN] Submitting score via backend:', gameStats, 'Name:', playerName || '(empty)');
 
+  // Check if game was in demo mode - prevent score submission
+  const game = typeof window !== 'undefined' && window.game ? window.game : null;
+  const gameState = typeof window !== 'undefined' && window.gameState ? window.gameState : null;
+  const isDemoMode = (game && game.isDemoMode) || (gameState && gameState.isDemoMode);
+  
+  if (isDemoMode) {
+    console.warn('⚠️ [BLOCKCHAIN] Score submission blocked - game was in demo mode');
+    return {
+      success: false,
+      error: 'Cannot submit scores from demo mode. Please purchase credits to save your score.'
+    };
+  }
+
+  // Check if this is a tournament game
+  // Try multiple sources to find tournament state
+  let isTournamentMode = false;
+  let tournamentObjectId = null;
+  let tournamentCategory = null;
+  
+  // Priority 1: window.game (most direct access)
+  if (game && game.isTournamentMode) {
+    isTournamentMode = game.isTournamentMode;
+    tournamentObjectId = game.tournamentObjectId;
+    tournamentCategory = game.tournamentCategory;
+  }
+  // Priority 2: gameState (window.gameState)
+  else if (gameState && gameState.isTournamentMode) {
+    isTournamentMode = gameState.isTournamentMode;
+    tournamentObjectId = gameState.tournamentObjectId;
+    tournamentCategory = gameState.tournamentCategory;
+  }
+  // Priority 3: window.gameState directly (in case game/gameState references are stale)
+  else if (typeof window !== 'undefined' && window.gameState && window.gameState.isTournamentMode) {
+    isTournamentMode = window.gameState.isTournamentMode;
+    tournamentObjectId = window.gameState.tournamentObjectId;
+    tournamentCategory = window.gameState.tournamentCategory;
+  }
+  // Priority 4: window.game directly (in case it's different from gameState)
+  else if (typeof window !== 'undefined' && window.game && window.game.isTournamentMode) {
+    isTournamentMode = window.game.isTournamentMode;
+    tournamentObjectId = window.game.tournamentObjectId;
+    tournamentCategory = window.game.tournamentCategory;
+  }
+  
+  // Debug logging for tournament mode detection
+  console.log('🏆 [SCORE SUBMISSION] Tournament mode check', {
+    isTournamentMode,
+    tournamentObjectId,
+    tournamentCategory,
+    gameIsTournamentMode: game?.isTournamentMode,
+    gameTournamentObjectId: game?.tournamentObjectId,
+    gameStateIsTournamentMode: gameState?.isTournamentMode,
+    gameStateTournamentObjectId: gameState?.tournamentObjectId,
+    windowGameIsTournamentMode: typeof window !== 'undefined' && window.game ? window.game.isTournamentMode : 'N/A',
+    windowGameTournamentObjectId: typeof window !== 'undefined' && window.game ? window.game.tournamentObjectId : 'N/A',
+    windowGameStateIsTournamentMode: typeof window !== 'undefined' && window.gameState ? window.gameState.isTournamentMode : 'N/A',
+    windowGameStateTournamentObjectId: typeof window !== 'undefined' && window.gameState ? window.gameState.tournamentObjectId : 'N/A',
+  });
+
   // Validate stats before submission
   const validation = validateGameStats(gameStats);
   if (!validation.valid) {
@@ -97,6 +156,98 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
     const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 
                          'http://localhost:3000/api';
 
+    // Route to tournament endpoint if tournament mode
+    if (isTournamentMode && tournamentObjectId) {
+      // Validate tournamentObjectId is present and valid format (Sui object ID)
+      if (!tournamentObjectId || typeof tournamentObjectId !== 'string' || tournamentObjectId.length < 10) {
+        console.error('❌ [TOURNAMENT] Invalid tournamentObjectId, falling back to regular game submission', {
+          tournamentObjectId,
+          isTournamentMode,
+        });
+        // Fall through to regular game submission
+      } else {
+        console.log(`🏆 [TOURNAMENT] Submitting tournament score to SPECIFIC tournament`, {
+          tournamentObjectId,
+          tournamentCategory,
+          playerAddress,
+          playerName: playerName || '(not provided)',
+          scoreData: {
+            score: Math.round(gameStats.score || 0),
+            distance: Math.round(gameStats.distance || 0),
+            coins: Math.round(gameStats.coins || 0),
+            bossesDefeated: Math.round(gameStats.bossesDefeated || 0),
+            enemiesDefeated: Math.round(gameStats.enemiesDefeated || 0),
+            longestCoinStreak: Math.round(gameStats.longestCoinStreak || 0),
+          },
+          endpoint: `${API_BASE_URL}/tournaments/${tournamentObjectId}/submit-score`,
+          note: 'Score will be validated to ensure player entered THIS specific tournament',
+        });
+
+      const response = await fetch(`${API_BASE_URL}/tournaments/${tournamentObjectId}/submit-score`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerAddress,
+          playerName: playerName || '',  // Include player name for leaderboard display
+          scoreData: {
+            score: Math.round(gameStats.score || 0),
+            distance: Math.round(gameStats.distance || 0),
+            coins: Math.round(gameStats.coins || 0),
+            bossesDefeated: Math.round(gameStats.bossesDefeated || 0),
+            enemiesDefeated: Math.round(gameStats.enemiesDefeated || 0),
+            longestCoinStreak: Math.round(gameStats.longestCoinStreak || 0),
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+        throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+        if (result.success) {
+          console.log('✅ [TOURNAMENT] Tournament score submitted successfully to CORRECT tournament!', {
+            digest: result.digest,
+            tournamentId: result.tournamentId,
+            tournamentName: result.tournamentName,
+            category: result.category,
+            categoryValue: result.categoryValue,
+            playerAddress: result.playerAddress,
+            tournamentObjectId,
+            note: 'Score was validated and submitted to the tournament the player entered',
+          });
+          
+          return {
+            success: true,
+            digest: result.digest,
+            playerAddress: result.playerAddress,
+            gasPaidBy: result.gasPaidBy,
+            message: result.message,
+            isTournament: true,
+            tournamentId: result.tournamentId,
+            tournamentName: result.tournamentName,
+            category: result.category,
+            categoryValue: result.categoryValue,
+          };
+        } else {
+          console.error('❌ [TOURNAMENT] Tournament score submission failed:', result.error);
+          throw new Error(result.error || 'Tournament score submission failed');
+        }
+      }
+    } else {
+      // Log why tournament submission was skipped
+      console.log('⚠️ [SCORE SUBMISSION] Skipping tournament submission - routing to regular game', {
+        isTournamentMode,
+        tournamentObjectId,
+        reason: !isTournamentMode ? 'Not in tournament mode' : !tournamentObjectId ? 'No tournament object ID' : 'Unknown',
+      });
+    }
+
+    // Regular game score submission
     console.log(`📤 [BLOCKCHAIN] Sending score data to backend: ${API_BASE_URL}/scores/submit`);
 
     // Send score data to backend
@@ -208,6 +359,20 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
         }
       }
       
+      // Check for eligible achievements after successful score submission
+      try {
+        if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+          const address = window.walletAPIInstance.getAddress();
+          if (address) {
+            // Check achievements asynchronously (don't block score submission)
+            checkAchievementsAsync(address);
+          }
+        }
+      } catch (achievementError) {
+        console.warn('⚠️ [ACHIEVEMENT] Error checking achievements:', achievementError);
+        // Don't fail score submission if achievement check fails
+      }
+      
       return {
         success: true,
         digest: result.digest,
@@ -247,7 +412,54 @@ function getContractPackageId() {
 
 // Export for use (as window properties, not ES module)
 if (typeof window !== 'undefined') {
-  window.submitScoreToBlockchain = submitScoreToBlockchain;
+  /**
+ * Check achievements asynchronously after score submission
+ * NOTE: This no longer auto-claims. It just notifies the player that rewards are available.
+ */
+async function checkAchievementsAsync(playerAddress) {
+  try {
+    console.log('🏆 [ACHIEVEMENT] Checking for eligible achievements...');
+    
+    const response = await fetch(`/api/achievements/check?address=${playerAddress}`);
+    if (!response.ok) {
+      throw new Error(`Failed to check achievements: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    // Note: The API now returns 'eligible' instead of 'claimed' since we don't auto-claim
+    const eligibleAchievements = data.eligible || data.claimed || [];
+    
+    if (data.success && eligibleAchievements.length > 0) {
+      console.log('🎁 [ACHIEVEMENT] Milestone rewards available!', { count: eligibleAchievements.length });
+      
+      // Update the badge on the Leaderboard button
+      if (typeof window.updateLeaderboardClaimBadge === 'function') {
+        window.updateLeaderboardClaimBadge(eligibleAchievements.length);
+      }
+      
+      // Show a notification that rewards are available to claim
+      // This is a non-blocking notification, not the full popup
+      if (typeof window.showMilestoneNotification === 'function') {
+        window.showMilestoneNotification(eligibleAchievements.length);
+      } else {
+        // Fallback: Show a simple notification
+        console.log('💡 [ACHIEVEMENT] You have milestone rewards available! Check the Leaderboard → Milestones tab to claim them.');
+      }
+    } else {
+      console.log('ℹ️ [ACHIEVEMENT] No new milestones reached');
+      
+      // Still update badge (may have unclaimed from previous sessions)
+      if (typeof window.updateLeaderboardClaimBadge === 'function') {
+        window.updateLeaderboardClaimBadge();
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ [ACHIEVEMENT] Error checking achievements:', error);
+    // Silently fail - don't interrupt user flow
+  }
+}
+
+window.submitScoreToBlockchain = submitScoreToBlockchain;
   window.setContractPackageId = setContractPackageId;
   window.getContractPackageId = getContractPackageId;
 }

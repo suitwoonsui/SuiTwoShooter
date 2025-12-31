@@ -10,6 +10,7 @@ const CONTRACT_CONFIG = {
     badgeRegistry: '0xe47d097edec0fa01aec081cf8cf59cb9c191fea487ed42daf5fadf24a630a286',
     statisticsRegistry: '0xec2f3ac00be49a5c4f2b2874b15c73e57c0de952b4e59f648b990b704e384571',
     clock: '0x6', // Standard Sui Clock object
+    usdcTokenTypeId: '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC',
   },
   mainnet: {
     // TODO: Add mainnet addresses when deployed
@@ -17,6 +18,7 @@ const CONTRACT_CONFIG = {
     badgeRegistry: '',
     statisticsRegistry: '',
     clock: '0x6',
+    usdcTokenTypeId: '', // TODO: Add mainnet USDC token type ID when available
   }
 };
 

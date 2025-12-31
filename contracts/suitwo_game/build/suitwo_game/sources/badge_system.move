@@ -23,12 +23,13 @@ module suitwo_game::badge_system {
     const TIER_EPIC: u8 = 4;
     const TIER_LEGENDARY: u8 = 5;
     
-    // Tier thresholds (Option A - Faster Progression with Extremely Rare Legendary)
+    // Tier thresholds - Updated for cleaner progression
     // Badge tier is determined ONLY by total_games (games played)
-    const THRESHOLD_COMMON: u64 = 6;
-    const THRESHOLD_UNCOMMON: u64 = 16;
-    const THRESHOLD_RARE: u64 = 36;
-    const THRESHOLD_EPIC: u64 = 76;
+    // Standard: 1-4 games, Common: 5-14, Uncommon: 15-34, Rare: 35-74, Epic: 75-149, Legendary: 150+
+    const THRESHOLD_COMMON: u64 = 5;
+    const THRESHOLD_UNCOMMON: u64 = 15;
+    const THRESHOLD_RARE: u64 = 35;
+    const THRESHOLD_EPIC: u64 = 75;
     const THRESHOLD_LEGENDARY: u64 = 150;
     
     // Store discount percentages (0-25%)
@@ -311,9 +312,9 @@ module suitwo_game::badge_system {
         // Player must have played at least 1 game to unlock badge minting
         let (has_stats, total_games, _best_score, _best_distance, _best_coins, _best_bosses_defeated, _best_enemies_defeated, _best_coin_streak, _total_score, _total_distance, _total_coins, _total_bosses_defeated, _total_enemies_defeated, _total_coin_streak, _first_game_date, _last_game_date) = score_submission::get_player_stats(stats_registry, player);
         
-        // Badge starts with 1 game played (the game that unlocked badge minting)
-        // If stats exist, use total_games (should be >= 1), otherwise default to 1
-        let initial_games_played = if (has_stats && total_games > 0) { total_games } else { 1 };
+        // Use game registry total_games as the source of truth
+        // The registry already tracks the game count, so use it directly (no need to add 1)
+        let initial_games_played = if (has_stats) { total_games } else { 0 };
         
         // Create badge with Standard tier (tier 0) for first-time players
         // Badge is created directly in player's wallet (no transfer needed - truly soulbound)
@@ -321,7 +322,7 @@ module suitwo_game::badge_system {
             id: object::new(ctx),
             owner: player,
             tier: TIER_STANDARD,  // Always start at Standard tier when minting
-            games_played: initial_games_played,  // Start at 1 (or total_games if >= 1)
+            games_played: initial_games_played,  // Use registry total_games directly (registry already has the count)
             mint_date: current_time,
             last_updated: current_time,
             image: image_url,  // URL to static Standard tier badge image
@@ -407,35 +408,6 @@ module suitwo_game::badge_system {
             // Tier didn't increase, but still update last_updated timestamp
             badge.last_updated = current_time;
         }
-    }
-    
-    /// Update badge games_played count (without tier upgrade)
-    /// Syncs badge's games_played with statistics registry
-    /// No payment required - this is just a data sync operation
-    /// Uses session_id for idempotency (prevents counting same game twice)
-    #[allow(lint(public_entry))]
-    public entry fun update_badge_games_played(
-        badge: &mut EarlySupporterBadge,
-        registry: &mut BadgeRegistry,
-        stats_registry: &StatisticsRegistry,
-        clock: &Clock,
-        session_id: vector<u8>,  // Session ID from score submission (for idempotency)
-        _ctx: &mut TxContext
-    ) {
-        let current_time = clock::timestamp_ms(clock);
-        
-        // Idempotency check - prevent counting same session twice
-        assert!(!is_session_counted(registry, session_id), E_SESSION_ALREADY_COUNTED);
-        
-        // Mark session as counted
-        mark_session_counted(registry, session_id);
-        
-        // Get current games_played from statistics registry (source of truth)
-        let (_has_stats, total_games, _best_score, _best_distance, _best_coins, _best_bosses_defeated, _best_enemies_defeated, _best_coin_streak, _total_score, _total_distance, _total_coins, _total_bosses_defeated, _total_enemies_defeated, _total_coin_streak, _first_game_date, _last_game_date) = score_submission::get_player_stats(stats_registry, badge.owner);
-        
-        // Update games_played count (sync with statistics)
-        badge.games_played = total_games;
-        badge.last_updated = current_time;
     }
     
     /// Update badge image URL (for wallet display)
@@ -589,9 +561,9 @@ module suitwo_game::badge_system {
         // Get player's total_games from statistics registry
         let (has_stats, total_games, _best_score, _best_distance, _best_coins, _best_bosses_defeated, _best_enemies_defeated, _best_coin_streak, _total_score, _total_distance, _total_coins, _total_bosses_defeated, _total_enemies_defeated, _total_coin_streak, _first_game_date, _last_game_date) = score_submission::get_player_stats(stats_registry, player);
         
-        // Badge starts with 1 game played (minimum - the game that unlocked badge minting)
-        // If stats exist, use total_games (should be >= 1), otherwise default to 1
-        let initial_games_played = if (has_stats && total_games > 0) { total_games } else { 1 };
+        // Use game registry total_games as the source of truth
+        // The registry already tracks the game count, so use it directly (no need to add 1)
+        let initial_games_played = if (has_stats) { total_games } else { 0 };
         
         // Create badge with specified tier
         // NOTE: Badge is created in admin's wallet (tx_context::sender()), but owner field is set to player
@@ -600,7 +572,7 @@ module suitwo_game::badge_system {
             id: object::new(ctx),
             owner: player,  // Set player as owner (metadata)
             tier,
-            games_played: initial_games_played,  // Start at 1 (or total_games if >= 1)
+            games_played: initial_games_played,  // Use registry total_games directly (registry already has the count)
             mint_date: current_time,
             last_updated: current_time,
             image: image_url,  // URL to static badge image
@@ -697,7 +669,7 @@ module suitwo_game::badge_system {
     #[allow(lint(public_entry))]
     public entry fun migrate_badge(
         registry: &mut BadgeRegistry,
-        stats_registry: &StatisticsRegistry,
+        _stats_registry: &StatisticsRegistry,
         clock: &Clock,
         old_tier: u8,  // Tier from old badge
         old_games_played: u64,  // Games played from old badge (preserved during migration)

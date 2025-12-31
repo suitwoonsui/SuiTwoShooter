@@ -4,10 +4,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { BadgeValidators } from '@/lib/sui/badge-validators';
 import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
 import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { Transaction } from '@mysten/sui/transactions';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+import { getConfig } from '@/config/config';
 
 /**
  * POST /api/badges/mint
@@ -22,54 +25,37 @@ import { BadgeLogger } from '@/lib/sui/badge-logger';
  * Returns:
  * {
  *   success: boolean,
- *   transactionData?: {
- *     packageId: string,
- *     module: string,
- *     function: string,
- *     arguments: any[],
- *     imageData: Uint8Array (base64 encoded)
- *   },
+ *   transaction?: string,   // Base64 transaction bytes
+ *   gasEstimate?: string,
  *   error?: string
  * }
  * 
  * Note: Frontend must sign and execute this transaction using player's wallet
  */
 
-// Handle CORS preflight
+// Handle CORS preflight - middleware handles this automatically
 export async function OPTIONS(request: NextRequest) {
+  const { handleCorsPreflight } = await import('@/lib/cors');
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const body = await request.json();
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
+    const body = await getRequestBody<{
+      playerAddress: string;
+      paymentCoinId?: string;
+    }>(request);
     const { playerAddress, paymentCoinId } = body;
 
     // Validate required fields and format using BadgeValidators
-    try {
-      if (!playerAddress) {
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
-          'playerAddress is required'
-        );
-      }
-      BadgeValidators.validateAddress(playerAddress);
-      BadgeValidators.validatePaymentCoinId(paymentCoinId);
-    } catch (validationError) {
-      if (validationError instanceof BadgeError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: validationError.message,
-            code: validationError.code,
-          },
-          { status: 400, headers: corsHeaders }
-        );
-      }
-      throw validationError;
+    if (!playerAddress) {
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'playerAddress is required'
+      );
     }
+    BadgeValidators.validateAddress(playerAddress);
+    BadgeValidators.validatePaymentCoinId(paymentCoinId);
 
     BadgeLogger.info('Badge mint request received', {
       playerAddress,
@@ -77,51 +63,111 @@ export async function POST(request: NextRequest) {
     });
 
     const badgeService = getBadgeService();
+    const config = getConfig();
     
-    // Build full transaction on backend (like store does) - ensures consistency
-    // This uses the same code path as admin_mint_badge which works
-    const result = await badgeService.buildMintBadgeTransaction(
+    // Get transaction data (creates BadgeImageData object on-chain)
+    // paymentCoinId is required for the new method - if not provided, we'll need to find one
+    let coinIdToUse = paymentCoinId;
+    
+    if (!coinIdToUse) {
+      // Find a SUI coin for the player (same as old method did)
+      const network = config.sui.network;
+      const client = new SuiClient({ 
+        url: network === 'testnet' 
+          ? getFullnodeUrl('testnet')
+          : network === 'mainnet'
+          ? getFullnodeUrl('mainnet')
+          : config.sui.rpcUrl
+      });
+      
+      const coins = await client.getCoins({
+        owner: playerAddress,
+        coinType: '0x2::sui::SUI',
+      });
+      
+      if (coins.data.length === 0) {
+        throw new BadgeError(
+          BadgeErrorCode.INSUFFICIENT_BALANCE,
+          'No SUI coins found. Please ensure you have SUI in your wallet.'
+        );
+      }
+      
+      // Use the first coin with sufficient balance (0.1 SUI + gas)
+      const requiredBalance = BigInt(100_000_000) + BigInt(config.sui.gasBudget); // 0.1 SUI + gas
+      const coinWithBalance = coins.data.find(coin => BigInt(coin.balance) >= requiredBalance);
+      
+      if (!coinWithBalance) {
+        throw new BadgeError(
+          BadgeErrorCode.INSUFFICIENT_BALANCE,
+          'Insufficient SUI balance. Need at least 0.1 SUI + gas for minting.'
+        );
+      }
+      
+      coinIdToUse = coinWithBalance.coinObjectId;
+    }
+    
+    // Get transaction data (creates BadgeImageData object on-chain)
+    const transactionDataResult = await badgeService.getMintBadgeTransactionData(
       playerAddress,
-      paymentCoinId // Optional - backend will find coin if not provided
+      coinIdToUse
     );
 
-    if (!result.success || !result.transaction) {
-      const errorMessage = result.error || 'Failed to build mint transaction';
-      BadgeLogger.error('Failed to build mint transaction', {
+    if (!transactionDataResult.success || !transactionDataResult.transactionData) {
+      const errorMessage = transactionDataResult.error || 'Failed to get mint transaction data';
+      BadgeLogger.error('Failed to get mint transaction data', {
         playerAddress,
         error: errorMessage,
       });
-      return NextResponse.json(
-        {
-          success: false,
-          error: errorMessage,
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.TRANSACTION_FAILED,
+        errorMessage
       );
     }
 
-    // Return built transaction as base64 (frontend just signs it, like store)
-    return NextResponse.json(
-      {
-        success: true,
-        transaction: result.transaction, // Base64 transaction bytes
-        gasEstimate: result.gasEstimate,
-      },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    const badgeError = BadgeError.fromUnknown(error, 'Failed to build mint transaction');
-    BadgeLogger.error('Error building mint transaction', badgeError);
+    const transactionData = transactionDataResult.transactionData;
     
-    return NextResponse.json(
-      {
-        success: false,
-        error: badgeError.message,
-        code: badgeError.code,
-        ...(badgeError.details && { details: badgeError.details }),
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    // Build transaction from transaction data
+    const network = config.sui.network;
+    const client = new SuiClient({ 
+      url: network === 'testnet' 
+        ? getFullnodeUrl('testnet')
+        : network === 'mainnet'
+        ? getFullnodeUrl('mainnet')
+        : config.sui.rpcUrl
+    });
+    
+    const txb = new Transaction();
+    const paymentAmount = BigInt(transactionData.arguments.paymentAmount);
+    const splitPaymentCoin = txb.splitCoins(txb.gas, [paymentAmount]);
+    
+    txb.moveCall({
+      target: `${transactionData.packageId}::${transactionData.module}::${transactionData.function}`,
+      arguments: [
+        txb.object(transactionData.arguments.badgeRegistry),
+        txb.object(transactionData.arguments.statsRegistry),
+        txb.object(transactionData.arguments.clock),
+        splitPaymentCoin,
+        txb.object(transactionData.arguments.imageDataObjectId),
+      ],
+    });
+    
+    txb.setSender(playerAddress);
+    txb.setGasBudget(transactionData.gasBudget);
+    
+    // Build transaction
+    const transactionBytes = await txb.build({ client });
+    
+    BadgeLogger.info('Transaction built successfully from transaction data', { playerAddress });
+
+    // Return built transaction as base64 (frontend just signs it, like store)
+    return {
+      success: true,
+      transaction: Buffer.from(transactionBytes).toString('base64'),
+      gasEstimate: transactionData.gasBudget.toString(),
+    };
+  },
+  {
+    logRequest: true,
   }
-}
+);
 

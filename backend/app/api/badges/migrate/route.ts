@@ -2,9 +2,13 @@
 // Badge Migration API Route
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
 
 /**
  * POST /api/badges/migrate
@@ -34,41 +38,37 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const body = await request.json();
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
+    const body = await getRequestBody<{ 
+      playerAddress: string; 
+      oldTier: number; 
+      oldGamesPlayed?: number; 
+      oldMintDate?: number;
+    }>(request);
     const { playerAddress, oldTier, oldGamesPlayed, oldMintDate } = body;
 
     // Validate required fields
-    if (!playerAddress || typeof playerAddress !== 'string' || !playerAddress.startsWith('0x')) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'playerAddress is required and must be a valid Sui address' 
-        },
-        { status: 400, headers: corsHeaders }
+    if (!playerAddress) {
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'playerAddress is required'
       );
     }
 
+    BadgeValidators.validateAddress(playerAddress);
+
     if (oldTier === undefined || oldTier === null || typeof oldTier !== 'number') {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'oldTier is required and must be a number (0-5)' 
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_TIER,
+        'oldTier is required and must be a number (0-5)'
       );
     }
 
     if (oldTier < 0 || oldTier > 5) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'oldTier must be between 0 and 5' 
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_TIER,
+        'oldTier must be between 0 and 5'
       );
     }
 
@@ -76,11 +76,12 @@ export async function POST(request: NextRequest) {
     const gamesPlayed = oldGamesPlayed !== undefined && oldGamesPlayed !== null ? Number(oldGamesPlayed) : 0;
     const mintDate = oldMintDate !== undefined && oldMintDate !== null ? Number(oldMintDate) : 0;
 
-    console.log(`📥 [MIGRATION] Badge migration request received`);
-    console.log(`   Player address: ${playerAddress}`);
-    console.log(`   Old tier: ${oldTier}`);
-    console.log(`   Old games played: ${gamesPlayed}`);
-    console.log(`   Old mint date: ${mintDate}`);
+    BadgeLogger.info('Badge migration request received', {
+      playerAddress,
+      oldTier,
+      oldGamesPlayed: gamesPlayed,
+      oldMintDate: mintDate,
+    });
 
     const badgeService = getBadgeService();
     
@@ -95,39 +96,22 @@ export async function POST(request: NextRequest) {
       mintDate
     );
 
-    if (result.success) {
-      console.log(`✅ [MIGRATION] Badge migration transaction built successfully`);
-      console.log(`   Transaction ready for player to sign`);
-      console.log(`   Badge will be created at tier ${oldTier} (preserved from old badge)`);
-      return NextResponse.json(
-        {
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to build badge migration transaction');
+    }
+
+    BadgeLogger.info('Badge migration transaction built successfully', {
+      playerAddress,
+      oldTier,
+      note: 'Transaction ready for player to sign',
+    });
+
+    return {
           success: true,
           transaction: result.transaction,
           gasEstimate: result.gasEstimate,
           message: `Badge migration transaction ready. Badge will be created at tier ${oldTier} with preserved data.`,
-        },
-        { headers: corsHeaders }
-      );
-    } else {
-      console.error(`❌ [MIGRATION] Badge migration failed: ${result.error}`);
-      return NextResponse.json(
-        {
-          success: false,
-          error: result.error || 'Failed to build badge migration transaction',
-        },
-        { status: 500, headers: corsHeaders }
-      );
-    }
-  } catch (error) {
-    console.error('❌ [MIGRATION] Error migrating badge:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to migrate badge',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    };
   }
-}
+);
 

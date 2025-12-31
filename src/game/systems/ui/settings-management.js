@@ -23,25 +23,81 @@ function loadSettingsToUI() {
   document.getElementById('soundEffects').checked = gameSettings.soundEffects;
   document.getElementById('backgroundMusic').checked = gameSettings.backgroundMusic;
   
-  // Add event listeners for range inputs
+  // Add event listeners for range inputs with throttling for immediate UI feedback
+  // Throttle at 16ms (60fps) for smooth slider updates while reducing excessive calls
+  let mouseSensitivityTimeout;
   document.getElementById('mouseSensitivity').addEventListener('input', function() {
+    // Update UI immediately for responsive feedback
     gameSettings.mouseSensitivity = parseFloat(this.value);
     document.getElementById('mouseSensitivityValue').textContent = this.value;
+    
+    // Throttle settings save (only save after user stops adjusting)
+    clearTimeout(mouseSensitivityTimeout);
+    mouseSensitivityTimeout = setTimeout(() => {
+      if (typeof saveGameData === 'function') {
+        saveGameData();
+      }
+    }, 500); // Save 500ms after user stops adjusting
   });
   
+  let masterVolumeTimeout;
   document.getElementById('masterVolume').addEventListener('input', function() {
+    // Update UI immediately for responsive feedback
     gameSettings.masterVolume = parseInt(this.value);
     document.getElementById('masterVolumeValue').textContent = this.value + '%';
+    
+    // Apply volume change immediately (no delay for audio feedback)
+    if (typeof applySettings === 'function') {
+      applySettings();
+    }
+    
+    // Throttle settings save
+    clearTimeout(masterVolumeTimeout);
+    masterVolumeTimeout = setTimeout(() => {
+      if (typeof saveGameData === 'function') {
+        saveGameData();
+      }
+    }, 500);
   });
   
+  let soundEffectsVolumeTimeout;
   document.getElementById('soundEffectsVolume').addEventListener('input', function() {
+    // Update UI immediately for responsive feedback
     gameSettings.soundEffectsVolume = parseInt(this.value);
     document.getElementById('soundEffectsVolumeValue').textContent = this.value + '%';
+    
+    // Apply volume change immediately (no delay for audio feedback)
+    if (typeof applySettings === 'function') {
+      applySettings();
+    }
+    
+    // Throttle settings save
+    clearTimeout(soundEffectsVolumeTimeout);
+    soundEffectsVolumeTimeout = setTimeout(() => {
+      if (typeof saveGameData === 'function') {
+        saveGameData();
+      }
+    }, 500);
   });
   
+  let backgroundMusicVolumeTimeout;
   document.getElementById('backgroundMusicVolume').addEventListener('input', function() {
+    // Update UI immediately for responsive feedback
     gameSettings.backgroundMusicVolume = parseInt(this.value);
     document.getElementById('backgroundMusicVolumeValue').textContent = this.value + '%';
+    
+    // Apply volume change immediately (no delay for audio feedback)
+    if (typeof applySettings === 'function') {
+      applySettings();
+    }
+    
+    // Throttle settings save
+    clearTimeout(backgroundMusicVolumeTimeout);
+    backgroundMusicVolumeTimeout = setTimeout(() => {
+      if (typeof saveGameData === 'function') {
+        saveGameData();
+      }
+    }, 500);
   });
   
   // Add event listeners for checkboxes

@@ -1,73 +1,62 @@
 // Score Migration API endpoint
-import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { NextRequest } from 'next/server';
+import { handleCorsPreflight } from '@/lib/cors';
 import { adminWalletService } from '@/lib/sui/admin-wallet-service';
 import { MigrationService } from '@/lib/sui/migration-service';
 import { getConfig } from '@/config/config';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  console.log('🔄 [SCORE MIGRATION API] Received POST request to /api/scores/migrate');
-  
-  try {
-    const body = await request.json();
-    console.log('🔄 [SCORE MIGRATION API] Request body:', JSON.stringify(body, null, 2));
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
+    BadgeLogger.info('Received POST request to /api/scores/migrate');
+    
+    const body = await getRequestBody<{ 
+      playerAddress: string; 
+      oldPackageId?: string; 
+      oldStatsRegistryId?: string;
+    }>(request);
+    BadgeLogger.debug('Request body', { body });
     
     const { playerAddress, oldPackageId, oldStatsRegistryId } = body;
-    const config = getConfig();
 
     // Validate required fields
     if (!playerAddress) {
-      console.error('❌ [SCORE MIGRATION API] Missing playerAddress');
-      return NextResponse.json(
-        { success: false, error: 'playerAddress is required' },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'playerAddress is required'
       );
     }
 
+    BadgeValidators.validateAddress(playerAddress);
+
     // Use old stats registry IDs from request body, or fall back to environment variables
-    const finalOldPackageId = oldPackageId || process.env.OLD_GAME_SCORE_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT;
-    const finalOldStatsRegistryId = oldStatsRegistryId || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID;
+    // Check TESTNET versions first, then fall back to non-testnet versions
+    const finalOldPackageId = oldPackageId || process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || process.env.OLD_GAME_SCORE_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT;
+    const finalOldStatsRegistryId = oldStatsRegistryId || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID;
 
     if (!finalOldPackageId) {
-      console.error('❌ [SCORE MIGRATION API] Missing oldPackageId (not provided in request and not in environment variables)');
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'oldPackageId is required. Provide it in the request body or set OLD_GAME_SCORE_PACKAGE_ID environment variable.' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error('oldPackageId is required. Provide it in the request body or set OLD_GAME_SCORE_CONTRACT_TESTNET (or OLD_GAME_SCORE_PACKAGE_ID) environment variable.');
     }
 
     if (!finalOldStatsRegistryId) {
-      console.error('❌ [SCORE MIGRATION API] Missing oldStatsRegistryId (not provided in request and not in environment variables)');
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'oldStatsRegistryId is required. Provide it in the request body or set OLD_STATISTICS_REGISTRY_OBJECT_ID environment variable.' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error('oldStatsRegistryId is required. Provide it in the request body or set OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET (or OLD_STATISTICS_REGISTRY_OBJECT_ID) environment variable.');
     }
 
-    // Validate player address format
-    if (!playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid player address format' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    console.log(`🔄 [SCORE MIGRATION API] Migrating stats for ${playerAddress}`);
-    console.log(`   Old Package: ${finalOldPackageId}${oldPackageId ? '' : ' (from environment)'}`);
-    console.log(`   Old Stats Registry: ${finalOldStatsRegistryId}${oldStatsRegistryId ? '' : ' (from environment)'}`);
+    BadgeLogger.info('Migrating stats', {
+      playerAddress,
+      oldPackageId: finalOldPackageId,
+      oldStatsRegistryId: finalOldStatsRegistryId,
+      packageIdSource: oldPackageId ? 'request' : 'environment',
+      statsRegistrySource: oldStatsRegistryId ? 'request' : 'environment',
+    });
 
     // Create migration service and migrate
     const migrationService = new MigrationService(adminWalletService);
@@ -78,123 +67,135 @@ export async function POST(request: NextRequest) {
     );
 
     if (!result.success) {
-      console.error('❌ [SCORE MIGRATION API] Migration failed:', result.error);
-      return NextResponse.json(
-        {
-          success: false,
-          error: result.error || 'Failed to migrate stats',
-        },
-        { status: 500, headers: corsHeaders }
-      );
+      throw new Error(result.error || 'Failed to migrate stats');
     }
 
-    console.log('✅ [SCORE MIGRATION API] Stats migrated successfully');
+    BadgeLogger.info('Stats migrated successfully', {
+      playerAddress,
+      digest: result.digest,
+    });
 
-    return NextResponse.json(
-      {
-        success: true,
-        digest: result.digest,
-        playerAddress,
-        message: 'Player statistics migrated successfully to new registry',
-      },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ [SCORE MIGRATION API] Error in migrate endpoint:', error);
-    if (error instanceof Error) {
-      console.error('   Message:', error.message);
-      console.error('   Stack:', error.stack);
-    }
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    return {
+      success: true,
+      digest: result.digest,
+      playerAddress,
+      message: 'Player statistics migrated successfully to new registry',
+    };
   }
-}
+);
 
 // GET endpoint to fetch all wallets with statistics
-export async function GET(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  console.log('🔍 [SCORE MIGRATION API] Received GET request to /api/scores/migrate (list wallets)');
-  
-  try {
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
+    BadgeLogger.info('Received GET request to /api/scores/migrate (list wallets)');
+    
     const { searchParams } = new URL(request.url);
     const oldStatsRegistryId = searchParams.get('oldStatsRegistryId');
     const oldPackageId = searchParams.get('oldPackageId');
-    const config = getConfig();
 
     // Use old stats registry ID from query param or fall back to environment variable
-    const finalOldStatsRegistryId = oldStatsRegistryId || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID;
-    const finalOldPackageId = oldPackageId || process.env.OLD_GAME_SCORE_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT;
+    // Check TESTNET versions first, then fall back to non-testnet versions
+    const finalOldStatsRegistryId = oldStatsRegistryId || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID;
+    const finalOldPackageId = oldPackageId || process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || process.env.OLD_GAME_SCORE_PACKAGE_ID || process.env.OLD_GAME_SCORE_CONTRACT;
 
     if (!finalOldStatsRegistryId) {
-      console.error('❌ [SCORE MIGRATION API] Missing oldStatsRegistryId');
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'oldStatsRegistryId is required. Provide it as a query parameter or set OLD_STATISTICS_REGISTRY_OBJECT_ID environment variable.' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error('oldStatsRegistryId is required. Provide it as a query parameter or set OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET (or OLD_STATISTICS_REGISTRY_OBJECT_ID) environment variable.');
     }
 
     if (!finalOldPackageId) {
-      console.error('❌ [SCORE MIGRATION API] Missing oldPackageId');
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'oldPackageId is required. Provide it as a query parameter or set OLD_GAME_SCORE_PACKAGE_ID environment variable.' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error('oldPackageId is required. Provide it as a query parameter or set OLD_GAME_SCORE_CONTRACT_TESTNET (or OLD_GAME_SCORE_PACKAGE_ID) environment variable.');
     }
 
-    console.log(`🔍 [SCORE MIGRATION API] Fetching wallets with stats from old registry: ${finalOldStatsRegistryId}`);
+    BadgeLogger.info('Fetching wallets with stats from old registry', {
+      oldStatsRegistryId: finalOldStatsRegistryId,
+      oldPackageId: finalOldPackageId,
+    });
 
     // Create migration service and get wallets
     const migrationService = new MigrationService(adminWalletService);
     const result = await migrationService.getAllWalletsWithStats(finalOldPackageId, finalOldStatsRegistryId);
 
     if (!result.success) {
-      console.error('❌ [SCORE MIGRATION API] Failed to fetch wallets:', result.error);
-      return NextResponse.json(
-        {
-          success: false,
-          error: result.error || 'Failed to fetch wallets with stats',
-        },
-        { status: 500, headers: corsHeaders }
-      );
+      throw new Error(result.error || 'Failed to fetch wallets with stats');
     }
 
-    console.log(`✅ [SCORE MIGRATION API] Found ${result.wallets?.length || 0} wallets with stats`);
+    BadgeLogger.info('Found wallets with stats', {
+      count: result.wallets?.length || 0,
+      oldStatsRegistryId: finalOldStatsRegistryId,
+    });
 
-    return NextResponse.json(
-      {
-        success: true,
-        wallets: result.wallets || [],
-        count: result.wallets?.length || 0,
-      },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ [SCORE MIGRATION API] Error in GET migrate endpoint:', error);
-    if (error instanceof Error) {
-      console.error('   Message:', error.message);
-      console.error('   Stack:', error.stack);
-    }
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    return {
+      success: true,
+      wallets: result.wallets || [],
+      count: result.wallets?.length || 0,
+    };
   }
-}
+);
+
+// DELETE endpoint to clear player stats
+export const DELETE = withApiHandler(
+  async (request: NextRequest) => {
+    BadgeLogger.info('Received DELETE request to /api/scores/migrate (clear stats)');
+    
+    const { searchParams } = new URL(request.url);
+    const playerAddress = searchParams.get('playerAddress');
+    const clearAll = searchParams.get('clearAll') === 'true';
+
+    // Create migration service
+    const migrationService = new MigrationService(adminWalletService);
+
+    if (clearAll) {
+      // Clear all players' stats
+      BadgeLogger.info('Clearing all player stats');
+
+      const result = await migrationService.clearAllPlayerStats();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to clear all player stats');
+      }
+
+      BadgeLogger.info('All stats cleared successfully', {
+        playersCleared: result.playersCleared,
+        errors: result.errors?.length || 0,
+      });
+
+      return {
+        success: true,
+        message: `Cleared stats for ${result.playersCleared} player(s)`,
+        playersCleared: result.playersCleared,
+        digests: result.digests,
+        errors: result.errors,
+      };
+    } else {
+      // Clear single player's stats
+      if (!playerAddress) {
+        throw new Error('playerAddress is required as a query parameter (or use clearAll=true)');
+      }
+
+      BadgeValidators.validateAddress(playerAddress);
+
+      BadgeLogger.info('Clearing stats', {
+        playerAddress,
+      });
+
+      const result = await migrationService.clearPlayerStats(playerAddress);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to clear player stats');
+      }
+
+      BadgeLogger.info('Stats cleared successfully', {
+        playerAddress,
+        digest: result.digest,
+      });
+
+      return {
+        success: true,
+        message: 'Player stats cleared successfully',
+        digest: result.digest,
+        playerAddress,
+      };
+    }
+  }
+);
 

@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getAddressParam } from '@/lib/api/api-handler';
 
 /**
  * OPTIONS /api/stats/[address]
@@ -14,36 +16,20 @@ export async function OPTIONS(request: NextRequest) {
  * GET /api/stats/[address]
  * Get player statistics from the blockchain
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ address: string }> }
-) {
-  const corsHeaders = getCorsHeaders(request);
+export const GET = withApiHandler(
+  async (
+    request: NextRequest,
+    context: { params: Promise<{ address: string }> }
+  ) => {
+    const address = await getAddressParam(context.params);
 
-  try {
-    const { address } = await params;
-
-    if (!address || address === 'undefined' || address === 'null') {
-      return NextResponse.json(
-        { success: false, error: 'Player address is required' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    // Validate address format (basic check)
-    if (!address.startsWith('0x') || address.length < 20) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid address format' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    console.log(`📊 [STATS API] Fetching stats for address: ${address}`);
+    BadgeLogger.info('Fetching stats for address', { address });
     
     const adminWallet = getAdminWalletService();
     const stats = await adminWallet.getPlayerStats(address);
 
-    console.log(`📊 [STATS API] Stats result:`, {
+    BadgeLogger.debug('Stats result', {
+      address,
       success: stats.success,
       hasStats: stats.hasStats,
       totalGames: stats.totalGames,
@@ -52,13 +38,10 @@ export async function GET(
     });
 
     if (!stats.success) {
-      return NextResponse.json(
-        { success: false, error: stats.error || 'Failed to fetch player stats' },
-        { status: 500, headers: corsHeaders }
-      );
+      throw new Error(stats.error || 'Failed to fetch player stats');
     }
 
-    return NextResponse.json({
+    return {
       success: true,
       hasStats: stats.hasStats || false,
       totalGames: stats.totalGames || 0,
@@ -74,16 +57,7 @@ export async function GET(
       totalCoins: stats.totalCoins || 0,
       firstGameDate: stats.firstGameDate || 0,
       lastGameDate: stats.lastGameDate || 0,
-    }, { headers: corsHeaders });
-  } catch (error) {
-    console.error('❌ Error fetching player stats:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    };
   }
-}
+);
 

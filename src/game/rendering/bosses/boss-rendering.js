@@ -115,7 +115,9 @@ function renderBoss(ctx) {
         const enrageBarHeight = 14;
         
         // Pulsing red background
-        const pulseAlpha = 0.7 + 0.3 * Math.sin(Date.now() * 0.015);
+        // Use performance.now() for better performance and precision
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const pulseAlpha = 0.7 + 0.3 * Math.sin(now * 0.015);
         ctx.fillStyle = `rgba(255, 0, 0, ${pulseAlpha})`;
         ctx.fillRect(enrageBarX, enrageBarY, enrageBarWidth, enrageBarHeight);
         

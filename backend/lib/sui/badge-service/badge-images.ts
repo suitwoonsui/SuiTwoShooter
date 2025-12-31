@@ -10,6 +10,7 @@ import { getBadgeImageCache } from '../badge-image-cache';
 import { validateAndSanitizeImage, getImageInfo } from '../badge-image-validator';
 import { SuiClient } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
+import { checkBalanceBeforeTransaction } from '../balance-checker';
 
 /**
  * Dependencies needed for badge images
@@ -209,23 +210,14 @@ export class BadgeImages {
     });
     txb.setGasBudget(batchedGasBudget);
     
-    // Check wallet balance
+    // Check wallet balance before building transaction
     const address = adminWallet.getAddress();
-    const balance = await client.getBalance({ owner: address });
-    const balanceInSUI = BigInt(balance.totalBalance) / BigInt(1_000_000_000);
-    BadgeLogger.debug('Wallet balance check', {
-      balance: balanceInSUI.toString(),
-      required: (batchedGasBudget / 1_000_000_000).toFixed(4),
+    await checkBalanceBeforeTransaction({
+      client,
+      walletAddress: address,
+      gasBudget: batchedGasBudget,
+      context: 'chunked image upload',
     });
-    
-    // Verify wallet has sufficient balance
-    const requiredBalance = BigInt(batchedGasBudget) + BigInt(100_000_000);
-    if (BigInt(balance.totalBalance) < requiredBalance) {
-      throw new BadgeError(
-        BadgeErrorCode.INSUFFICIENT_BALANCE,
-        `Insufficient wallet balance. Need ${(Number(requiredBalance) / 1_000_000_000).toFixed(4)} SUI, have ${balanceInSUI.toString()} SUI`
-      );
-    }
     
     // Execute the batched transaction
     BadgeLogger.info('Executing batched transaction', { totalChunks });

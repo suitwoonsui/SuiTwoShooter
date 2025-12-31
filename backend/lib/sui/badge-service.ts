@@ -125,12 +125,13 @@ export class BadgeService {
     const oldPackageId = process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || process.env.OLD_GAME_SCORE_CONTRACT;
     const oldRegistryId = process.env.OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_BADGE_REGISTRY_OBJECT_ID;
 
-    console.log(`🔍 [BADGE LOOKUP OLD] Checking OLD contract for badge`);
-    console.log(`🔍 [BADGE LOOKUP OLD] Old Package ID: ${oldPackageId ? oldPackageId.substring(0, 10) + '...' : 'NOT SET'}`);
-    console.log(`🔍 [BADGE LOOKUP OLD] Old Registry ID: ${oldRegistryId ? oldRegistryId.substring(0, 10) + '...' : 'NOT SET'}`);
+    BadgeLogger.debug('Checking OLD contract for badge', {
+      oldPackageId: oldPackageId ? oldPackageId.substring(0, 10) + '...' : 'NOT SET',
+      oldRegistryId: oldRegistryId ? oldRegistryId.substring(0, 10) + '...' : 'NOT SET',
+    });
 
     if (!oldPackageId || !oldRegistryId) {
-      console.warn('⚠️ [BADGE LOOKUP OLD] Old contract IDs not configured');
+      BadgeLogger.warn('Old contract IDs not configured');
       return false;
     }
 
@@ -138,8 +139,10 @@ export class BadgeService {
       const client = this.getClient();
       const packageId = oldPackageId.split('::')[0]; // Extract package ID if full path provided
       
-      console.log(`🔍 [BADGE LOOKUP OLD] Using package: ${packageId.substring(0, 10)}...`);
-      console.log(`🔍 [BADGE LOOKUP OLD] Using registry: ${oldRegistryId.substring(0, 10)}...`);
+      BadgeLogger.debug('Using old contract', {
+        package: packageId.substring(0, 10) + '...',
+        registry: oldRegistryId.substring(0, 10) + '...',
+      });
       
       // Use devInspectTransactionBlock to call view function
       const tx = new Transaction();
@@ -172,15 +175,15 @@ export class BadgeService {
           }
           
           const hasBadge = actualValue === "1" || actualValue === 1 || actualValue === true;
-          console.log(`🔍 [BADGE LOOKUP OLD] Result: ${hasBadge} (from ${actualValue})`);
+          BadgeLogger.debug('Old contract badge lookup result', { hasBadge, actualValue });
           return hasBadge;
         }
       }
 
-      console.log(`🔍 [BADGE LOOKUP OLD] No badge found - returning false`);
+      BadgeLogger.debug('No badge found in old contract - returning false');
       return false;
     } catch (error) {
-      console.error('❌ [BADGE LOOKUP OLD] Error checking old contract badge:', error);
+      BadgeLogger.error('Error checking old contract badge', error);
       return false;
     }
   }
@@ -201,7 +204,7 @@ export class BadgeService {
     const oldRegistryId = process.env.OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_BADGE_REGISTRY_OBJECT_ID;
 
     if (!oldPackageId || !oldRegistryId) {
-      console.warn('⚠️ [BADGE GET OLD] Old contract IDs not configured');
+      BadgeLogger.warn('Old contract IDs not configured');
       return null;
     }
 
@@ -253,7 +256,7 @@ export class BadgeService {
       }
       
       if (!badgeId) {
-        console.warn('⚠️ [BADGE GET OLD] Could not extract badge ID from return value:', returnValue);
+        BadgeLogger.warn('Could not extract badge ID from return value', { returnValue });
         return null;
       }
 
@@ -306,7 +309,7 @@ export class BadgeService {
         }
       } catch (error) {
         // Image URL is optional, continue without it
-        console.warn('⚠️ [BADGE GET OLD] Could not get image URL:', error);
+        BadgeLogger.warn('Could not get image URL from old contract', error);
       }
 
       return {
@@ -318,7 +321,7 @@ export class BadgeService {
         imageUrl,
       };
     } catch (error) {
-      console.error('❌ [BADGE GET OLD] Error getting old contract badge:', error);
+      BadgeLogger.error('Error getting old contract badge', error);
       return null;
     }
   }
@@ -377,21 +380,6 @@ export class BadgeService {
     return this.badgeTransactions.getMintBadgeTransactionData(playerAddress, paymentCoinId);
   }
 
-  /**
-   * Build mint badge transaction (legacy - builds on backend)
-   * @deprecated Use getMintBadgeTransactionData() instead and build in wallet module
-   */
-  async buildMintBadgeTransaction(
-    playerAddress: string,
-    paymentCoinId?: string
-  ): Promise<{
-    success: boolean;
-    transaction?: string;
-    gasEstimate?: string;
-    error?: string;
-  }> {
-    return this.badgeTransactions.buildMintBadgeTransaction(playerAddress, paymentCoinId);
-  }
 
   /**
    * Build migrate badge transaction for player to sign
@@ -445,7 +433,25 @@ export class BadgeService {
   }
 
   /**
+   * Check if badge tier upgrade is available (read-only, no transaction building)
+   * This is used by the /check-upgrade endpoint to determine if an upgrade is available
+   * without requiring gas or building transaction data.
+   */
+  async checkBadgeUpgrade(
+    playerAddress: string
+  ): Promise<{
+    success: boolean;
+    hasPendingUpgrade: boolean;
+    newTier?: number;
+    badgeId?: string;
+    error?: string;
+  }> {
+    return this.badgeTransactions.checkBadgeUpgrade(playerAddress);
+  }
+
+  /**
    * Check if badge tier should be updated and build transaction if needed
+   * This is used when actually performing the upgrade (requires gas)
    */
   async checkAndBuildBadgeUpdate(
     playerAddress: string,
@@ -515,129 +521,128 @@ export class BadgeService {
 
     try {
       // Step 3: Get client and configuration
-      console.log(`\n📋 [ADMIN MINT] Step 3: Getting Sui client and configuration...`);
+      BadgeLogger.debug('Getting Sui client and configuration for admin mint');
       const client = this.getClient();
       const registryObjectId = this.config.contracts.badgeRegistry;
       const statsRegistryObjectId = this.config.contracts.statisticsRegistry;
       const adminCapabilityObjectId = this.config.contracts.adminCapability;
       const packageId = this.config.contracts.gameScore;
       
-      console.log(`📋 [ADMIN MINT] Configuration values:`);
-      console.log(`   - registryObjectId: ${registryObjectId}`);
-      console.log(`   - statsRegistryObjectId: ${statsRegistryObjectId}`);
-      console.log(`   - adminCapabilityObjectId: ${adminCapabilityObjectId}`);
-      console.log(`   - packageId: ${packageId}`);
-      console.log(`   - network: ${this.config.sui.network}`);
-      console.log(`   - adminWallet address: ${this.adminWallet.getAddress()}`);
+      BadgeLogger.debug('Admin mint configuration', {
+        registryObjectId,
+        statsRegistryObjectId,
+        adminCapabilityObjectId,
+        packageId,
+        network: this.config.sui.network,
+        adminWalletAddress: this.adminWallet.getAddress(),
+      });
 
       // Step 4: Validate all required object IDs
-      console.log(`\n📋 [ADMIN MINT] Step 4: Validating all required object IDs...`);
+      BadgeLogger.debug('Validating all required object IDs');
       if (!registryObjectId || registryObjectId.trim() === '') {
-        console.error(`❌ [ADMIN MINT] BadgeRegistry object ID is missing`);
+        BadgeLogger.error('BadgeRegistry object ID is missing');
         return {
           success: false,
           error: 'BadgeRegistry object ID is missing. Please set BADGE_REGISTRY_OBJECT_ID_TESTNET in Vercel environment variables.',
         };
       }
-      console.log(`✅ [ADMIN MINT] BadgeRegistry object ID: ${registryObjectId}`);
+      BadgeLogger.debug('BadgeRegistry object ID validated', { registryObjectId });
       
       if (!statsRegistryObjectId || statsRegistryObjectId.trim() === '') {
-        console.error(`❌ [ADMIN MINT] StatisticsRegistry object ID is missing`);
+        BadgeLogger.error('StatisticsRegistry object ID is missing');
         return {
           success: false,
           error: 'StatisticsRegistry object ID is missing. Please set STATISTICS_REGISTRY_OBJECT_ID_TESTNET in Vercel environment variables.',
         };
       }
-      console.log(`✅ [ADMIN MINT] StatisticsRegistry object ID: ${statsRegistryObjectId}`);
+      BadgeLogger.debug('StatisticsRegistry object ID validated', { statsRegistryObjectId });
       
       if (!adminCapabilityObjectId || adminCapabilityObjectId.trim() === '') {
-        console.error(`❌ [ADMIN MINT] AdminCapability object ID is missing`);
+        BadgeLogger.error('AdminCapability object ID is missing');
         return {
           success: false,
           error: 'AdminCapability object ID is missing. Please set ADMIN_CAPABILITY_OBJECT_ID_TESTNET in Vercel environment variables.',
         };
       }
-      console.log(`✅ [ADMIN MINT] AdminCapability object ID: ${adminCapabilityObjectId}`);
+      BadgeLogger.debug('AdminCapability object ID validated', { adminCapabilityObjectId });
       
       if (!packageId || packageId.trim() === '') {
-        console.error(`❌ [ADMIN MINT] Game Score package ID is missing`);
+        BadgeLogger.error('Game Score package ID is missing');
         return {
           success: false,
           error: 'Game Score package ID is missing. Please set GAME_SCORE_CONTRACT_TESTNET in Vercel environment variables.',
         };
       }
-      console.log(`✅ [ADMIN MINT] Game Score package ID: ${packageId}`);
-      console.log(`✅ [ADMIN MINT] All object IDs validated successfully`);
+      BadgeLogger.debug('All object IDs validated successfully');
 
       // Step 5: Check if player already has a badge in the registry
       // This uses the same hasBadge function that the lookup uses
-      console.log(`\n📋 [ADMIN MINT] Step 5: Checking if player already has badge...`);
-      console.log(`📋 [ADMIN MINT] Calling hasBadge('${playerAddress}')...`);
-      console.log(`📋 [ADMIN MINT] Using same function as lookup - should return same result`);
+      BadgeLogger.debug('Checking if player already has badge', { playerAddress });
       
       const hasBadge = await this.hasBadge(playerAddress);
       
-      console.log(`\n📋 [ADMIN MINT] hasBadge() returned: ${hasBadge}`);
-      console.log(`📋 [ADMIN MINT] Type: ${typeof hasBadge}, Value: ${hasBadge}`);
+      BadgeLogger.debug('hasBadge check result', { hasBadge, playerAddress });
       
       if (hasBadge) {
-        console.log(`\n⚠️ [ADMIN MINT] Player HAS a badge - cannot mint another one`);
-        console.log(`⚠️ [ADMIN MINT] Attempting to get badge details for error message...`);
+        BadgeLogger.warn('Player already has badge - cannot mint another one', { playerAddress });
         
         // Try to get the badge to provide more details in the error message
         let badgeInfo = '';
         try {
-          console.log(`📋 [ADMIN MINT] Calling getBadge('${playerAddress}')...`);
           const badge = await this.getBadge(playerAddress);
-          console.log(`📋 [ADMIN MINT] getBadge() returned:`, badge ? `Found badge` : 'null');
+          BadgeLogger.debug('Retrieved badge details for error message', { 
+            playerAddress, 
+            hasBadge: !!badge,
+            badgeId: badge?.badgeId 
+          });
           
           if (badge && badge.badgeId) {
             badgeInfo = ` Badge ID: ${badge.badgeId}, Tier: ${badge.tier}.`;
-            console.log(`📋 [ADMIN MINT] Badge details:`, JSON.stringify(badge, null, 2));
+            BadgeLogger.debug('Badge details', badge);
           } else {
-            console.log(`⚠️ [ADMIN MINT] getBadge returned null or no badgeId - this is inconsistent with hasBadge=true`);
+            BadgeLogger.warn('getBadge returned null or no badgeId - inconsistent with hasBadge=true', { playerAddress });
           }
         } catch (error) {
           // Ignore errors getting badge details - just use the hasBadge result
-          console.warn(`⚠️ [ADMIN MINT] Error getting badge details:`, error);
-          console.warn(`⚠️ [ADMIN MINT] Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
-          console.warn(`⚠️ [ADMIN MINT] Error message: ${error instanceof Error ? error.message : String(error)}`);
+          BadgeLogger.warn('Error getting badge details for error message', error);
         }
         
-        console.error(`❌ [ADMIN MINT] MINT FAILED: Player already has badge`);
+        BadgeLogger.error('Admin mint failed - player already has badge', { playerAddress });
         return {
           success: false,
           error: `Player already has a badge in the registry.${badgeInfo} Please burn the existing badge first if you want to mint a new one.`,
         };
       }
       
-      console.log(`\n✅ [ADMIN MINT] Player does NOT have badge - proceeding with mint...`);
+      BadgeLogger.debug('Player does not have badge - proceeding with mint', { playerAddress });
 
       // Step 6: Get badge image URL for the tier
-      console.log(`\n📋 [ADMIN MINT] Step 6: Getting badge image URL for tier ${tier}...`);
+      BadgeLogger.debug('Getting badge image URL for tier', { tier });
       const imageUrl = this.getBadgeImageUrl(tier);
-      console.log(`✅ [ADMIN MINT] Badge image URL: ${imageUrl}`);
+      BadgeLogger.debug('Badge image URL retrieved', { tier, imageUrl });
 
       // Step 7: Build mint transaction using admin_mint_badge function
       // This creates the badge in admin's wallet (for testing/admin purposes)
       // Admin signs and executes - no player signature needed
-      console.log(`\n📋 [ADMIN MINT] Step 7: Building mint transaction using admin_mint_badge...`);
-      console.log(`📋 [ADMIN MINT] Note: Using admin_mint_badge function - admin signs and executes`);
-      console.log(`📋 [ADMIN MINT] Badge will be created at tier ${tier} in admin's wallet`);
-      console.log(`📋 [ADMIN MINT] Badge metadata owner will be set to player: ${playerAddress}`);
+      BadgeLogger.debug('Building mint transaction using admin_mint_badge', {
+        playerAddress,
+        tier,
+        note: 'Admin signs and executes - badge created in admin wallet',
+      });
       
       const txb = new Transaction();
 
       const moveCallTarget = `${packageId}::badge_system::admin_mint_badge`;
-      console.log(`📋 [ADMIN MINT] Move call target: ${moveCallTarget}`);
-      console.log(`📋 [ADMIN MINT] Transaction arguments:`);
-      console.log(`   - adminCapability: ${adminCapabilityObjectId}`);
-      console.log(`   - registry: ${registryObjectId}`);
-      console.log(`   - statsRegistry: ${statsRegistryObjectId}`);
-      console.log(`   - clock: 0x6`);
-      console.log(`   - player: ${playerAddress}`);
-      console.log(`   - tier: ${tier}`);
-      console.log(`   - imageUrl: ${imageUrl}`);
+      BadgeLogger.debug('Transaction details', {
+        moveCallTarget,
+        adminCapability: adminCapabilityObjectId,
+        registry: registryObjectId,
+        statsRegistry: statsRegistryObjectId,
+        clock: '0x6',
+        player: playerAddress,
+        tier,
+        imageUrl,
+      });
 
       // Build move call - using admin_mint_badge function
       // Function signature: admin_mint_badge(admin_cap, registry, stats_registry, clock, player, tier, image_url, ctx)
@@ -656,8 +661,17 @@ export class BadgeService {
 
       txb.setGasBudget(this.config.sui.gasBudget);
       
+      // Check wallet balance before building transaction
+      const { checkBalanceBeforeTransaction } = await import('./balance-checker');
+      await checkBalanceBeforeTransaction({
+        client,
+        walletAddress: this.adminWallet.getAddress(),
+        gasBudget: this.config.sui.gasBudget,
+        context: 'admin mint badge',
+      });
+      
       // Sign and execute with admin wallet (no player signature needed)
-      console.log(`\n📋 [ADMIN MINT] Step 8: Signing and executing transaction with admin wallet...`);
+      BadgeLogger.debug('Signing and executing transaction with admin wallet');
       const keypair = this.adminWallet.getKeypair();
       
       const result = await client.signAndExecuteTransaction({
@@ -671,8 +685,11 @@ export class BadgeService {
 
       // Check if transaction succeeded
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [ADMIN MINT] Badge minted successfully!`);
-        console.log(`✅ [ADMIN MINT] Transaction digest: ${result.digest}`);
+        BadgeLogger.info('Badge minted successfully', {
+          playerAddress,
+          tier,
+          digest: result.digest,
+        });
         return {
           success: true,
           digest: result.digest,
@@ -680,23 +697,25 @@ export class BadgeService {
         };
       } else {
         const errorMsg = result.effects?.status?.error || 'Transaction failed';
-        console.error(`❌ [ADMIN MINT] Transaction failed: ${errorMsg}`);
+        BadgeLogger.error('Admin mint transaction failed', {
+          playerAddress,
+          tier,
+          error: errorMsg,
+        });
         return {
           success: false,
           error: errorMsg,
         };
       }
     } catch (error) {
-      console.error(`\n❌ [ADMIN MINT] ========== MINT ERROR ==========`);
-      console.error(`❌ [ADMIN MINT] Exception caught during mint process`);
-      console.error(`❌ [ADMIN MINT] Error type: ${error instanceof Error ? error.constructor.name : typeof error}`);
-      console.error(`❌ [ADMIN MINT] Error message: ${error instanceof Error ? error.message : String(error)}`);
-      if (error instanceof Error && error.stack) {
-        console.error(`❌ [ADMIN MINT] Stack trace:`, error.stack);
-      }
-      console.error(`❌ [ADMIN MINT] Player: ${playerAddress}`);
-      console.error(`❌ [ADMIN MINT] Tier: ${tier}`);
-      console.error(`❌ [ADMIN MINT] ===================================\n`);
+      BadgeLogger.error('Admin mint error - exception caught during mint process', {
+        error,
+        playerAddress,
+        tier,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       
       return {
         success: false,
@@ -752,7 +771,7 @@ export class BadgeService {
 
       txb.setGasBudget(this.config.sui.gasBudget);
 
-      console.log(`🧹 [ADMIN BADGE] Cleaning up orphaned registry entry for ${playerAddress}`);
+      BadgeLogger.info('Cleaning up orphaned registry entry', { playerAddress });
 
       // Sign and execute with admin wallet
       const keypair = this.adminWallet.getKeypair();
@@ -768,7 +787,10 @@ export class BadgeService {
 
       // Check if transaction succeeded
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [ADMIN BADGE] Orphaned entry cleaned up successfully: ${result.digest}`);
+        BadgeLogger.info('Orphaned entry cleaned up successfully', {
+          playerAddress,
+          digest: result.digest,
+        });
         return {
           success: true,
           digest: result.digest,
@@ -780,7 +802,7 @@ export class BadgeService {
         };
       }
     } catch (error) {
-      console.error('❌ [ADMIN BADGE] Error cleaning up orphaned entry:', error);
+      BadgeLogger.error('Error cleaning up orphaned entry', { error, playerAddress });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -850,13 +872,21 @@ export class BadgeService {
 
         // Check ownership - badge must be owned by admin wallet
         const owner = badgeObject.data.owner;
-        console.log(`🔍 [ADMIN BADGE] Checking badge ownership. Badge ID: ${badgeId}, Owner:`, JSON.stringify(owner), `Admin: ${adminAddress}`);
+        BadgeLogger.debug('Checking badge ownership', {
+          badgeId,
+          owner: JSON.stringify(owner),
+          adminAddress,
+        });
         
         if (owner && typeof owner === 'object' && 'AddressOwner' in owner) {
           const ownerAddress = owner.AddressOwner.toLowerCase();
           const adminAddressLower = adminAddress.toLowerCase();
           
-          console.log(`🔍 [ADMIN BADGE] Owner address: ${ownerAddress}, Admin address: ${adminAddressLower}, Match: ${ownerAddress === adminAddressLower}`);
+          BadgeLogger.debug('Badge ownership check', {
+            ownerAddress,
+            adminAddress: adminAddressLower,
+            match: ownerAddress === adminAddressLower,
+          });
           
           if (ownerAddress !== adminAddressLower) {
             // Try to get the badge's metadata owner (the player it was minted for)
@@ -876,7 +906,7 @@ export class BadgeService {
             };
           }
         } else {
-          console.log(`⚠️ [ADMIN BADGE] Badge ownership format unexpected:`, owner);
+          BadgeLogger.warn('Badge ownership format unexpected', { owner, badgeId });
           return {
             success: false,
             error: `Badge ownership is not an address owner. Owner type: ${typeof owner}, Value: ${JSON.stringify(owner)}. Badges must be owned by the admin wallet to be burned.`,
@@ -906,7 +936,7 @@ export class BadgeService {
 
       txb.setGasBudget(this.config.sui.gasBudget);
 
-      console.log(`🔧 [ADMIN BADGE] Burning badge: ${badgeId}`);
+      BadgeLogger.info('Burning badge', { badgeId });
 
       // Sign and execute with admin wallet
       const keypair = this.adminWallet.getKeypair();
@@ -922,7 +952,10 @@ export class BadgeService {
 
       // Check if transaction succeeded
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [ADMIN BADGE] Badge burned successfully: ${result.digest}`);
+        BadgeLogger.info('Badge burned successfully', {
+          badgeId,
+          digest: result.digest,
+        });
         return {
           success: true,
           digest: result.digest,
@@ -934,7 +967,7 @@ export class BadgeService {
         };
       }
     } catch (error) {
-      console.error('❌ [ADMIN BADGE] Error burning badge:', error);
+      BadgeLogger.error('Error burning badge', { error, badgeId });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -976,7 +1009,7 @@ export class BadgeService {
       const client = this.getClient();
       const packageId = oldPackageId.split('::')[0];
 
-      console.log(`🔍 [FIND OLD OBJECTS] Searching for objects from package: ${packageId}`);
+      BadgeLogger.debug('Searching for objects from old package', { packageId });
       
       // First, check if we already have IDs configured in env
       const envRegistryId = process.env.OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_BADGE_REGISTRY_OBJECT_ID;
@@ -995,10 +1028,10 @@ export class BadgeService {
           const obj = await client.getObject({ id: envAdminCapId, options: { showType: true } });
           if (obj.data?.type && obj.data.type.includes(packageId)) {
             results.adminCapabilityId = envAdminCapId;
-            console.log(`✅ [FIND OLD OBJECTS] Using AdminCapability from env: ${envAdminCapId}`);
+            BadgeLogger.debug('Using AdminCapability from env', { adminCapabilityId: envAdminCapId });
           }
         } catch (e) {
-          console.warn(`⚠️ [FIND OLD OBJECTS] Could not verify env AdminCapability:`, e);
+          BadgeLogger.warn('Could not verify env AdminCapability', e);
         }
       }
       
@@ -1007,10 +1040,10 @@ export class BadgeService {
           const obj = await client.getObject({ id: envStatsRegId, options: { showType: true } });
           if (obj.data?.type && obj.data.type.includes(packageId)) {
             results.statisticsRegistryId = envStatsRegId;
-            console.log(`✅ [FIND OLD OBJECTS] Using StatisticsRegistry from env: ${envStatsRegId}`);
+            BadgeLogger.debug('Using StatisticsRegistry from env', { statisticsRegistryId: envStatsRegId });
           }
         } catch (e) {
-          console.warn(`⚠️ [FIND OLD OBJECTS] Could not verify env StatisticsRegistry:`, e);
+          BadgeLogger.warn('Could not verify env StatisticsRegistry', e);
         }
       }
       
@@ -1019,13 +1052,16 @@ export class BadgeService {
           const obj = await client.getObject({ id: envRegistryId, options: { showType: true } });
           if (obj.data?.type && obj.data.type.includes(packageId)) {
             results.registryId = envRegistryId;
-            console.log(`✅ [FIND OLD OBJECTS] Using BadgeRegistry from env: ${envRegistryId}`);
+            BadgeLogger.debug('Using BadgeRegistry from env', { registryId: envRegistryId });
           } else if (obj.data?.type) {
             const objPackage = obj.data.type.split('::')[0];
-            console.warn(`⚠️ [FIND OLD OBJECTS] Env BadgeRegistry is from package ${objPackage}, but searching for package ${packageId}`);
+            BadgeLogger.warn('Env BadgeRegistry package mismatch', {
+              envPackage: objPackage,
+              expectedPackage: packageId,
+            });
           }
         } catch (e) {
-          console.warn(`⚠️ [FIND OLD OBJECTS] Could not verify env BadgeRegistry:`, e);
+          BadgeLogger.warn('Could not verify env BadgeRegistry', e);
         }
       }
 
@@ -1074,21 +1110,21 @@ export class BadgeService {
                 if (change.objectType.includes('BadgeRegistry') && change.objectType.includes(packageId)) {
                   if (!results.registryId) {
                     results.registryId = change.objectId;
-                    console.log(`✅ [FIND OLD OBJECTS] Found BadgeRegistry: ${change.objectId}`);
+                    BadgeLogger.debug('Found BadgeRegistry via events', { registryId: change.objectId });
                   }
                 }
                 // Check for AdminCapability
                 if (change.objectType.includes('AdminCapability') && change.objectType.includes(packageId)) {
                   if (!results.adminCapabilityId) {
                     results.adminCapabilityId = change.objectId;
-                    console.log(`✅ [FIND OLD OBJECTS] Found AdminCapability: ${change.objectId}`);
+                    BadgeLogger.debug('Found AdminCapability via events', { adminCapabilityId: change.objectId });
                   }
                 }
                 // Check for StatisticsRegistry
                 if (change.objectType.includes('StatisticsRegistry') && change.objectType.includes(packageId)) {
                   if (!results.statisticsRegistryId) {
                     results.statisticsRegistryId = change.objectId;
-                    console.log(`✅ [FIND OLD OBJECTS] Found StatisticsRegistry: ${change.objectId}`);
+                    BadgeLogger.debug('Found StatisticsRegistry via events', { statisticsRegistryId: change.objectId });
                   }
                 }
               }
@@ -1102,7 +1138,11 @@ export class BadgeService {
 
       // If we didn't find all objects through events, try direct object queries
       if (!results.registryId || !results.adminCapabilityId || !results.statisticsRegistryId) {
-        console.log(`🔍 [FIND OLD OBJECTS] Some objects not found via events, trying direct queries...`);
+        BadgeLogger.debug('Some objects not found via events, trying direct queries', {
+          hasRegistry: !!results.registryId,
+          hasAdminCap: !!results.adminCapabilityId,
+          hasStatsReg: !!results.statisticsRegistryId,
+        });
         
         // Try to find BadgeRegistry by querying objects of that type
         if (!results.registryId) {
@@ -1118,20 +1158,20 @@ export class BadgeService {
             // Note: queryObjects doesn't exist in Sui SDK
             // Shared objects must be found via events or known object IDs
           } catch (err) {
-            console.warn(`⚠️ [FIND OLD OBJECTS] Error querying BadgeRegistry:`, err);
+            BadgeLogger.warn('Error querying BadgeRegistry', err);
           }
         }
         
         // Try to find AdminCapability
         // Note: queryObjects doesn't exist in Sui SDK - AdminCapability must be found via events or known object IDs
         if (!results.adminCapabilityId) {
-          console.log(`⚠️ [FIND OLD OBJECTS] AdminCapability not found via events - cannot query directly`);
+          BadgeLogger.debug('AdminCapability not found via events - cannot query directly');
         }
         
         // Try to find StatisticsRegistry
         // Note: queryObjects doesn't exist in Sui SDK - StatisticsRegistry must be found via events or known object IDs
         if (!results.statisticsRegistryId) {
-          console.log(`⚠️ [FIND OLD OBJECTS] StatisticsRegistry not found via events - cannot query directly`);
+          BadgeLogger.debug('StatisticsRegistry not found via events - cannot query directly');
         }
       }
 
@@ -1149,7 +1189,7 @@ export class BadgeService {
         };
       }
     } catch (error: any) {
-      console.error(`❌ [FIND OLD OBJECTS] Error:`, error);
+      BadgeLogger.error('Error finding old contract objects', error);
       return {
         success: false,
         error: error.message || 'Failed to find old contract objects',
@@ -1180,7 +1220,7 @@ export class BadgeService {
       const client = this.getClient();
       const packageId = oldPackageId.split('::')[0];
 
-      console.log(`🔍 [FIND OLD REGISTRY] Searching for BadgeRegistry from package: ${packageId}`);
+      BadgeLogger.debug('Searching for BadgeRegistry from old package', { packageId });
       
       // Query for BadgeRegistry objects by type
       const expectedType = `${packageId}::badge_system::BadgeRegistry`;
@@ -1206,7 +1246,10 @@ export class BadgeService {
           );
           
           if (sharedRegistry) {
-            console.log(`✅ [FIND OLD REGISTRY] Found shared BadgeRegistry: ${sharedRegistry.data?.objectId}`);
+            BadgeLogger.debug('Found shared BadgeRegistry', {
+              registryId: sharedRegistry.data?.objectId,
+              registryType: sharedRegistry.data?.type || expectedType,
+            });
             return {
               success: true,
               registryId: sharedRegistry.data?.objectId,
@@ -1215,12 +1258,12 @@ export class BadgeService {
           }
         }
       } catch (queryError) {
-        console.log(`⚠️ [FIND OLD REGISTRY] Query by type failed, trying alternative method...`);
+        BadgeLogger.debug('Query by type failed, trying alternative method');
       }
 
       // Alternative: Query events from initialize_badge_registry
       // Look for BadgeRegistry creation events
-      console.log(`🔍 [FIND OLD REGISTRY] Querying events for BadgeRegistry creation...`);
+      BadgeLogger.debug('Querying events for BadgeRegistry creation');
       
       // Query all events from the old package's badge_system module
       const events = await client.queryEvents({
@@ -1251,9 +1294,11 @@ export class BadgeService {
                   change.objectType && 
                   change.objectType.includes('BadgeRegistry') &&
                   change.objectType.includes(packageId)) {
-                console.log(`✅ [FIND OLD REGISTRY] Found BadgeRegistry in transaction ${event.id.txDigest}`);
-                console.log(`   Registry ID: ${change.objectId}`);
-                console.log(`   Registry Type: ${change.objectType}`);
+                BadgeLogger.debug('Found BadgeRegistry in transaction', {
+                  transactionDigest: event.id.txDigest,
+                  registryId: change.objectId,
+                  registryType: change.objectType,
+                });
                 
                 return {
                   success: true,
@@ -1274,7 +1319,7 @@ export class BadgeService {
         error: 'Could not find BadgeRegistry object from old package. It may not have been initialized, or the package ID is incorrect.',
       };
     } catch (error: any) {
-      console.error(`❌ [FIND OLD REGISTRY] Error:`, error);
+      BadgeLogger.error('Error finding old BadgeRegistry', error);
       return {
         success: false,
         error: error.message || 'Failed to find old BadgeRegistry',
@@ -1439,7 +1484,7 @@ export class BadgeService {
     try {
       const client = this.getClient();
       
-      console.log(`🔍 [PACKAGE INFO] Getting deployment info for package: ${packageId}`);
+      BadgeLogger.debug('Getting deployment info for package', { packageId });
       
       // Get package object to find publish transaction
       const packageObj = await client.getObject({
@@ -1473,10 +1518,12 @@ export class BadgeService {
         
         const timestamp = txDetails.timestampMs;
         
-        console.log(`📅 [PACKAGE INFO] Package ${packageId.substring(0, 10)}...`);
-        console.log(`   Publish Transaction: ${publishTx}`);
-        console.log(`   Publish Date: ${timestamp ? new Date(Number(timestamp)).toISOString() : 'unknown'}`);
-        console.log(`   Timestamp (ms): ${timestamp}`);
+        BadgeLogger.debug('Package deployment info', {
+          packageId: packageId.substring(0, 10) + '...',
+          publishTransaction: publishTx,
+          publishDate: timestamp ? new Date(Number(timestamp)).toISOString() : 'unknown',
+          timestamp,
+        });
         
         return {
           success: true,
@@ -1491,7 +1538,7 @@ export class BadgeService {
         packageId,
       };
     } catch (error: any) {
-      console.error(`❌ [PACKAGE INFO] Error:`, error);
+      BadgeLogger.error('Error getting package deployment info', error);
       return {
         success: false,
         error: error.message || 'Failed to get package info',
@@ -1525,11 +1572,14 @@ export class BadgeService {
         const older = info1.publishDate < info2.publishDate ? packageId1 : packageId2;
         const newer = info1.publishDate < info2.publishDate ? packageId2 : packageId1;
         
-        console.log(`📊 [PACKAGE COMPARE]`);
-        console.log(`   Package 1 (${packageId1.substring(0, 10)}...): ${new Date(info1.publishDate).toISOString()}`);
-        console.log(`   Package 2 (${packageId2.substring(0, 10)}...): ${new Date(info2.publishDate).toISOString()}`);
-        console.log(`   Older: ${older.substring(0, 10)}...`);
-        console.log(`   Newer: ${newer.substring(0, 10)}...`);
+        BadgeLogger.debug('Package comparison', {
+          package1: packageId1.substring(0, 10) + '...',
+          package1Date: new Date(info1.publishDate).toISOString(),
+          package2: packageId2.substring(0, 10) + '...',
+          package2Date: new Date(info2.publishDate).toISOString(),
+          older: older.substring(0, 10) + '...',
+          newer: newer.substring(0, 10) + '...',
+        });
         
         return {
           success: true,
@@ -1692,7 +1742,7 @@ export class BadgeService {
       const client = this.getClient();
       const packageId = oldPackageId.split('::')[0]; // Extract package ID if full path provided
 
-      console.log(`🔍 [INSPECT OLD] Inspecting old contract package: ${packageId}`);
+      BadgeLogger.debug('Inspecting old contract package', { packageId });
       
       // Get package information
       const packageInfo = await client.getNormalizedMoveModule({
@@ -1700,7 +1750,7 @@ export class BadgeService {
         module: 'badge_system',
       });
 
-      console.log(`📋 [INSPECT OLD] Package info retrieved:`, JSON.stringify(packageInfo, null, 2));
+      BadgeLogger.debug('Package info retrieved', { packageId, packageInfo });
 
       // Extract functions with their signatures
       const functions: Array<{ 
@@ -1727,11 +1777,15 @@ export class BadgeService {
       // Note: packageInfo.functions doesn't exist in SuiMoveNormalizedModule type
       // We only have access to exposedFunctions via the normalized module API
 
-      console.log(`✅ [INSPECT OLD] Found ${functions.length} functions:`);
-      functions.forEach(f => {
-        const params = f.parameters?.map((p: any) => p.type || 'unknown').join(', ') || 'none';
-        console.log(`   - ${f.name} (${f.visibility}${f.isEntry ? ', entry' : ''})`);
-        console.log(`     Parameters: [${params}]`);
+      BadgeLogger.debug('Found functions in old contract', {
+        packageId,
+        functionCount: functions.length,
+        functions: functions.map(f => ({
+          name: f.name,
+          visibility: f.visibility,
+          isEntry: f.isEntry,
+          parameters: f.parameters?.map((p: any) => p.type || 'unknown') || [],
+        })),
       });
 
       // Filter for admin-related functions
@@ -1741,11 +1795,12 @@ export class BadgeService {
       );
       
       if (adminFunctions.length > 0) {
-        console.log(`\n🔍 [INSPECT OLD] Admin/Mint-related functions:`);
-        adminFunctions.forEach(f => {
-          const params = f.parameters?.map((p: any) => p.type || 'unknown').join(', ') || 'none';
-          console.log(`   - ${f.name}`);
-          console.log(`     Parameters: [${params}]`);
+        BadgeLogger.debug('Admin/Mint-related functions found', {
+          packageId,
+          adminFunctions: adminFunctions.map(f => ({
+            name: f.name,
+            parameters: f.parameters?.map((p: any) => p.type || 'unknown') || [],
+          })),
         });
       }
 
@@ -1754,7 +1809,7 @@ export class BadgeService {
         functions,
       };
     } catch (error: any) {
-      console.error(`❌ [INSPECT OLD] Error inspecting old contract:`, error);
+      BadgeLogger.error('Error inspecting old contract', error);
       return {
         success: false,
         error: error.message || 'Failed to inspect contract',
@@ -1787,14 +1842,15 @@ export class BadgeService {
       const oldStatsRegistryId = process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET || process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID;
       
       // Debug: Log what we're reading from environment
-      console.log(`\n🔍 [ADMIN MINT OLD] Environment Variable Debug:`);
-      console.log(`   OLD_GAME_SCORE_CONTRACT_TESTNET: ${process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || 'NOT SET'}`);
-      console.log(`   OLD_GAME_SCORE_CONTRACT: ${process.env.OLD_GAME_SCORE_CONTRACT || 'NOT SET'}`);
-      console.log(`   Resolved oldPackageId: ${oldPackageId || 'NOT SET'}`);
-      console.log(`   OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET: ${process.env.OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET || 'NOT SET'}`);
-      console.log(`   OLD_ADMIN_CAPABILITY_OBJECT_ID_TESTNET: ${process.env.OLD_ADMIN_CAPABILITY_OBJECT_ID_TESTNET || 'NOT SET'}`);
-      console.log(`   OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET: ${process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET || 'NOT SET'}`);
-      console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'NOT SET'}`);
+      BadgeLogger.debug('Environment variable debug for old contract', {
+        OLD_GAME_SCORE_CONTRACT_TESTNET: process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || 'NOT SET',
+        OLD_GAME_SCORE_CONTRACT: process.env.OLD_GAME_SCORE_CONTRACT || 'NOT SET',
+        resolvedOldPackageId: oldPackageId || 'NOT SET',
+        OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET: process.env.OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET || 'NOT SET',
+        OLD_ADMIN_CAPABILITY_OBJECT_ID_TESTNET: process.env.OLD_ADMIN_CAPABILITY_OBJECT_ID_TESTNET || 'NOT SET',
+        OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET: process.env.OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET || 'NOT SET',
+        NODE_ENV: process.env.NODE_ENV || 'NOT SET',
+      });
 
       if (!oldPackageId || !oldRegistryId) {
         return {
@@ -1804,7 +1860,7 @@ export class BadgeService {
       }
 
       if (!oldStatsRegistryId) {
-        console.warn('⚠️ [ADMIN MINT OLD] OLD_STATISTICS_REGISTRY_OBJECT_ID not configured. Using new contract stats registry as fallback.');
+        BadgeLogger.warn('OLD_STATISTICS_REGISTRY_OBJECT_ID not configured. Using new contract stats registry as fallback.');
       }
 
       // Get old admin capability
@@ -1817,16 +1873,17 @@ export class BadgeService {
         };
       }
 
-      console.log(`🎖️ [ADMIN MINT OLD] Building badge mint transaction for OLD contract`);
-      console.log(`   Player: ${playerAddress}`);
-      console.log(`   Tier: ${tier}`);
-      console.log(`   Old Package ID: ${oldPackageId.substring(0, 10)}...`);
-      console.log(`   Old Registry ID: ${oldRegistryId.substring(0, 10)}...`);
-      console.log(`   Old Admin Capability: ${oldAdminCapabilityId.substring(0, 10)}...`);
+      BadgeLogger.info('Building badge mint transaction for OLD contract', {
+        playerAddress,
+        tier,
+        oldPackageId: oldPackageId.substring(0, 10) + '...',
+        oldRegistryId: oldRegistryId.substring(0, 10) + '...',
+        oldAdminCapabilityId: oldAdminCapabilityId.substring(0, 10) + '...',
+      });
 
       // Get badge image URL based on tier
       const imageUrl = this.getBadgeImageUrl(tier);
-      console.log(`🖼️ [ADMIN MINT OLD] Badge image URL: ${imageUrl}`);
+      BadgeLogger.debug('Badge image URL', { tier, imageUrl });
 
       // Extract package ID - use the exact package ID from environment variable
       // (Should be 0x66b58fb2... for badge operations)
@@ -1835,8 +1892,10 @@ export class BadgeService {
         packageId = packageId.split('::')[0];
       }
       
-      console.log(`📋 [ADMIN MINT OLD] Using package ID: ${packageId}`);
-      console.log(`📋 [ADMIN MINT OLD] Note: All types (AdminCapability, BadgeRegistry, StatisticsRegistry) must be from this package`);
+      BadgeLogger.debug('Using package ID for old contract', {
+        packageId,
+        note: 'All types (AdminCapability, BadgeRegistry, StatisticsRegistry) must be from this package',
+      });
 
       // Use old stats registry if configured, otherwise use new one as fallback
       const statsRegistryToUse = oldStatsRegistryId || this.config.contracts.statisticsRegistry;
@@ -1848,10 +1907,12 @@ export class BadgeService {
         };
       }
 
-      console.log(`📋 [ADMIN MINT OLD] Using stats registry: ${statsRegistryToUse.substring(0, 10)}...`);
+      BadgeLogger.debug('Using stats registry', {
+        statsRegistryId: statsRegistryToUse.substring(0, 10) + '...',
+        isOldContract: !!oldStatsRegistryId,
+      });
 
       // Verify all old contract objects are configured and accessible
-      console.log(`\n🔍 [ADMIN MINT OLD] Verifying all old contract objects...`);
       const oldObjects = {
         packageId: oldPackageId,
         registryId: oldRegistryId,
@@ -1859,7 +1920,7 @@ export class BadgeService {
         adminCapabilityId: oldAdminCapabilityId,
       };
       
-      console.log(`📋 [ADMIN MINT OLD] Old contract configuration:`, {
+      BadgeLogger.debug('Old contract configuration', {
         packageId: oldObjects.packageId ? `${oldObjects.packageId.substring(0, 10)}...` : 'NOT SET',
         registryId: oldObjects.registryId ? `${oldObjects.registryId.substring(0, 10)}...` : 'NOT SET',
         statsRegistryId: typeof oldObjects.statsRegistryId === 'string' && oldObjects.statsRegistryId.startsWith('0x') 
@@ -1873,7 +1934,7 @@ export class BadgeService {
 
       // Verify all objects are from the correct package
       // The old contract expects all types from the package specified in OLD_GAME_SCORE_CONTRACT_TESTNET
-      console.log(`📋 [ADMIN MINT OLD] Verifying all objects are from correct package...`);
+      BadgeLogger.debug('Verifying all objects are from correct package');
       try {
         const registryObj = await client.getObject({
           id: oldRegistryId,
@@ -1890,7 +1951,7 @@ export class BadgeService {
           options: { showType: true },
         });
         
-        console.log(`📋 [ADMIN MINT OLD] Object types:`, {
+        BadgeLogger.debug('Object types retrieved', {
           registryType: registryObj.data?.type,
           adminCapType: adminCapObj.data?.type,
           statsRegType: statsRegObj.data?.type,
@@ -1914,10 +1975,11 @@ export class BadgeService {
         
         // Check if registry type is valid (not 'package')
         if (!registryObj.data.type || registryObj.data.type === 'package' || !registryObj.data.type.includes('BadgeRegistry')) {
-          console.error(`❌ [ADMIN MINT OLD] Invalid registry object!`);
-          console.error(`   Registry ID: ${oldRegistryId}`);
-          console.error(`   Registry type: ${registryObj.data?.type || 'undefined'}`);
-          console.error(`   This appears to be a package ID, not a BadgeRegistry object ID.`);
+          BadgeLogger.error('Invalid registry object', {
+            registryId: oldRegistryId,
+            registryType: registryObj.data?.type || 'undefined',
+            note: 'This appears to be a package ID, not a BadgeRegistry object ID',
+          });
           
           return {
             success: false,
@@ -1928,13 +1990,13 @@ export class BadgeService {
         // Check if registry type matches expected package
         if (registryObj.data.type && !registryObj.data.type.includes(packageId)) {
           const registryPackage = registryObj.data.type.split('::')[0];
-          console.error(`❌ [ADMIN MINT OLD] PACKAGE MISMATCH!`);
-          console.error(`   Registry is from package: ${registryPackage}`);
-          console.error(`   Expected package (from OLD_GAME_SCORE_CONTRACT_TESTNET): ${packageId}`);
-          console.error(`   Registry type: ${registryObj.data.type}`);
-          console.error(`\n   💡 SOLUTION: Update OLD_GAME_SCORE_CONTRACT_TESTNET in .env to: ${registryPackage}`);
-          console.error(`   The badge registry (${oldRegistryId.substring(0, 10)}...) is from package ${registryPackage},`);
-          console.error(`   so OLD_GAME_SCORE_CONTRACT_TESTNET should be set to ${registryPackage}, not ${packageId}.`);
+          BadgeLogger.error('Package mismatch for registry', {
+            registryPackage,
+            expectedPackage: packageId,
+            registryType: registryObj.data.type,
+            registryId: oldRegistryId.substring(0, 10) + '...',
+            solution: `Update OLD_GAME_SCORE_CONTRACT_TESTNET in .env to: ${registryPackage}`,
+          });
           
           return {
             success: false,
@@ -1947,16 +2009,19 @@ export class BadgeService {
           const adminCapPackage = adminCapObj.data.type.split('::')[0];
           const registryPackage = registryObj.data.type.split('::')[0];
           
-          console.error(`❌ [ADMIN MINT OLD] ADMIN CAPABILITY PACKAGE MISMATCH!`);
-          console.error(`   Admin Capability is from package: ${adminCapPackage}`);
-          console.error(`   Registry is from package: ${registryPackage}`);
-          console.error(`   OLD_GAME_SCORE_CONTRACT_TESTNET is set to: ${packageId}`);
-          console.error(`   Admin Capability type: ${adminCapObj.data.type}`);
+          BadgeLogger.error('Admin capability package mismatch', {
+            adminCapPackage,
+            registryPackage,
+            expectedPackage: packageId,
+            adminCapType: adminCapObj.data.type,
+          });
           
           // If registry package is different from packageId, suggest updating packageId
           if (registryPackage !== packageId) {
-            console.error(`\n   💡 SOLUTION: Update OLD_GAME_SCORE_CONTRACT_TESTNET to ${registryPackage}`);
-            console.error(`   Then find AdminCapability and StatisticsRegistry from package ${registryPackage}.`);
+            BadgeLogger.error('Solution for package mismatch', {
+              solution: `Update OLD_GAME_SCORE_CONTRACT_TESTNET to ${registryPackage}`,
+              note: 'Then find AdminCapability and StatisticsRegistry from package ' + registryPackage,
+            });
             return {
               success: false,
               error: `Package mismatch: The badge registry is from package ${registryPackage}, but OLD_GAME_SCORE_CONTRACT_TESTNET is set to ${packageId}. The admin capability is from ${adminCapPackage}. Please update OLD_GAME_SCORE_CONTRACT_TESTNET to ${registryPackage} and ensure all objects (registry, admin capability, stats registry) are from package ${registryPackage}.`,
@@ -1974,16 +2039,19 @@ export class BadgeService {
           const statsRegPackage = statsRegObj.data.type.split('::')[0];
           const registryPackage = registryObj.data.type.split('::')[0];
           
-          console.error(`❌ [ADMIN MINT OLD] STATISTICS REGISTRY PACKAGE MISMATCH!`);
-          console.error(`   Statistics Registry is from package: ${statsRegPackage}`);
-          console.error(`   Registry is from package: ${registryPackage}`);
-          console.error(`   OLD_GAME_SCORE_CONTRACT_TESTNET is set to: ${packageId}`);
-          console.error(`   Statistics Registry type: ${statsRegObj.data.type}`);
+          BadgeLogger.error('Statistics registry package mismatch', {
+            statsRegPackage,
+            registryPackage,
+            expectedPackage: packageId,
+            statsRegType: statsRegObj.data.type,
+          });
           
           // If registry package is different from packageId, suggest updating packageId
           if (registryPackage !== packageId) {
-            console.error(`\n   💡 SOLUTION: Update OLD_GAME_SCORE_CONTRACT_TESTNET to ${registryPackage}`);
-            console.error(`   Then find StatisticsRegistry from package ${registryPackage}.`);
+            BadgeLogger.error('Solution for package mismatch', {
+              solution: `Update OLD_GAME_SCORE_CONTRACT_TESTNET to ${registryPackage}`,
+              note: 'Then find StatisticsRegistry from package ' + registryPackage,
+            });
             return {
               success: false,
               error: `Package mismatch: The badge registry is from package ${registryPackage}, but OLD_GAME_SCORE_CONTRACT_TESTNET is set to ${packageId}. The statistics registry is from ${statsRegPackage}. Please update OLD_GAME_SCORE_CONTRACT_TESTNET to ${registryPackage} and ensure all objects (registry, admin capability, stats registry) are from package ${registryPackage}.`,
@@ -1998,10 +2066,12 @@ export class BadgeService {
         
         // Check if it's a shared object
         if (!registryObj.data.owner || typeof registryObj.data.owner !== 'object' || !('Shared' in registryObj.data.owner)) {
-          console.warn(`⚠️ [ADMIN MINT OLD] Old registry may not be a shared object. Owner:`, registryObj.data.owner);
+          BadgeLogger.warn('Old registry may not be a shared object', {
+            owner: registryObj.data.owner,
+          });
         }
       } catch (objError: any) {
-        console.error(`❌ [ADMIN MINT OLD] Failed to verify objects:`, objError);
+        BadgeLogger.error('Failed to verify objects', objError);
         return {
           success: false,
           error: `Failed to verify objects: ${objError.message}`,
@@ -2022,9 +2092,10 @@ export class BadgeService {
       // All types must be from the package specified in OLD_GAME_SCORE_CONTRACT_TESTNET
       
       // Build the transaction directly (function exists, signature matches)
-      console.log(`📋 [ADMIN MINT OLD] Building transaction with admin_mint_badge...`);
-      console.log(`📋 [ADMIN MINT OLD] Using package: ${packageId}`);
-      console.log(`📋 [ADMIN MINT OLD] Function signature verified from inspection`);
+      BadgeLogger.debug('Building transaction with admin_mint_badge', {
+        packageId,
+        note: 'Function signature verified from inspection',
+      });
       
       const txb = new Transaction();
       txb.moveCall({
@@ -2043,7 +2114,11 @@ export class BadgeService {
       txb.setGasBudget(this.config.sui.gasBudget);
       
       // Sign and execute with admin wallet (no player signature needed)
-      console.log(`\n📋 [ADMIN MINT OLD] Signing and executing transaction with admin wallet...`);
+      BadgeLogger.info('Signing and executing transaction with admin wallet', {
+        playerAddress,
+        tier,
+        packageId,
+      });
       
       const result = await client.signAndExecuteTransaction({
         signer: keypair,
@@ -2056,8 +2131,11 @@ export class BadgeService {
 
       // Check if transaction succeeded
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [ADMIN MINT OLD] Badge minted successfully!`);
-        console.log(`✅ [ADMIN MINT OLD] Transaction digest: ${result.digest}`);
+        BadgeLogger.info('Badge minted successfully on old contract', {
+          playerAddress,
+          tier,
+          digest: result.digest,
+        });
         return {
           success: true,
           digest: result.digest,
@@ -2065,14 +2143,18 @@ export class BadgeService {
         };
       } else {
         const errorMsg = result.effects?.status?.error || 'Transaction failed';
-        console.error(`❌ [ADMIN MINT OLD] Transaction failed: ${errorMsg}`);
+        BadgeLogger.error('Transaction failed', {
+          playerAddress,
+          tier,
+          error: errorMsg,
+        });
         return {
           success: false,
           error: errorMsg,
         };
       }
     } catch (error) {
-      console.error('❌ [ADMIN MINT OLD] Error building transaction:', error);
+      BadgeLogger.error('Error building transaction', { error, playerAddress, tier });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -2130,7 +2212,7 @@ export class BadgeService {
 
       txb.setGasBudget(this.config.sui.gasBudget);
 
-      console.log(`🧹 [ADMIN BADGE OLD] Cleaning up orphaned registry entry for ${playerAddress} on old contract`);
+      BadgeLogger.info('Cleaning up orphaned registry entry on old contract', { playerAddress });
 
       // Sign and execute with admin wallet
       const keypair = this.adminWallet.getKeypair();
@@ -2146,7 +2228,10 @@ export class BadgeService {
 
       // Check if transaction succeeded
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [ADMIN BADGE OLD] Orphaned entry cleaned up successfully: ${result.digest}`);
+        BadgeLogger.info('Orphaned entry cleaned up successfully on old contract', {
+          playerAddress,
+          digest: result.digest,
+        });
         return {
           success: true,
           digest: result.digest,
@@ -2158,7 +2243,7 @@ export class BadgeService {
         };
       }
     } catch (error) {
-      console.error('❌ [ADMIN BADGE OLD] Error cleaning up orphaned entry:', error);
+      BadgeLogger.error('Error cleaning up orphaned entry on old contract', { error, playerAddress });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -2238,13 +2323,21 @@ export class BadgeService {
 
         // Check ownership - badge must be owned by admin wallet
         const owner = badgeObject.data.owner;
-        console.log(`🔍 [ADMIN BADGE OLD] Checking badge ownership. Badge ID: ${badgeId}, Owner:`, JSON.stringify(owner), `Admin: ${adminAddress}`);
+        BadgeLogger.debug('Checking badge ownership on old contract', {
+          badgeId,
+          owner: JSON.stringify(owner),
+          adminAddress,
+        });
         
         if (owner && typeof owner === 'object' && 'AddressOwner' in owner) {
           const ownerAddress = owner.AddressOwner.toLowerCase();
           const adminAddressLower = adminAddress.toLowerCase();
           
-          console.log(`🔍 [ADMIN BADGE OLD] Owner address: ${ownerAddress}, Admin address: ${adminAddressLower}, Match: ${ownerAddress === adminAddressLower}`);
+          BadgeLogger.debug('Badge ownership check on old contract', {
+            ownerAddress,
+            adminAddress: adminAddressLower,
+            match: ownerAddress === adminAddressLower,
+          });
           
           if (ownerAddress !== adminAddressLower) {
             // Try to get the badge's metadata owner (the player it was minted for)
@@ -2264,7 +2357,7 @@ export class BadgeService {
             };
           }
         } else {
-          console.log(`⚠️ [ADMIN BADGE OLD] Badge ownership format unexpected:`, owner);
+          BadgeLogger.warn('Badge ownership format unexpected on old contract', { owner, badgeId });
           return {
             success: false,
             error: `Badge ownership is not an address owner. Owner type: ${typeof owner}, Value: ${JSON.stringify(owner)}. Badges must be owned by the admin wallet to be burned.`,
@@ -2294,7 +2387,7 @@ export class BadgeService {
 
       txb.setGasBudget(this.config.sui.gasBudget);
 
-      console.log(`🔧 [ADMIN BADGE OLD] Burning badge on old contract: ${badgeId}`);
+      BadgeLogger.info('Burning badge on old contract', { badgeId });
 
       // Sign and execute with admin wallet
       const keypair = this.adminWallet.getKeypair();
@@ -2310,7 +2403,10 @@ export class BadgeService {
 
       // Check if transaction succeeded
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [ADMIN BADGE OLD] Badge burned successfully: ${result.digest}`);
+        BadgeLogger.info('Badge burned successfully on old contract', {
+          badgeId,
+          digest: result.digest,
+        });
         return {
           success: true,
           digest: result.digest,
@@ -2322,7 +2418,7 @@ export class BadgeService {
         };
       }
     } catch (error) {
-      console.error('❌ [ADMIN BADGE OLD] Error burning badge:', error);
+      BadgeLogger.error('Error burning badge on old contract', { error, badgeId });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -2341,6 +2437,7 @@ export class BadgeService {
     playerAddress: string,
     imageUrl?: string
   ): Promise<{ success: boolean; error?: string }> {
+    let badgeId: string | undefined;
     try {
       const client = this.getClient();
       const packageId = this.config.contracts.gameScore;
@@ -2354,15 +2451,17 @@ export class BadgeService {
           error: 'Player does not have a badge',
         };
       }
-      const badgeId = badge.badgeId;
+      badgeId = badge.badgeId;
 
       // Construct image URL if not provided
       // Use the static file URL based on tier
       const url = imageUrl || this.getBadgeImageUrl(badge.tier);
 
-      console.log(`🖼️ [UPDATE IMAGE URL] Updating badge image URL for ${playerAddress}`);
-      console.log(`🖼️ [UPDATE IMAGE URL] Badge ID: ${badgeId}`);
-      console.log(`🖼️ [UPDATE IMAGE URL] Image URL: ${url}`);
+      BadgeLogger.info('Updating badge image URL', {
+        playerAddress,
+        badgeId,
+        imageUrl: url,
+      });
 
       const txb = new Transaction();
 
@@ -2390,19 +2489,27 @@ export class BadgeService {
       });
 
       if (result.effects?.status?.status === 'success') {
-        console.log(`✅ [UPDATE IMAGE URL] Successfully updated badge image URL`);
-        console.log(`✅ [UPDATE IMAGE URL] Transaction digest: ${result.digest}`);
+        BadgeLogger.info('Successfully updated badge image URL', {
+          playerAddress,
+          badgeId,
+          imageUrl: url,
+          digest: result.digest,
+        });
         return { success: true };
       } else {
         const errorMsg = result.effects?.status?.error || 'Unknown error';
-        console.error(`❌ [UPDATE IMAGE URL] Failed to update badge image URL: ${errorMsg}`);
+        BadgeLogger.error('Failed to update badge image URL', {
+          playerAddress,
+          badgeId,
+          error: errorMsg,
+        });
         return {
           success: false,
           error: errorMsg,
         };
       }
     } catch (error) {
-      console.error(`❌ [UPDATE IMAGE URL] Error updating badge image URL:`, error);
+      BadgeLogger.error('Error updating badge image URL', { error, playerAddress, badgeId: badgeId || 'unknown' });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

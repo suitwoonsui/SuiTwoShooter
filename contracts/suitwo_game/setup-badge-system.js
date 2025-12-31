@@ -11,10 +11,11 @@ const { Transaction } = require('@mysten/sui/transactions');
 const privateKey = 'suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m';
 
 // Get package ID from environment variable or use the one from deployment
+// IMPORTANT: This must be the NEW package ID from the latest deployment
 const packageId = process.env.GAME_SCORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT_TESTNET || 
                   process.env.PREMIUM_STORE_CONTRACT || 
-                  '0x10666e8f2da2023c89e5d3b5259fa6e091a10ddd862536afdd1eedad4e53591b'; // Latest package
+                  '0x96401d57521e6a7abe5a04d072983713330fb8b5a55601ebfe9fc04ed652abe3'; // Latest package (2025-01-XX) with ticket_count fix
 
 // Fee recipient address (admin wallet address)
 const feeRecipient = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
@@ -215,7 +216,8 @@ async function setupBadgeSystem() {
     
     // Step 2: Find Publisher and Create Display
     // Use the Publisher from the deployment transaction (package Publisher)
-    let publisherId = publisherObjectId || '0xbea00530109982af37b5134fc7236a040735869d67341ce9b953167dc49aee43';
+    // New deployment Publisher: 0x1939eff49571cb44905841150733ed8730a28e7822b11e9f9481412e75446216
+    let publisherId = publisherObjectId || '0x1939eff49571cb44905841150733ed8730a28e7822b11e9f9481412e75446216';
     
     // Add a small delay to ensure gas objects are refreshed
     console.log('\n⏳ Waiting before creating Display...');

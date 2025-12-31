@@ -1,14 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 /**
  * GET /api/health
  * Health check endpoint for Render free tier keep-alive
  */
-export async function GET(request: NextRequest) {
-  return NextResponse.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'suitwo-backend'
-  });
-}
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
+    return {
+      success: true,
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      service: 'suitwo-backend'
+    };
+  }
+);
 

@@ -211,7 +211,7 @@ class GameAudioManager {
         { note: 'F3', duration: 3.5 }
       ],
       
-    // THEME 4: RETRO SCI-FI - Classic Space Game Feel
+    // THEME 4: NEO-TOKYO CYBERPUNK - Cyberpunk Neo-Tokyo Aesthetic
     theme4Melody: [
       { note: 'C4', duration: 0.3 },
       { note: 'E4', duration: 0.3 },

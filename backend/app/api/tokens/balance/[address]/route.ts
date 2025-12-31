@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { suiService } from '@/lib/sui/suiService';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { withApiHandler, getAddressParam } from '@/lib/api/api-handler';
 
 /**
  * GET /api/tokens/balance/[address]
@@ -13,41 +14,21 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ address: string }> }
-) {
-  const corsHeaders = getCorsHeaders(request);
-  try {
-    const { address } = await params;
+export const GET = withApiHandler(
+  async (
+    request: NextRequest,
+    context: { params: Promise<{ address: string }> }
+  ) => {
+    const address = await getAddressParam(context.params);
 
-    if (!address) {
-      return NextResponse.json(
-        { error: 'Address parameter is required' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    // Validate address format (basic check)
+    // Validate address format (basic check - getAddressParam already validates Sui format, but this is more lenient)
     if (!address.startsWith('0x') || address.length < 10) {
-      return NextResponse.json(
-        { error: 'Invalid address format' },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error('Invalid address format');
     }
 
     const balance = await suiService.getTokenBalance(address);
 
-    return NextResponse.json(balance, { headers: corsHeaders });
-  } catch (error) {
-    console.error('Error in token balance endpoint:', error);
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    return balance;
   }
-}
+);
 

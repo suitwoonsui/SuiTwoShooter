@@ -2,9 +2,13 @@
 // Admin API: Update Badge Image URL
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
 
 /**
  * POST /api/admin/badges/update-image-url
@@ -20,46 +24,26 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const body = await request.json();
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
+    const body = await getRequestBody<{ playerAddress: string }>(request);
     const { playerAddress } = body;
 
-    if (!playerAddress || !playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid player address format' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    BadgeValidators.validateAddress(playerAddress);
 
     const badgeService = getBadgeService();
     
     // Update the badge image URL (will use getBadgeImageUrl based on tier)
     const result = await badgeService.updateBadgeImageUrl(playerAddress);
 
-    if (result.success) {
-      return NextResponse.json(
-        { success: true, message: 'Badge image URL updated successfully' },
-        { headers: corsHeaders }
-      );
-    } else {
-      return NextResponse.json(
-        { success: false, error: result.error || 'Failed to update badge image URL' },
-        { status: 500, headers: corsHeaders }
-      );
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update badge image URL');
     }
-  } catch (error) {
-    console.error('Error updating badge image URL:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to update badge image URL',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+
+    return {
+      success: true,
+      message: 'Badge image URL updated successfully',
+    };
   }
-}
+);
 

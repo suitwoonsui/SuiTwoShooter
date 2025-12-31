@@ -5,10 +5,28 @@
 // Collision detection is handled in collision.js, but this module processes the results.
 
 /**
+ * Get game state - helper function for accessing game state
+ * @returns {Object|null} The game state object
+ */
+function getGameState() {
+  // Try window.gameState first (from game-state.js), then window.game (backward compatibility)
+  if (typeof window !== 'undefined') {
+    return window.gameState || window.game || null;
+  }
+  return null;
+}
+
+/**
  * Handle coin collection - increment count, manage streak, check force field activation
  * @param {Object} tile - The tile containing the coin
  */
 function collectCoin(tile) {
+  const game = getGameState();
+  if (!game) {
+    console.error('❌ [COLLECTIBLES] Game state not available');
+    return;
+  }
+  
   // Increment coin count
   game.coins++;
   
@@ -42,6 +60,12 @@ function collectCoin(tile) {
  * @param {boolean} isBonus - True for powerup bonus, false for powerdown
  */
 function collectPowerup(tile, isBonus) {
+  const game = getGameState();
+  if (!game) {
+    console.error('❌ [COLLECTIBLES] Game state not available');
+    return;
+  }
+  
   if (isBonus) {
     // Power-up bonus - upgrade projectile level
     // Max level is 10 (stretched from 6)
@@ -106,6 +130,12 @@ function collectPowerup(tile, isBonus) {
  * Thresholds: Level 1 = 5 coins, Level 2 = 12 coins, Level 3 = 30 coins
  */
 function checkForceFieldActivation() {
+  const game = getGameState();
+  if (!game || !game.forceField) {
+    console.error('❌ [COLLECTIBLES] Game state or forceField not available');
+    return;
+  }
+  
   if (game.forceField.coinStreak >= 5 && game.forceField.level === 0) {
     // Activate level 1 force field
     game.forceField.level = 1;
@@ -117,9 +147,15 @@ function checkForceFieldActivation() {
       playForceFieldSound();
     }
     
-    // Visual effect for force field activation
-    for (let i = 0; i < 20; i++) {
-      game.particles.push(new Particle(player.x + player.width/2, player.y + player.height/2, '#00FFFF'));
+    // Visual effect for force field activation (reduced particle count for performance)
+    // Spread particle creation over multiple frames to avoid frame drop
+    if (typeof createParticleEffect === 'function') {
+      createParticleEffect(player.x + player.width/2, player.y + player.height/2, '#00FFFF', 10); // Reduced from 20 to 10
+    } else {
+      // Fallback: create fewer particles
+      for (let i = 0; i < 10; i++) {
+        game.particles.push(new Particle(player.x + player.width/2, player.y + player.height/2, '#00FFFF'));
+      }
     }
   } else if (game.forceField.coinStreak >= 12 && game.forceField.level === 1) {
     // Upgrade to level 2 force field (threshold updated from 10 to 12)
@@ -146,10 +182,17 @@ function checkForceFieldActivation() {
     }
     
     // Visual effect for force field upgrade (more dramatic for level 3)
-    createCoinCollectionEffect(player.x + player.width/2, player.y + player.height/2);
-    for (let i = 0; i < 30; i++) {
-      game.particles.push(new Particle(player.x + player.width/2, player.y + player.height/2, '#FFD700'));
+    // Reduced particle count to avoid frame drops
+    if (typeof createParticleEffect === 'function') {
+      createParticleEffect(player.x + player.width/2, player.y + player.height/2, '#FFD700', 15); // Reduced from 30 to 15
+    } else {
+      // Fallback: create fewer particles
+      for (let i = 0; i < 15; i++) {
+        game.particles.push(new Particle(player.x + player.width/2, player.y + player.height/2, '#FFD700'));
+      }
     }
+    // Coin collection effect (already optimized, creates 30 particles but uses helper)
+    createCoinCollectionEffect(player.x + player.width/2, player.y + player.height/2);
   }
 }
 
@@ -157,6 +200,11 @@ function checkForceFieldActivation() {
  * Reset coin streak when player gets hit
  */
 function resetCoinStreak() {
+  const game = getGameState();
+  if (!game || !game.forceField) {
+    console.warn('⚠️ [COLLECTIBLES] Cannot reset coin streak - game state not available');
+    return;
+  }
   game.forceField.coinStreak = 0;
 }
 

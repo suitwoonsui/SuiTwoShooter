@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { suiService } from '@/lib/sui/suiService';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 /**
  * Generate mock leaderboard data for testing
@@ -67,8 +69,8 @@ function generateMockLeaderboard(count: number) {
  * - limit: Number of scores to return (default: 100, max: 1000)
  * - mock: Set to 'true' to return mock data for testing (default: false)
  */
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get('limit');
     const mockParam = searchParams.get('mock');
@@ -81,13 +83,48 @@ export async function GET(request: NextRequest) {
 
     let leaderboard;
     if (useMock) {
-      console.log(`🧪 [LEADERBOARD] Using mock data (${limit} entries)`);
+      BadgeLogger.info('Using mock leaderboard data', { limit });
       leaderboard = generateMockLeaderboard(limit);
     } else {
-      leaderboard = await suiService.queryEvents(limit);
-    }
+      // Query both events and StatisticsRegistry
+      // Events contain all individual score submissions (what we want for leaderboard)
+      // Registry contains best scores per player (used as fallback for migrated stats without events)
+      const [eventScores, registryScores] = await Promise.all([
+        suiService.queryEvents(limit * 2), // Get more from events to merge
+        suiService.queryStatisticsRegistry(limit * 2), // Get more from registry to merge
+      ]);
 
-    const corsHeaders = getCorsHeaders(request);
+      BadgeLogger.info('Fetched leaderboard data', {
+        eventCount: eventScores.length,
+        registryCount: registryScores.length,
+      });
+
+      // Use all event scores (individual game submissions) as the primary source
+      // These represent actual game sessions with timestamps
+      const allScores = [...eventScores];
+
+      // For players who have stats in registry but no events (migrated stats),
+      // add their best score as a single entry
+      const playersWithEvents = new Set(eventScores.map(s => s.walletAddress));
+      for (const registryScore of registryScores) {
+        if (!playersWithEvents.has(registryScore.walletAddress)) {
+          // This player has migrated stats but no events, add their best score
+          allScores.push(registryScore);
+        }
+      }
+
+      // Sort all scores by score (descending) and limit
+      leaderboard = allScores
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+
+      BadgeLogger.info('Merged leaderboard data', {
+        finalCount: leaderboard.length,
+        totalScores: allScores.length,
+        eventScores: eventScores.length,
+        registryOnlyScores: registryScores.filter(s => !playersWithEvents.has(s.walletAddress)).length,
+      });
+    }
     
     // Get network info for verification (skip if using mock data)
     let connectionInfo;
@@ -97,34 +134,17 @@ export async function GET(request: NextRequest) {
       connectionInfo = { network: 'testnet', chainId: 'mock' };
     }
     
-    return NextResponse.json({
+    return {
+      success: true,
       leaderboard,
       count: leaderboard.length,
       limit,
       network: connectionInfo.network, // Include network info for verification
       chainId: connectionInfo.chainId, // Include chain ID for verification
       mock: useMock, // Indicate if mock data is being used
-    }, {
-      headers: corsHeaders,
-    });
-  } catch (error) {
-    console.error('Error in leaderboard endpoint:', error);
-    const corsHeaders = getCorsHeaders(request);
-    
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        leaderboard: [],
-        count: 0
-      },
-      { 
-        status: 500,
-        headers: corsHeaders,
-      }
-    );
+    };
   }
-}
+);
 
 /**
  * Handle CORS preflight (OPTIONS) request

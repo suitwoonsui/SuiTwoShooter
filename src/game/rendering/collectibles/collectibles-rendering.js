@@ -6,33 +6,64 @@
 
 // Render all collectibles (coins, power-ups, power-downs)
 function renderCollectibles(ctx) {
-  tiles.forEach(tile => {
+  // OPTIMIZATION: Create Map lookups for pulled items ONCE (not per tile)
+  // This avoids O(n*m) complexity from find() calls inside the loop
+  const pulledCoinsMap = new Map();
+  const pulledPowerupsMap = new Map();
+  
+  if (typeof window.pulledCoins !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active) {
+    const pulledCoins = window.pulledCoins;
+    const pulledCoinsLength = pulledCoins.length;
+    for (let i = 0; i < pulledCoinsLength; i++) {
+      const pulled = pulledCoins[i];
+      pulledCoinsMap.set(pulled.tile, pulled);
+    }
+  }
+  
+  if (typeof window.pulledPowerups !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active && game.coinTractorBeam.level >= 3) {
+    const pulledPowerups = window.pulledPowerups;
+    const pulledPowerupsLength = pulledPowerups.length;
+    for (let i = 0; i < pulledPowerupsLength; i++) {
+      const pulled = pulledPowerups[i];
+      if (pulled.isBonus) {
+        pulledPowerupsMap.set(pulled.tile, pulled);
+      }
+    }
+  }
+  
+  // OPTIMIZATION: Cache collectible dimensions (function now handles caching internally)
+  // Only calculates once per image, then uses cache - no need to check .complete every frame
+  const coinDims = getCollectibleDimensions(collectibleImage);
+  const powerupBonusDims = getCollectibleDimensions(powerupBonusImage);
+  const powerupMalusDims = getCollectibleDimensions(powerupMalusImage);
+  
+  // OPTIMIZATION: Use for loop instead of forEach for better performance
+  const tilesLength = tiles.length;
+  for (let tileIdx = 0; tileIdx < tilesLength; tileIdx++) {
+    const tile = tiles[tileIdx];
     // Only render tiles that are visible on screen
     if (tile.x > -100 && tile.x < game.width + 100) {
       // Coins
       if (tile.coinLane !== null) {
-        // Check if coin is being pulled by tractor beam
+        // Check if coin is being pulled by tractor beam (using Map lookup - O(1))
         let offsetX = 0;
         let offsetY = 0;
-        if (typeof window.pulledCoins !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active) {
-          const pulled = window.pulledCoins.find(p => p.tile === tile);
-          if (pulled) {
-            offsetX = pulled.offsetX;
-            offsetY = pulled.offsetY;
-          }
+        const pulled = pulledCoinsMap.get(tile);
+        if (pulled) {
+          offsetX = pulled.offsetX;
+          offsetY = pulled.offsetY;
         }
         
         const cx = tile.x + COLLECTIBLE_X_OFFSET + offsetX;
         const cy = tile.coinLane * game.laneHeight + (game.laneHeight - COLLECTIBLE_FALLBACK_HEIGHT) / 2 + offsetY;
       
-        // Draw coin image with dynamic width by aspect ratio
-        if (collectibleImage.complete && collectibleImage.naturalWidth > 0) {
-          const coinDims = getCollectibleDimensions(collectibleImage);
+        // Draw coin image with dynamic width by aspect ratio (using cached dimensions)
+        if (coinDims) {
           const coinCenterX = cx + coinDims.centerOffset + coinDims.width / 2;
           const coinCenterY = cy + coinDims.height / 2;
           
           // Draw green glow around coin if being pulled (same style as player's normal glow)
-          if (offsetX !== 0 || offsetY !== 0 || (typeof window.pulledCoins !== 'undefined' && window.pulledCoins.find(p => p.tile === tile))) {
+          if (pulled) {
             ctx.save();
             const coinGlowRadius = 30; // Same as player glow
             const coinGrad = ctx.createRadialGradient(coinCenterX, coinCenterY, 0, coinCenterX, coinCenterY, coinGlowRadius);
@@ -52,7 +83,7 @@ function renderCollectibles(ctx) {
           const coinCenterY = cy + 20;
           
           // Draw green glow around coin if being pulled
-          if (offsetX !== 0 || offsetY !== 0 || (typeof window.pulledCoins !== 'undefined' && window.pulledCoins.find(p => p.tile === tile))) {
+          if (pulled) {
             ctx.save();
             const coinGlowRadius = 30;
             const coinGrad = ctx.createRadialGradient(coinCenterX, coinCenterY, 0, coinCenterX, coinCenterY, coinGlowRadius);
@@ -74,27 +105,24 @@ function renderCollectibles(ctx) {
     
       // Power-up (bonus)
       if (tile.powerupBonus) {
-        // Check if power-up is being pulled by tractor beam (Level 3 only)
+        // Check if power-up is being pulled by tractor beam (using Map lookup - O(1))
         let offsetX = 0;
         let offsetY = 0;
-        if (typeof window.pulledPowerups !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active && game.coinTractorBeam.level >= 3) {
-          const pulled = window.pulledPowerups.find(p => p.tile === tile && p.isBonus);
-          if (pulled) {
-            offsetX = pulled.offsetX;
-            offsetY = pulled.offsetY;
-          }
+        const pulledPowerup = pulledPowerupsMap.get(tile);
+        if (pulledPowerup) {
+          offsetX = pulledPowerup.offsetX;
+          offsetY = pulledPowerup.offsetY;
         }
         
         const px = tile.x + COLLECTIBLE_X_OFFSET + offsetX;
         const py = tile.powerupBonus.lane * game.laneHeight + (game.laneHeight - COLLECTIBLE_FALLBACK_HEIGHT) / 2 + offsetY;
         
-        if (powerupBonusImage.complete && powerupBonusImage.naturalWidth > 0) {
-          const powerupDims = getCollectibleDimensions(powerupBonusImage);
-          const powerupCenterX = px + powerupDims.centerOffset + powerupDims.width / 2;
-          const powerupCenterY = py + powerupDims.height / 2;
+        if (powerupBonusDims) {
+          const powerupCenterX = px + powerupBonusDims.centerOffset + powerupBonusDims.width / 2;
+          const powerupCenterY = py + powerupBonusDims.height / 2;
           
           // Draw green glow around power-up if being pulled (same style as player's normal glow)
-          if (offsetX !== 0 || offsetY !== 0 || (typeof window.pulledPowerups !== 'undefined' && window.pulledPowerups.find(p => p.tile === tile && p.isBonus))) {
+          if (pulledPowerup) {
             ctx.save();
             const powerupGlowRadius = 30; // Same as player glow
             const powerupGrad = ctx.createRadialGradient(powerupCenterX, powerupCenterY, 0, powerupCenterX, powerupCenterY, powerupGlowRadius);
@@ -107,13 +135,13 @@ function renderCollectibles(ctx) {
             ctx.restore();
           }
           
-          ctx.drawImage(powerupBonusImage, px + powerupDims.centerOffset, py, powerupDims.width, powerupDims.height);
+          ctx.drawImage(powerupBonusImage, px + powerupBonusDims.centerOffset, py, powerupBonusDims.width, powerupBonusDims.height);
         } else {
           const powerupCenterX = px + 20;
           const powerupCenterY = py + 20;
           
           // Draw green glow around power-up if being pulled
-          if (offsetX !== 0 || offsetY !== 0 || (typeof window.pulledPowerups !== 'undefined' && window.pulledPowerups.find(p => p.tile === tile && p.isBonus))) {
+          if (pulledPowerup) {
             ctx.save();
             const powerupGlowRadius = 30;
             const powerupGrad = ctx.createRadialGradient(powerupCenterX, powerupCenterY, 0, powerupCenterX, powerupCenterY, powerupGlowRadius);
@@ -136,14 +164,13 @@ function renderCollectibles(ctx) {
         // Note: Power-downs are NOT pulled by tractor beam (only bonus power-ups at Level 3)
         const px = tile.x + COLLECTIBLE_X_OFFSET;
         const py = tile.powerdown.lane * game.laneHeight + (game.laneHeight - COLLECTIBLE_FALLBACK_HEIGHT) / 2;
-        if (powerupMalusImage.complete && powerupMalusImage.naturalWidth > 0) {
-          const powerdownDims = getCollectibleDimensions(powerupMalusImage);
-          ctx.drawImage(powerupMalusImage, px + powerdownDims.centerOffset, py, powerdownDims.width, powerdownDims.height);
+        if (powerupMalusDims) {
+          ctx.drawImage(powerupMalusImage, px + powerupMalusDims.centerOffset, py, powerupMalusDims.width, powerupMalusDims.height);
         } else {
           ctx.fillStyle = '#FF0000';
           ctx.fillRect(px, py, 40, 40);
         }
       }
     }
-  });
+  }
 }

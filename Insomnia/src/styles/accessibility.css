@@ -1,0 +1,137 @@
+/* Accessibility CSS */
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--color-accent1);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1000;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  :root {
+    --color-background: #000000;
+    --color-text: #ffffff;
+    --color-accent1: #ffff00;
+    --color-accent2: #00ffff;
+    --color-border: #ffffff;
+  }
+}
+
+/* Focus indicators */
+*:focus {
+  outline: 2px solid var(--color-accent1);
+  outline-offset: 2px;
+}
+
+/* Enhanced focus for keyboard navigation */
+.keyboard-navigation *:focus {
+  outline: 3px solid var(--color-accent1);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px var(--color-background), 0 0 0 4px var(--color-accent1);
+}
+
+/* Game-specific accessibility */
+.game-grid-container [role="grid"] button:focus {
+  z-index: 15;
+  transform: scale(1.1);
+}
+
+/* Screen reader mode enhancements */
+.screen-reader-mode {
+  /* Add more spacing for easier navigation */
+}
+
+.screen-reader-mode button,
+.screen-reader-mode [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Touch target size for mobile */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Color blindness support */
+.game-grid-container [role="grid"] button[aria-pressed="true"] {
+  /* Add pattern or shape for colorblind users */
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.1) 2px,
+    rgba(255, 255, 255, 0.1) 4px
+  );
+}
+
+/* High contrast mode overrides */
+.high-contrast {
+  filter: contrast(2);
+}
+
+.high-contrast .game-grid-container [role="grid"] button {
+  border-width: 3px;
+}
+
+/* Prefers reduced motion */
+.reduced-motion * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.reduced-motion .animate-pulse {
+  animation: none;
+  opacity: 1;
+}
+
+/* Focus trap for modals */
+.modal-focus-trap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+}

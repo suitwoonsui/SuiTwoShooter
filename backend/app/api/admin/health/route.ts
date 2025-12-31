@@ -2,20 +2,21 @@
 // Admin Wallet Health Check API Route
 // ==========================================
 
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 /**
  * GET /api/admin/health
  * Check admin wallet status and balance
  */
-export async function GET() {
-  try {
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
     const adminWallet = getAdminWalletService();
     const balance = await adminWallet.checkBalance();
     const address = adminWallet.getAddress();
 
-    return NextResponse.json({
+    return {
       success: true,
       adminWallet: {
         address,
@@ -27,17 +28,7 @@ export async function GET() {
       message: balance.hasEnough 
         ? 'Admin wallet is healthy and ready for transactions'
         : 'Warning: Admin wallet balance is low. Please fund the wallet with testnet SUI.'
-    });
-  } catch (error) {
-    console.error('❌ Error checking admin wallet health:', error);
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Failed to check admin wallet health',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 

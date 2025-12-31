@@ -7,8 +7,18 @@
 // ==========================================
 
 // Player and UI images (moved from utils/helpers.js)
-const characterImage = new Image();
-characterImage.src = 'assets/SuiTwo_Character.webp';
+// Try to get from preloader first, fall back to direct loading
+let characterImage = null;
+
+if (typeof window !== 'undefined' && window.getGameImage) {
+  characterImage = window.getGameImage('player');
+}
+
+// Fallback to direct loading if preloader not available or image not loaded yet
+if (!characterImage) {
+  characterImage = new Image();
+  characterImage.src = 'assets/SuiTwo_Character.webp';
+}
 
 // Life images moved to src/game/rendering/ui/life-images.js
 

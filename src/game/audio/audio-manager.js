@@ -9,6 +9,12 @@ class AudioManager {
     this.music = new MusicManager(this.audioContext);
     this.settings = new AudioSettingsManager();
     
+    // Initialize buffer generator after audio context is ready
+    this.bufferGenerator = null;
+    
+    // Initialize sample loader after audio context is ready
+    this.sampleLoader = null;
+    
     this.isInitialized = false;
     
     this.init();
@@ -19,6 +25,19 @@ class AudioManager {
     try {
       this.audioContext.init();
       this.isInitialized = true;
+      
+      // Initialize buffer generator if AudioBufferGenerator is available
+      if (this.isInitialized && typeof AudioBufferGenerator !== 'undefined') {
+        this.bufferGenerator = new AudioBufferGenerator(this.audioContext.audioContext);
+        console.log('✓ Audio buffer generator initialized');
+      }
+      
+      // Initialize sample loader if AudioSampleLoader is available
+      if (this.isInitialized && typeof AudioSampleLoader !== 'undefined') {
+        this.sampleLoader = new AudioSampleLoader(this.audioContext.audioContext);
+        console.log('✓ Audio sample loader initialized');
+      }
+      
       console.log('✓ Audio system initialized');
     } catch (error) {
       console.warn('⚠ Audio not supported:', error);
@@ -90,8 +109,34 @@ class AudioManager {
     }
   }
   
-  // Specialized sound effects
-  playExplosion() {
+  // Specialized sound effects with hybrid sample/buffer/oscillator support
+  async playExplosion(useSample = true) {
+    // Try sample first if available and requested
+    if (useSample && this.sampleLoader && typeof getSampleConfig === 'function') {
+      const config = getSampleConfig('explosion');
+      if (config) {
+        try {
+          const source = await this.sampleLoader.playSample(
+            config.url,
+            this.settings.getSoundEffectsVolume(config.volume)
+          );
+          if (source) {
+            return; // Sample played successfully
+          }
+        } catch (error) {
+          console.warn('Failed to play explosion sample, falling back:', error);
+        }
+        
+        // Fallback based on config
+        if (config.fallback === 'buffer' && this.bufferGenerator) {
+          const buffer = this.bufferGenerator.generateExplosionBuffer(1.0);
+          this.bufferGenerator.playBuffer(buffer, this.settings.getSoundEffectsVolume(config.volume));
+          return;
+        }
+      }
+    }
+    
+    // Fallback to oscillator-based explosion
     this.soundEffects.playExplosion(this.settings);
   }
   
@@ -103,12 +148,65 @@ class AudioManager {
     this.soundEffects.playBossSpawn(this.settings);
   }
   
-  playBossDestroyed() {
+  async playBossDestroyed(useSample = true) {
+    // Try sample first if available and requested
+    if (useSample && this.sampleLoader && typeof getSampleConfig === 'function') {
+      const config = getSampleConfig('bossDestroyed');
+      if (config) {
+        try {
+          const source = await this.sampleLoader.playSample(
+            config.url,
+            this.settings.getSoundEffectsVolume(config.volume)
+          );
+          if (source) {
+            return; // Sample played successfully
+          }
+        } catch (error) {
+          console.warn('Failed to play boss destroyed sample, falling back:', error);
+        }
+        
+        // Fallback based on config
+        if (config.fallback === 'buffer' && this.bufferGenerator) {
+          const buffer = this.bufferGenerator.generateExplosionBuffer(1.5);
+          this.bufferGenerator.playBuffer(buffer, this.settings.getSoundEffectsVolume(config.volume));
+          return;
+        }
+      }
+    }
+    
+    // Fallback to oscillator-based boss destroyed
     this.soundEffects.playBossDestroyed(this.settings);
   }
   
-  playGameOver() {
+  async playGameOver(useSample = true) {
     this.stopBackgroundMusic();
+    
+    // Try sample first if available and requested
+    if (useSample && this.sampleLoader && typeof getSampleConfig === 'function') {
+      const config = getSampleConfig('gameOver');
+      if (config) {
+        try {
+          const source = await this.sampleLoader.playSample(
+            config.url,
+            this.settings.getSoundEffectsVolume(config.volume)
+          );
+          if (source) {
+            return; // Sample played successfully
+          }
+        } catch (error) {
+          console.warn('Failed to play game over sample, falling back:', error);
+        }
+        
+        // Fallback based on config
+        if (config.fallback === 'buffer' && this.bufferGenerator) {
+          const buffer = this.bufferGenerator.generateGameOverBuffer();
+          this.bufferGenerator.playBuffer(buffer, this.settings.getSoundEffectsVolume(config.volume));
+          return;
+        }
+      }
+    }
+    
+    // Fallback to oscillator-based game over
     this.soundEffects.playGameOver(this.settings);
   }
   
@@ -193,8 +291,6 @@ function getGameAudio() {
   return gameAudio;
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-  // Small delay to ensure other systems are loaded
-  setTimeout(initGameAudio, 100);
-});
+// Initialize audio after scripts are loaded (not on DOMContentLoaded)
+// Audio will be initialized when menu scripts load (see lazy-loader.js)
+// This ensures gameSettings and other dependencies are available

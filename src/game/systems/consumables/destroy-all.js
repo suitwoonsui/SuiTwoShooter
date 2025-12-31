@@ -50,10 +50,11 @@ class DestroyAllMissile {
       return;
     }
     
-    // Move towards target
+    // Move towards target - scale by delta time
     if (distance > 0) {
-      this.x += (dx / distance) * this.speed;
-      this.y += (dy / distance) * this.speed;
+      const deltaMultiplier = game.deltaMultiplier || 1.0;
+      this.x += (dx / distance) * this.speed * deltaMultiplier;
+      this.y += (dy / distance) * this.speed * deltaMultiplier;
     }
     
     // Update trail
@@ -64,19 +65,8 @@ class DestroyAllMissile {
   }
   
   getEnemyX() {
-    // Get enemy X position based on system (tile-based or separate)
-    if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies()) {
-      // After tier 4: Enemy has absolute X position
-      return this.targetEnemy.x;
-    } else {
-      // Before tier 4: Enemy is in tile, need to find tile
-      for (let tile of tiles) {
-        if (tile.obstacles && tile.obstacles.includes(this.targetEnemy)) {
-          return tile.x + 20; // ENEMY_X_OFFSET
-        }
-      }
-      return this.targetX; // Fallback
-    }
+    // ALWAYS use enemy.x - enemies always have absolute X position in enemies[] array
+    return this.targetEnemy.x;
   }
   
   getEnemyY() {
@@ -123,10 +113,10 @@ class DestroyAllMissile {
       game.enemyTypes.push(this.targetEnemy.type);
     }
     
-    // Play enemy destroyed sound (same as player projectiles)
-    if (typeof playEnemyDestroyedSound === 'function') {
-      playEnemyDestroyedSound();
-    }
+    // Play enemy destroyed sound (same as player projectiles) - DISABLED (keeping only enemy hit sound)
+    // if (typeof playEnemyDestroyedSound === 'function') {
+    //   playEnemyDestroyedSound();
+    // }
     
     // Create explosion effect (same as player projectiles)
     if (typeof createExplosionEffect === 'function') {
@@ -249,51 +239,26 @@ function activateDestroyAll() {
   destroyAllMissiles = [];
   
   // Collect all enemies on screen
+  // ALWAYS use enemies[] array - enemies are never in tile.obstacles anymore
   const allEnemies = [];
+  const enemiesArray = (typeof window !== 'undefined' && window.enemies) ? window.enemies : 
+                       (typeof enemies !== 'undefined' ? enemies : []);
   
-  // Get enemies from tile-based system (before tier 4)
-  if (typeof shouldUseSeparateEnemies === 'function' && !shouldUseSeparateEnemies()) {
-    tiles.forEach(tile => {
-      if (tile.x > -100 && tile.x < game.width + 100) { // On screen
-        tile.obstacles.forEach(obs => {
-          const enemyX = tile.x + 20; // ENEMY_X_OFFSET
-          const enemyY = obs.lane * game.laneHeight + (game.laneHeight - 60) / 2;
-          const distance = Math.hypot(
-            enemyX - (player.x + player.width / 2),
-            enemyY - (player.y + player.height / 2)
-          );
-          allEnemies.push({
-            enemy: obs,
-            x: enemyX,
-            y: enemyY,
-            distance: distance,
-            isTileBased: true,
-            tile: tile
-          });
-        });
-      }
-    });
-  }
-  
-  // Get enemies from separate enemies array (after tier 4)
-  if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
-    enemies.forEach(enemy => {
-      if (enemy.x > -100 && enemy.x < game.width + 100) { // On screen
-        const enemyY = enemy.lane * game.laneHeight + (game.laneHeight - 60) / 2;
-        const distance = Math.hypot(
-          enemy.x - (player.x + player.width / 2),
-          enemyY - (player.y + player.height / 2)
-        );
-        allEnemies.push({
-          enemy: enemy,
-          x: enemy.x,
-          y: enemyY,
-          distance: distance,
-          isTileBased: false
-        });
-      }
-    });
-  }
+  enemiesArray.forEach(enemy => {
+    if (enemy.x > -100 && enemy.x < game.width + 100) { // On screen
+      const enemyY = enemy.lane * game.laneHeight + (game.laneHeight - 60) / 2;
+      const distance = Math.hypot(
+        enemy.x - (player.x + player.width / 2),
+        enemyY - (player.y + player.height / 2)
+      );
+      allEnemies.push({
+        enemy: enemy,
+        x: enemy.x,
+        y: enemyY,
+        distance: distance
+      });
+    }
+  });
   
   // Sort by distance (closest first)
   allEnemies.sort((a, b) => a.distance - b.distance);

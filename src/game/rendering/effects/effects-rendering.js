@@ -4,7 +4,12 @@
 
 // Render particles
 function renderParticles(ctx) {
-  game.particles.forEach(p => p.draw(ctx));
+  // Optimized: Use for loop instead of forEach for better performance
+  const particles = game.particles;
+  const particlesLength = particles.length;
+  for (let i = 0; i < particlesLength; i++) {
+    particles[i].draw(ctx);
+  }
 }
 
 // Render flash effect

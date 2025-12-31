@@ -1,391 +1,284 @@
 # Contract Deployment Guide
 
-## Prerequisites
+**This is the ONLY deployment guide you need.**
 
-### 1. **Sui CLI Installation**
-
-**Important:** You need the Sui CLI tool to deploy contracts. The CLI is a command-line tool (like `git` or `npm`), not a programming language.
-
-**Installation Options:**
-
-#### Option A: Install via Rust/Cargo (Standard Method)
-
-This is the most common way. Rust is just used to build/install the CLI - you don't write Rust code:
-
-```bash
-# Install Rust first (if needed)
-# On Windows, download from: https://rustup.rs/
-# Or use PowerShell:
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Install Sui CLI via Cargo (Rust's package manager)
-cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui
-
-# Verify installation
-sui --version
-```
-
-#### Option B: Pre-built Binaries (If Available)
-
-Check Sui's GitHub releases for pre-built Windows binaries:
-- Visit: https://github.com/MystenLabs/sui/releases
-- Download the Windows binary if available
-- Add to your PATH
-
-#### Option C: Chocolatey (Windows Package Manager) ✅ **RECOMMENDED FOR WINDOWS**
-
-If you installed Sui CLI via Chocolatey (like you did), update it with:
-
-```powershell
-# Run PowerShell as Administrator, then:
-choco upgrade sui -y
-```
-
-**To check if you have Chocolatey version:**
-```powershell
-where.exe sui
-# If it shows: C:\ProgramData\chocolatey\bin\sui.exe
-# Then you installed via Chocolatey
-```
-
-**Note:** Chocolatey is a Windows package manager (like `apt` on Linux or `brew` on Mac). It doesn't deploy contracts itself - it just installs the Sui CLI tool, which you then use to deploy contracts.
-
-**What You Actually Use:**
-
-Once Sui CLI is installed, you use these commands (no Rust coding needed):
-- `sui move build` - Builds your Move contract
-- `sui client publish` - Deploys your contract
-- `sui client call` - Calls contract functions
-
-**The contracts themselves are written in Move language** (not Rust), which is Sui's smart contract language.
-
-### 2. **Wallet Setup** ✅ **REQUIRED**
-
-**Yes, you need a wallet for deployment!** Here's why:
-
-- **Gas Fees**: The wallet pays for deployment transaction gas
-- **Publisher Address**: Your wallet address becomes the package publisher
-- **Ownership**: You own the published package (can upgrade if needed)
-
-#### Create a New Wallet (if you don't have one):
-
-**Option 1: Interactive Setup (Recommended)**
-
-Run this command in your terminal:
-
-```bash
-sui client
-```
-
-When prompted:
-1. "Do you want to connect to a Sui Full node server [y/N]?" → Type `y` and press Enter
-2. "Sui Full node server URL" → Press Enter (defaults to testnet: `https://fullnode.testnet.sui.io:443`)
-3. "Select key scheme to generate keypair" → Type `0` for ed25519 and press Enter
-
-This will initialize the client and create a default address.
-
-**Option 2: Create Address Directly**
-
-If the client is already initialized:
-
-```bash
-# Create a new Ed25519 address
-sui client new-address ed25519
-
-# This will:
-# 1. Generate a new keypair
-# 2. Create a new address
-# 3. Save it to your Sui keystore
-# 4. Display the address and recovery phrase (SAVE THIS!)
-```
-
-**⚠️ IMPORTANT**: 
-- **Save your recovery phrase securely!** You'll need it to recover your wallet.
-- The recovery phrase is your private key - keep it secret!
-- Write it down and store it safely - you cannot recover it if lost.
-
-#### Switch to Testnet:
-
-```bash
-# Switch to testnet environment
-sui client switch --env testnet
-
-# Verify you're on testnet
-sui client active-env
-```
-
-#### Get Testnet SUI (for gas):
-
-You need testnet SUI to pay for deployment. Get it from:
-
-1. **Sui Testnet Faucet** (Discord):
-   - Join: https://discord.gg/sui
-   - Go to: `#testnet-faucet` channel
-   - Use command: `!faucet <YOUR_ADDRESS>`
-
-2. **Or use the web faucet**:
-   - Visit: https://discord.com/channels/916379725201563759/971488439931392130
-   - Request SUI for your address
-
-3. **Check your balance**:
-   ```bash
-   sui client gas
-   ```
-
-   You need at least **~0.1 SUI** for deployment (gas budget is 10,000,000 MIST = 0.01 SUI, but having extra is safer).
-
----
-
-## Deployment Steps
-
-### Step 1: Build the Contract
+## Quick Start
 
 ```bash
 cd contracts/suitwo_game
-sui move build
+npm install
+node deploy.js
 ```
 
-This should complete without errors. If you see warnings, they're okay (like unused constants).
-
-### Step 2: Deploy to Testnet
-
-```bash
-# Deploy with gas budget (increased for init function)
-sui client publish --gas-budget 50000000
-```
-
-**What happens:**
-1. Sui CLI builds your contract
-2. Creates a transaction to publish the package
-3. **The `init` function automatically runs**, creating the `SessionRegistry` shared object
-4. Signs it with your wallet
-5. Submits to testnet
-6. Waits for confirmation
-7. Returns package information
-
-### Step 3: Save the Output
-
-After deployment, you'll see output like:
-
-```
-Published Objects:
- ┌──
- │ PackageID: 0xabc123def456789...
- │ Version: 1
- │ Digest: 7xK8mN...
- └──
-
-Transaction Digest: 9xK7mN...
-```
-
-**Save these values:**
-- **Package ID**: `0xabc123def456789...` ← **REQUIRED!**
-- **Transaction Digest**: For verification and extracting Session Registry ID
-
-### Step 4: Extract Session Registry Object ID (NEW)
-
-The `init` function creates a `SessionRegistry` shared object. You need to extract its Object ID:
-
-**Method 1: From Sui Explorer (Easiest)**
-1. Visit: https://suiexplorer.com/txblock/<TRANSACTION_DIGEST>?network=testnet
-2. Look at the "Object Changes" section
-3. Find the object with type containing `SessionRegistry`
-4. Copy its Object ID
-
-**Method 2: From CLI**
-```bash
-# Get full transaction details
-sui client tx <TRANSACTION_DIGEST>
-
-# Look for created objects with type containing "SessionRegistry"
-```
-
-**Method 3: Query Package**
-```bash
-# Query all objects created by the package
-sui client objects --package <PACKAGE_ID>
-
-# Look for SessionRegistry in the output
-```
-
-**Save this value:**
-- **Session Registry Object ID**: `0x...` ← **REQUIRED!** (for backend config)
-
-### Step 5: Verify on Sui Explorer
-
-1. Visit: https://suiexplorer.com/?network=testnet
-2. Paste your **Transaction Digest** or **Package ID**
-3. Verify the package is published correctly
-4. Verify the `SessionRegistry` object was created (check Object Changes)
-
-### Step 6: Update Backend Environment Variables
-
-Add both IDs to your backend `.env` file:
-
-```bash
-GAME_SCORE_CONTRACT_TESTNET=0x<PACKAGE_ID>
-SESSION_REGISTRY_OBJECT_ID=0x<REGISTRY_OBJECT_ID>
-```
-
-**Both are required** for the backend to submit scores successfully.
+That's it! The script handles everything automatically.
 
 ---
 
-## Ownership & Package Information
+## What the Script Does
 
-### What Gets Created:
+The `deploy.js` script automatically:
 
-1. **Package Object**: 
-   - Owned by your wallet address (the publisher)
-   - Contains all your Move modules
-   - Immutable (cannot be changed after publishing)
+1. ✅ **Tests RPC connections** - Finds a working Sui testnet endpoint
+2. ✅ **Checks wallet balance** - Verifies you have enough SUI (0.5+ required)
+3. ✅ **Builds the contract** - Compiles all Move modules
+4. ✅ **Publishes the package** - Deploys to testnet with retry logic
+5. ✅ **Initializes Badge Registry** - Sets up badge system
+6. ✅ **Creates Badge Display** - Required for wallet compatibility
+7. ✅ **Creates Admin Capabilities** - For all modules (score, store, tournaments)
+8. ✅ **Extracts all IDs** - Provides complete deployment summary
 
-2. **Publisher Address**:
-   - Your wallet address is recorded as the publisher
-   - Visible on Sui Explorer
-   - Used for package upgrades (if needed later)
-
-### Important Notes:
-
-- **Package is Immutable**: Once published, the code cannot be changed
-- **Upgrades**: If you need to upgrade, you publish a new package version
-- **Ownership**: The package is owned by your publisher address
-- **Public Access**: Anyone can call your contract functions (that's the point!)
+**Total Time:** ~3-5 minutes
 
 ---
 
-## Update Frontend Configuration
+## Prerequisites
 
-After deployment, update your frontend to use the new package ID:
+1. **Sui CLI** - Install from https://github.com/MystenLabs/sui
+2. **Node.js** - For running the deployment script
+3. **Wallet with SUI** - At least 0.5 SUI for full deployment
+4. **Internet connection** - Stable connection to Sui testnet
 
-### Option 1: Set in Browser Console (Temporary)
+### Installing Sui CLI
 
-```javascript
-// In browser console after page loads
-window.setContractPackageId('0xYOUR_PACKAGE_ID_HERE');
+**Windows (Chocolatey):**
+```powershell
+choco install sui -y
 ```
 
-### Option 2: Add to index.html (Permanent)
-
-Add this script tag in `index.html` after the wallet API loads:
-
-```html
-<script>
-  // Set contract package ID after deployment
-  if (typeof window.setContractPackageId === 'function') {
-    window.setContractPackageId('0xYOUR_PACKAGE_ID_HERE');
-  }
-</script>
+**Linux/Mac:**
+```bash
+cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui
 ```
 
-### Option 3: Create Config File (Recommended)
-
-Create `public/config.js`:
-
-```javascript
-// Contract configuration
-window.GAME_CONTRACT_CONFIG = {
-  packageId: '0xYOUR_PACKAGE_ID_HERE',
-  module: 'score_submission',
-  function: 'submit_game_session'
-};
+**Verify installation:**
+```bash
+sui --version
 ```
 
-Then load it in `index.html`:
+### Getting Testnet SUI
 
-```html
-<script src="config.js"></script>
-```
+1. Join Sui Discord: https://discord.gg/sui
+2. Go to `#testnet-faucet` channel
+3. Use command: `!faucet <YOUR_ADDRESS>`
 
-And update `score-submission.js` to read from config:
-
-```javascript
-const GAME_CONTRACT_PACKAGE_ID = window.GAME_CONTRACT_CONFIG?.packageId || null;
+Or check your balance:
+```bash
+node check-balance.js
 ```
 
 ---
 
-## Testing the Deployment
+## Deployment Process
 
-### Test Score Submission:
+### Step 1: Navigate to Contract Directory
 
 ```bash
-# Call the contract function directly
-sui client call \
-  --package 0xYOUR_PACKAGE_ID \
-  --module score_submission \
-  --function submit_game_session \
-  --args 0x6 5000 10000 50 2 10 5 \
-  --gas-budget 10000000
+cd contracts/suitwo_game
 ```
 
-**Arguments:**
-- `0x6` - Clock object ID (standard Sui Clock)
-- `5000` - score
-- `10000` - distance
-- `50` - coins
-- `2` - bosses_defeated
-- `10` - enemies_defeated
-- `5` - longest_coin_streak
+### Step 2: Install Dependencies
 
-### Verify Events:
+```bash
+npm install
+```
 
-Check Sui Explorer for `ScoreSubmitted` events emitted by your contract.
+### Step 3: Run Deployment
+
+```bash
+node deploy.js
+```
+
+The script will:
+- Test multiple RPC endpoints
+- Retry on failures automatically
+- Provide clear progress updates
+- Extract all object IDs
+
+### Step 4: Copy Output IDs
+
+After successful deployment, you'll see a summary with all IDs. Copy these to:
+
+1. **`backend/.env.local`** - Update environment variables
+2. **`DEPLOYMENT_IDS.md`** - Update deployment history
+
+---
+
+## Post-Deployment Steps
+
+### 1. Update Backend Environment Variables
+
+Copy the IDs from deployment output to `backend/.env.local`:
+
+```env
+# Main Package ID
+GAME_SCORE_CONTRACT_TESTNET=0x<package_id>
+
+# Score Submission Module
+SESSION_REGISTRY_OBJECT_ID_TESTNET=0x<session_registry>
+STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0x<statistics_registry>
+ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x<score_admin_cap>
+
+# Premium Store Module
+PREMIUM_STORE_CONTRACT_TESTNET=0x<package_id>
+PREMIUM_STORE_OBJECT_ID_TESTNET=0x<premium_store>
+PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x<store_admin_cap>
+
+# Badge System Module
+BADGE_REGISTRY_OBJECT_ID_TESTNET=0x<badge_registry>
+BADGE_PUBLISHER_OBJECT_ID_TESTNET=0x<badge_publisher>
+BADGE_DISPLAY_OBJECT_ID_TESTNET=0x<badge_display>
+
+# Game Pass Module
+GAME_PASS_CONTRACT_TESTNET=0x<package_id>
+GAME_PASS_SYSTEM_OBJECT_ID_TESTNET=0x<game_pass_system>
+
+# Tournament Module
+TOURNAMENT_REGISTRY_OBJECT_ID_TESTNET=0x<tournament_registry>
+TOURNAMENT_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x<tournament_admin_cap>
+```
+
+### 2. Update DEPLOYMENT_IDS.md
+
+Add the new deployment information to `DEPLOYMENT_IDS.md` (this is the source of truth for all contract IDs).
+
+### 3. Restart Backend Server
+
+```bash
+cd backend
+npm run dev
+```
 
 ---
 
 ## Troubleshooting
 
-### "Insufficient gas" error:
-- Get more testnet SUI from the faucet
-- Increase gas budget: `--gas-budget 20000000`
+### "All RPC endpoints failed"
 
-### "Package already exists" error:
-- This shouldn't happen - each publish creates a new package
-- Check you're using the correct network
+**Cause:** Network connectivity issues or Sui testnet is down
 
-### "Module not found" error:
-- Verify module name matches: `score_submission`
-- Check package ID is correct
-- Ensure you're on the right network (testnet)
+**Solutions:**
+1. Check your internet connection
+2. Try again later (testnet may be experiencing issues)
+3. Check Sui status: https://status.sui.io
 
-### Wallet not found:
-- List your addresses: `sui client addresses`
-- Set active address: `sui client active-address <ADDRESS>`
+### "Insufficient balance"
+
+**Cause:** Wallet doesn't have enough SUI
+
+**Solutions:**
+1. Get testnet SUI from Discord faucet
+2. Check balance: `node check-balance.js`
+3. Need at least 0.5 SUI for full deployment
+
+### "Build failed"
+
+**Cause:** Contract compilation errors
+
+**Solutions:**
+1. Check for syntax errors in Move files
+2. Run `sui move build` manually to see detailed errors
+3. Ensure all dependencies are correct
+
+### "Package publish failed after 3 attempts"
+
+**Cause:** Network issues or testnet congestion
+
+**Solutions:**
+1. Wait a few minutes and try again
+2. Check if testnet is experiencing high traffic
+3. The script will automatically retry
+
+### "Request timeout"
+
+**Cause:** Network is slow or RPC endpoint is overloaded
+
+**Solutions:**
+1. The script will automatically try alternative endpoints
+2. Wait for retries to complete
+3. If all timeouts, check your network connection
 
 ---
 
-## Next Steps
+## Features
 
-After successful deployment:
+### Connection Testing
+- Tests 4 different Sui testnet RPC endpoints
+- Automatically selects the first working endpoint
+- Provides clear feedback on connection status
 
-1. ✅ Save package ID
-2. ✅ Update frontend configuration
-3. ✅ Test score submission from game
-4. ✅ Verify events on Sui Explorer
-5. ✅ Update documentation with package ID
+### Retry Logic
+- Automatically retries failed operations up to 3 times
+- Uses exponential backoff (2s, 3s, 4.5s delays)
+- Only fails after all retries are exhausted
+
+### Timeout Handling
+- All network requests have timeouts
+- Prevents indefinite hanging
+- Provides clear timeout error messages
+
+### Error Recovery
+- Handles network hiccups gracefully
+- Tries alternative endpoints if one fails
+- Provides actionable error messages
 
 ---
 
-## Mainnet Deployment (Later)
+## Manual Deployment (Alternative)
 
-When ready for mainnet:
+If the script fails, you can deploy manually:
 
-1. **Switch to mainnet**:
-   ```bash
-   sui client switch --env mainnet
-   ```
+### 1. Build Contract
 
-2. **Get mainnet SUI** (you'll need real SUI):
-   - Buy from an exchange
-   - Transfer to your wallet
+```bash
+sui move build
+```
 
-3. **Deploy**:
-   ```bash
-   sui client publish --gas-budget 10000000
-   ```
+### 2. Publish Package
 
-4. **Update all configurations** to use mainnet package ID
+```bash
+sui client publish --gas-budget 200000000
+```
 
-**⚠️ WARNING**: Only deploy to mainnet after thorough testnet testing!
+### 3. Extract IDs
 
+Use the transaction digest to view on Sui Explorer and extract object IDs manually.
+
+### 4. Initialize Systems
+
+```bash
+# Badge Registry
+sui client call --package <PACKAGE_ID> --module badge_system --function initialize_badge_registry --args <ADDRESS> --gas-budget 50000000
+
+# Badge Display
+sui client call --package <PACKAGE_ID> --module badge_system --function create_display --args <PUBLISHER_ID> --gas-budget 50000000
+
+# Admin Capabilities
+sui client call --package <PACKAGE_ID> --module score_submission --function create_admin_capability --args <ADDRESS> --gas-budget 30000000
+sui client call --package <PACKAGE_ID> --module premium_store --function create_admin_capability --args <ADDRESS> --gas-budget 30000000
+sui client call --package <PACKAGE_ID> --module tournaments --function create_admin_capability --args <ADDRESS> --gas-budget 30000000
+```
+
+---
+
+## Important Files
+
+- **`deploy.js`** - The ONLY deployment script you need
+- **`DEPLOYMENT_IDS.md`** - Source of truth for all contract IDs
+- **`DEPLOYMENT.md`** - This guide (the ONLY guide you need)
+
+---
+
+## Support
+
+If you continue to experience issues:
+
+1. Check the error message carefully
+2. Review the troubleshooting section above
+3. Verify all prerequisites are met
+4. Check Sui testnet status
+5. Review the script output for specific error details
+
+---
+
+**Last Updated:** 2025-01-XX  
+**Script Version:** 2.0 (Consolidated)

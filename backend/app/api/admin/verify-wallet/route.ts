@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { NextRequest } from 'next/server';
+import { handleCorsPreflight } from '@/lib/cors';
 import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 /**
  * GET /api/admin/verify-wallet
@@ -12,30 +13,15 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function GET(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-
-  try {
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
     const adminWallet = getAdminWalletService();
     const adminAddress = adminWallet.getAddress();
 
-    return NextResponse.json(
-      {
-        success: true,
-        adminAddress: adminAddress,
-      },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ [ADMIN VERIFY] Error getting admin address:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to get admin address',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    return {
+      success: true,
+      adminAddress: adminAddress,
+    };
   }
-}
+);
 

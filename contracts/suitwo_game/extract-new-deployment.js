@@ -2,8 +2,8 @@
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 const path = require('path');
 
-const txDigest = 'ACuUuNH4f3aa3m3eQw2DGQMCGzbcvkScTPHN2bcYTHki';
-const packageId = '0x10666e8f2da2023c89e5d3b5259fa6e091a10ddd862536afdd1eedad4e53591b';
+const txDigest = '3y563TzEdn3KJAZTPNrF3e9S367tKbxKFte1f6Lqbri8';
+const packageId = '0x96401d57521e6a7abe5a04d072983713330fb8b5a55601ebfe9fc04ed652abe3';
 const deployerAddress = '0xccf281e7d5a183ff4b63339a4da42220f30653f46e475463e997793f80b56ea3';
 
 async function extractAll() {
@@ -28,6 +28,8 @@ async function extractAll() {
     statisticsRegistry: null,
     premiumStore: null,
     publisher: null,
+    gamePassSystem: null,
+    tournamentRegistry: null,
   };
   
   console.log('=== OBJECTS FROM DEPLOYMENT TRANSACTION ===\n');
@@ -62,6 +64,14 @@ async function extractAll() {
           objects.publisher = id;
           console.log('  ✅ Publisher');
         }
+        if (type.includes('GamePassSystem')) {
+          objects.gamePassSystem = id;
+          console.log('  ✅ Game Pass System');
+        }
+        if (type.includes('TournamentRegistry')) {
+          objects.tournamentRegistry = id;
+          console.log('  ✅ Tournament Registry');
+        }
       }
     }
   }
@@ -93,6 +103,8 @@ async function extractAll() {
   console.log('Statistics Registry:', objects.statisticsRegistry || 'NOT FOUND');
   console.log('Premium Store:', objects.premiumStore || 'NOT FOUND');
   console.log('Publisher:', objects.publisher || 'NOT FOUND');
+  console.log('Game Pass System:', objects.gamePassSystem || 'NOT FOUND');
+  console.log('Tournament Registry:', objects.tournamentRegistry || 'NOT FOUND');
   
   console.log('\n' + '='.repeat(80));
   console.log('📝 .ENV VARIABLES:\n');
@@ -109,6 +121,12 @@ async function extractAll() {
   }
   if (objects.publisher) {
     console.log(`BADGE_PUBLISHER_OBJECT_ID_TESTNET=${objects.publisher}`);
+  }
+  if (objects.gamePassSystem) {
+    console.log(`GAME_PASS_SYSTEM_OBJECT_ID_TESTNET=${objects.gamePassSystem}`);
+  }
+  if (objects.tournamentRegistry) {
+    console.log(`TOURNAMENT_REGISTRY_OBJECT_ID_TESTNET=${objects.tournamentRegistry}`);
   }
   
   return objects;

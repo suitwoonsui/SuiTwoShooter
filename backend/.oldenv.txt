@@ -1,0 +1,99 @@
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+CORS_ORIGIN=*
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+# CORS_ORIGIN=http://localhost:3000
+
+# Sui Blockchain Configuration
+# Set SUI_NETWORK to 'mainnet' or 'testnet' to switch networks
+SUI_MAINNET_NETWORK=mainnet
+SUI_TESTNET_NETWORK=testnet
+
+# Network-specific RPC URLs (both configured, switch via SUI_NETWORK)
+SUI_MAINNET_RPC_URL=https://fullnode.mainnet.sui.io:443
+SUI_TESTNET_RPC_URL=https://fullnode.testnet.sui.io:443
+
+# Fallback (used if network-specific URL not set)
+SUI_RPC_URL=https://fullnode.mainnet.sui.io:443
+SUI_GAS_BUDGET=10000000
+
+# Admin Wallet (your bech32 key)
+GAME_WALLET_PRIVATE_KEY=suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m
+
+# Token Configuration (`$Mews)
+MEWS_TOKEN_TYPE_ID=0x2dcf8629a70b235cda598170fc9b271f03f33d34dd6fa148adaff481e7a792d2::mews::MEWS
+MIN_TOKEN_BALANCE=500000000
+
+# Smart Contract Addresses (fill in after deployment)
+# Mainnet contracts
+GAME_SCORE_CONTRACT_MAINNET=0x...
+TOKEN_BURN_CONTRACT_MAINNET=0x...
+SUBSCRIPTION_CONTRACT_MAINNET=0x...
+
+#Mews token minting for Testnet
+MEWS_TOKEN_TYPE_ID_TESTNET=0xcc01924c571e20ad9e7151e83cf43238c5b74c7836d54b39390ad071d74f477a::mews::MEWS
+MEWS_TREASURY_CAP_OBJECT_ID_TESTNET=0x5f39df4a95196b95954100357d74f8405969e0cb4c3e16b1ca41bcbb8ddb7dba
+USDC_TOKEN_TYPE_ID_TESTNET=0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC
+
+# ==========================================
+# Main Package ID (contains all modules: score_submission, premium_store, badge_system, game_pass)
+# ==========================================
+GAME_SCORE_CONTRACT_TESTNET=0x55d41f538c96a26737847cb78b304b8a590c6926f1303ebae269ec453e48f335
+OLD_GAME_SCORE_CONTRACT_TESTNET=0x7b109d8d984b8eb98ea4d7062e9096a2215f38931c4948379cc9d4bb405deb2a
+
+# ==========================================
+# Score Submission Module
+# ==========================================
+SESSION_REGISTRY_OBJECT_ID_TESTNET=0x9e4721d08a0642aba3bca1655776e84ede648407e878d39f7beb85624c68c409
+STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0x533b6ee6e712c402a8101f1febcd59582d1e8e1085b8dbc61aca00b3b9a04e0f
+ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x112d192c6f20d49cee87bece4fc6ddb3d1e188be19dda8b7cbd725aa692d3662
+OLD_SESSION_REGISTRY_OBJECT_ID_TESTNET=0xb485b5ad10150938c10c231f964d4bcc8593b35d1647b5f13c3fd89d504ec014
+OLD_STATISTICS_REGISTRY_OBJECT_ID_TESTNET=0x44283e1d2fab3c8c66ef46ff0d8024fdd077fa45ccf15d5a3ef657144d83426c
+OLD_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x131f1cb551bea1cff12a0d3db9c3a9422aa60dfc00d773cbe43c0362d442648f
+
+# ==========================================
+# Premium Store Module
+# ==========================================
+PREMIUM_STORE_CONTRACT_TESTNET=0x55d41f538c96a26737847cb78b304b8a590c6926f1303ebae269ec453e48f335
+PREMIUM_STORE_OBJECT_ID_TESTNET=0x3f21eafb95a26ff1c8c5228f8bcbe9f2d85f18ad4c10bd919168252cfd8f39b9
+PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x1f0de6984727923c99d42777a3e85c6bb48768e01de7caa8f9b441dceaaf96b1
+OLD_PREMIUM_STORE_CONTRACT_TESTNET=0x7b109d8d984b8eb98ea4d7062e9096a2215f38931c4948379cc9d4bb405deb2a
+OLD_PREMIUM_STORE_OBJECT_ID_TESTNET=0x3f75df2b72d776a6f0a8fd6dcf145cbbd0f7a8158a969fc91c842c188344fcc9
+OLD_PREMIUM_STORE_ADMIN_CAPABILITY_OBJECT_ID_TESTNET=0x5d91bf04a5eebbe8d99b014b5ea1d885bdb8e2690eecbf073f1d7f6bff230909
+
+# ==========================================
+# Badge System Module
+# ==========================================
+BADGE_REGISTRY_OBJECT_ID_TESTNET=0xcf1409de0493a1797782ca3c0411d92c8ffe36e2661fe52ff1045db4520e9ce1
+BADGE_PUBLISHER_OBJECT_ID_TESTNET=0x7e9268babd7aebd25bbadf006dd8c8f4f192eff496d2b925672cbd8504a75a18
+BADGE_DISPLAY_OBJECT_ID_TESTNET=0xc94d78d651b9f7632d99603a96d072d9cdfad2becc5f829750835cbee5d54423
+OLD_BADGE_REGISTRY_OBJECT_ID_TESTNET=0x1e84e8028c34082de5a7dcd786f70bdaeb596cd82059cf3093e29b6399f8cd3b
+OLD_BADGE_PUBLISHER_OBJECT_ID_TESTNET=0xab4b373c78eae42c2c0455fabc72cbbd358a083c6b1649e4bc274b069296df72
+OLD_BADGE_DISPLAY_OBJECT_ID_TESTNET=0x4ce1ed3df4d00755eb4c59a75647648eb3c0910520232b797aa5c007d5a3b0f3
+
+# ==========================================
+# Game Pass Module (NEW)
+# ==========================================
+GAME_PASS_CONTRACT_TESTNET=0x55d41f538c96a26737847cb78b304b8a590c6926f1303ebae269ec453e48f335
+GAME_PASS_SYSTEM_OBJECT_ID_TESTNET=0x7e0ffceb387e2d1d46dfc1f7e7766a24f24cd7f46602c91a98b919fdea41e45e
+
+# Admin Wallet (Required)
+GAME_WALLET_PRIVATE_KEY=suiprivkey1qz2p2z2lq2crycc9prf4qux2uhpwcd5yx6uksvzkwtgusr5a4fmaqwsvm0m
+
+# Old Contract Configuration For Migration
+OLD_TOKEN_BURN_CONTRACT_TESTNET=0x...
+OLD_SUBSCRIPTION_CONTRACT_TESTNET=0x...
+
+# Fallback (used if network-specific contract not set)
+GAME_SCORE_CONTRACT=0x...
+TOKEN_BURN_CONTRACT=0x...
+SUBSCRIPTION_CONTRACT=0x...
+
+# Security (optional for MVP)
+API_KEY=8df228b05125fd26a0d33554d6543c846f3addc76ed620ae3859b46c9d474826
+JWT_SECRET=your-jwt-secret-here
+
+#Mews Price Placeholder
+MEWS_GECKOTERMINAL_POOL_ID=0x4febe18cc3fd99c29c7c1ff26b33776ace91c35d8047e70193733513b9d88c29
+MEWS_PRICE_USD=0.00001885

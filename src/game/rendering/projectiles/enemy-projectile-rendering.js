@@ -7,7 +7,11 @@ function renderEnemyProjectiles(ctx) {
   ctx.fillStyle = '#FF4444'; 
   ctx.strokeStyle = '#FF0000'; 
   ctx.lineWidth = 2;
-  game.enemyProjectiles.forEach(b => {
+  // Optimized: Use for loop instead of forEach for better performance
+  const enemyProjectiles = game.enemyProjectiles;
+  const enemyProjectilesLength = enemyProjectiles.length;
+  for (let i = 0; i < enemyProjectilesLength; i++) {
+    const b = enemyProjectiles[i];
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.spin);
@@ -24,5 +28,5 @@ function renderEnemyProjectiles(ctx) {
     }
     
     ctx.restore();
-  });
+  }
 }

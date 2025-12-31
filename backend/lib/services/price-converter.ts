@@ -5,6 +5,16 @@
 
 import { getConfig } from '@/config/config';
 
+/**
+ * Get MEWS decimals based on network
+ * Mainnet: 6 decimals
+ * Testnet: 9 decimals
+ */
+function getMEWSDecimals(): number {
+  const config = getConfig();
+  return config.sui.network === 'testnet' ? 9 : 6;
+}
+
 interface TokenPrices {
   sui: number;
   mews: number;
@@ -625,16 +635,12 @@ export class PriceConverter {
 
       // Calculate token amount
       // SUI uses 9 decimals, MEWS uses 6 decimals (mainnet) or 9 decimals (testnet), USDC uses 6 decimals
-      // For now, we'll use 9 decimals for SUI and MEWS (testnet), but this should be network-aware
-      // TODO: Make decimals network-aware based on the network being used
       let decimals: number;
       if (token === 'USDC') {
         decimals = 6;
       } else if (token === 'MEWS') {
         // MEWS mainnet uses 6 decimals, testnet uses 9 decimals
-        // For now, default to 6 for mainnet (most common case)
-        // This should be made configurable based on network
-        decimals = 6; // Mainnet MEWS uses 6 decimals
+        decimals = getMEWSDecimals();
       } else {
         decimals = 9; // SUI uses 9 decimals
       }
@@ -695,7 +701,7 @@ export class PriceConverter {
             break;
           case 'MEWS':
             tokenPrice = prices.mews;
-            decimals = 6; // MEWS mainnet uses 6 decimals
+            decimals = getMEWSDecimals(); // Network-aware: 6 for mainnet, 9 for testnet
             break;
           case 'USDC':
             tokenPrice = prices.usdc;
@@ -782,8 +788,9 @@ export class PriceConverter {
       const suiAmount = (usdPrice / tokenPrices.sui) * 1_000_000_000;
       const suiRounded = Math.round(suiAmount);
 
-      // Convert to MEWS (6 decimals for mainnet)
-      const mewsAmount = (usdPrice / tokenPrices.mews) * 1_000_000;
+      // Convert to MEWS (network-aware decimals)
+      const mewsDecimals = getMEWSDecimals();
+      const mewsAmount = (usdPrice / tokenPrices.mews) * Math.pow(10, mewsDecimals);
       const mewsRounded = Math.round(mewsAmount);
 
       // Convert to USDC (6 decimals)
@@ -799,7 +806,7 @@ export class PriceConverter {
           },
           mews: {
             amount: mewsRounded.toString(),
-            display: (mewsAmount / 1_000_000).toFixed(6),
+            display: (mewsAmount / Math.pow(10, mewsDecimals)).toFixed(6),
           },
           usdc: {
             amount: usdcRounded.toString(),
@@ -851,8 +858,9 @@ export class PriceConverter {
         const suiAmount = (usdPrice / prices.sui) * 1_000_000_000;
         const suiRounded = Math.round(suiAmount);
 
-        // Convert to MEWS (6 decimals for mainnet)
-        const mewsAmount = (usdPrice / prices.mews) * 1_000_000;
+        // Convert to MEWS (network-aware decimals)
+        const mewsDecimals = getMEWSDecimals();
+        const mewsAmount = (usdPrice / prices.mews) * Math.pow(10, mewsDecimals);
         const mewsRounded = Math.round(mewsAmount);
 
         // Convert to USDC (6 decimals)
@@ -866,7 +874,7 @@ export class PriceConverter {
           },
           mews: {
             amount: mewsRounded.toString(),
-            display: (mewsAmount / 1_000_000).toFixed(6),
+            display: (mewsAmount / Math.pow(10, mewsDecimals)).toFixed(6),
           },
           usdc: {
             amount: usdcRounded.toString(),

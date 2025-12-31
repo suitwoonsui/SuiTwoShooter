@@ -18,10 +18,13 @@ function updateEnemyProjectiles() {
   // Get effective projectile speed multiplier (applies slow time if active)
   const speedMultiplier = typeof getEffectiveProjectileSpeedMultiplier === 'function' ? getEffectiveProjectileSpeedMultiplier() : 1.0;
   
+  // Get delta time multiplier (1.0 at 60 FPS)
+  const deltaMultiplier = game.deltaMultiplier || 1.0;
+  
   game.enemyProjectiles = game.enemyProjectiles.filter(b => {
-    b.x += b.vx * speedMultiplier;
-    b.y += b.vy * speedMultiplier;
-    b.spin += 0.2; // Rotate the spinning candle effect
+    b.x += b.vx * speedMultiplier * deltaMultiplier;
+    b.y += b.vy * speedMultiplier * deltaMultiplier;
+    b.spin += 0.2 * deltaMultiplier; // Rotate the spinning candle effect - scale by delta
     return b.x > -50 && b.x < game.width + 50 && b.y > -50 && b.y < game.height + 50;
   });
 }

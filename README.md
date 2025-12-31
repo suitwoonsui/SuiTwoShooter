@@ -1,6 +1,13 @@
 # SuiTwo Shooter Game
 
-A modular JavaScript shooter game built with clean architecture principles.
+A modular JavaScript shooter game built with clean architecture principles, featuring a Neo-Tokyo cyberpunk aesthetic.
+
+## 📊 Project Status
+
+**Current Focus:** Weekly Tournament System Implementation  
+**Last Updated:** 2025-12-09
+
+For detailed project status, see **[PROJECT_STATUS.md](docs/PROJECT_STATUS.md)**
 
 ## Project Structure
 

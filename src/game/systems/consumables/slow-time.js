@@ -29,10 +29,13 @@ class SlowTimeParticle {
   }
   
   update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.life -= this.decay;
-    this.size *= 0.98;
+    // Scale particle movement by delta time
+    const deltaMultiplier = game.deltaMultiplier || 1.0;
+    this.x += this.vx * deltaMultiplier;
+    this.y += this.vy * deltaMultiplier;
+    // Decay and size reduction should also scale by delta for consistency
+    this.life -= this.decay * deltaMultiplier;
+    this.size *= Math.pow(0.98, deltaMultiplier); // Scale decay rate
   }
   
   draw(ctx) {
@@ -86,29 +89,48 @@ function updateSlowTime() {
     return;
   }
   
-  // Update remaining time (using same deltaTime calculation as coin tractor beam)
-  const deltaTime = game.lastFrameTime ? (Date.now() - game.lastFrameTime) : 16;
-  game.slowTimePower.remainingTime -= deltaTime;
+  // Pause timer during boss transitions and level start delays
+  // This prevents slow-time from expiring during these transitions
+  // Timer pauses during: boss warning, boss victory timeout, level start delay
+  // Timer continues during: boss active (boss fight is still gameplay)
+  const isTimerPaused = game.bossWarning || 
+                        game.bossVictoryTimeout || 
+                        (game.levelStartDelay > 0);
   
-  // Check if time expired
-  if (game.slowTimePower.remainingTime <= 0) {
-    deactivateSlowTime();
-    return;
+  // Only update timer if not paused
+  if (!isTimerPaused) {
+    // Update remaining time using delta time from GameLoop (already in milliseconds)
+    const deltaTime = game.deltaTime || 16;
+    game.slowTimePower.remainingTime -= deltaTime;
+    
+    // Check if time expired
+    if (game.slowTimePower.remainingTime <= 0) {
+      deactivateSlowTime();
+      return;
+    }
   }
   
   // Apply speed multiplier to scrollSpeed and enemySpeed
   // We apply the multiplier during movement, not by modifying the base values
   // This way the speed increments still work correctly
+  // Note: During boss fights, slow-time still affects movement (if active)
   game.slowTimePower.currentScrollSpeed = game.scrollSpeed * SLOW_TIME_SPEED_REDUCTION;
   game.slowTimePower.currentEnemySpeed = game.enemySpeed * SLOW_TIME_SPEED_REDUCTION;
   
-  // Update particles
-  slowTimeParticles.forEach(p => p.update());
-  slowTimeParticles = slowTimeParticles.filter(p => p.life > 0);
+  // Update particles (pause during transitions where there's no movement)
+  // Keep particles active during boss fights (there's still movement)
+  const shouldUpdateParticles = !game.bossWarning && 
+                                 !game.bossVictoryTimeout && 
+                                 !(game.levelStartDelay > 0);
   
-  // Spawn new particles occasionally
-  if (Math.random() < 0.1) {
-    spawnSlowTimeParticle();
+  if (shouldUpdateParticles) {
+    slowTimeParticles.forEach(p => p.update());
+    slowTimeParticles = slowTimeParticles.filter(p => p.life > 0);
+    
+    // Spawn new particles occasionally
+    if (Math.random() < 0.1) {
+      spawnSlowTimeParticle();
+    }
   }
 }
 

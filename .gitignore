@@ -58,5 +58,8 @@ node_modules/
 *.tmp
 *.temp
 
+# Migration lock files
+backend/scripts/.migration-lock
+
 # Agent notes/documentation (not part of codebase)
 docs/results.md

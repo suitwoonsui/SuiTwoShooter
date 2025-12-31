@@ -7,12 +7,13 @@
  * Public method for external use (e.g., reconciliation)
  */
 export function calculateTierFromGames(gamesPlayed: number): number {
+  // Updated thresholds: Standard (1-4), Common (5-14), Uncommon (15-34), Rare (35-74), Epic (75-149), Legendary (150+)
   if (gamesPlayed >= 150) return 5; // Legendary
-  if (gamesPlayed >= 76) return 4;  // Epic
-  if (gamesPlayed >= 36) return 3;  // Rare
-  if (gamesPlayed >= 16) return 2;  // Uncommon
-  if (gamesPlayed >= 6) return 1;   // Common
-  return 0; // Starter
+  if (gamesPlayed >= 75) return 4;  // Epic
+  if (gamesPlayed >= 35) return 3;  // Rare
+  if (gamesPlayed >= 15) return 2;  // Uncommon
+  if (gamesPlayed >= 5) return 1;   // Common
+  return 0; // Standard (1-4 games)
 }
 
 /**

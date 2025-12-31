@@ -734,9 +734,13 @@ const MobileUI = {
       }, 100);
     });
     
-    // Listen for resize events
+    // Listen for resize events with debouncing
+    let resizeTimeout;
     window.addEventListener('resize', () => {
-      this.handleDeviceChange();
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        this.handleDeviceChange();
+      }, 150); // 150ms debounce - slightly longer than canvas-manager for device detection
     });
   },
 

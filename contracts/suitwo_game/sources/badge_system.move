@@ -23,12 +23,13 @@ module suitwo_game::badge_system {
     const TIER_EPIC: u8 = 4;
     const TIER_LEGENDARY: u8 = 5;
     
-    // Tier thresholds (Option A - Faster Progression with Extremely Rare Legendary)
+    // Tier thresholds - Updated for cleaner progression
     // Badge tier is determined ONLY by total_games (games played)
-    const THRESHOLD_COMMON: u64 = 6;
-    const THRESHOLD_UNCOMMON: u64 = 16;
-    const THRESHOLD_RARE: u64 = 36;
-    const THRESHOLD_EPIC: u64 = 76;
+    // Standard: 1-4 games, Common: 5-14, Uncommon: 15-34, Rare: 35-74, Epic: 75-149, Legendary: 150+
+    const THRESHOLD_COMMON: u64 = 5;
+    const THRESHOLD_UNCOMMON: u64 = 15;
+    const THRESHOLD_RARE: u64 = 35;
+    const THRESHOLD_EPIC: u64 = 75;
     const THRESHOLD_LEGENDARY: u64 = 150;
     
     // Store discount percentages (0-25%)
@@ -668,7 +669,7 @@ module suitwo_game::badge_system {
     #[allow(lint(public_entry))]
     public entry fun migrate_badge(
         registry: &mut BadgeRegistry,
-        stats_registry: &StatisticsRegistry,
+        _stats_registry: &StatisticsRegistry,
         clock: &Clock,
         old_tier: u8,  // Tier from old badge
         old_games_played: u64,  // Games played from old badge (preserved during migration)

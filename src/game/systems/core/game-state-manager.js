@@ -2,13 +2,23 @@
 // GAME STATE MANAGEMENT (EXACT COPY FROM HTML)
 // ==========================================
 
-// Game state management
-let gameState = {
+// UI state management (separate from game state in game-state.js)
+// This tracks UI visibility states (menu, game, pause, game over)
+let uiGameState = {
   isMenuVisible: true,
   isGameRunning: false,
   isPaused: false,
   isGameOver: false
 };
+
+// NOTE: gameState is now defined in game-state.js (the GameState class instance)
+// We use uiGameState here to avoid conflicts
+// For backward compatibility, we'll create a reference after game-state.js loads
+
+// Expose uiGameState globally for menu-system.js to use
+if (typeof window !== 'undefined') {
+  window.uiGameState = uiGameState;
+}
 
 // Game settings
 let gameSettings = {

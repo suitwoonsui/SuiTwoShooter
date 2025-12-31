@@ -79,16 +79,20 @@ const CSSLoader = {
     
     // Theme and base styles (load first for CSS variables)
     await this.loadCSS('src/game/rendering/responsive/shared/shared-theme.css');
+    // CRITICAL: Load front-page CSS BEFORE base-styles to prevent background flash
+    await this.loadCSS('src/game/rendering/responsive/shared/shared-front-page.css');
+    // Base styles (contains body::before background - load after front-page)
     await this.loadCSS('src/game/rendering/responsive/shared/shared-base-styles.css');
     
     // Universal component styling (load early for base classes)
     await this.loadCSS('src/game/rendering/responsive/shared/shared-components.css');
+    await this.loadCSS('src/game/rendering/responsive/shared/shared-achievements.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-ui-components.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-ui-classes.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-viewport-container.css');
+    await this.loadCSS('src/game/rendering/ui/tournament-creation-modal.css'); // Tournament creation modal styles
     
-    // Feature-specific modules - CRITICAL: Load front-page CSS early
-    await this.loadCSS('src/game/rendering/responsive/shared/shared-front-page.css');
+    // Feature-specific modules (front-page already loaded above)
     await this.loadCSS('src/game/rendering/responsive/shared/shared-main-menu.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-panels.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-typography.css');
@@ -171,16 +175,16 @@ const CSSLoader = {
     
     // Mark as loaded and dispatch custom event to signal CSS is loaded
     this.isLoaded = true;
-    window.CSSLoader = this; // Make it accessible globally for UI initialization check
+    // window.CSSLoader is already set at module load time, no need to set it again
     window.dispatchEvent(new CustomEvent('cssLoaded'));
     
     console.log('🎉 CSS loading complete!');
   }
 };
 
-// Auto-initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  CSSLoader.init().catch(err => {
-    console.error('❌ CSS loading failed:', err);
-  });
-});
+// Expose CSSLoader to window immediately so it can be accessed before init() is called
+window.CSSLoader = CSSLoader;
+
+// CSS loader is now loaded dynamically after start screen is visible
+// No auto-initialization - it's called from ui-initialization.js
+// This prevents CSS from loading before the start screen is ready

@@ -35,9 +35,9 @@ export const ITEM_CATALOG: ItemCatalog = {
     category: 'defensive',
     icon: '❤️',
     levels: [
-      { level: 1, usdPrice: 0.50, effect: '+1 life', description: 'Start with 4 total lives (3 base + 1 purchased)' },
-      { level: 2, usdPrice: 1.25, effect: '+2 lives', description: 'Start with 5 total lives (3 base + 2 purchased)' },
-      { level: 3, usdPrice: 2.50, effect: '+3 lives', description: 'Start with 6 total lives (3 base + 3 purchased)' },
+      { level: 1, usdPrice: 0.35, effect: '+1 life', description: 'Start with 4 total lives (3 base + 1 purchased)' },
+      { level: 2, usdPrice: 1.00, effect: '+2 lives', description: 'Start with 5 total lives (3 base + 2 purchased)' },
+      { level: 3, usdPrice: 2.00, effect: '+3 lives', description: 'Start with 6 total lives (3 base + 3 purchased)' },
     ],
   },
   forceField: {
@@ -47,9 +47,9 @@ export const ITEM_CATALOG: ItemCatalog = {
     category: 'defensive',
     icon: '🛡️',
     levels: [
-      { level: 1, usdPrice: 1.00, effect: 'Level 1 force field', description: 'Start with Level 1 force field active (normally requires 5 coin streak)' },
-      { level: 2, usdPrice: 2.00, effect: 'Level 2 force field', description: 'Start with Level 2 force field active (normally requires 12 coin streak)' },
-      { level: 3, usdPrice: 3.00, effect: 'Level 3 force field', description: 'Start with Level 3 force field active (normally requires 30 coin streak)' },
+      { level: 1, usdPrice: 0.75, effect: 'Level 1 force field', description: 'Start with Level 1 force field active (normally requires 5 coin streak)' },
+      { level: 2, usdPrice: 1.60, effect: 'Level 2 force field', description: 'Start with Level 2 force field active (normally requires 12 coin streak)' },
+      { level: 3, usdPrice: 2.40, effect: 'Level 3 force field', description: 'Start with Level 3 force field active (normally requires 30 coin streak)' },
     ],
   },
   orbLevel: {
@@ -59,9 +59,9 @@ export const ITEM_CATALOG: ItemCatalog = {
     category: 'offensive',
     icon: '🔮',
     levels: [
-      { level: 1, usdPrice: 0.75, effect: 'Start at Level 2', description: 'Begin at Orb Level 2 (skip initial grind)' },
-      { level: 2, usdPrice: 1.50, effect: 'Start at Level 3', description: 'Begin at Orb Level 3 (stronger starting power)' },
-      { level: 3, usdPrice: 2.25, effect: 'Start at Level 4', description: 'Begin at Orb Level 4 (very strong starting power)' },
+      { level: 1, usdPrice: 0.50, effect: 'Start at Level 2', description: 'Begin at Orb Level 2 (skip initial grind)' },
+      { level: 2, usdPrice: 1.20, effect: 'Start at Level 3', description: 'Begin at Orb Level 3 (stronger starting power)' },
+      { level: 3, usdPrice: 1.80, effect: 'Start at Level 4', description: 'Begin at Orb Level 4 (very strong starting power)' },
     ],
   },
   coinTractorBeam: {
@@ -71,9 +71,9 @@ export const ITEM_CATALOG: ItemCatalog = {
     category: 'utility',
     icon: '🧲',
     levels: [
-      { level: 1, usdPrice: 1.00, effect: '4 seconds, 30% range', description: 'Pull coins from 30% of screen range for 4 seconds' },
-      { level: 2, usdPrice: 1.50, effect: '6 seconds, 60% range', description: 'Pull coins from 60% of screen range for 6 seconds' },
-      { level: 3, usdPrice: 2.00, effect: '8 seconds, 90% range', description: 'Pull coins from 90% of screen range for 8 seconds' },
+      { level: 1, usdPrice: 0.75, effect: '4 seconds, 30% range', description: 'Pull coins from 30% of screen range for 4 seconds' },
+      { level: 2, usdPrice: 1.20, effect: '6 seconds, 60% range', description: 'Pull coins from 60% of screen range for 6 seconds' },
+      { level: 3, usdPrice: 1.60, effect: '8 seconds, 90% range', description: 'Pull coins from 90% of screen range for 8 seconds' },
     ],
   },
   slowTime: {
@@ -83,9 +83,9 @@ export const ITEM_CATALOG: ItemCatalog = {
     category: 'tactical',
     icon: '⏱️',
     levels: [
-      { level: 1, usdPrice: 1.50, effect: '4 seconds duration', description: 'Slow time for 4 seconds (50% speed reduction)' },
-      { level: 2, usdPrice: 2.25, effect: '6 seconds duration', description: 'Slow time for 6 seconds (50% speed reduction)' },
-      { level: 3, usdPrice: 3.00, effect: '8 seconds duration', description: 'Slow time for 8 seconds (50% speed reduction)' },
+      { level: 1, usdPrice: 1.00, effect: '4 seconds duration', description: 'Slow time for 4 seconds (50% speed reduction)' },
+      { level: 2, usdPrice: 1.80, effect: '6 seconds duration', description: 'Slow time for 6 seconds (50% speed reduction)' },
+      { level: 3, usdPrice: 2.40, effect: '8 seconds duration', description: 'Slow time for 8 seconds (50% speed reduction)' },
     ],
   },
   destroyAll: {
@@ -95,7 +95,7 @@ export const ITEM_CATALOG: ItemCatalog = {
     category: 'tactical',
     icon: '💥',
     levels: [
-      { level: 1, usdPrice: 2.50, effect: 'Clear all enemies', description: 'Instantly destroy all enemies on screen (one-time use per game)' },
+      { level: 1, usdPrice: 1.75, effect: 'Clear all enemies', description: 'Instantly destroy all enemies on screen (one-time use per game)' },
     ],
   },
   bossKillShot: {
@@ -105,7 +105,7 @@ export const ITEM_CATALOG: ItemCatalog = {
     category: 'tactical',
     icon: '🎯',
     levels: [
-      { level: 1, usdPrice: 3.75, effect: 'Instant boss kill', description: 'Instantly defeat any boss regardless of remaining HP (one-time use per game)' },
+      { level: 1, usdPrice: 2.50, effect: 'Instant boss kill', description: 'Instantly defeat any boss regardless of remaining HP (one-time use per game)' },
     ],
   },
 };

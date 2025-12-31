@@ -3,32 +3,25 @@
 // Returns item catalog with current token prices
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { NextRequest } from 'next/server';
+import { handleCorsPreflight } from '@/lib/cors';
 import { priceConverter } from '@/lib/services/price-converter';
 import { ITEM_CATALOG } from '@/lib/services/item-catalog';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function GET(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
+export const GET = withApiHandler(
+  async (request: NextRequest) => {
     // Get current token prices
     const pricesResult = await priceConverter.getTokenPrices();
     
     if (!pricesResult.success || !pricesResult.prices) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: pricesResult.error || 'Failed to fetch token prices',
-          message: 'Unable to retrieve current prices. Please try again later.',
-        },
-        { status: 503, headers: corsHeaders }
-      );
+      throw new Error(pricesResult.error || 'Failed to fetch token prices');
     }
 
     // Convert all items with token prices using priceConverter service
@@ -69,29 +62,16 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    return NextResponse.json(
-      {
-        success: true,
-        items,
-        prices: {
-          sui: pricesResult.prices.sui,
-          mews: pricesResult.prices.mews,
-          usdc: pricesResult.prices.usdc,
-        },
-        timestamp: pricesResult.timestamp,
+    return {
+      success: true,
+      items,
+      prices: {
+        sui: pricesResult.prices.sui,
+        mews: pricesResult.prices.mews,
+        usdc: pricesResult.prices.usdc,
       },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ Error in store items endpoint:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+      timestamp: pricesResult.timestamp,
+    };
   }
-}
+);
 

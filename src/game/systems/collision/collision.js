@@ -88,32 +88,18 @@ function checkObstacleCollision() {
     return false;
   }
   
-  // After tier 4: Only check separate enemies (tile obstacles are for lane tracking only)
-  if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
-    // Check separate enemies (after tier 4)
-    for (let i = enemies.length - 1; i >= 0; i--) {
-      const enemy = enemies[i];
-      const result = checkEnemyCollisionWithPlayer(enemy, enemy.x, enemies, i);
-      // Only return true if player was actually hit (not blocked by forcefield)
-      if (result === true) {
-        return true; // Player hit
-      }
-      // If result is false, forcefield blocked it - continue checking other enemies
+  // ALWAYS check enemies[] array - enemies are never in tile.obstacles anymore
+  const enemiesArray = (typeof window !== 'undefined' && window.enemies) ? window.enemies : 
+                       (typeof enemies !== 'undefined' ? enemies : []);
+  
+  for (let i = enemiesArray.length - 1; i >= 0; i--) {
+    const enemy = enemiesArray[i];
+    const result = checkEnemyCollisionWithPlayer(enemy, enemy.x, enemiesArray, i);
+    // Only return true if player was actually hit (not blocked by forcefield)
+    if (result === true) {
+      return true; // Player hit
     }
-  } else {
-    // Before tier 4: Check tile-based enemies
-    for (let tile of tiles) {
-      for (let i = tile.obstacles.length - 1; i >= 0; i--) {
-        const obs = tile.obstacles[i];
-        const ox = tile.x + 20;
-        const result = checkEnemyCollisionWithPlayer(obs, ox, tile.obstacles, i);
-        // Only return true if player was actually hit (not blocked by forcefield)
-        if (result === true) {
-          return true; // Player hit
-        }
-        // If result is false, forcefield blocked it - continue checking other enemies
-      }
-    }
+    // If result is false, forcefield blocked it - continue checking other enemies
   }
   
   return false;
@@ -204,22 +190,36 @@ function checkCoinCollection() {
   const bodyX = player.x + (player.width - bodyWidth) / 2;
   const bodyY = player.y + (player.height - bodyHeight) / 2;
   
-  tiles.forEach(tile => {
+  // OPTIMIZATION: Create Map lookup for pulled coins ONCE (not per tile)
+  const pulledCoinsMap = new Map();
+  if (typeof window.pulledCoins !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active) {
+    const pulledCoins = window.pulledCoins;
+    const pulledCoinsLength = pulledCoins.length;
+    for (let i = 0; i < pulledCoinsLength; i++) {
+      const pulled = pulledCoins[i];
+      pulledCoinsMap.set(pulled.tile, pulled);
+    }
+  }
+  
+  // OPTIMIZATION: Cache coin dimensions (same for all coins)
+  const coinDims = getCollectibleDimensions(collectibleImage);
+  
+  // OPTIMIZATION: Use for loop instead of forEach for better performance
+  const tilesLength = tiles.length;
+  for (let i = 0; i < tilesLength; i++) {
+    const tile = tiles[i];
     if (tile.coinLane!==null && tile.x > bodyX-50 && tile.x < bodyX+bodyWidth+50) {
-      // Check if coin is being pulled by tractor beam (account for offset)
+      // Check if coin is being pulled by tractor beam (using Map lookup - O(1))
       let offsetX = 0;
       let offsetY = 0;
-      if (typeof window.pulledCoins !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active) {
-        const pulled = window.pulledCoins.find(p => p.tile === tile);
-        if (pulled) {
-          offsetX = pulled.offsetX;
-          offsetY = pulled.offsetY;
-        }
+      const pulled = pulledCoinsMap.get(tile);
+      if (pulled) {
+        offsetX = pulled.offsetX;
+        offsetY = pulled.offsetY;
       }
       
       const coinX = tile.x + COLLECTIBLE_X_OFFSET + offsetX;
       const coinY = tile.coinLane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2 + offsetY;
-      const coinDims = getCollectibleDimensions(collectibleImage);
       const coinXAdj = coinX + coinDims.centerOffset;
       
       // Check actual collision between player body and coin (using dynamic width)
@@ -229,7 +229,7 @@ function checkCoinCollection() {
         collectCoin(tile);
       }
     }
-  });
+  }
 }
 
 // Check collision between player and powerups
@@ -240,25 +240,42 @@ function checkPowerupCollection() {
   const bodyX = player.x + (player.width - bodyWidth) / 2;
   const bodyY = player.y + (player.height - bodyHeight) / 2;
   
-  tiles.forEach(tile => {
+  // OPTIMIZATION: Create Map lookup for pulled powerups ONCE (not per tile)
+  const pulledPowerupsMap = new Map();
+  if (typeof window.pulledPowerups !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active && game.coinTractorBeam.level >= 3) {
+    const pulledPowerups = window.pulledPowerups;
+    const pulledPowerupsLength = pulledPowerups.length;
+    for (let i = 0; i < pulledPowerupsLength; i++) {
+      const pulled = pulledPowerups[i];
+      if (pulled.isBonus) {
+        pulledPowerupsMap.set(pulled.tile, pulled);
+      }
+    }
+  }
+  
+  // OPTIMIZATION: Cache powerup dimensions (same for all powerups of same type)
+  const powerupBonusDims = getCollectibleDimensions(powerupBonusImage);
+  const powerupMalusDims = getCollectibleDimensions(powerupMalusImage);
+  
+  // OPTIMIZATION: Use for loop instead of forEach for better performance
+  const tilesLength = tiles.length;
+  for (let i = 0; i < tilesLength; i++) {
+    const tile = tiles[i];
     // Check bonus power-up
     if (tile.powerupBonus && tile.x > bodyX-50 && tile.x < bodyX+bodyWidth+50) {
-      // Check if power-up is being pulled by tractor beam (Level 3 only)
+      // Check if power-up is being pulled by tractor beam (using Map lookup - O(1))
       let offsetX = 0;
       let offsetY = 0;
-      if (typeof window.pulledPowerups !== 'undefined' && game.coinTractorBeam && game.coinTractorBeam.active && game.coinTractorBeam.level >= 3) {
-        const pulled = window.pulledPowerups.find(p => p.tile === tile && p.isBonus);
-        if (pulled) {
-          offsetX = pulled.offsetX;
-          offsetY = pulled.offsetY;
-        }
+      const pulled = pulledPowerupsMap.get(tile);
+      if (pulled) {
+        offsetX = pulled.offsetX;
+        offsetY = pulled.offsetY;
       }
       
       const px = tile.x + COLLECTIBLE_X_OFFSET + offsetX;
       const py = tile.powerupBonus.lane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2 + offsetY;
-      const powerupDims = getCollectibleDimensions(powerupBonusImage);
-      const pxAdj = px + powerupDims.centerOffset;
-      if (bodyX < pxAdj + powerupDims.width && bodyX + bodyWidth > pxAdj && bodyY < py + powerupDims.height && bodyY + bodyHeight > py) {
+      const pxAdj = px + powerupBonusDims.centerOffset;
+      if (bodyX < pxAdj + powerupBonusDims.width && bodyX + bodyWidth > pxAdj && bodyY < py + powerupBonusDims.height && bodyY + bodyHeight > py) {
         // Delegate to collectibles system for behavior
         collectPowerup(tile, true);
       }
@@ -269,12 +286,11 @@ function checkPowerupCollection() {
       // Note: Power-downs are NOT pulled by tractor beam (only bonus power-ups at Level 3)
       const px = tile.x + COLLECTIBLE_X_OFFSET;
       const py = tile.powerdown.lane*game.laneHeight + (game.laneHeight-COLLECTIBLE_FALLBACK_HEIGHT)/2;
-      const powerdownDims = getCollectibleDimensions(powerupMalusImage);
-      const pxAdj = px + powerdownDims.centerOffset;
-      if (bodyX < pxAdj + powerdownDims.width && bodyX + bodyWidth > pxAdj && bodyY < py + powerdownDims.height && bodyY + bodyHeight > py) {
+      const pxAdj = px + powerupMalusDims.centerOffset;
+      if (bodyX < pxAdj + powerupMalusDims.width && bodyX + bodyWidth > pxAdj && bodyY < py + powerupMalusDims.height && bodyY + bodyHeight > py) {
         // Delegate to collectibles system for behavior
         collectPowerup(tile, false);
       }
     }
-  });
+  }
 }

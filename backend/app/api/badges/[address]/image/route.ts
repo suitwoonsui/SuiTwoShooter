@@ -4,7 +4,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight, getCorsHeaders } from '@/lib/cors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getAddressParam } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
 
 /**
  * GET /api/badges/[address]/image
@@ -17,40 +20,30 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ address: string }> }
-) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const { address: playerAddress } = await params;
-
-    // Validate address format
-    if (!playerAddress || !playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      return NextResponse.json(
-        { error: 'Invalid player address format' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+export const GET = withApiHandler(
+  async (
+    request: NextRequest,
+    context: { params: Promise<{ address: string }> }
+  ) => {
+    const playerAddress = await getAddressParam(context.params);
 
     const badgeService = getBadgeService();
     
     // Check if player has badge
     const hasBadge = await badgeService.hasBadge(playerAddress);
     if (!hasBadge) {
-      return NextResponse.json(
-        { error: 'Player does not have a badge' },
-        { status: 404, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'Player does not have a badge'
       );
     }
 
     // Get badge data to determine tier
     const badge = await badgeService.getBadge(playerAddress);
     if (!badge) {
-      return NextResponse.json(
-        { error: 'Badge not found' },
-        { status: 404, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_BADGE_ID,
+        'Badge not found'
       );
     }
 
@@ -59,19 +52,12 @@ export async function GET(
     
     // Redirect to the static image file
     // The image is served from the public/Badges/ directory
+    // Return NextResponse directly for redirects
+    const corsHeaders = getCorsHeaders(request);
     return NextResponse.redirect(new URL(imageUrl), {
       status: 302,
       headers: corsHeaders,
     });
-  } catch (error) {
-    console.error('Error fetching badge image:', error);
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch badge image',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
   }
-}
+);
 

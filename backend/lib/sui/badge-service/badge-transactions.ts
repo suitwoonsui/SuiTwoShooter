@@ -8,6 +8,7 @@ import { BadgeLogger } from '../badge-logger';
 import { BadgeError, BadgeErrorCode } from '../badge-errors';
 import { BadgeValidators } from '../badge-validators';
 import { validateAndSanitizeImage } from '../badge-image-validator';
+import { checkBalanceBeforeTransaction, checkPlayerBalanceForTransaction } from '../balance-checker';
 
 /**
  * Dependencies needed for badge transactions
@@ -139,6 +140,17 @@ export class BadgeTransactions {
         imageDataObjectId = await this.dependencies.createImageDataObjectChunked(imageData);
       } else {
         BadgeLogger.debug('Using direct upload for image', { size: imageData.length });
+        
+        // Check wallet balance before building transaction
+        const adminWallet = this.dependencies.getAdminWallet();
+        const adminAddress = adminWallet.getAddress();
+        await checkBalanceBeforeTransaction({
+          client,
+          walletAddress: adminAddress,
+          gasBudget: config.sui.gasBudget,
+          context: 'mint badge (direct upload)',
+        });
+        
         const txbCreate = new Transaction();
         const imageDataObj = txbCreate.moveCall({
           target: `${config.contracts.gameScore}::badge_system::create_image_data_small`,
@@ -146,11 +158,11 @@ export class BadgeTransactions {
             txbCreate.pure.vector('u8', Array.from(imageData)),
           ],
         });
-        txbCreate.transferObjects([imageDataObj], this.dependencies.getAdminWallet().getAddress());
+        txbCreate.transferObjects([imageDataObj], adminAddress);
         txbCreate.setGasBudget(config.sui.gasBudget);
 
         const resultCreate = await client.signAndExecuteTransaction({
-          signer: this.dependencies.getAdminWallet().getKeypair(),
+          signer: adminWallet.getKeypair(),
           transaction: txbCreate,
           options: {
             showEffects: true,
@@ -219,161 +231,6 @@ export class BadgeTransactions {
     }
   }
 
-  /**
-   * Build mint badge transaction (legacy - builds on backend)
-   */
-  async buildMintBadgeTransaction(
-    playerAddress: string,
-    paymentCoinId?: string
-  ): Promise<{
-    success: boolean;
-    transaction?: string;
-    gasEstimate?: string;
-    error?: string;
-  }> {
-    try {
-      BadgeValidators.validateAddress(playerAddress);
-      if (paymentCoinId) {
-        BadgeValidators.validatePaymentCoinId(paymentCoinId);
-      }
-
-      const client = this.dependencies.getClient();
-      const config = this.dependencies.getConfig();
-      const packageId = config.contracts.gameScore.split('::')[0];
-      const registryId = config.contracts.badgeRegistry;
-      const statsRegistryId = config.contracts.statisticsRegistry;
-      const clockId = '0x6';
-
-      BadgeLogger.debug('Contract configuration', {
-        packageId,
-        registryId,
-        statsRegistryId,
-        clockId,
-        playerAddress,
-      });
-      
-      // Verify shared objects exist (batched for performance)
-      try {
-        const [registryObj, statsObj] = await Promise.all([
-          client.getObject({
-            id: registryId!,
-            options: { showType: true, showOwner: true },
-          }),
-          client.getObject({
-            id: statsRegistryId!,
-            options: { showType: true, showOwner: true },
-          }),
-        ]);
-        
-        BadgeLogger.debug('Shared objects verified', {
-          registryExists: !!registryObj.data,
-          statsExists: !!statsObj.data,
-        });
-      } catch (objError) {
-        BadgeLogger.warn('Failed to verify shared objects', objError);
-      }
-
-      if (!packageId || !registryId || !statsRegistryId) {
-        throw new BadgeError(
-          BadgeErrorCode.CONFIG_MISSING,
-          'Missing contract configuration'
-        );
-      }
-
-      // Check if player already has badge
-      try {
-        const hasBadgeRegistry = await this.dependencies.hasBadge(playerAddress);
-        
-        if (hasBadgeRegistry) {
-          const existingBadge = await this.dependencies.getBadge(playerAddress);
-          
-          if (existingBadge && existingBadge.badgeId) {
-            throw new BadgeError(
-              BadgeErrorCode.BADGE_ALREADY_EXISTS,
-              'Player already has a badge. Minting is not needed.'
-            );
-          } else {
-            // Orphaned entry - clean it up
-            BadgeLogger.warn('Orphaned registry entry detected, cleaning up');
-            try {
-              const cleanupResult = await this.dependencies.adminCleanupOrphanedEntry(playerAddress);
-              if (cleanupResult.success) {
-                BadgeLogger.info('Orphaned entry cleaned up');
-              }
-            } catch (cleanupError) {
-              BadgeLogger.warn('Error cleaning up orphaned entry', cleanupError);
-            }
-          }
-        }
-      } catch (checkError) {
-        if (checkError instanceof BadgeError) {
-          throw checkError;
-        }
-        BadgeLogger.warn('Error checking for existing badge (non-fatal)', checkError);
-      }
-
-      const imageUrl = this.dependencies.getBadgeImageUrl(0);
-      BadgeLogger.debug('Badge image URL', { imageUrl });
-
-      const txb = new Transaction();
-      const paymentAmount = BigInt(100_000_000);
-      const splitPaymentCoin = txb.splitCoins(txb.gas, [paymentAmount]);
-      
-      txb.moveCall({
-        target: `${packageId}::badge_system::mint_badge`,
-        arguments: [
-          txb.object(registryId),
-          txb.object(statsRegistryId),
-          txb.object(clockId),
-          splitPaymentCoin,
-          txb.pure.string(imageUrl),
-        ],
-      });
-      
-      txb.setSender(playerAddress);
-      txb.setGasBudget(config.sui.gasBudget);
-      
-      // Test transaction
-      try {
-        const testResult = await client.devInspectTransactionBlock({
-          sender: playerAddress,
-          transactionBlock: txb,
-        });
-        
-        const firstResult = testResult.results?.[0] as any;
-        const error = firstResult?.error as string | undefined;
-        
-        if (error) {
-          throw new BadgeError(
-            BadgeErrorCode.TRANSACTION_BUILD_FAILED,
-            `Transaction validation failed: ${error}`
-          );
-        }
-      } catch (testError) {
-        if (testError instanceof BadgeError) {
-          throw testError;
-        }
-        BadgeLogger.warn('devInspectTransactionBlock test failed (non-fatal)', testError);
-      }
-      
-      const transactionBytes = await txb.build({ client });
-      
-      BadgeLogger.info('Transaction built successfully', { playerAddress });
-      
-      return {
-        success: true,
-        transaction: Buffer.from(transactionBytes).toString('base64'),
-        gasEstimate: config.sui.gasBudget.toString(),
-      };
-    } catch (error) {
-      const badgeError = BadgeError.fromUnknown(error, 'Error building mint transaction');
-      BadgeLogger.error('Error building transaction', badgeError);
-      return {
-        success: false,
-        error: badgeError.message,
-      };
-    }
-  }
 
   /**
    * Build upgrade badge transaction
@@ -412,11 +269,22 @@ export class BadgeTransactions {
       const imageUrl = this.dependencies.getBadgeImageUrl(newTier);
       BadgeLogger.debug('Badge image URL for tier', { newTier, imageUrl });
 
+      // Check player balance before building transaction
+      // Player needs: gas + payment amount (100_000_000 = 0.1 SUI)
+      const paymentAmount = 100_000_000; // 0.1 SUI
+      await checkPlayerBalanceForTransaction({
+        client,
+        walletAddress: playerAddress,
+        gasBudget: config.sui.gasBudget,
+        paymentAmount: paymentAmount,
+        context: 'upgrade badge',
+      });
+
       const sessionIdBytes = Array.from(new TextEncoder().encode(sessionId));
 
       const txb = new Transaction();
-      const paymentAmount = BigInt(100_000_000);
-      const splitPaymentCoin = txb.splitCoins(txb.gas, [paymentAmount]);
+      const paymentAmountBigInt = BigInt(paymentAmount);
+      const splitPaymentCoin = txb.splitCoins(txb.gas, [paymentAmountBigInt]);
       
       txb.moveCall({
         target: `${packageId}::badge_system::update_badge_tier`,
@@ -512,6 +380,92 @@ export class BadgeTransactions {
         };
       }
 
+      // CRITICAL: Verify BadgeRegistry is from the same package as the function
+      try {
+        const registryObj = await client.getObject({
+          id: registryId,
+          options: { showType: true, showContent: false },
+        });
+        
+        if (registryObj.error) {
+          BadgeLogger.error('BadgeRegistry object not found', {
+            registryId,
+            error: registryObj.error,
+          });
+          return {
+            success: false,
+            error: `BadgeRegistry object not found: ${registryId}. Please verify BADGE_REGISTRY_OBJECT_ID_TESTNET is correct.`,
+          };
+        }
+
+        const registryType = registryObj.data?.type || 'unknown';
+        const registryPackageId = registryType.split('::')[0];
+        
+        BadgeLogger.debug('BadgeRegistry verification', {
+          registryId,
+          registryType,
+          registryPackageId,
+          expectedPackageId: packageId,
+        });
+
+        if (registryPackageId !== packageId) {
+          return {
+            success: false,
+            error: `Package ID mismatch! The BadgeRegistry is from package ${registryPackageId}, but the migrate_badge function is from package ${packageId}. They must match. Please ensure BADGE_REGISTRY_OBJECT_ID_TESTNET is from the new package (${packageId}).`,
+          };
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        BadgeLogger.error('Could not verify BadgeRegistry object', { errorMessage });
+        return {
+          success: false,
+          error: `Failed to verify BadgeRegistry object: ${errorMessage}. Please check that BADGE_REGISTRY_OBJECT_ID_TESTNET is correct.`,
+        };
+      }
+
+      // CRITICAL: Verify StatisticsRegistry is from the same package as the function
+      try {
+        const statsRegistryObj = await client.getObject({
+          id: statsRegistryId,
+          options: { showType: true, showContent: false },
+        });
+        
+        if (statsRegistryObj.error) {
+          BadgeLogger.error('StatisticsRegistry object not found', {
+            statsRegistryId,
+            error: statsRegistryObj.error,
+          });
+          return {
+            success: false,
+            error: `StatisticsRegistry object not found: ${statsRegistryId}. Please verify STATISTICS_REGISTRY_OBJECT_ID_TESTNET is correct.`,
+          };
+        }
+
+        const statsRegistryType = statsRegistryObj.data?.type || 'unknown';
+        const statsRegistryPackageId = statsRegistryType.split('::')[0];
+        
+        BadgeLogger.debug('StatisticsRegistry verification', {
+          statsRegistryId,
+          statsRegistryType,
+          statsRegistryPackageId,
+          expectedPackageId: packageId,
+        });
+
+        if (statsRegistryPackageId !== packageId) {
+          return {
+            success: false,
+            error: `Package ID mismatch! The StatisticsRegistry is from package ${statsRegistryPackageId}, but the migrate_badge function is from package ${packageId}. They must match. Please ensure STATISTICS_REGISTRY_OBJECT_ID_TESTNET is from the new package (${packageId}).`,
+          };
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        BadgeLogger.error('Could not verify StatisticsRegistry object', { errorMessage });
+        return {
+          success: false,
+          error: `Failed to verify StatisticsRegistry object: ${errorMessage}. Please check that STATISTICS_REGISTRY_OBJECT_ID_TESTNET is correct.`,
+        };
+      }
+
       if (oldTier < 0 || oldTier > 5) {
         return {
           success: false,
@@ -604,7 +558,131 @@ export class BadgeTransactions {
   }
 
   /**
+   * Check if badge tier upgrade is available (read-only, no transaction building)
+   * This is used by the /check-upgrade endpoint to determine if an upgrade is available
+   * without requiring gas or building transaction data.
+   */
+  async checkBadgeUpgrade(
+    playerAddress: string
+  ): Promise<{
+    success: boolean;
+    hasPendingUpgrade: boolean;
+    newTier?: number;
+    badgeId?: string;
+    error?: string;
+  }> {
+    try {
+      BadgeValidators.validateAddress(playerAddress);
+
+      const config = this.dependencies.getConfig();
+      const statsRegistryId = config.contracts.statisticsRegistry;
+
+      if (!statsRegistryId) {
+        return {
+          success: false,
+          hasPendingUpgrade: false,
+          error: 'StatisticsRegistry object ID not configured',
+        };
+      }
+
+      const client = this.dependencies.getClient();
+      
+      // Get player stats (read-only query, no gas needed)
+      const tx1 = new Transaction();
+      tx1.moveCall({
+        target: `${config.contracts.gameScore}::score_submission::get_player_stats`,
+        arguments: [
+          tx1.object(statsRegistryId),
+          tx1.pure.address(playerAddress),
+        ],
+      });
+
+      const result1 = await client.devInspectTransactionBlock({
+        transactionBlock: tx1,
+        sender: this.dependencies.getAdminWallet().getAddress(),
+      });
+
+      if (!result1.results || !result1.results[0].returnValues) {
+        return {
+          success: false,
+          hasPendingUpgrade: false,
+          error: 'Failed to get player stats',
+        };
+      }
+
+      const returnValues = result1.results[0].returnValues;
+      
+      // Parse hasStats
+      const hasStatsByteArray = Array.isArray(returnValues[0]) && Array.isArray(returnValues[0][0]) 
+        ? returnValues[0][0] 
+        : [];
+      const hasStats = Array.isArray(hasStatsByteArray) && hasStatsByteArray.length > 0 && hasStatsByteArray[0] === 1;
+      
+      // Parse totalGames
+      const parseU64FromBytes = (byteArray: number[]): number => {
+        if (!Array.isArray(byteArray) || byteArray.length !== 8) {
+          return 0;
+        }
+        let value = 0;
+        for (let i = 0; i < 8; i++) {
+          value += byteArray[i] * Math.pow(256, i);
+        }
+        return value;
+      };
+      
+      const totalGamesByteArray = Array.isArray(returnValues[1]) && Array.isArray(returnValues[1][0]) && returnValues[1][0].length === 8
+        ? returnValues[1][0] as number[]
+        : [];
+      const totalGames = parseU64FromBytes(totalGamesByteArray);
+      
+      if (!hasStats || totalGames === 0) {
+        return {
+          success: true,
+          hasPendingUpgrade: false,
+        };
+      }
+
+      // Get current badge (read-only query)
+      const currentBadge = await this.dependencies.getBadge(playerAddress);
+      
+      if (!currentBadge || !currentBadge.badgeId) {
+        return {
+          success: true,
+          hasPendingUpgrade: false,
+        };
+      }
+
+      // Calculate new tier based on games played
+      const newTier = this.dependencies.calculateTierFromGames(totalGames);
+      
+      // Check if upgrade is needed
+      if (newTier <= currentBadge.tier) {
+        return {
+          success: true,
+          hasPendingUpgrade: false,
+        };
+      }
+
+      // Upgrade is available - return info without building transaction
+      return {
+        success: true,
+        hasPendingUpgrade: true,
+        newTier: newTier,
+        badgeId: currentBadge.badgeId,
+      };
+    } catch (error) {
+      BadgeLogger.error('Error checking badge upgrade', error);
+      return {
+        success: false,
+        hasPendingUpgrade: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Check if badge tier should be updated and build transaction if needed
+   * This is used when actually performing the upgrade (requires gas)
    */
   async checkAndBuildBadgeUpdate(
     playerAddress: string,
@@ -745,8 +823,19 @@ export class BadgeTransactions {
           imageSize: imageData.length,
           threshold: CHUNK_THRESHOLD,
         });
-        // Create directly in a single transaction
+        
+        // Check wallet balance before building transaction
         const client = this.dependencies.getClient();
+        const adminWallet = this.dependencies.getAdminWallet();
+        const adminAddress = adminWallet.getAddress();
+        await checkBalanceBeforeTransaction({
+          client,
+          walletAddress: adminAddress,
+          gasBudget: config.sui.gasBudget,
+          context: 'upgrade badge (direct upload)',
+        });
+        
+        // Create directly in a single transaction
         const txbCreate = new Transaction();
         const imageDataObj = txbCreate.moveCall({
           target: `${config.contracts.gameScore}::badge_system::create_image_data_small`,
@@ -754,11 +843,11 @@ export class BadgeTransactions {
             txbCreate.pure.vector('u8', Array.from(imageData)),
           ],
         });
-        txbCreate.transferObjects([imageDataObj], this.dependencies.getAdminWallet().getAddress());
+        txbCreate.transferObjects([imageDataObj], adminAddress);
         txbCreate.setGasBudget(config.sui.gasBudget);
 
         const resultCreate = await client.signAndExecuteTransaction({
-          signer: this.dependencies.getAdminWallet().getKeypair(),
+          signer: adminWallet.getKeypair(),
           transaction: txbCreate,
           options: {
             showEffects: true,

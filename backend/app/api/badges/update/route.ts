@@ -2,9 +2,13 @@
 // Badge Update API Route
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
 
 /**
  * POST /api/badges/update
@@ -40,49 +44,33 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-  
-  try {
-    const body = await request.json();
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
+    const body = await getRequestBody<{ playerAddress: string; sessionId: string }>(request);
     const { playerAddress, sessionId } = body;
 
     // Validate required fields
     if (!playerAddress) {
-      return NextResponse.json(
-        { 
-          success: false,
-          tierUpgraded: false,
-          error: 'playerAddress is required' 
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_ADDRESS,
+        'playerAddress is required'
       );
     }
 
     if (!sessionId) {
-      return NextResponse.json(
-        { 
-          success: false,
-          tierUpgraded: false,
-          error: 'sessionId is required' 
-        },
-        { status: 400, headers: corsHeaders }
+      throw new BadgeError(
+        BadgeErrorCode.INVALID_SESSION_ID,
+        'sessionId is required'
       );
     }
 
     // Validate address format
-    if (!playerAddress.startsWith('0x') || playerAddress.length !== 66) {
-      return NextResponse.json(
-        { 
-          success: false,
-          tierUpgraded: false,
-          error: 'Invalid player address format. Must be a valid Sui address (0x followed by 64 hex characters)' 
-        },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    BadgeValidators.validateAddress(playerAddress);
 
-    console.log(`📥 Badge update check request received for: ${playerAddress}, session: ${sessionId}`);
+    BadgeLogger.info('Badge update check request received', {
+      playerAddress,
+      sessionId,
+    });
 
     const badgeService = getBadgeService();
     
@@ -93,25 +81,15 @@ export async function POST(request: NextRequest) {
     );
 
     if (!result.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          tierUpgraded: false,
-          error: result.error || 'Failed to check badge update',
-        },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error(result.error || 'Failed to check badge update');
     }
 
     // If tier didn't upgrade, return early
     if (!result.tierUpgraded) {
-      return NextResponse.json(
-        {
-          success: true,
-          tierUpgraded: false,
-        },
-        { headers: corsHeaders }
-      );
+      return {
+        success: true,
+        tierUpgraded: false,
+      };
     }
 
     // Tier upgraded - return transaction data
@@ -121,29 +99,15 @@ export async function POST(request: NextRequest) {
       ? Buffer.from(transactionData.imageData).toString('base64')
       : undefined;
 
-    return NextResponse.json(
-      {
-        success: true,
-        tierUpgraded: true,
-        newTier: result.newTier,
-        transactionData: {
-          ...transactionData,
-          ...(imageDataBase64 && { imageData: imageDataBase64 }), // Include if available
-        },
+    return {
+      success: true,
+      tierUpgraded: true,
+      newTier: result.newTier,
+      transactionData: {
+        ...transactionData,
+        ...(imageDataBase64 && { imageData: imageDataBase64 }), // Include if available
       },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    console.error('❌ Error checking badge update:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        tierUpgraded: false,
-        error: 'Failed to check badge update',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+    };
   }
-}
+);
 

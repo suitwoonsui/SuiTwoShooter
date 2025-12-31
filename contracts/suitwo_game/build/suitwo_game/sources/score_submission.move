@@ -599,23 +599,33 @@ module suitwo_game::score_submission {
     /// This allows migrating player stats when upgrading to a new contract
     /// REQUIRES AdminCapability - only admin wallet can call this function
     /// If player already has stats in new registry, merges the data (takes maximums for bests, sums for totals)
+    /// 
+    /// NOTE: This function accepts individual stat values instead of the old registry object
+    /// because Move's type system doesn't allow passing types from different packages.
+    /// The backend reads the old stats first and passes the values individually.
     #[allow(lint(public_entry))]
     public entry fun migrate_player_stats(
         _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
-        old_stats_registry: &StatisticsRegistry,  // Old statistics registry to read from
         new_stats_registry: &mut StatisticsRegistry,  // New statistics registry to write to
         player: address,  // Player address to migrate
+        // Old stats values (read from old registry by backend)
+        old_total_games: u64,
+        old_best_score: u64,
+        old_best_distance: u64,
+        old_best_coins: u64,
+        old_best_bosses_defeated: u64,
+        old_best_enemies_defeated: u64,
+        old_best_coin_streak: u64,
+        old_total_score: u64,
+        old_total_distance: u64,
+        old_total_coins: u64,
+        old_total_bosses_defeated: u64,
+        old_total_enemies_defeated: u64,
+        old_total_coin_streak: u64,
+        old_first_game_date: u64,
+        old_last_game_date: u64,
         ctx: &mut TxContext
     ) {
-        // Check if player has stats in old registry
-        if (!table::contains(&old_stats_registry.player_stats, player)) {
-            // No stats to migrate - nothing to do
-            return
-        };
-        
-        // Read old stats
-        let old_stats = table::borrow(&old_stats_registry.player_stats, player);
-        
         // Get or create stats in new registry
         let new_stats = get_or_create_player_stats(new_stats_registry, player, ctx);
         
@@ -626,42 +636,90 @@ module suitwo_game::score_submission {
         // - For timestamps: take earliest first_game_date, latest last_game_date
         
         // Personal bests: take maximum
-        if (old_stats.best_score > new_stats.best_score) {
-            new_stats.best_score = old_stats.best_score;
+        if (old_best_score > new_stats.best_score) {
+            new_stats.best_score = old_best_score;
         };
-        if (old_stats.best_distance > new_stats.best_distance) {
-            new_stats.best_distance = old_stats.best_distance;
+        if (old_best_distance > new_stats.best_distance) {
+            new_stats.best_distance = old_best_distance;
         };
-        if (old_stats.best_coins > new_stats.best_coins) {
-            new_stats.best_coins = old_stats.best_coins;
+        if (old_best_coins > new_stats.best_coins) {
+            new_stats.best_coins = old_best_coins;
         };
-        if (old_stats.best_bosses_defeated > new_stats.best_bosses_defeated) {
-            new_stats.best_bosses_defeated = old_stats.best_bosses_defeated;
+        if (old_best_bosses_defeated > new_stats.best_bosses_defeated) {
+            new_stats.best_bosses_defeated = old_best_bosses_defeated;
         };
-        if (old_stats.best_enemies_defeated > new_stats.best_enemies_defeated) {
-            new_stats.best_enemies_defeated = old_stats.best_enemies_defeated;
+        if (old_best_enemies_defeated > new_stats.best_enemies_defeated) {
+            new_stats.best_enemies_defeated = old_best_enemies_defeated;
         };
-        if (old_stats.best_coin_streak > new_stats.best_coin_streak) {
-            new_stats.best_coin_streak = old_stats.best_coin_streak;
+        if (old_best_coin_streak > new_stats.best_coin_streak) {
+            new_stats.best_coin_streak = old_best_coin_streak;
         };
         
         // Totals: sum both
-        new_stats.total_games = new_stats.total_games + old_stats.total_games;
-        new_stats.total_score = new_stats.total_score + old_stats.total_score;
-        new_stats.total_distance = new_stats.total_distance + old_stats.total_distance;
-        new_stats.total_coins = new_stats.total_coins + old_stats.total_coins;
-        new_stats.total_bosses_defeated = new_stats.total_bosses_defeated + old_stats.total_bosses_defeated;
-        new_stats.total_enemies_defeated = new_stats.total_enemies_defeated + old_stats.total_enemies_defeated;
-        new_stats.total_coin_streak = new_stats.total_coin_streak + old_stats.total_coin_streak;
+        new_stats.total_games = new_stats.total_games + old_total_games;
+        new_stats.total_score = new_stats.total_score + old_total_score;
+        new_stats.total_distance = new_stats.total_distance + old_total_distance;
+        new_stats.total_coins = new_stats.total_coins + old_total_coins;
+        new_stats.total_bosses_defeated = new_stats.total_bosses_defeated + old_total_bosses_defeated;
+        new_stats.total_enemies_defeated = new_stats.total_enemies_defeated + old_total_enemies_defeated;
+        new_stats.total_coin_streak = new_stats.total_coin_streak + old_total_coin_streak;
         
         // Timestamps: earliest first_game_date, latest last_game_date
-        if (old_stats.first_game_date > 0) {
-            if (new_stats.first_game_date == 0 || old_stats.first_game_date < new_stats.first_game_date) {
-                new_stats.first_game_date = old_stats.first_game_date;
+        if (old_first_game_date > 0) {
+            if (new_stats.first_game_date == 0 || old_first_game_date < new_stats.first_game_date) {
+                new_stats.first_game_date = old_first_game_date;
             };
         };
-        if (old_stats.last_game_date > new_stats.last_game_date) {
-            new_stats.last_game_date = old_stats.last_game_date;
+        if (old_last_game_date > new_stats.last_game_date) {
+            new_stats.last_game_date = old_last_game_date;
+        };
+    }
+    
+    /// Admin function: Clear/reset player statistics
+    /// REQUIRES AdminCapability - only admin wallet can call this function
+    /// This resets all player stats to 0, effectively clearing their progress
+    /// Useful for testing, fixing migration issues, or resetting a player's progress
+    #[allow(lint(public_entry))]
+    public entry fun clear_player_stats(
+        _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
+        stats_registry: &mut StatisticsRegistry,  // Statistics registry
+        player: address,  // Player address to clear
+    ) {
+        // Reset player stats to zero if they exist
+        if (table::contains(&stats_registry.player_stats, player)) {
+            let stats = table::borrow_mut(&mut stats_registry.player_stats, player);
+            stats.total_games = 0;
+            stats.best_score = 0;
+            stats.best_distance = 0;
+            stats.best_coins = 0;
+            stats.best_bosses_defeated = 0;
+            stats.best_enemies_defeated = 0;
+            stats.best_coin_streak = 0;
+            stats.total_score = 0;
+            stats.total_distance = 0;
+            stats.total_coins = 0;
+            stats.total_bosses_defeated = 0;
+            stats.total_enemies_defeated = 0;
+            stats.total_coin_streak = 0;
+            stats.first_game_date = 0;
+            stats.last_game_date = 0;
+        };
+    }
+
+    /// Admin function: Clear a single session ID from the session registry
+    /// REQUIRES AdminCapability - only admin wallet can call this function
+    /// This removes a session ID from the used_sessions table, allowing it to be reused
+    /// Useful when clearing player stats and re-migrating sessions
+    /// Note: Call this function multiple times to clear multiple session IDs
+    #[allow(lint(public_entry))]
+    public entry fun clear_session_id(
+        _admin_cap: &AdminCapability,  // Admin capability - proves caller is admin
+        session_registry: &mut SessionRegistry,  // Session registry
+        session_id: vector<u8>,  // Session ID to clear
+    ) {
+        // Remove session ID from registry if it exists
+        if (table::contains(&session_registry.used_sessions, session_id)) {
+            table::remove(&mut session_registry.used_sessions, session_id);
         };
     }
 }

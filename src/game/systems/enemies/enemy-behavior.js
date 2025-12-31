@@ -54,17 +54,11 @@ function updateEnemyShooting() {
     }
   }
   
-  // Process enemies based on system being used
-  if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
-    // After tier 4: Process separate enemies only (obstacles in tiles are just for lane tracking)
-    enemies.forEach(enemy => {
-      processEnemyShooting(enemy, enemy.x);
-    });
-  } else {
-    // Before tier 4: Process tile-based enemies
-    tiles.forEach(tile => tile.obstacles.forEach(obs => {
-      const tx = tile.x + 20;
-      processEnemyShooting(obs, tx);
-    }));
-  }
+  // ALWAYS process enemies from enemies[] array - enemies are never in tile.obstacles anymore
+  const enemiesArray = (typeof window !== 'undefined' && window.enemies) ? window.enemies : 
+                       (typeof enemies !== 'undefined' ? enemies : []);
+  
+  enemiesArray.forEach(enemy => {
+    processEnemyShooting(enemy, enemy.x);
+  });
 }

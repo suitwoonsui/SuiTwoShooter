@@ -24,10 +24,38 @@ function spawnBoss() {
     stopBackgroundMusic();
   }
   
+  // Pre-load boss assets during warning transition (2 seconds available)
+  if (typeof window.handleBossWarningTransition === 'function') {
+    window.handleBossWarningTransition(game.currentTier);
+  }
+  
   // Clear all existing content
-  tiles = [];
-  if (typeof enemies !== 'undefined') {
-    enemies = []; // Clear separate enemies array
+  // IMPORTANT: After tier 4, enemies are in a separate array, so we need to clear both
+  // Use window.tiles and window.enemies (exposed by main.js)
+  if (typeof window !== 'undefined') {
+    // Clear tiles (contains enemies before tier 4, collectibles after tier 4)
+    window.tiles = [];
+    // Clear separate enemies array (used after tier 4)
+    window.enemies = [];
+    
+    // Also clear the local variables directly to ensure rendering sees the cleared arrays
+    // The rendering functions use the global tiles/enemies variables, not window.tiles/enemies
+    if (typeof tiles !== 'undefined') {
+      tiles = [];
+    }
+    if (typeof enemies !== 'undefined') {
+      enemies = [];
+    }
+    
+    // Sync to ensure both references stay in sync
+    if (typeof window.syncGameArrays === 'function') {
+      window.syncGameArrays();
+    }
+    
+    // Debug log to verify clearing
+    const tilesAfterClear = (typeof window !== 'undefined' && window.tiles) ? window.tiles.length : 0;
+    const enemiesAfterClear = (typeof window !== 'undefined' && window.enemies) ? window.enemies.length : 0;
+    console.log('🧹 [BOSS SPAWN] Cleared arrays - tiles:', tilesAfterClear, 'enemies:', enemiesAfterClear, 'bossesDefeated:', game.bossesDefeated);
   }
   game.enemyProjectiles = [];
   game.bossProjectiles = [];
@@ -71,13 +99,22 @@ function createBoss() {
   const baseFireRate = currentBossStats.fireRate;
   const effectiveFireRate = Math.floor(baseFireRate / fireRateMultiplier); // Divide to make faster (lower ms = faster)
   
+  // Ensure game dimensions are valid before calculating boss position
+  if (!game.width || !game.height || game.width <= 0 || game.height <= 0) {
+    console.error('❌ [BOSS] Invalid game dimensions:', { width: game.width, height: game.height });
+    return; // Don't create boss if dimensions are invalid
+  }
+  
+  // Calculate initial Y position (centered vertically)
+  const initialY = Math.max(0, Math.min((game.height - size) / 2, game.height - size));
+  
   game.boss = {
     type: bossImageType,
     tier: game.currentTier,
     hp: currentBossStats.hp,
     maxHp: currentBossStats.hp,
     x: game.width + size, // Start off-screen right
-    y: (game.height - size) / 2, // Centered vertically
+    y: initialY, // Centered vertically (clamped to valid range)
     targetX: game.width - size - 50, // Final position
     width: size,
     height: size,
@@ -91,7 +128,7 @@ function createBoss() {
     lastPatternChange: 0,
     patternDuration: 3000, // Change pattern every 3 seconds
     moveDirection: 1, // Vertical movement direction
-    baseY: (game.height - size) / 2, // Base Y position
+    baseY: initialY, // Base Y position (same as initial Y, clamped to valid range)
     fireRate: effectiveFireRate, // Apply post-tier-4 fire rate scaling
     maxPatterns: currentBossStats.patterns,
     enrageTime: currentBossStats.enrageTime,

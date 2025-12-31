@@ -44,6 +44,14 @@
   border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
   border-radius: min(1vh, 1.5vw); /* Dynamic border radius */
   display: block;
+  transition: all 0.3s ease;
+}
+
+/* Tournament mode - gold border */
+.mobile-game-canvas.tournament-mode,
+#gameCanvas.tournament-mode {
+  border: min(0.2vw, 0.3vh) solid rgba(255, 215, 0, 0.6); /* Gold border for tournament */
+  box-shadow: 0 0 min(1vh, 1.5vw) rgba(255, 215, 0, 0.3);
 }
 
 /* Mobile Game Header - visuals only; structure is owned by shared header */

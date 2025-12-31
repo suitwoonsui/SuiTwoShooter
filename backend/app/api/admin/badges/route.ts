@@ -2,11 +2,15 @@
 // Admin Badge Management API Route
 // ==========================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBadgeService } from '@/lib/sui/badge-service';
-import { getCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { handleCorsPreflight } from '@/lib/cors';
 import { getConfig } from '@/config/config';
 import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
 
 /**
  * POST /api/admin/badges
@@ -28,23 +32,24 @@ export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
 }
 
-export async function POST(request: NextRequest) {
-  const corsHeaders = getCorsHeaders(request);
-
-  try {
+export const POST = withApiHandler(
+  async (request: NextRequest) => {
     // Verify API key is configured (server-side check)
     const config = getConfig();
     if (!config.security.apiKey || config.security.apiKey === '') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'API_KEY not configured on server. Please set API_KEY in backend/.env.local',
-        },
-        { status: 500, headers: corsHeaders }
-      );
+      throw new Error('API_KEY not configured on server. Please set API_KEY in backend/.env.local');
     }
 
-    const body = await request.json();
+    const body = await getRequestBody<{
+      action: string;
+      playerAddress?: string;
+      tier?: number;
+      badgeId?: string;
+      adminWalletAddress: string;
+      contract?: 'new' | 'old';
+      packageId1?: string;
+      packageId2?: string;
+    }>(request);
     const { action, playerAddress, tier, badgeId, adminWalletAddress, contract } = body;
 
     // Verify admin wallet address matches
@@ -53,154 +58,111 @@ export async function POST(request: NextRequest) {
     const providedAdminAddress = adminWalletAddress?.toLowerCase();
 
     if (!providedAdminAddress || providedAdminAddress !== expectedAdminAddress) {
-      console.warn('⚠️ [ADMIN BADGE API] Wallet verification failed');
-      console.warn(`   Expected: ${expectedAdminAddress}`);
-      console.warn(`   Provided: ${providedAdminAddress || 'none'}`);
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Unauthorized. Admin wallet verification failed. Please connect the correct admin wallet.',
-        },
-        { status: 403, headers: corsHeaders }
+      BadgeLogger.warn('Wallet verification failed', {
+        expected: expectedAdminAddress,
+        provided: providedAdminAddress || 'none',
+      });
+      throw new BadgeError(
+        BadgeErrorCode.UNAUTHORIZED,
+        'Unauthorized. Admin wallet verification failed. Please connect the correct admin wallet.'
       );
     }
 
-    console.log('✅ [ADMIN BADGE API] Admin wallet verified:', providedAdminAddress);
+    BadgeLogger.info('Admin wallet verified', { adminAddress: providedAdminAddress });
 
     const badgeService = getBadgeService();
 
     // Validate action
-    const validActions = ['mint', 'burn', 'cleanup', 'find-old-objects', 'find-old-registry', 'inspect-old-contract', 'compare-packages', 'verify-old-config'];
+    const validActions = ['mint', 'burn', 'cleanup', 'find-old-objects', 'find-old-registry', 'inspect-old-contract', 'compare-packages', 'verify-old-config', 'verify-config'];
     if (!action || !validActions.includes(action)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid action. Must be one of: ${validActions.join(', ')}`,
-        },
-        { status: 400, headers: corsHeaders }
-      );
+      throw new Error(`Invalid action. Must be one of: ${validActions.join(', ')}`);
     }
 
     // Handle cleanup action
     if (action === 'cleanup') {
       // Validate cleanup parameters
-      if (!playerAddress || typeof playerAddress !== 'string' || !playerAddress.startsWith('0x')) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Invalid playerAddress. Must be a valid Sui address.',
-          },
-          { status: 400, headers: corsHeaders }
+      if (!playerAddress) {
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_ADDRESS,
+          'Invalid playerAddress. Must be a valid Sui address.'
         );
       }
+
+      BadgeValidators.validateAddress(playerAddress);
 
       // Determine which contract to use (default to 'new')
       const contractType = contract || 'new';
       const useOldContract = contractType === 'old';
 
-      console.log(`🧹 [ADMIN BADGE API] Cleaning up orphaned entry for: ${playerAddress}`);
-      console.log(`🧹 [ADMIN BADGE API] Contract: ${useOldContract ? 'OLD' : 'NEW'}`);
+      BadgeLogger.info('Cleaning up orphaned entry', {
+        playerAddress,
+        contract: useOldContract ? 'OLD' : 'NEW',
+      });
 
       const result = useOldContract
         ? await badgeService.adminCleanupOrphanedEntryOldContract(playerAddress)
         : await badgeService.adminCleanupOrphanedEntry(playerAddress);
 
-      if (result.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            digest: result.digest,
-            message: `Successfully cleaned up orphaned entry for ${playerAddress}`,
-          },
-          { headers: corsHeaders }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: result.error || 'Failed to cleanup orphaned entry',
-          },
-          { status: 500, headers: corsHeaders }
-        );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to cleanup orphaned entry');
       }
+
+      return {
+        success: true,
+        digest: result.digest,
+        message: `Successfully cleaned up orphaned entry for ${playerAddress}`,
+      };
     }
 
     if (action === 'inspect-old-contract') {
       // Inspect old contract functions
-      console.log(`🔍 [ADMIN BADGE API] Inspecting old contract functions...`);
+      BadgeLogger.info('Inspecting old contract functions');
       const inspectResult = await badgeService.inspectOldContractFunctions();
       
-      if (inspectResult.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            functions: inspectResult.functions,
-            message: `Found ${inspectResult.functions?.length || 0} functions in old contract`,
-          },
-          { headers: corsHeaders }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: inspectResult.error || 'Failed to inspect old contract',
-          },
-          { status: 500, headers: corsHeaders }
-        );
+      if (!inspectResult.success) {
+        throw new Error(inspectResult.error || 'Failed to inspect old contract');
       }
+
+      return {
+        success: true,
+        functions: inspectResult.functions,
+        message: `Found ${inspectResult.functions?.length || 0} functions in old contract`,
+      };
     }
 
     if (action === 'find-old-registry') {
       // Find old BadgeRegistry object ID
-      console.log(`🔍 [ADMIN BADGE API] Finding old BadgeRegistry object...`);
+      BadgeLogger.info('Finding old BadgeRegistry object');
       const findResult = await badgeService.findOldBadgeRegistry();
       
-      if (findResult.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            registryId: findResult.registryId,
-            registryType: findResult.registryType,
-            message: `Found old BadgeRegistry: ${findResult.registryId}`,
-          },
-          { headers: corsHeaders }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: findResult.error || 'Failed to find old BadgeRegistry',
-          },
-          { status: 500, headers: corsHeaders }
-        );
+      if (!findResult.success) {
+        throw new Error(findResult.error || 'Failed to find old BadgeRegistry');
       }
+
+      return {
+        success: true,
+        registryId: findResult.registryId,
+        registryType: findResult.registryType,
+        message: `Found old BadgeRegistry: ${findResult.registryId}`,
+      };
     }
 
     if (action === 'find-old-objects') {
       // Find all old contract objects (BadgeRegistry, AdminCapability, StatisticsRegistry)
-      console.log(`🔍 [ADMIN BADGE API] Finding all old contract objects...`);
+      BadgeLogger.info('Finding all old contract objects');
       const findResult = await badgeService.findOldContractObjects();
       
-      if (findResult.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            registryId: findResult.registryId,
-            adminCapabilityId: findResult.adminCapabilityId,
-            statisticsRegistryId: findResult.statisticsRegistryId,
-            message: `Found all old contract objects from package ${process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || 'unknown'}`,
-          },
-          { headers: corsHeaders }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: findResult.error || 'Failed to find old contract objects',
-          },
-          { status: 500, headers: corsHeaders }
-        );
+      if (!findResult.success) {
+        throw new Error(findResult.error || 'Failed to find old contract objects');
       }
+
+      return {
+        success: true,
+        registryId: findResult.registryId,
+        adminCapabilityId: findResult.adminCapabilityId,
+        statisticsRegistryId: findResult.statisticsRegistryId,
+        message: `Found all old contract objects from package ${process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || 'unknown'}`,
+      };
     }
 
     if (action === 'compare-packages') {
@@ -208,126 +170,92 @@ export async function POST(request: NextRequest) {
       const { packageId1, packageId2 } = body;
       
       if (!packageId1 || !packageId2) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Both packageId1 and packageId2 are required',
-          },
-          { status: 400, headers: corsHeaders }
-        );
+        throw new Error('Both packageId1 and packageId2 are required');
       }
       
-      console.log(`🔍 [ADMIN BADGE API] Comparing packages...`);
+      BadgeLogger.info('Comparing packages', { packageId1, packageId2 });
       const compareResult = await badgeService.comparePackageAges(packageId1, packageId2);
       
-      if (compareResult.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            older: compareResult.older,
-            newer: compareResult.newer,
-            package1Date: compareResult.package1Date,
-            package2Date: compareResult.package2Date,
-            message: `Package ${compareResult.older?.substring(0, 10)}... is older than ${compareResult.newer?.substring(0, 10)}...`,
-          },
-          { headers: corsHeaders }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: compareResult.error || 'Failed to compare packages',
-          },
-          { status: 500, headers: corsHeaders }
-        );
+      if (!compareResult.success) {
+        throw new Error(compareResult.error || 'Failed to compare packages');
       }
+
+      return {
+        success: true,
+        older: compareResult.older,
+        newer: compareResult.newer,
+        package1Date: compareResult.package1Date,
+        package2Date: compareResult.package2Date,
+        message: `Package ${compareResult.older?.substring(0, 10)}... is older than ${compareResult.newer?.substring(0, 10)}...`,
+      };
     }
 
     if (action === 'verify-old-config') {
       // Verify old contract configuration
-      console.log(`🔍 [ADMIN BADGE API] Verifying old contract configuration...`);
+      BadgeLogger.info('Verifying old contract configuration');
       const verifyResult = await badgeService.verifyOldContractConfig();
       
       if (verifyResult.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            config: verifyResult.config,
-            message: 'Old contract configuration is correct - all objects are from the same package',
-          },
-          { headers: corsHeaders }
-        );
+        return {
+          success: true,
+          config: verifyResult.config,
+          message: 'Old contract configuration is correct - all objects are from the same package',
+        };
       } else {
-        return NextResponse.json(
-          {
-            success: false,
-            config: verifyResult.config,
-            issues: verifyResult.issues,
-            error: verifyResult.error || 'Configuration issues found',
-          },
-          { status: 400, headers: corsHeaders }
-        );
+        return {
+          success: false,
+          config: verifyResult.config,
+          issues: verifyResult.issues,
+          error: verifyResult.error || 'Configuration issues found',
+        };
       }
     }
 
     if (action === 'verify-config') {
       // Verify environment configuration
-      console.log(`🔍 [ADMIN BADGE API] Verifying environment configuration...`);
+      BadgeLogger.info('Verifying environment configuration');
       const verifyResult = await badgeService.verifyEnvironmentConfig();
       
       if (verifyResult.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            config: verifyResult.config,
-            warnings: verifyResult.warnings,
-            message: 'Environment configuration verified successfully',
-          },
-          { headers: corsHeaders }
-        );
+        return {
+          success: true,
+          config: verifyResult.config,
+          warnings: verifyResult.warnings,
+          message: 'Environment configuration verified successfully',
+        };
       } else {
-        return NextResponse.json(
-          {
-            success: false,
-            config: verifyResult.config,
-            errors: verifyResult.errors,
-            warnings: verifyResult.warnings,
-            message: 'Environment configuration has errors',
-          },
-          { status: 400, headers: corsHeaders }
-        );
+        return {
+          success: false,
+          config: verifyResult.config,
+          errors: verifyResult.errors,
+          warnings: verifyResult.warnings,
+          message: 'Environment configuration has errors',
+        };
       }
     }
 
     if (action === 'mint') {
       // Validate mint parameters
-      if (!playerAddress || typeof playerAddress !== 'string') {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Invalid playerAddress. Must be a valid Sui address.',
-          },
-          { status: 400, headers: corsHeaders }
+      if (!playerAddress) {
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_ADDRESS,
+          'Invalid playerAddress. Must be a valid Sui address.'
         );
       }
 
+      BadgeValidators.validateAddress(playerAddress);
+
       if (tier === undefined || tier === null || typeof tier !== 'number') {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Invalid tier. Must be a number (0-5).',
-          },
-          { status: 400, headers: corsHeaders }
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_TIER,
+          'Invalid tier. Must be a number (0-5).'
         );
       }
 
       if (tier < 0 || tier > 5) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Invalid tier. Must be between 0 and 5.',
-          },
-          { status: 400, headers: corsHeaders }
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_TIER,
+          'Invalid tier. Must be between 0 and 5.'
         );
       }
 
@@ -335,41 +263,32 @@ export async function POST(request: NextRequest) {
       const contractType = contract || 'new';
       const useOldContract = contractType === 'old';
 
-      console.log(`🎖️ [ADMIN BADGE API] Building badge mint transaction for ${playerAddress}, tier: ${tier}`);
-      console.log(`🎖️ [ADMIN BADGE API] Contract: ${useOldContract ? 'OLD' : 'NEW'}`);
-      console.log(`🎖️ [ADMIN BADGE API] Note: Badge will be created at tier 0 (Standard), player must sign transaction`);
+      BadgeLogger.info('Building badge mint transaction', {
+        playerAddress,
+        tier,
+        contract: useOldContract ? 'OLD' : 'NEW',
+        note: 'Badge will be created at tier 0 (Standard), player must sign transaction',
+      });
 
       const result = useOldContract
         ? await badgeService.adminMintBadgeOldContract(playerAddress, tier)
         : await badgeService.adminMintBadge(playerAddress, tier);
 
-      if (result.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            digest: result.digest,
-            message: result.note || `Badge minted successfully at tier ${tier}.`,
-          },
-          { headers: corsHeaders }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: result.error || 'Failed to mint badge',
-          },
-          { status: 500, headers: corsHeaders }
-        );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to mint badge');
       }
+
+      return {
+        success: true,
+        digest: result.digest,
+        message: result.note || `Badge minted successfully at tier ${tier}.`,
+      };
     } else if (action === 'burn') {
       // Validate burn parameters
       if (!badgeId || typeof badgeId !== 'string') {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Invalid badgeId. Must be a valid Sui object ID.',
-          },
-          { status: 400, headers: corsHeaders }
+        throw new BadgeError(
+          BadgeErrorCode.INVALID_BADGE_ID,
+          'Invalid badgeId. Must be a valid Sui object ID.'
         );
       }
 
@@ -377,42 +296,28 @@ export async function POST(request: NextRequest) {
       const contractType = contract || 'new';
       const useOldContract = contractType === 'old';
 
-      console.log(`🔥 [ADMIN BADGE API] Burning badge: ${badgeId}`);
-      console.log(`🔥 [ADMIN BADGE API] Contract: ${useOldContract ? 'OLD' : 'NEW'}`);
+      BadgeLogger.info('Burning badge', {
+        badgeId,
+        contract: useOldContract ? 'OLD' : 'NEW',
+      });
 
       const result = useOldContract
         ? await badgeService.adminBurnBadgeOldContract(badgeId)
         : await badgeService.adminBurnBadge(badgeId);
 
-      if (result.success) {
-        return NextResponse.json(
-          {
-            success: true,
-            digest: result.digest,
-            message: `Successfully burned badge ${badgeId}`,
-          },
-          { headers: corsHeaders }
-        );
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: result.error || 'Failed to burn badge',
-          },
-          { status: 500, headers: corsHeaders }
-        );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to burn badge');
       }
+
+      return {
+        success: true,
+        digest: result.digest,
+        message: `Successfully burned badge ${badgeId}`,
+      };
     }
-  } catch (error) {
-    console.error('❌ [ADMIN BADGE API] Error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders }
-    );
+
+    // If we get here, action was not handled (shouldn't happen due to validation above)
+    throw new Error(`Action handler not implemented for: ${action}`);
   }
-}
+);
 

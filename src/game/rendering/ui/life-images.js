@@ -6,13 +6,22 @@
 // ==========================================
 
 // UI life images (split from player-images.js)
-const lifeFullImage = new Image();
-lifeFullImage.src = 'assets/Life_Full.webp';
+// Helper function to get image from preloader or create new one
+function getLifeImage(key, src) {
+  if (typeof window !== 'undefined' && window.getGameImage) {
+    const image = window.getGameImage(key);
+    if (image) return image;
+  }
+  // Fallback to direct loading
+  const img = new Image();
+  img.src = src;
+  return img;
+}
 
-const lifeFullGoldImage = new Image();
-lifeFullGoldImage.src = 'assets/Life_Full_Gold.webp';
+const lifeFullImage = getLifeImage('life_full', 'assets/Life_Full.webp');
 
-const lifeEmptyImage = new Image();
-lifeEmptyImage.src = 'assets/Life_Empty.webp';
+const lifeFullGoldImage = getLifeImage('life_full_gold', 'assets/Life_Full_Gold.webp');
+
+const lifeEmptyImage = getLifeImage('life_empty', 'assets/Life_Empty.webp');
 
 

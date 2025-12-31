@@ -47,14 +47,18 @@ function calculateSpriteDimensions(image, baseHeight, centerWidth) {
   };
 }
 
+// Cache for image dimensions to avoid recalculating every frame
+const _imageDimensionsCache = new WeakMap();
+
 /**
  * Get collectible sprite dimensions (dynamic based on image)
+ * Cached to avoid recalculating every frame - only recalculates when image loads
  * @param {HTMLImageElement} image - The collectible image
  * @param {number} targetHeight - Desired height for the sprite
  * @returns {Object} - {width, height, centerOffset}
  */
 function getCollectibleDimensions(image, targetHeight = COLLECTIBLE_FALLBACK_HEIGHT) {
-  if (!image || !image.complete || image.naturalWidth <= 0) {
+  if (!image) {
     return {
       width: COLLECTIBLE_FALLBACK_WIDTH,
       height: COLLECTIBLE_FALLBACK_HEIGHT,
@@ -62,25 +66,52 @@ function getCollectibleDimensions(image, targetHeight = COLLECTIBLE_FALLBACK_HEI
     };
   }
   
-  const aspectRatio = image.naturalWidth / image.naturalHeight;
-  const width = targetHeight * aspectRatio;
-  const centerOffset = (COLLECTIBLE_FALLBACK_WIDTH - width) / 2;
+  // Check cache first (only if image is loaded)
+  if (image.complete && image.naturalWidth > 0) {
+    const cacheKey = `${targetHeight}`;
+    const cached = _imageDimensionsCache.get(image);
+    if (cached && cached[cacheKey]) {
+      return cached[cacheKey];
+    }
+    
+    // Calculate and cache
+    const aspectRatio = image.naturalWidth / image.naturalHeight;
+    const width = targetHeight * aspectRatio;
+    const centerOffset = (COLLECTIBLE_FALLBACK_WIDTH - width) / 2;
+    
+    const dimensions = {
+      width,
+      height: targetHeight,
+      centerOffset
+    };
+    
+    // Store in cache
+    if (!cached) {
+      _imageDimensionsCache.set(image, { [cacheKey]: dimensions });
+    } else {
+      cached[cacheKey] = dimensions;
+    }
+    
+    return dimensions;
+  }
   
+  // Image not loaded yet - return fallback
   return {
-    width,
-    height: targetHeight,
-    centerOffset
+    width: COLLECTIBLE_FALLBACK_WIDTH,
+    height: COLLECTIBLE_FALLBACK_HEIGHT,
+    centerOffset: 0
   };
 }
 
 /**
  * Get enemy sprite dimensions (dynamic based on image)
+ * Cached to avoid recalculating every frame
  * @param {HTMLImageElement} image - The enemy image
  * @param {number} targetHeight - Desired height for the sprite
  * @returns {Object} - {width, height, centerOffset}
  */
 function getEnemyDimensions(image, targetHeight = ENEMY_FALLBACK_HEIGHT) {
-  if (!image || !image.complete || image.naturalWidth <= 0) {
+  if (!image) {
     return {
       width: ENEMY_FALLBACK_HEIGHT,
       height: ENEMY_FALLBACK_HEIGHT,
@@ -88,26 +119,53 @@ function getEnemyDimensions(image, targetHeight = ENEMY_FALLBACK_HEIGHT) {
     };
   }
   
-  const aspectRatio = image.naturalWidth / image.naturalHeight;
-  const width = targetHeight * aspectRatio;
-  const centerOffset = (ENEMY_FALLBACK_HEIGHT - width) / 2;
+  // Check cache first (only if image is loaded)
+  if (image.complete && image.naturalWidth > 0) {
+    const cacheKey = `${targetHeight}`;
+    const cached = _imageDimensionsCache.get(image);
+    if (cached && cached[cacheKey]) {
+      return cached[cacheKey];
+    }
+    
+    // Calculate and cache
+    const aspectRatio = image.naturalWidth / image.naturalHeight;
+    const width = targetHeight * aspectRatio;
+    const centerOffset = (ENEMY_FALLBACK_HEIGHT - width) / 2;
+    
+    const dimensions = {
+      width,
+      height: targetHeight,
+      centerOffset
+    };
+    
+    // Store in cache
+    if (!cached) {
+      _imageDimensionsCache.set(image, { [cacheKey]: dimensions });
+    } else {
+      cached[cacheKey] = dimensions;
+    }
+    
+    return dimensions;
+  }
   
+  // Image not loaded yet - return fallback
   return {
-    width,
-    height: targetHeight,
-    centerOffset
+    width: ENEMY_FALLBACK_HEIGHT,
+    height: ENEMY_FALLBACK_HEIGHT,
+    centerOffset: 0
   };
 }
 
 /**
  * Get boss sprite dimensions (dynamic based on image)
+ * Cached to avoid recalculating every frame
  * @param {HTMLImageElement} image - The boss image
  * @param {number} containerWidth - Boss container width
  * @param {number} containerHeight - Boss container height
  * @returns {Object} - {width, height, centerOffset}
  */
 function getBossDimensions(image, containerWidth, containerHeight) {
-  if (!image || !image.complete || image.naturalWidth <= 0) {
+  if (!image) {
     return {
       width: containerWidth,
       height: containerHeight,
@@ -115,14 +173,40 @@ function getBossDimensions(image, containerWidth, containerHeight) {
     };
   }
   
-  const aspectRatio = image.naturalWidth / image.naturalHeight;
-  const width = containerHeight * aspectRatio;
-  const centerOffset = (containerWidth - width) / 2;
+  // Check cache first (only if image is loaded)
+  if (image.complete && image.naturalWidth > 0) {
+    const cacheKey = `${containerWidth}_${containerHeight}`;
+    const cached = _imageDimensionsCache.get(image);
+    if (cached && cached[cacheKey]) {
+      return cached[cacheKey];
+    }
+    
+    // Calculate and cache
+    const aspectRatio = image.naturalWidth / image.naturalHeight;
+    const width = containerHeight * aspectRatio;
+    const centerOffset = (containerWidth - width) / 2;
+    
+    const dimensions = {
+      width,
+      height: containerHeight,
+      centerOffset
+    };
+    
+    // Store in cache
+    if (!cached) {
+      _imageDimensionsCache.set(image, { [cacheKey]: dimensions });
+    } else {
+      cached[cacheKey] = dimensions;
+    }
+    
+    return dimensions;
+  }
   
+  // Image not loaded yet - return fallback
   return {
-    width,
+    width: containerWidth,
     height: containerHeight,
-    centerOffset
+    centerOffset: 0
   };
 }
 

@@ -203,6 +203,21 @@ canvas:hover {
     inset 0 0 20px rgba(0, 0, 0, 0.8);
 }
 
+/* Tournament mode - gold border */
+canvas.tournament-mode {
+  border: 3px solid #FFD700;
+  box-shadow: 
+    0 0 20px rgba(255, 215, 0, 0.3),
+    inset 0 0 20px rgba(0, 0, 0, 0.8);
+  transition: all 0.3s ease;
+}
+
+canvas.tournament-mode:hover {
+  box-shadow: 
+    0 0 30px rgba(255, 215, 0, 0.5),
+    inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
 /* In-Game UI - Side-by-side with canvas */
 /* INFO BOX - appears on LEFT side */
 .game-ui-overlay {

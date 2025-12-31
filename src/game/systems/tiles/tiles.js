@@ -4,37 +4,57 @@
 
 // Generate tiles (vertical columns of enemies)
 function generateTiles() {
-  while (tiles.length < 30) {
+  const game = (typeof window !== 'undefined' && window.gameState) ? window.gameState : 
+               (typeof window !== 'undefined' && window.game) ? window.game : null;
+  
+  if (!game) {
+    console.error('❌ [TILES] Game state not available');
+    return;
+  }
+  
+  // Get reference to tiles - try window.tiles first, then fallback to global tiles
+  // This matches the backup behavior where tiles is a global variable
+  let tilesArray;
+  if (typeof window !== 'undefined' && window.tiles) {
+    tilesArray = window.tiles;
+  } else if (typeof tiles !== 'undefined') {
+    tilesArray = tiles;
+  } else {
+    tilesArray = [];
+  }
+  
+  // Generate tiles until we have 30 (matching backup behavior)
+  while (tilesArray.length < 30) {
     // Determine starting X position - ALWAYS use tiles for consistent spacing
     // (Enemies move faster after tier 4, so using enemy positions would cause inconsistent spacing)
-    const lastX = tiles.length ? tiles[tiles.length-1].x : game.width;
+    const lastX = tilesArray.length ? tilesArray[tilesArray.length-1].x : game.width;
     const x = lastX + game.width / 10;
     const lanes = [0,1,2];
 
-    // Obstacles (monsters) - limited by current tier
-    const recent = tiles.slice(-3);
+    // Enemies (monsters) - limited by current tier
+    // ALWAYS use enemies[] array - never use tile.obstacles for enemies
+    const recent = tilesArray.slice(-3);
     let count;
     let used;
     
-    if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies() && typeof enemies !== 'undefined') {
-      // After tier 4: Count enemies from separate enemies[] array that are in recent tile area
-      // Find the X position range of recent tiles
-      const recentTileMinX = recent.length > 0 ? Math.min(...recent.map(t => t.x)) : -Infinity;
-      const recentTileMaxX = recent.length > 0 ? Math.max(...recent.map(t => t.x)) : Infinity;
-      
-      // Count enemies that are spatially within the recent tile area
-      const recentEnemies = enemies.filter(e => e.x >= recentTileMinX && e.x <= recentTileMaxX);
-      count = recentEnemies.length;
-      
-      // Get lanes used by enemies in recent area
-      used = recentEnemies.map(e => e.lane);
-    } else {
-      // Before tier 4: Count enemies in tiles
-      count = recent.reduce((sum, t) => sum + t.obstacles.length, 0);
-      used = recent.flatMap(t => t.obstacles.map(o => o.lane));
-    }
+    // Get enemies array from window (exposed by main.js) or use global
+    const enemiesArray = (typeof window !== 'undefined' && window.enemies) ? window.enemies : 
+                         (typeof enemies !== 'undefined' ? enemies : []);
     
-    const obstacles = [];
+    // Count enemies from enemies[] array that are in recent tile area
+    // Find the X position range of recent tiles
+    const recentTileMinX = recent.length > 0 ? Math.min(...recent.map(t => t.x)) : -Infinity;
+    const recentTileMaxX = recent.length > 0 ? Math.max(...recent.map(t => t.x)) : Infinity;
+    
+    // Count enemies that are spatially within the recent tile area
+    const recentEnemies = enemiesArray.filter(e => e.x >= recentTileMinX && e.x <= recentTileMaxX);
+    count = recentEnemies.length;
+    
+    // Get lanes used by enemies in recent area
+    used = recentEnemies.map(e => e.lane);
+    
+    // Spawn enemy if count is low
+    let spawnedEnemyLane = null;
     if (count < 3 && Math.random() < 0.35) {
       const free = lanes.filter(l => !used.includes(l));
       const lane = free.length
@@ -64,6 +84,7 @@ function generateTiles() {
       if (Math.random() < 0.2) power = Math.random() < 0.5 ? 'freeze' : 'slow';
       
       const enemyData = { 
+        x: x + 20, // ENEMY_X_OFFSET (absolute X position)
         lane, 
         type, 
         power, 
@@ -73,29 +94,22 @@ function generateTiles() {
         maxHp: enemyStats[type].hp
       };
       
-      // After tier 4: Add to separate enemies array AND obstacles array for lane tracking
-      if (typeof shouldUseSeparateEnemies === 'function' && shouldUseSeparateEnemies()) {
-        // Add to separate enemies array with absolute X position
-        if (typeof enemies !== 'undefined') {
-          enemies.push({
-            x: x + 20, // ENEMY_X_OFFSET (same as tile.x + 20)
-            ...enemyData
-          });
-        }
-        // Also add to obstacles array so collectibles can check lanes (even though enemies are separate)
-        obstacles.push(enemyData);
-      } else {
-        // Before tier 4: Add to tile obstacles (current behavior)
-        obstacles.push(enemyData);
+      // ALWAYS add to enemies[] array (never to tile.obstacles)
+      enemiesArray.push(enemyData);
+      // Update global reference
+      if (typeof window !== 'undefined') {
+        window.enemies = enemiesArray;
       }
+      
+      spawnedEnemyLane = lane; // Track for lane checking
     }
 
-    // Coin
+    // Coin - check lanes used by enemies in enemies[] array
     let coinLane = null;
     if (Math.random() < 0.2) {
-      // Use obstacles array for lane checking (works for both before and after tier 4)
-      // After tier 4, obstacles array is populated for lane tracking even though enemies are separate
-      const usedLanes = obstacles.map(o => o.lane);
+      // Get lanes used by enemies near this tile position
+      const nearbyEnemies = enemiesArray.filter(e => Math.abs(e.x - x) < 100);
+      const usedLanes = nearbyEnemies.map(e => e.lane);
       const free = lanes.filter(l => !usedLanes.includes(l));
       coinLane = free.length
         ? free[Math.floor(Math.random()*free.length)]
@@ -112,9 +126,9 @@ function generateTiles() {
     const isAtOrbCap = currentOrbLevel >= orbLevelCap;
     
     if (Math.random() < 0.1) {
-      // Use obstacles array for lane checking (works for both before and after tier 4)
-      // After tier 4, obstacles array is populated for lane tracking even though enemies are separate
-      const usedLanes = [...obstacles.map(o => o.lane), coinLane].filter(x => x !== null);
+      // Get lanes used by enemies near this tile position
+      const nearbyEnemies = enemiesArray.filter(e => Math.abs(e.x - x) < 100);
+      const usedLanes = [...nearbyEnemies.map(e => e.lane), coinLane].filter(x => x !== null);
       const free = lanes.filter(l => !usedLanes.includes(l));
       const lane = free.length
         ? free[Math.floor(Math.random()*free.length)]
@@ -135,6 +149,19 @@ function generateTiles() {
       }
     }
 
-    tiles.push({ x, obstacles, coinLane, powerupBonus, powerdown });
+    // Push tile WITHOUT obstacles - tiles are now ONLY for collectibles (coins, power-ups)
+    // Enemies are always in enemies[] array
+    tilesArray.push({ x, coinLane, powerupBonus, powerdown });
   }
+  
+  // Ensure window.tiles points to the same array (matching backup behavior)
+  // In the backup, tiles is a global variable that's always the same reference
+  if (typeof window !== 'undefined') {
+    window.tiles = tilesArray;
+  }
+}
+
+// Expose globally
+if (typeof window !== 'undefined') {
+  window.generateTiles = generateTiles;
 }

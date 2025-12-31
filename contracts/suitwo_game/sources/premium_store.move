@@ -5,6 +5,7 @@ module suitwo_game::premium_store {
     use sui::event;
     use sui::clock::{Self, Clock};
     use sui::dynamic_object_field as ofield;
+    use sui::coin::{Self, Coin};
 
     // ===== CONSTANTS =====
     
@@ -103,6 +104,19 @@ module suitwo_game::premium_store {
         item_type: u8,
         item_level: u8,
         quantity: u64,
+        timestamp: u64,
+    }
+    
+    /// Event emitted when items are merged
+    struct ItemsMerged has copy, drop {
+        player: address,
+        item_type: u8,
+        source_level: u8,
+        target_level: u8,
+        items_consumed: u64,  // Number of items consumed (3 for standard, 9 for hyper merge)
+        items_created: u64,   // Always 1
+        amount_paid: u64,     // Fee paid in token amount
+        payment_token: u8,    // 0=SUI, 1=MEWS, 2=USDC
         timestamp: u64,
     }
 
@@ -426,18 +440,20 @@ module suitwo_game::premium_store {
     // ===== MAIN FUNCTIONS =====
     
     /// Purchase an item (player signs, player pays)
-    /// Payment transfer should happen in the same transaction (handled by frontend/backend)
-    /// This function only updates the inventory
+    /// Purchase item with payment coin
+    /// Accepts a Coin<T> parameter so wallet can display the payment amount
+    /// Transfers payment to admin wallet and updates inventory
     #[allow(lint(public_entry))]
-    public entry fun purchase_item(
+    public entry fun purchase_item<T>(
         store: &mut PremiumStore,
         clock: &Clock,
         player: address,
         item_type: u8,
         item_level: u8,
         quantity: u64,
-        amount_paid: u64,
         payment_token: u8,
+        admin_address: address,  // Admin wallet address to receive payment
+        payment: Coin<T>,
         ctx: &mut TxContext
     ) {
         let current_time = clock::timestamp_ms(clock);
@@ -447,6 +463,12 @@ module suitwo_game::premium_store {
         assert!(item_level >= 1 && item_level <= 3, 2); // Error code 2: Invalid item level
         assert!(quantity > 0, 3); // Error code 3: Quantity must be positive
         assert!(payment_token <= PAYMENT_TOKEN_USDC, 4); // Error code 4: Invalid payment token
+        
+        // Get payment amount from coin (for event)
+        let amount_paid = coin::value(&payment);
+        
+        // Transfer payment to admin wallet
+        transfer::public_transfer(payment, admin_address);
         
         // Get or create inventory
         let inventory = get_or_create_inventory(store, player, ctx);
@@ -474,6 +496,106 @@ module suitwo_game::premium_store {
             item_level,
             quantity_change: quantity,
             new_quantity,
+            timestamp: current_time,
+        });
+    }
+    
+    /// Merge items (player signs, player pays)
+    /// Merges lower-level items into higher-level items for a fee
+    /// Supports: 3x L1 → 1x L2, 3x L2 → 1x L3, or 9x L1 → 1x L3 (hyper merge)
+    #[allow(lint(public_entry))]
+    public entry fun merge_items<T>(
+        store: &mut PremiumStore,
+        clock: &Clock,
+        player: address,
+        item_type: u8,
+        source_level: u8,
+        target_level: u8,
+        payment_token: u8,
+        admin_address: address,  // Admin wallet address to receive payment
+        payment: Coin<T>,
+        ctx: &mut TxContext
+    ) {
+        let current_time = clock::timestamp_ms(clock);
+        
+        // Validate inputs
+        assert!(item_type <= ITEM_TYPE_COIN_TRACTOR_BEAM, 1); // Error code 1: Invalid item type
+        assert!(payment_token <= PAYMENT_TOKEN_USDC, 2); // Error code 2: Invalid payment token
+        
+        // Validate merge path
+        // Valid paths: L1→L2, L2→L3, or L1→L3 (hyper merge)
+        assert!(
+            (source_level == 1 && target_level == 2) ||
+            (source_level == 2 && target_level == 3) ||
+            (source_level == 1 && target_level == 3),
+            3  // Error code 3: Invalid merge path
+        );
+        
+        // Validate item type is mergeable (not single-level items)
+        // destroy_all (4) and boss_kill_shot (5) are single-level and cannot be merged
+        assert!(item_type != ITEM_TYPE_DESTROY_ALL && item_type != ITEM_TYPE_BOSS_KILL_SHOT, 4); // Error code 4: Item type cannot be merged
+        
+        // Determine items needed based on merge path
+        let items_needed = if (source_level == 1 && target_level == 2) {
+            3  // Standard: 3x Level 1 → 1x Level 2
+        } else if (source_level == 2 && target_level == 3) {
+            3  // Standard: 3x Level 2 → 1x Level 3
+        } else {  // source_level == 1 && target_level == 3 (hyper merge)
+            9  // Premium: 9x Level 1 → 1x Level 3 (skip Level 2)
+        };
+        
+        // Get payment amount from coin (for event)
+        let amount_paid = coin::value(&payment);
+        
+        // Transfer payment to admin wallet
+        transfer::public_transfer(payment, admin_address);
+        
+        // Get or create inventory
+        let inventory = get_or_create_inventory(store, player, ctx);
+        
+        // Check inventory has sufficient items
+        let items_available = get_inventory_count(inventory, item_type, source_level);
+        assert!(items_available >= items_needed, 5); // Error code 5: Insufficient items
+        
+        // Consume source items
+        assert!(decrement_inventory(inventory, item_type, source_level, items_needed), 6); // Error code 6: Failed to decrement inventory
+        
+        // Create target item
+        increment_inventory(inventory, item_type, target_level, 1);
+        
+        // Get new quantities for events
+        let source_quantity_after = get_inventory_count(inventory, item_type, source_level);
+        let target_quantity_after = get_inventory_count(inventory, item_type, target_level);
+        
+        // Emit ItemsMerged event
+        event::emit(ItemsMerged {
+            player,
+            item_type,
+            source_level,
+            target_level,
+            items_consumed: items_needed,
+            items_created: 1,
+            amount_paid,
+            payment_token,
+            timestamp: current_time,
+        });
+        
+        // Emit InventoryUpdated events for source (consumption) and target (creation)
+        event::emit(InventoryUpdated {
+            player,
+            item_type,
+            item_level: source_level,
+            quantity_change: items_needed,  // Amount consumed (positive value, consumption indicated by ItemsMerged event)
+            new_quantity: source_quantity_after,
+            timestamp: current_time,
+        });
+        
+        event::emit(InventoryUpdated {
+            player,
+            item_type,
+            item_level: target_level,
+            quantity_change: 1,  // Amount created
+            new_quantity: target_quantity_after,
             timestamp: current_time,
         });
     }
