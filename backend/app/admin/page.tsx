@@ -1,6 +1,7 @@
 // ==========================================
 // Admin Page - Refactored Main Component
 // ==========================================
+// Updated: Removed old HTML file from public directory
 
 'use client';
 
