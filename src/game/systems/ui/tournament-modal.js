@@ -1477,10 +1477,21 @@ async function startTournamentGame(tournamentObjectId = null) {
         hasStartGame: window.GameService ? typeof window.GameService.startGame : 'N/A',
       });
       alert('Tournament game start not available. Please refresh the page and try again.');
+      // Restore tournament modal visibility
+      if (tournamentModal) {
+        tournamentModal.classList.remove('tournament-modal-hidden');
+        tournamentModal.classList.add('tournament-modal-visible');
+      }
     }
   } catch (error) {
     log.error('TOURNAMENT MODAL', 'Error starting tournament game', error);
     alert(`Error starting tournament game: ${error.message}`);
+    // Restore tournament modal visibility on error
+    const tournamentModal = document.getElementById('tournamentModal');
+    if (tournamentModal) {
+      tournamentModal.classList.remove('tournament-modal-hidden');
+      tournamentModal.classList.add('tournament-modal-visible');
+    }
   }
 }
 

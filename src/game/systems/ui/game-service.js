@@ -345,6 +345,12 @@ const GameService = {
       if (now > gracePeriodEnd) {
         alert(`This tournament has ended. The grace period for score submission has expired.\n\nTournament: ${tournament.name}\nEnded: ${new Date(tournament.endTime).toLocaleString()}\n\nYou cannot start a new game for this tournament.`);
         this.enableStartGameButton();
+        // Restore tournament modal visibility if it was hidden
+        const tournamentModal = document.getElementById('tournamentModal');
+        if (tournamentModal) {
+          tournamentModal.classList.remove('tournament-modal-hidden');
+          tournamentModal.classList.add('tournament-modal-visible');
+        }
         return;
       }
       
@@ -368,6 +374,12 @@ const GameService = {
           : '0';
         alert(`Insufficient $MEWS balance. You need at least 500,000 $MEWS for gas fees.\n\nCurrent balance: ${balanceDisplay} $MEWS`);
         this.enableStartGameButton();
+        // Restore tournament modal visibility if it was hidden
+        const tournamentModal = document.getElementById('tournamentModal');
+        if (tournamentModal) {
+          tournamentModal.classList.remove('tournament-modal-hidden');
+          tournamentModal.classList.add('tournament-modal-visible');
+        }
         return;
       }
       
@@ -383,6 +395,12 @@ const GameService = {
           if (!hasTickets) {
             alert(`You need ${tournament.entryFeeTickets} tournament ticket${tournament.entryFeeTickets !== 1 ? 's' : ''} to enter this tournament. Purchase tickets from the Store.`);
             this.enableStartGameButton();
+            // Restore tournament modal visibility if it was hidden
+            const tournamentModal = document.getElementById('tournamentModal');
+            if (tournamentModal) {
+              tournamentModal.classList.remove('tournament-modal-hidden');
+              tournamentModal.classList.add('tournament-modal-visible');
+            }
             return;
           }
         }
@@ -405,6 +423,12 @@ const GameService = {
       alert(`Error starting tournament game: ${error.message || 'Unknown error'}`);
       // Re-enable button on error
       this.enableStartGameButton();
+      // Restore tournament modal visibility if it was hidden
+      const tournamentModal = document.getElementById('tournamentModal');
+      if (tournamentModal) {
+        tournamentModal.classList.remove('tournament-modal-hidden');
+        tournamentModal.classList.add('tournament-modal-visible');
+      }
     }
     // Note: Button will be re-enabled by _startGameInternal or error handler
   },
