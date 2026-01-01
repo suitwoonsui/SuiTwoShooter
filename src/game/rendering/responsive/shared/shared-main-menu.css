@@ -773,9 +773,15 @@
   }
 }
 
-/* Override overflow:hidden on leaderboard button to allow badge visibility */
+/* Leaderboard button: keep overflow hidden to prevent hover expansion to adjacent buttons */
 #leaderboardMenuBtn {
-  overflow: visible;
+  overflow: hidden;
+}
+
+/* Adjust badge positioning to work with overflow:hidden - position at top-right corner with small inset */
+#leaderboardMenuBtn .claim-badge {
+  top: 2px;
+  right: 2px;
 }
 
 .menu-footer {

@@ -542,7 +542,9 @@ async function loadMilestoneProgress(type) {
       let eligible = [];
 
       try {
-        const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}`);
+        // Add cache-busting parameter to ensure fresh data
+        const timestamp = Date.now();
+        const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}&clearCache=true&_t=${timestamp}`);
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
@@ -636,7 +638,9 @@ async function loadMilestoneProgress(type) {
       let eligible = [];
 
       try {
-        const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}`);
+        // Add cache-busting parameter to ensure fresh data
+        const timestamp = Date.now();
+        const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}&clearCache=true&_t=${timestamp}`);
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
@@ -665,7 +669,9 @@ async function loadMilestoneProgress(type) {
     const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
     log.debug('ACHIEVEMENT PROGRESS', 'Fetching milestone progress from API (fallback)', { playerAddress, type, API_BASE_URL });
     
-    const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}`);
+    // Add cache-busting parameter to ensure fresh data
+    const timestamp = Date.now();
+    const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}&clearCache=true&_t=${timestamp}`);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -1182,8 +1188,18 @@ async function claimMilestoneRewards(category) {
       log.debug('ACHIEVEMENT PROGRESS', 'Waiting for transaction finalization before refresh');
       await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
       
+      // Clear local cached state to force fresh render
+      window._milestoneClaimedIds = null;
+      window._milestoneClaimed = null;
+      window._milestoneEligible = null;
+      
       // Refresh milestone progress to update claimed status in the modal
+      // This will fetch fresh data from the API with cache-busting
       const currentSubTab = window._currentMilestoneSubTab || 'per-game';
+      log.info('ACHIEVEMENT PROGRESS', 'Refreshing milestone progress after claim', { 
+        currentSubTab, 
+        claimedCount: claimed.length 
+      });
       await loadMilestoneProgress(currentSubTab);
       
       // Force a fresh fetch for the badge count (don't use cache)
@@ -1201,6 +1217,12 @@ async function claimMilestoneRewards(category) {
       setTimeout(async () => {
         await updateLeaderboardClaimBadge(null, true);
       }, 500);
+      
+      // Additional refresh after a longer delay to ensure blockchain data is fully indexed
+      setTimeout(async () => {
+        log.debug('ACHIEVEMENT PROGRESS', 'Performing additional refresh after delay');
+        await loadMilestoneProgress(currentSubTab);
+      }, 3000);
     }
     
   } catch (error) {
