@@ -462,5 +462,6 @@ async function checkAchievementsAsync(playerAddress) {
 window.submitScoreToBlockchain = submitScoreToBlockchain;
   window.setContractPackageId = setContractPackageId;
   window.getContractPackageId = getContractPackageId;
+  window.checkAchievementsAsync = checkAchievementsAsync;
 }
 

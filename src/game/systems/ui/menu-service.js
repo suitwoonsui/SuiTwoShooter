@@ -195,9 +195,10 @@ const MenuService = {
           });
         }
         
-        // Update leaderboard claim badge when menu is shown
+        // Update leaderboard claim badge when menu is shown (force refresh to get latest count)
         if (typeof window.updateLeaderboardClaimBadge === 'function') {
-          window.updateLeaderboardClaimBadge().catch(err => {
+          // Use forceRefresh=true to bypass cache and get fresh data
+          window.updateLeaderboardClaimBadge(null, true).catch(err => {
             log.warn('MENU SERVICE', 'Failed to update leaderboard claim badge', err);
           });
         }
@@ -230,12 +231,29 @@ const MenuService = {
             log.warn('MENU SERVICE', 'Failed to refresh credit display', err);
           });
         }
+        
+        // Update leaderboard claim badge when menu is shown (force refresh)
+        if (typeof window.updateLeaderboardClaimBadge === 'function') {
+          window.updateLeaderboardClaimBadge(null, true).catch(err => {
+            log.warn('MENU SERVICE', 'Failed to update leaderboard claim badge', err);
+          });
+        }
       } else {
         this._updateWalletUI(null);
         // Hide badge display when wallet disconnected
         const badgeDisplay = document.getElementById('menuBadgeDisplay');
         if (badgeDisplay) {
           badgeDisplay.style.display = 'none';
+        }
+        
+        // Hide leaderboard claim badge when wallet disconnected
+        const claimBadge = document.getElementById('leaderboardClaimBadge');
+        if (claimBadge) {
+          claimBadge.style.display = 'none';
+        }
+        const tabBadge = document.getElementById('milestonesTabBadge');
+        if (tabBadge) {
+          tabBadge.style.display = 'none';
         }
       }
     }

@@ -218,13 +218,26 @@ function addMilestoneProgressToLeaderboard() {
    loadMilestoneProgress(subTab);
  }
 
- /**
-  * Refresh milestone progress for current sub-tab
-  */
- function refreshMilestoneProgress() {
-   const currentSubTab = window._currentMilestoneSubTab || 'per-game';
-   loadMilestoneProgress(currentSubTab);
- }
+/**
+ * Refresh milestone progress for current sub-tab
+ */
+function refreshMilestoneProgress() {
+  const currentSubTab = window._currentMilestoneSubTab || 'per-game';
+  loadMilestoneProgress(currentSubTab);
+  
+  // Also refresh the badge count when manually refreshing milestone progress
+  if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    if (typeof window.updateLeaderboardClaimBadge === 'function') {
+      // Clear cache and force refresh to get latest count
+      if (typeof window.clearEligibleMilestonesCache === 'function') {
+        window.clearEligibleMilestonesCache();
+      }
+      window.updateLeaderboardClaimBadge(null, true).catch(err => {
+        console.warn('⚠️ [ACHIEVEMENT PROGRESS] Failed to update badge on refresh:', err);
+      });
+    }
+  }
+}
 
 // Milestone category state
 if (!window._milestoneCategoryIndex) {
@@ -1483,5 +1496,17 @@ function closeMilestoneNotification() {
  window.claimMilestoneRewards = claimMilestoneRewards;
  window.showMilestoneNotification = showMilestoneNotification;
  window.closeMilestoneNotification = closeMilestoneNotification;
- window.updateLeaderboardClaimBadge = updateLeaderboardClaimBadge;
+ /**
+ * Clear the eligible milestones cache
+ * Called when wallet changes to ensure fresh data
+ */
+function clearEligibleMilestonesCache() {
+  eligibleMilestonesCache = null;
+  eligibleMilestonesCacheTimestamp = 0;
+  eligibleMilestonesFetchPromise = null;
+  console.log('🏆 [CLAIM BADGE] Cleared eligible milestones cache');
+}
+
+window.updateLeaderboardClaimBadge = updateLeaderboardClaimBadge;
+window.clearEligibleMilestonesCache = clearEligibleMilestonesCache;
 

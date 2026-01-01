@@ -49,10 +49,26 @@ function onWalletConnected(address) {
     console.error('❌ [FLOW WALLET] Error in onWalletConnected:', err);
   });
   
-  // Update leaderboard claim badge when wallet connects
+  // Clear eligible milestones cache when wallet changes (force fresh fetch)
+  // This ensures the badge shows correct count for the new wallet
+  if (typeof window.clearEligibleMilestonesCache === 'function') {
+    window.clearEligibleMilestonesCache();
+  }
+  
+  // Update leaderboard claim badge when wallet connects (force refresh to bypass cache)
   if (typeof window.updateLeaderboardClaimBadge === 'function') {
-    window.updateLeaderboardClaimBadge().catch(err => {
+    // Use forceRefresh=true to bypass cache and get fresh data for new wallet
+    window.updateLeaderboardClaimBadge(null, true).catch(err => {
       console.warn('⚠️ [FLOW WALLET] Failed to update leaderboard claim badge:', err);
+    });
+  }
+  
+  // Check for eligible milestones when wallet connects
+  // This uses the same async check function used after score submission
+  if (typeof window.checkAchievementsAsync === 'function') {
+    window.checkAchievementsAsync(address).catch(err => {
+      console.warn('⚠️ [FLOW WALLET] Failed to check achievements on wallet connect:', err);
+      // Silently fail - don't interrupt user flow
     });
   }
 }
@@ -86,10 +102,21 @@ function onWalletDisconnected() {
     badgeDisplay.innerHTML = '';
   }
   
+  // Clear eligible milestones cache when wallet disconnects
+  if (typeof window.clearEligibleMilestonesCache === 'function') {
+    window.clearEligibleMilestonesCache();
+  }
+  
   // Hide leaderboard claim badge when wallet disconnects
   const claimBadge = document.getElementById('leaderboardClaimBadge');
   if (claimBadge) {
     claimBadge.style.display = 'none';
+  }
+  
+  // Also hide the tab badge
+  const tabBadge = document.getElementById('milestonesTabBadge');
+  if (tabBadge) {
+    tabBadge.style.display = 'none';
   }
   
   // Clear game pass display (credits and tickets) when wallet disconnects
@@ -129,6 +156,16 @@ function onReturnToMenu() {
         console.error('❌ [FLOW WALLET] Error re-displaying badge on return to menu:', err);
       });
     }
+    
+    // Update leaderboard claim badge when returning to menu (force refresh to get latest count)
+    if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+      if (typeof window.updateLeaderboardClaimBadge === 'function') {
+        // Use forceRefresh=true to bypass cache and get fresh data
+        window.updateLeaderboardClaimBadge(null, true).catch(err => {
+          console.warn('⚠️ [FLOW WALLET] Failed to update leaderboard claim badge on return to menu:', err);
+        });
+      }
+    }
     return;
   }
   
@@ -137,6 +174,18 @@ function onReturnToMenu() {
     window.GameDataFlowService.load(GameDataState.walletAddress).catch(err => {
       console.error('❌ [FLOW WALLET] Error reloading on return to menu:', err);
     });
+    
+    // Update leaderboard claim badge after reload (force refresh)
+    if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+      if (typeof window.updateLeaderboardClaimBadge === 'function') {
+        // Small delay to ensure data is loaded, then update badge
+        setTimeout(() => {
+          window.updateLeaderboardClaimBadge(null, true).catch(err => {
+            console.warn('⚠️ [FLOW WALLET] Failed to update leaderboard claim badge after reload:', err);
+          });
+        }, 500);
+      }
+    }
   }
 }
 

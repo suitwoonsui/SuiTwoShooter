@@ -114,10 +114,10 @@ async function showLeaderboard() {
     addMilestoneProgressToLeaderboard();
   }
   
-  // Update badge counts after modal is set up (with small delay to ensure DOM is ready)
+  // Update badge counts after modal is set up (force refresh to get latest count)
   if (typeof updateLeaderboardClaimBadge === 'function') {
     setTimeout(async () => {
-      await updateLeaderboardClaimBadge(null, false);
+      await updateLeaderboardClaimBadge(null, true);
     }, 100);
   }
   
@@ -163,10 +163,10 @@ async function showLeaderboard() {
       hideLoadingModal('leaderboardLoadingModal');
     }
     
-    // Update badge counts after leaderboard is fully loaded
+    // Update badge counts after leaderboard is fully loaded (force refresh to get latest count)
     if (typeof updateLeaderboardClaimBadge === 'function') {
       setTimeout(async () => {
-        await updateLeaderboardClaimBadge(null, false);
+        await updateLeaderboardClaimBadge(null, true);
       }, 200);
     }
   }
