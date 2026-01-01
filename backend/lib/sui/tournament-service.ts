@@ -332,11 +332,13 @@ export class TournamentService {
 
       // Tournament creation is a complex operation, use higher gas budget
       // Base gas budget + extra for reward config operations
+      // Default rewards: create_tournament_default_rewards is complex with 17 arguments and Table operations
+      // Custom rewards: even more complex with variable item counts
       const baseGasBudget = this.config.sui.gasBudget;
       const hasCustomRewards = config.rewardConfig && Object.keys(config.rewardConfig.itemRewards || {}).length > 0;
       const gasBudget = hasCustomRewards 
-        ? Math.max(baseGasBudget * 3, baseGasBudget + 20_000_000) // 3x base or base + 0.02 SUI for custom rewards
-        : Math.max(baseGasBudget * 2, baseGasBudget + 10_000_000); // 2x base or base + 0.01 SUI for default rewards
+        ? Math.max(baseGasBudget * 3, baseGasBudget + 50_000_000) // 3x base or base + 0.05 SUI for custom rewards
+        : Math.max(baseGasBudget * 3, baseGasBudget + 50_000_000); // 3x base or base + 0.05 SUI for default rewards (matches migration service)
 
       // Check admin wallet balance before building transaction
       try {
