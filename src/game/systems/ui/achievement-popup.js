@@ -112,6 +112,11 @@ function showAchievementPopup(achievements) {
   // Prevent interaction with anything behind the popup
   popup.style.zIndex = '9999999';
   popup.style.pointerEvents = 'auto';
+  
+  // Prevent clicks on the popup from bubbling up to trigger click-outside handlers on other modals
+  popup.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
 
   log.info('ACHIEVEMENT POPUP', 'Achievement popup displayed', { count: achievements.length });
 }
@@ -132,18 +137,57 @@ function closeAchievementPopup() {
     }, 300);
   }
 
-  // Re-enable main menu buttons
-  const mainMenu = document.getElementById('mainMenuOverlay');
-  if (mainMenu) {
-    const buttons = mainMenu.querySelectorAll('button');
-    buttons.forEach(btn => {
-      btn.disabled = false;
-      btn.style.pointerEvents = '';
-      btn.style.opacity = '';
-    });
+  // Check if leaderboard modal is open - if so, don't show main menu, just re-enable buttons
+  const leaderboardModal = document.getElementById('leaderboardModal');
+  const isLeaderboardOpen = leaderboardModal && leaderboardModal.classList.contains('leaderboard-modal-visible');
+  
+  // Check if tournament modal is open - if so, don't show main menu
+  const tournamentModal = document.getElementById('tournamentModal');
+  const isTournamentOpen = tournamentModal && tournamentModal.classList.contains('tournament-modal-visible');
+
+  // Only re-enable main menu buttons if we're actually on the main menu
+  // If leaderboard or tournament modal is open, we should stay there
+  if (!isLeaderboardOpen && !isTournamentOpen) {
+    // Re-enable main menu buttons
+    const mainMenu = document.getElementById('mainMenuOverlay');
+    if (mainMenu) {
+      const buttons = mainMenu.querySelectorAll('button');
+      buttons.forEach(btn => {
+        btn.disabled = false;
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
+      });
+    }
+  } else {
+    // If leaderboard or tournament is open, just re-enable buttons in that modal
+    // This allows the user to continue interacting with the modal
+    log.debug('ACHIEVEMENT POPUP', 'Leaderboard or tournament modal is open, staying in modal');
+    
+    // Re-enable buttons in the leaderboard modal if it's open
+    if (isLeaderboardOpen && leaderboardModal) {
+      const buttons = leaderboardModal.querySelectorAll('button');
+      buttons.forEach(btn => {
+        btn.disabled = false;
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
+      });
+    }
+    
+    // Re-enable buttons in the tournament modal if it's open
+    if (isTournamentOpen && tournamentModal) {
+      const buttons = tournamentModal.querySelectorAll('button');
+      buttons.forEach(btn => {
+        btn.disabled = false;
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
+      });
+    }
   }
 
-  log.info('ACHIEVEMENT POPUP', 'Achievement popup closed');
+  log.info('ACHIEVEMENT POPUP', 'Achievement popup closed', { 
+    isLeaderboardOpen, 
+    isTournamentOpen 
+  });
 }
 
 /**

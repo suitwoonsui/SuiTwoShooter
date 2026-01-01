@@ -128,6 +128,13 @@ async function showLeaderboard() {
       return; // Modal is not visible, ignore this event
     }
     
+    // Don't close if click is on achievement popup (user is claiming rewards)
+    const achievementPopup = document.getElementById('achievementPopup');
+    if (achievementPopup && achievementPopup.contains(event.target)) {
+      log.debug('🟠 [LEADERBOARD MODAL] Click was on achievement popup - not closing leaderboard');
+      return;
+    }
+    
     // Check if click is outside the modal
     if (!leaderboardModal.contains(event.target)) {
       log.debug('🟠 [LEADERBOARD MODAL] Click was outside leaderboard modal - closing');
