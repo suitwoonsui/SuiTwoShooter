@@ -75,7 +75,26 @@ export function useWalletDiscovery({
         setExpandedWallets(newExpanded);
         onWalletExpanded?.(found);
       } else {
-        alert('Wallet not found in discovered wallets. Please discover wallets first or check the address.');
+        // For inventory type, allow adding wallets that don't have inventory yet
+        if (discoveryType === 'inventory') {
+          // Validate address format (basic Sui address check)
+          if (address.startsWith('0x') && address.length === 66) {
+            // Add wallet to discovered list even if it doesn't have inventory
+            const newWallets = [...discoveredWallets, address];
+            setDiscoveredWallets(newWallets);
+            onWalletsDiscovered?.(newWallets);
+            
+            // Expand and load the wallet
+            const newExpanded = new Set(expandedWallets);
+            newExpanded.add(address);
+            setExpandedWallets(newExpanded);
+            onWalletExpanded?.(address);
+          } else {
+            alert('Invalid wallet address format. Sui addresses should start with 0x and be 66 characters long.');
+          }
+        } else {
+          alert('Wallet not found in discovered wallets. Please discover wallets first or check the address.');
+        }
       }
       return;
     }
@@ -95,10 +114,44 @@ export function useWalletDiscovery({
         setExpandedWallets(newExpanded);
         onWalletExpanded?.(address);
       } else {
-        alert(`No ${discoveryType} found for this wallet address.`);
+        // For inventory type, allow adding wallets that don't have inventory yet
+        if (discoveryType === 'inventory') {
+          // Validate address format (basic Sui address check)
+          if (address.startsWith('0x') && address.length === 66) {
+            // Add wallet to discovered list even if it doesn't have inventory
+            setDiscoveredWallets([address]);
+            onWalletsDiscovered?.([address]);
+            
+            // Expand and load the wallet
+            const newExpanded = new Set([address]);
+            setExpandedWallets(newExpanded);
+            onWalletExpanded?.(address);
+          } else {
+            alert('Invalid wallet address format. Sui addresses should start with 0x and be 66 characters long.');
+          }
+        } else {
+          alert(`No ${discoveryType} found for this wallet address.`);
+        }
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Network error');
+      // For inventory type, allow adding wallets even if check fails (network error, etc.)
+      if (discoveryType === 'inventory') {
+        // Validate address format (basic Sui address check)
+        if (address.startsWith('0x') && address.length === 66) {
+          // Add wallet to discovered list
+          setDiscoveredWallets([address]);
+          onWalletsDiscovered?.([address]);
+          
+          // Expand and load the wallet
+          const newExpanded = new Set([address]);
+          setExpandedWallets(newExpanded);
+          onWalletExpanded?.(address);
+        } else {
+          alert('Invalid wallet address format. Sui addresses should start with 0x and be 66 characters long.');
+        }
+      } else {
+        alert(error instanceof Error ? error.message : 'Network error');
+      }
     } finally {
       setSearchingWallet(false);
     }

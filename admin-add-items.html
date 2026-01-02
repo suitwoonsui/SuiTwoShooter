@@ -223,6 +223,14 @@
         <div id="result"></div>
 
         <div class="alert alert-info" style="margin-top: 2rem;">
+            <strong>ℹ️ Information:</strong>
+            <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                <li><strong>New Wallets:</strong> You can add items to wallets that don't have an inventory yet. An inventory will be automatically created for them.</li>
+                <li><strong>Existing Wallets:</strong> Items will be added to existing inventory (quantities are additive).</li>
+            </ul>
+        </div>
+        
+        <div class="alert alert-info" style="margin-top: 1rem;">
             <strong>🔒 Security:</strong> This page requires:
             <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
                 <li>Admin wallet connection (verified on frontend and backend)</li>
@@ -517,28 +525,42 @@
                     }),
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    // If response is not JSON, try to get text
+                    const text = await response.text();
+                    throw new Error(`Server error (${response.status}): ${text || 'Unknown error'}`);
+                }
 
-                if (data.success) {
-                    resultDiv.innerHTML = `
-                        <div class="alert alert-success">
-                            <strong>✅ Success!</strong>
-                            <p>${data.message}</p>
-                            ${data.digest ? `<p style="margin-top: 0.5rem; font-size: 0.9rem;">Transaction: <code>${data.digest}</code></p>` : ''}
-                        </div>
-                    `;
-                    // Reset form
-                    document.getElementById('playerAddress').value = '';
-                    items = [{ itemId: 'extraLives', level: 1, quantity: 1 }];
-                    renderItems();
-                } else {
+                if (!response.ok || !data.success) {
+                    const errorMessage = data?.error || data?.message || `Server returned status ${response.status}`;
                     resultDiv.innerHTML = `
                         <div class="alert alert-error">
                             <strong>❌ Error:</strong>
-                            <p>${data.error || 'Failed to add items'}</p>
+                            <p>${errorMessage}</p>
+                            ${data?.details ? `<p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">${data.details}</p>` : ''}
                         </div>
                     `;
+                    return;
                 }
+
+                // Success!
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>✅ Success!</strong>
+                        <p>${data.message || 'Items added successfully'}</p>
+                        ${data.digest ? `<p style="margin-top: 0.5rem; font-size: 0.9rem;">Transaction: <code>${data.digest}</code></p>` : ''}
+                        <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+                            ${playerAddress.length > 20 ? `Items added to ${playerAddress.substring(0, 10)}...${playerAddress.substring(playerAddress.length - 8)}` : `Items added to ${playerAddress}`}
+                        </p>
+                    </div>
+                `;
+                // Reset form
+                document.getElementById('playerAddress').value = '';
+                items = [{ itemId: 'extraLives', level: 1, quantity: 1 }];
+                renderItems();
             } catch (error) {
                 resultDiv.innerHTML = `
                     <div class="alert alert-error">

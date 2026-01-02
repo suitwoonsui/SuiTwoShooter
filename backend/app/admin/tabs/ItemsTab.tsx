@@ -235,15 +235,25 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
           [address]: { inventory: data.inventory || {}, loading: false, error: null }
         }));
       } else {
-        setWalletInventories(prev => ({
-          ...prev,
-          [address]: { inventory: null, loading: false, error: data.error || 'Failed to load inventory' }
-        }));
+        // If inventory doesn't exist (404 or similar), treat it as empty inventory, not an error
+        // This allows us to add items to wallets that don't have inventory yet
+        if (response.status === 404 || (data.error && data.error.toLowerCase().includes('not found'))) {
+          setWalletInventories(prev => ({
+            ...prev,
+            [address]: { inventory: null, loading: false, error: null } // null inventory, no error
+          }));
+        } else {
+          setWalletInventories(prev => ({
+            ...prev,
+            [address]: { inventory: null, loading: false, error: data.error || 'Failed to load inventory' }
+          }));
+        }
       }
     } catch (error) {
+      // On network error, still allow adding items (treat as no inventory)
       setWalletInventories(prev => ({
         ...prev,
-        [address]: { inventory: null, loading: false, error: error instanceof Error ? error.message : 'Network error' }
+        [address]: { inventory: null, loading: false, error: null } // null inventory, no error - allow adding items
       }));
     }
   };
@@ -255,14 +265,34 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
     adminAddress,
     discoveryType: 'inventory',
     checkWalletExists,
-    onWalletsDiscovered: () => {
-      setWalletInventories({});
+    onWalletsDiscovered: (wallets) => {
+      // Initialize all discovered wallets in state if not present
+      setWalletInventories(prev => {
+        const updated = { ...prev };
+        wallets.forEach(address => {
+          if (!updated[address]) {
+            updated[address] = { inventory: null, loading: false, error: null };
+          }
+        });
+        return updated;
+      });
     },
     onWalletExpanded: (address) => {
-      // Load inventory if not already loaded
-      if (!walletInventories[address] || walletInventories[address].inventory === null) {
+      // Always initialize wallet in state if not present (ensures it's available for rendering)
+      const currentData = walletInventories[address];
+      if (!currentData) {
+        // Initialize immediately
+        setWalletInventories(prev => ({
+          ...prev,
+          [address]: { inventory: null, loading: false, error: null }
+        }));
+        // Then try to load inventory
+        refreshWalletInventory(address);
+      } else if (currentData.inventory === null || currentData.inventory === undefined) {
+        // Wallet exists but has no inventory - try to load it
         refreshWalletInventory(address);
       }
+      // If wallet has inventory, no need to reload
     },
   });
 
@@ -680,7 +710,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
 
         if (itemsToAdd.length > 0) {
           promises.push(
-            fetch(getApiUrl('api/admin/inventory/add-items'), {
+            fetch(getApiUrl('api/admin/add-items'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -725,9 +755,13 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
         });
         clearPendingChanges();
         
-        // Refresh all affected wallets
+        // Refresh all affected wallets (including wallets that didn't have inventory before)
         for (const walletAddress of Object.keys(changesByAddress)) {
           await refreshWalletInventory(walletAddress);
+          // Also trigger wallet expansion to show the new inventory
+          if (!walletDiscovery.expandedWallets.has(walletAddress)) {
+            walletDiscovery.toggleWalletExpansion(walletAddress);
+          }
         }
         
         // Clear success message after 5 seconds
@@ -850,7 +884,16 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
           searchAddress={walletDiscovery.searchAddress}
           expandedWallets={walletDiscovery.expandedWallets}
           onToggleExpansion={toggleWalletExpansion}
-          getWalletData={(address) => walletInventories[address] || { inventory: null, loading: false, error: null }}
+          getWalletData={(address) => {
+            // Always return a valid wallet data object
+            const data = walletInventories[address] || { inventory: null, loading: false, error: null };
+            // Ensure inventory is explicitly null (not undefined) if not set
+            return {
+              inventory: data.inventory ?? null,
+              loading: data.loading ?? false,
+              error: data.error ?? null
+            };
+          }}
           renderWalletContent={(address, isExpanded, walletData) => {
             if (walletData.loading) {
               return (
@@ -860,7 +903,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
               );
             }
 
-            if (walletData.error) {
+            if (walletData.error && walletData.error !== null) {
               return (
                 <div
                   style={{
@@ -877,8 +920,379 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
               );
             }
 
-            if (walletData.inventory === null) {
-              return null;
+            // Show add item cards if inventory is null/undefined/empty (wallet has no inventory yet)
+            // Show even if there's an error (network issues shouldn't prevent adding items)
+            const hasNoInventory = !walletData.inventory || 
+                                   walletData.inventory === null || 
+                                   walletData.inventory === undefined || 
+                                   (typeof walletData.inventory === 'object' && Object.keys(walletData.inventory).length === 0);
+            const isNotLoading = !walletData.loading;
+            
+            // For wallets without inventory, show add item cards (even if there was an error checking)
+            // This allows adding items to wallets that don't have inventory yet
+            if (hasNoInventory && isNotLoading) {
+              // Wallet has no inventory yet - show empty state but allow adding items
+              // Use the same structure as wallets with inventory
+              const walletPendingChanges = pendingChanges.filter(c => c.address === address);
+              
+              // Get categories in proper order (matching wallets with inventory)
+              const properItemOrder = ['extraLives', 'forceField', 'orbLevel', 'coinTractorBeam', 'slowTime', 'destroyAll', 'bossKillShot'];
+              const orderedCategories = properItemOrder.filter(id => itemTypes.some(t => t.id === id));
+              
+              return (
+                <div>
+                  <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h4 style={{ margin: 0, color: styles.text }}>
+                      Inventory for {address.slice(0, 10)}...{address.slice(-8)}
+                    </h4>
+                    {getPendingChangesCount(address) > 0 && (
+                      <span className="admin-badge admin-badge-primary">
+                        {getPendingChangesCount(address)} pending
+                      </span>
+                    )}
+                  </div>
+
+                  {walletData.error && (
+                    <div
+                      style={{
+                        padding: '1rem',
+                        borderRadius: '4px',
+                        backgroundColor: styles.bgError,
+                        border: `1px solid ${styles.borderError}`,
+                        color: styles.textError,
+                        marginBottom: '1.5rem',
+                      }}
+                    >
+                      <strong>❌ Error:</strong> {walletData.error}
+                    </div>
+                  )}
+
+                  {/* Show empty inventory with same structure as wallets with inventory */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '1rem', color: styles.text, fontSize: '1.1rem' }}>Current Inventory</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {orderedCategories.map((categoryId) => {
+                        const categoryType = itemTypes.find(t => t.id === categoryId);
+                        if (!categoryType) return null;
+                        
+                        return (
+                          <div 
+                            key={categoryId} 
+                            style={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: '0.5rem',
+                              padding: '0.75rem',
+                              backgroundColor: styles.bgSecondary,
+                              borderRadius: '8px',
+                              border: `1px solid ${styles.border}`,
+                              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.08)',
+                            }}
+                          >
+                            <div style={{ 
+                              paddingBottom: '0.5rem',
+                              borderBottom: `1px solid ${styles.border}`,
+                              marginBottom: '0.25rem',
+                            }}>
+                              <h5 style={{ 
+                                margin: 0, 
+                                color: styles.text, 
+                                fontSize: '0.95rem', 
+                                fontWeight: 'bold' 
+                              }}>
+                                {categoryType.name}
+                              </h5>
+                            </div>
+                            <div style={{ 
+                              display: 'grid', 
+                              gridTemplateColumns: 'repeat(4, 1fr)', 
+                              gap: '0.75rem' 
+                            }}>
+                              {/* Show empty inventory cards for levels 1, 2, 3 (matching structure of wallets with inventory) */}
+                              {[1, 2, 3].map((level) => {
+                                // Check if this level exists for this category
+                                if (!categoryType.levels.includes(level)) return null;
+                                
+                                // Check for pending changes
+                                const pendingChange = getPendingChange(address, categoryId, level);
+                                const currentQuantity = 0; // No inventory yet
+                                const targetQuantity = pendingChange ? pendingChange.targetQuantity : currentQuantity;
+                                const difference = targetQuantity - currentQuantity;
+                                const hasChange = difference !== 0;
+                                
+                                return (
+                                  <div
+                                    key={`${categoryId}_${level}`}
+                                    className={`admin-card-compact inventory-item-card ${hasChange ? (difference > 0 ? 'admin-card-positive has-change-positive' : 'admin-card-negative has-change-negative') : ''}`}
+                                    style={{
+                                      backgroundColor: !hasChange ? styles.bgTertiary : undefined,
+                                      borderColor: !hasChange ? styles.border : undefined,
+                                    }}
+                                  >
+                                    <div className="admin-content inventory-item-content">
+                                      <div className="admin-level-badge">
+                                        <span className="admin-level-text">
+                                          L{level}
+                                        </span>
+                                      </div>
+                                      <div className="inventory-quantity-section">
+                                        <div className="admin-content-row inventory-quantity-row">
+                                          <span className="admin-label-small">Cur:</span>
+                                          <span className="admin-value inventory-quantity-value">{currentQuantity}</span>
+                                        </div>
+                                        <div className="admin-content-row inventory-quantity-row" style={{ flexWrap: 'wrap' }}>
+                                          <span className="admin-label-bold">Tgt:</span>
+                                          <input
+                                            type="number"
+                                            value={targetQuantity}
+                                            onChange={(e) => {
+                                              const newValue = parseInt(e.target.value) || 0;
+                                              updatePendingChange(address, categoryId, level, newValue);
+                                            }}
+                                            min="0"
+                                            className="admin-input-number inventory-target-input"
+                                            style={{
+                                              borderColor: hasChange ? (difference > 0 ? '#4CAF50' : '#f44336') : styles.border,
+                                              borderWidth: '1.5px',
+                                              borderStyle: 'solid',
+                                            }}
+                                            onWheel={(e) => e.currentTarget.blur()}
+                                          />
+                                          {hasChange && (
+                                            <span
+                                              className={`admin-badge-${difference > 0 ? 'positive' : 'negative'}`}
+                                            >
+                                              {difference > 0 ? '+' : ''}{difference}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="inventory-button-row">
+                                      <button
+                                        type="button"
+                                        onClick={() => updatePendingChange(address, categoryId, level, targetQuantity + 1)}
+                                        disabled={itemsLoading || removeItemsLoading}
+                                        className="admin-button-small admin-button-add inventory-button"
+                                        onMouseEnter={(e) => {
+                                          if (!itemsLoading && !removeItemsLoading) e.currentTarget.style.opacity = '0.8';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.opacity = '1';
+                                        }}
+                                        title="Add 1"
+                                      >
+                                        +
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => updatePendingChange(address, categoryId, level, Math.max(0, targetQuantity - 1))}
+                                        disabled={(itemsLoading || removeItemsLoading) || targetQuantity <= 0}
+                                        className="admin-button-small admin-button-remove inventory-button"
+                                        style={{
+                                          backgroundColor: ((itemsLoading || removeItemsLoading) || targetQuantity <= 0) ? styles.buttonDisabled : undefined,
+                                          cursor: ((itemsLoading || removeItemsLoading) || targetQuantity <= 0) ? 'not-allowed' : 'pointer',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!itemsLoading && !removeItemsLoading && targetQuantity > 0) e.currentTarget.style.opacity = '0.8';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.opacity = '1';
+                                        }}
+                                        title="Remove 1"
+                                      >
+                                        −
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Add Item Card - 4th Column (matching wallets with inventory) */}
+                              <CategoryAddItemCard
+                                address={address}
+                                categoryId={categoryId}
+                                onAdd={(addr, itemId, level, quantity) => {
+                                  const walletData = walletInventories[addr];
+                                  if (walletData && walletData.inventory) {
+                                    const key = `${itemId}_${level}`;
+                                    const currentQuantity = walletData.inventory[key] || 0;
+                                    updatePendingChange(addr, itemId, level, currentQuantity + quantity);
+                                  } else {
+                                    // If inventory hasn't been loaded yet, still add to pending changes
+                                    updatePendingChange(addr, itemId, level, quantity);
+                                  }
+                                }}
+                                styles={styles}
+                                itemTypes={itemTypes}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Fallback: If we reach here and inventory is still null/undefined, show empty inventory cards
+            // This ensures wallets without inventory can always add items with the correct layout
+            if (!walletData.inventory || walletData.inventory === null || walletData.inventory === undefined) {
+              const walletPendingChanges = pendingChanges.filter(c => c.address === address);
+              const properItemOrder = ['extraLives', 'forceField', 'orbLevel', 'coinTractorBeam', 'slowTime', 'destroyAll', 'bossKillShot'];
+              const orderedCategories = properItemOrder.filter(id => itemTypes.some(t => t.id === id));
+              
+              return (
+                <div>
+                  <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h4 style={{ margin: 0, color: styles.text }}>
+                      Inventory for {address.slice(0, 10)}...{address.slice(-8)}
+                    </h4>
+                    {getPendingChangesCount(address) > 0 && (
+                      <span className="admin-badge admin-badge-primary">
+                        {getPendingChangesCount(address)} pending
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '1rem', color: styles.text, fontSize: '1.1rem' }}>Current Inventory</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {orderedCategories.map((categoryId) => {
+                        const categoryType = itemTypes.find(t => t.id === categoryId);
+                        if (!categoryType) return null;
+                        
+                        return (
+                          <div 
+                            key={categoryId} 
+                            style={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: '0.5rem',
+                              padding: '0.75rem',
+                              backgroundColor: styles.bgSecondary,
+                              borderRadius: '8px',
+                              border: `1px solid ${styles.border}`,
+                              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.08)',
+                            }}
+                          >
+                            <div style={{ 
+                              paddingBottom: '0.5rem',
+                              borderBottom: `1px solid ${styles.border}`,
+                              marginBottom: '0.25rem',
+                            }}>
+                              <h5 style={{ 
+                                margin: 0, 
+                                color: styles.text, 
+                                fontSize: '0.95rem', 
+                                fontWeight: 'bold' 
+                              }}>
+                                {categoryType.name}
+                              </h5>
+                            </div>
+                            <div style={{ 
+                              display: 'grid', 
+                              gridTemplateColumns: 'repeat(4, 1fr)', 
+                              gap: '0.75rem' 
+                            }}>
+                              {[1, 2, 3].map((level) => {
+                                if (!categoryType.levels.includes(level)) return null;
+                                
+                                const pendingChange = getPendingChange(address, categoryId, level);
+                                const currentQuantity = 0;
+                                const targetQuantity = pendingChange ? pendingChange.targetQuantity : currentQuantity;
+                                const difference = targetQuantity - currentQuantity;
+                                const hasChange = difference !== 0;
+                                
+                                return (
+                                  <div
+                                    key={`${categoryId}_${level}`}
+                                    className={`admin-card-compact inventory-item-card ${hasChange ? (difference > 0 ? 'admin-card-positive has-change-positive' : 'admin-card-negative has-change-negative') : ''}`}
+                                    style={{
+                                      backgroundColor: !hasChange ? styles.bgTertiary : undefined,
+                                      borderColor: !hasChange ? styles.border : undefined,
+                                    }}
+                                  >
+                                    <div className="admin-content inventory-item-content">
+                                      <div className="admin-level-badge">
+                                        <span className="admin-level-text">L{level}</span>
+                                      </div>
+                                      <div className="inventory-quantity-section">
+                                        <div className="admin-content-row inventory-quantity-row">
+                                          <span className="admin-label-small">Cur:</span>
+                                          <span className="admin-value inventory-quantity-value">{currentQuantity}</span>
+                                        </div>
+                                        <div className="admin-content-row inventory-quantity-row" style={{ flexWrap: 'wrap' }}>
+                                          <span className="admin-label-bold">Tgt:</span>
+                                          <input
+                                            type="number"
+                                            value={targetQuantity}
+                                            onChange={(e) => {
+                                              const newValue = parseInt(e.target.value) || 0;
+                                              updatePendingChange(address, categoryId, level, newValue);
+                                            }}
+                                            min="0"
+                                            className="admin-input-number inventory-target-input"
+                                            style={{
+                                              borderColor: hasChange ? (difference > 0 ? '#4CAF50' : '#f44336') : styles.border,
+                                              borderWidth: '1.5px',
+                                              borderStyle: 'solid',
+                                            }}
+                                            onWheel={(e) => e.currentTarget.blur()}
+                                          />
+                                          {hasChange && (
+                                            <span className={`admin-badge-${difference > 0 ? 'positive' : 'negative'}`}>
+                                              {difference > 0 ? '+' : ''}{difference}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="inventory-button-row">
+                                      <button
+                                        type="button"
+                                        onClick={() => updatePendingChange(address, categoryId, level, targetQuantity + 1)}
+                                        disabled={itemsLoading || removeItemsLoading}
+                                        className="admin-button-small admin-button-add inventory-button"
+                                        title="Add 1"
+                                      >
+                                        +
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => updatePendingChange(address, categoryId, level, Math.max(0, targetQuantity - 1))}
+                                        disabled={(itemsLoading || removeItemsLoading) || targetQuantity <= 0}
+                                        className="admin-button-small admin-button-remove inventory-button"
+                                        style={{
+                                          backgroundColor: ((itemsLoading || removeItemsLoading) || targetQuantity <= 0) ? styles.buttonDisabled : undefined,
+                                          cursor: ((itemsLoading || removeItemsLoading) || targetQuantity <= 0) ? 'not-allowed' : 'pointer',
+                                        }}
+                                        title="Remove 1"
+                                      >
+                                        −
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              <CategoryAddItemCard
+                                address={address}
+                                categoryId={categoryId}
+                                onAdd={(addr, itemId, level, quantity) => {
+                                  updatePendingChange(addr, itemId, level, quantity);
+                                }}
+                                styles={styles}
+                                itemTypes={itemTypes}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
             }
 
             return (
