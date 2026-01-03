@@ -148,7 +148,8 @@ export class PaymentTransactionBuilder {
 
     if (paymentToken === 'SUI') {
       // For SUI, split from gas coin
-      const paymentCoin = txb.splitCoins(txb.gas, [paymentAmountBigInt]);
+      // splitCoins returns an array, so we need to destructure when splitting into one coin
+      const [paymentCoin] = txb.splitCoins(txb.gas, [paymentAmountBigInt]);
       return {
         paymentCoin,
       };
@@ -173,23 +174,23 @@ export class PaymentTransactionBuilder {
           coin => BigInt(coin.balance) >= paymentAmountBigInt
         );
 
-        let paymentCoin: any;
+        let coinToSplit: any;
 
         if (coinWithEnoughBalance) {
           // Use a single coin that has enough balance - no merge needed
-          paymentCoin = txb.object(coinWithEnoughBalance.coinObjectId);
+          coinToSplit = txb.object(coinWithEnoughBalance.coinObjectId);
         } else if (coins.data.length === 1) {
           // Only one coin exists (will fail at execution if insufficient)
-          paymentCoin = txb.object(coins.data[0].coinObjectId);
+          coinToSplit = txb.object(coins.data[0].coinObjectId);
         } else {
           // Multiple coins and none has enough alone - merge them
           const coinObjects = coins.data.map(coin => txb.object(coin.coinObjectId));
-          const mergedCoin = txb.mergeCoins(coinObjects[0], coinObjects.slice(1));
-          paymentCoin = mergedCoin;
+          coinToSplit = txb.mergeCoins(coinObjects[0], coinObjects.slice(1));
         }
 
         // Split the payment amount from the coin
-        paymentCoin = txb.splitCoins(paymentCoin, [paymentAmountBigInt]);
+        // splitCoins returns an array, so we need to destructure when splitting into one coin
+        const [paymentCoin] = txb.splitCoins(coinToSplit, [paymentAmountBigInt]);
 
         return {
           paymentCoin,
