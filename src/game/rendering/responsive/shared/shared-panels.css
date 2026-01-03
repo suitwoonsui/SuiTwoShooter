@@ -139,7 +139,7 @@
   font-weight: 500;
   font-size: min(2vw, 2.5vh);
   flex: 1;
-  margin-right: 15px;
+  margin-right: min(1.5vh, 2vw);
 }
 
 .setting-item input[type="range"] {
@@ -914,7 +914,7 @@
   justify-content: center;
   gap: min(0.8vh, 1vw);
   flex: 1;
-  max-width: 200px;
+  max-width: min(20vh, 25vw);
 }
 
 .payment-token-btn .token-icon {
@@ -1440,7 +1440,7 @@
 .store-actions .menu-btn {
   min-width: min(15vh, 18vw);
   flex: 1;
-  max-width: 250px;
+  max-width: min(25vh, 30vw);
 }
 
 /* ========================================== */
@@ -1717,7 +1717,7 @@
 .item-consumption-actions .menu-btn {
   min-width: min(15vh, 18vw);
   flex: 1;
-  max-width: 250px;
+  max-width: min(25vh, 30vw);
 }
 
 /* ========================================== */

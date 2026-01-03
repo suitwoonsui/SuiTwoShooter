@@ -6,7 +6,7 @@
 #gamePassCreditsDisplay {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: min(1vh, 1.2vw);
 }
 
 #gamePassCreditsValue {
@@ -43,56 +43,58 @@
 
 .end-demo-modal-content {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border: 2px solid #FFD700;
-  border-radius: 16px;
-  padding: 32px;
-  max-width: 500px;
-  width: 90%;
+  border: min(0.2vw, 0.3vh) solid #FFD700;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(3vh, 4vw);
+  max-width: min(50vh, 60vw);
+  width: min(90vw, 90vh);
   text-align: center;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 min(1vh, 1.5vw) min(4vh, 5vw) rgba(0, 0, 0, 0.5);
 }
 
 .end-demo-modal-header h2 {
   color: #FFD700;
-  margin: 0 0 8px 0;
-  font-size: 28px;
+  margin: 0 0 min(1vh, 1.2vw) 0;
+  font-size: min(3.5vw, 4vh);
 }
 
 .end-demo-subtitle {
   color: #ccc;
-  margin: 0 0 24px 0;
+  margin: 0 0 min(2.5vh, 3vw) 0;
+  font-size: min(1.6vw, 2vh);
 }
 
 .end-demo-stats {
   display: flex;
   justify-content: space-around;
-  margin: 24px 0;
-  padding: 16px;
+  margin: min(2.5vh, 3vw) 0;
+  padding: min(1.5vh, 2vw);
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  border-radius: min(1vh, 1.2vw);
 }
 
 .end-demo-stat {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: min(0.5vh, 0.6vw);
 }
 
 .end-demo-stat-label {
   color: #999;
-  font-size: 14px;
+  font-size: min(1.4vw, 1.8vh);
 }
 
 .end-demo-stat-value {
   color: #FFD700;
-  font-size: 24px;
+  font-size: min(2.5vw, 3vh);
   font-weight: bold;
 }
 
 .end-demo-message {
-  margin: 24px 0;
+  margin: min(2.5vh, 3vw) 0;
   color: #ccc;
   line-height: 1.6;
+  font-size: min(1.6vw, 2vh);
 }
 
 .end-demo-has-pass {
@@ -103,8 +105,8 @@
 .end-demo-modal-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 24px;
+  gap: min(1.5vh, 2vw);
+  margin-top: min(2.5vh, 3vw);
 }
 
 /* Store Tabs */
@@ -166,27 +168,27 @@
 
 /* Game Pass Tab */
 .game-pass-tab-content {
-  padding: 16px 0;
+  padding: min(1.5vh, 2vw) 0;
 }
 
 .game-pass-status {
   background: rgba(255, 215, 0, 0.1);
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 24px;
+  border: min(0.15vw, 0.2vh) solid rgba(255, 215, 0, 0.3);
+  border-radius: min(1vh, 1.2vw);
+  padding: min(1.5vh, 2vw);
+  margin-bottom: min(2.5vh, 3vw);
   text-align: center;
 }
 
 .game-pass-status-label {
   color: #999;
-  font-size: 14px;
-  margin-right: 8px;
+  font-size: min(1.4vw, 1.8vh);
+  margin-right: min(1vh, 1.2vw);
 }
 
 .game-pass-status-value {
   color: #FFD700;
-  font-size: 20px;
+  font-size: min(2vw, 2.5vh);
   font-weight: bold;
 }
 
@@ -194,7 +196,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: min(1vh, 1.2vw);
 }
 
 .game-pass-status-line:last-child {
@@ -202,27 +204,27 @@
 }
 
 .game-pass-section {
-  margin-bottom: 32px;
+  margin-bottom: min(3vh, 4vw);
 }
 
 .game-pass-section h3 {
   color: #FFD700;
-  margin-bottom: 16px;
-  font-size: 20px;
+  margin-bottom: min(1.5vh, 2vw);
+  font-size: min(2vw, 2.5vh);
 }
 
 .game-pass-packs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(min(20vh, 25vw), 1fr));
+  gap: min(1.5vh, 2vw);
+  margin-bottom: min(2.5vh, 3vw);
 }
 
 .game-pass-pack-card {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 20px;
+  border: min(0.15vw, 0.2vh) solid rgba(255, 255, 255, 0.1);
+  border-radius: min(1.5vh, 2vw);
+  padding: min(2vh, 2.5vw);
   text-align: center;
   transition: all 0.3s ease;
 }
@@ -230,85 +232,85 @@
 .game-pass-pack-card:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: #FFD700;
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
 }
 
 .pack-header {
-  margin-bottom: 12px;
+  margin-bottom: min(1.5vh, 2vw);
 }
 
 .pack-header h3 {
   color: #FFD700;
-  margin: 0 0 8px 0;
-  font-size: 20px;
+  margin: 0 0 min(1vh, 1.2vw) 0;
+  font-size: min(2vw, 2.5vh);
 }
 
 .pack-games {
   color: #999;
-  font-size: 14px;
+  font-size: min(1.4vw, 1.8vh);
 }
 
 .pack-description {
   color: #ccc;
-  font-size: 12px;
-  margin-bottom: 16px;
-  min-height: 32px;
+  font-size: min(1.2vw, 1.5vh);
+  margin-bottom: min(1.5vh, 2vw);
+  min-height: min(3vh, 4vw);
 }
 
 .pack-pricing {
-  margin-bottom: 16px;
+  margin-bottom: min(1.5vh, 2vw);
   position: relative;
 }
 
 .pack-price {
   color: #FFD700;
-  font-size: 24px;
+  font-size: min(2.5vw, 3vh);
   font-weight: bold;
 }
 
 .pack-price-original {
   color: #999;
-  font-size: 16px;
+  font-size: min(1.6vw, 2vh);
   text-decoration: line-through;
-  margin-bottom: 4px;
+  margin-bottom: min(0.5vh, 0.6vw);
 }
 
 .pack-price-discounted {
   color: #FFD700;
-  font-size: 24px;
+  font-size: min(2.5vw, 3vh);
   font-weight: bold;
 }
 
 .pack-discount-badge {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: min(-1vh, -1.2vw);
+  right: min(-1vh, -1.2vw);
   background: #4CAF50;
   color: white;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: min(0.5vh, 0.6vw) min(1vh, 1.2vw);
+  border-radius: min(1.5vh, 2vw);
+  font-size: min(1.2vw, 1.5vh);
   font-weight: bold;
 }
 
 /* Price display matching items store format */
 .pack-pricing .price-usd {
   color: #39ff14;
-  font-size: 20px;
+  font-size: min(2vw, 2.5vh);
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: min(0.5vh, 0.6vw);
 }
 
 .pack-pricing .price-token {
   color: #4DA2FF;
-  font-size: 16px;
+  font-size: min(1.6vw, 2vh);
   font-weight: 500;
 }
 
 .pack-pricing .badge-discount-badge {
-  font-size: 0.75rem;
+  font-size: min(1.2vw, 1.5vh);
   color: #39ff14;
-  margin-top: 0.25rem;
+  margin-top: min(0.3vh, 0.4vw);
 }
 
 .pack-purchase-btn {
@@ -317,77 +319,80 @@
 
 .pay-per-game-card {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 24px;
+  border: min(0.15vw, 0.2vh) solid rgba(255, 255, 255, 0.1);
+  border-radius: min(1.5vh, 2vw);
+  padding: min(2.5vh, 3vw);
   display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 24px;
+  gap: min(2.5vh, 3vw);
 }
 
 .pay-per-game-info {
   flex: 1;
+  min-width: min(20vh, 25vw);
 }
 
 .pay-per-game-label {
   color: #FFD700;
-  font-size: 20px;
+  font-size: min(2vw, 2.5vh);
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: min(1vh, 1.2vw);
 }
 
 .pay-per-game-price {
-  margin-bottom: 8px;
+  margin-bottom: min(1vh, 1.2vw);
 }
 
 .pay-per-game-price .price {
   color: #FFD700;
-  font-size: 24px;
+  font-size: min(2.5vw, 3vh);
   font-weight: bold;
 }
 
 .pay-per-game-price .price-original {
   color: #999;
-  font-size: 16px;
+  font-size: min(1.6vw, 2vh);
   text-decoration: line-through;
-  margin-right: 8px;
+  margin-right: min(1vh, 1.2vw);
 }
 
 .pay-per-game-price .price-discounted {
   color: #FFD700;
-  font-size: 24px;
+  font-size: min(2.5vw, 3vh);
   font-weight: bold;
 }
 
 .pay-per-game-description {
   color: #999;
-  font-size: 14px;
+  font-size: min(1.4vw, 1.8vh);
 }
 
 /* Inventory Tab */
 .inventory-tab-content {
-  padding: 16px 0;
+  padding: min(1.5vh, 2vw) 0;
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
 .inventory-header {
-  margin-bottom: 24px;
+  margin-bottom: min(2.5vh, 3vw);
   text-align: center;
 }
 
 .inventory-title {
   color: #FFD700;
-  font-size: 24px;
-  margin: 0 0 8px 0;
+  font-size: min(2.5vw, 3vh);
+  margin: 0 0 min(1vh, 1.2vw) 0;
   font-weight: bold;
 }
 
 .inventory-subtitle {
   color: #999;
-  font-size: 14px;
+  font-size: min(1.4vw, 1.8vh);
   margin: 0;
   line-height: 1.5;
 }
@@ -398,22 +403,22 @@
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 0 4px;
+  gap: min(2vh, 2.5vw);
+  padding: 0 min(0.5vh, 0.6vw);
 }
 
 .inventory-items-container::-webkit-scrollbar {
-  width: 8px;
+  width: min(1vh, 1.2vw);
 }
 
 .inventory-items-container::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  border-radius: min(0.5vh, 0.6vw);
 }
 
 .inventory-items-container::-webkit-scrollbar-thumb {
   background: rgba(255, 215, 0, 0.5);
-  border-radius: 4px;
+  border-radius: min(0.5vh, 0.6vw);
 }
 
 .inventory-items-container::-webkit-scrollbar-thumb:hover {
@@ -423,28 +428,28 @@
 /* Inventory Item Type Card */
 .inventory-item-type-card {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 20px;
+  border: min(0.15vw, 0.2vh) solid rgba(255, 255, 255, 0.1);
+  border-radius: min(1.5vh, 2vw);
+  padding: min(2vh, 2.5vw);
   transition: all 0.3s ease;
 }
 
 .inventory-item-type-card:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 215, 0, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(min(-0.3vh, -0.4vw));
+  box-shadow: 0 min(0.5vh, 0.6vw) min(1.5vh, 2vw) rgba(0, 0, 0, 0.2);
 }
 
 .inventory-item-type-header {
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: min(1.5vh, 2vw);
+  padding-bottom: min(1.5vh, 2vw);
+  border-bottom: min(0.15vw, 0.2vh) solid rgba(255, 255, 255, 0.1);
 }
 
 .inventory-item-type-name {
   color: #FFD700;
-  font-size: 20px;
+  font-size: min(2vw, 2.5vh);
   margin: 0;
   font-weight: bold;
 }
@@ -453,26 +458,28 @@
 .inventory-item-levels {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: min(1.5vh, 2vw);
 }
 
 /* Inventory Item Level Card */
 .inventory-item-level-card {
   background: rgba(77, 162, 255, 0.05);
-  border: 1px solid rgba(77, 162, 255, 0.2);
-  border-radius: 8px;
-  padding: 16px;
+  border: min(0.15vw, 0.2vh) solid rgba(77, 162, 255, 0.2);
+  border-radius: min(1vh, 1.2vw);
+  padding: min(1.5vh, 2vw);
   display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: min(1.5vh, 2vw);
   transition: all 0.3s ease;
 }
 
 .inventory-item-level-card:hover {
   background: rgba(77, 162, 255, 0.1);
   border-color: rgba(77, 162, 255, 0.4);
-  transform: translateX(4px);
+  transform: translateX(min(0.5vh, 0.6vw));
 }
 
 .inventory-item-level-info {
@@ -483,16 +490,16 @@
 .inventory-item-level-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: min(1.5vh, 2vw);
+  margin-bottom: min(1vh, 1.2vw);
 }
 
 .inventory-item-level-badge {
   background: linear-gradient(135deg, #4DA2FF, #3A7BD5);
   color: white;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: min(0.5vh, 0.6vw) min(1.5vh, 2vw);
+  border-radius: min(1.5vh, 2vw);
+  font-size: min(1.2vw, 1.5vh);
   font-weight: bold;
   white-space: nowrap;
 }
@@ -500,25 +507,25 @@
 .inventory-item-quantity-badge {
   background: rgba(255, 215, 0, 0.2);
   color: #FFD700;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 14px;
+  padding: min(0.5vh, 0.6vw) min(1.5vh, 2vw);
+  border-radius: min(1.5vh, 2vw);
+  font-size: min(1.4vw, 1.8vh);
   font-weight: bold;
-  border: 1px solid rgba(255, 215, 0, 0.3);
+  border: min(0.15vw, 0.2vh) solid rgba(255, 215, 0, 0.3);
 }
 
 .inventory-item-level-name {
   color: #ccc;
-  font-size: 16px;
+  font-size: min(1.6vw, 2vh);
   font-weight: 500;
-  margin-bottom: 6px;
+  margin-bottom: min(0.8vh, 1vw);
 }
 
 .inventory-item-level-description {
   color: #999;
-  font-size: 13px;
+  font-size: min(1.3vw, 1.6vh);
   line-height: 1.4;
-  margin-top: 4px;
+  margin-top: min(0.5vh, 0.6vw);
   font-style: italic;
 }
 
@@ -530,17 +537,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: min(1vh, 1.2vw);
   width: 100%;
 }
 
 .inventory-merge-container .inventory-merge-btn {
   width: 100%;
-  max-width: 200px;
+  max-width: min(20vh, 25vw);
 }
 
 .inventory-merge-btn {
-  min-width: 120px;
+  min-width: min(12vh, 15vw);
   white-space: nowrap;
 }
 
@@ -568,7 +575,7 @@
 }
 
 .inventory-merge-price {
-  font-size: 12px;
+  font-size: min(1.2vw, 1.5vh);
   color: #FFD700;
   font-weight: 500;
   text-align: center;
@@ -578,16 +585,16 @@
 .inventory-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
+  gap: min(0.8vh, 1vw);
+  padding: min(1vh, 1.2vw) min(1.5vh, 2vw);
+  border-radius: min(1vh, 1.2vw);
+  font-size: min(1.4vw, 1.8vh);
   font-weight: 500;
   white-space: nowrap;
 }
 
 .inventory-status-badge .status-icon {
-  font-size: 16px;
+  font-size: min(1.6vw, 2vh);
 }
 
 .inventory-max-level {
@@ -611,60 +618,30 @@
 /* Empty State */
 .inventory-empty-state {
   text-align: center;
-  padding: 60px 20px;
+  padding: min(6vh, 8vw) min(2vh, 2.5vw);
   color: #999;
 }
 
 .inventory-empty-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
+  font-size: min(8vh, 10vw);
+  margin-bottom: min(2vh, 2.5vw);
   opacity: 0.5;
 }
 
 .inventory-empty-title {
   color: #ccc;
-  font-size: 24px;
-  margin: 0 0 12px 0;
+  font-size: min(2.5vw, 3vh);
+  margin: 0 0 min(1.5vh, 2vw) 0;
   font-weight: bold;
 }
 
 .inventory-empty-message {
   color: #888;
-  font-size: 16px;
+  font-size: min(1.6vw, 2vh);
   line-height: 1.6;
   margin: 0;
-  max-width: 400px;
+  max-width: min(40vh, 50vw);
   margin-left: auto;
   margin-right: auto;
-}
-
-@media (max-width: 600px) {
-  .pay-per-game-card {
-    flex-direction: column;
-    text-align: center;
-  }
-  
-  .game-pass-packs-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .inventory-item-level-card {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  
-  .inventory-item-level-action {
-    width: 100%;
-  }
-  
-  .inventory-merge-btn {
-    width: 100%;
-  }
-  
-  .inventory-status-badge {
-    width: 100%;
-    justify-content: center;
-  }
 }
 
