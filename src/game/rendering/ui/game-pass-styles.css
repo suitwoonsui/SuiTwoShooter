@@ -110,33 +110,38 @@
 /* Store Tabs */
 .store-tabs {
   display: flex;
-  gap: 8px;
-  margin: 16px 0;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  gap: min(1vh, 1.2vw);
+  margin: min(1.5vh, 2vw) 0;
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
 .store-tab {
-  padding: 12px 24px;
+  padding: min(1vh, 1.2vw) min(2vh, 2.5vw);
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: min(0.2vw, 0.3vh) solid transparent;
   color: #999;
   cursor: pointer;
-  font-size: 16px;
+  font-size: min(1.6vw, 2vh);
   transition: all 0.3s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .store-tab:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .store-tab.active {
   color: #FFD700;
   border-bottom-color: #FFD700;
+  font-weight: 600;
 }
 
 .store-tab-content-container {
-  margin-top: 16px;
+  margin-top: min(1.5vh, 2vw);
   flex: 1;
   min-height: 0;
   max-height: 100%; /* Ensure it doesn't exceed parent */
