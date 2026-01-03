@@ -196,6 +196,11 @@ async function showTournaments() {
   
   // Load active tournaments
   await loadActiveTournaments();
+  
+  // Restart menu music if background music is enabled (tournament menu should have menu music)
+  if (typeof startMenuMusic === 'function' && typeof gameSettings !== 'undefined' && gameSettings.backgroundMusic) {
+    startMenuMusic();
+  }
 }
 
 // Assign to window immediately after function declaration to prevent race conditions

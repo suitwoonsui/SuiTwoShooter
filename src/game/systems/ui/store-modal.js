@@ -151,8 +151,13 @@ async function showStoreInternal(context = 'main-menu') {
         if (itemsTab) itemsTab.style.display = '';
         if (ticketsTab) ticketsTab.style.display = '';
         if (storeTabsContainer) storeTabsContainer.style.justifyContent = '';
-        // Update buttons for items tab
-        updateStoreButtons('items', context);
+        // Update buttons for inventory tab (default)
+        updateStoreButtons('inventory', context);
+        
+        // Switch to inventory tab
+        if (typeof switchStoreTab === 'function') {
+          await switchStoreTab('inventory');
+        }
       }
     
     // Setup click-outside handler for existing modal
@@ -271,8 +276,8 @@ async function showStoreInternal(context = 'main-menu') {
     
     <!-- Store Tabs -->
     <div class="store-tabs" id="storeTabs">
-      <button class="store-tab active" onclick="switchStoreTab('items')" id="storeTabItems">Items</button>
-      <button class="store-tab" onclick="switchStoreTab('inventory')" id="storeTabInventory">Inventory</button>
+      <button class="store-tab active" onclick="switchStoreTab('inventory')" id="storeTabInventory">Inventory</button>
+      <button class="store-tab" onclick="switchStoreTab('items')" id="storeTabItems">Items</button>
       <button class="store-tab" onclick="switchStoreTab('gamePass')" id="storeTabGamePass">Game Pass</button>
       <button class="store-tab" onclick="switchStoreTab('tickets')" id="storeTabTickets">Tournament Tickets</button>
     </div>
@@ -311,8 +316,17 @@ async function showStoreInternal(context = 'main-menu') {
     
     <!-- Tab Content Container -->
     <div class="store-tab-content-container">
+      <!-- Inventory Tab Content -->
+      <div class="store-tab-content active" id="storeTabContentInventory">
+        <div id="storeInventoryTabContent">
+          <div class="store-loading">
+            <span class="btn-icon">⏳</span> Loading Inventory...
+          </div>
+        </div>
+      </div>
+      
       <!-- Items Tab Content -->
-      <div class="store-tab-content active" id="storeTabContentItems">
+      <div class="store-tab-content" id="storeTabContentItems">
     <!-- Store Items Container -->
     <div class="store-items-container" id="storeItemsContainer">
       <div class="store-loading" id="storeLoading">
@@ -326,15 +340,6 @@ async function showStoreInternal(context = 'main-menu') {
         <div id="storeGamePassTabContent">
           <div class="store-loading">
             <span class="btn-icon">⏳</span> Loading Game Pass options...
-          </div>
-        </div>
-      </div>
-      
-      <!-- Inventory Tab Content -->
-      <div class="store-tab-content" id="storeTabContentInventory">
-        <div id="storeInventoryTabContent">
-          <div class="store-loading">
-            <span class="btn-icon">⏳</span> Loading Inventory...
           </div>
         </div>
       </div>
@@ -564,8 +569,13 @@ async function showStoreInternal(context = 'main-menu') {
     storeModal.classList.remove('store-modal-hidden');
     storeModal.classList.add('store-modal-visible');
     
-    // Update buttons based on initial tab (items is default)
-    updateStoreButtons('items', context);
+    // Update buttons based on initial tab (inventory is default)
+    updateStoreButtons('inventory', context);
+    
+    // Initialize inventory tab content
+    if (typeof switchStoreTab === 'function') {
+      await switchStoreTab('inventory');
+    }
     
     // Handle special contexts (credits-only or gamePass)
     if (context === 'gamePass' || context === 'credits-only') {
