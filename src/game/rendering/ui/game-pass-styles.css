@@ -405,6 +405,8 @@
   flex-direction: column;
   gap: min(2vh, 2.5vw);
   padding: 0 min(0.5vh, 0.6vw);
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .inventory-items-container::-webkit-scrollbar {

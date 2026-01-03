@@ -284,7 +284,7 @@
   align-items: flex-start;
   justify-content: flex-start;
   margin-right: min(2vw, 2vh); /* Space between badge and wallet section */
-  max-width: 200px;
+  max-width: min(20vh, 25vw);
   flex-shrink: 0;
   order: 2; /* After game-title-left, before wallet-connection-section */
 }
@@ -296,8 +296,8 @@
   align-items: flex-start;
   padding: min(0.8vh, 1vw);
   background: rgba(77, 162, 255, 0.1);
-  border: 1px solid rgba(77, 162, 255, 0.3);
-  border-radius: 8px;
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.3);
+  border-radius: min(1vh, 1.2vw);
   width: 100%;
   text-align: left;
 }
@@ -308,7 +308,7 @@
 }
 
 .menu-badge-display .badge-display-header h3 {
-  font-size: clamp(10px, min(1.4vh, 1.7vw), 13px);
+  font-size: clamp(min(1vh, 1.2vw), min(1.4vh, 1.7vw), min(1.3vh, 1.6vw));
   color: #4DA2FF;
   margin: 0 0 min(0.5vh, 0.6vw) 0;
   font-weight: 600;
@@ -329,23 +329,23 @@
 }
 
 .menu-badge-display .badge-display-image {
-  width: clamp(40px, min(6vh, 7vw), 60px);
-  height: clamp(40px, min(6vh, 7vw), 60px);
-  border-radius: 8px;
-  border: 2px solid #4DA2FF;
+  width: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  height: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  border-radius: min(1vh, 1.2vw);
+  border: min(0.2vw, 0.3vh) solid #4DA2FF;
   object-fit: cover;
   margin: min(0.3vh, 0.4vw) 0;
 }
 
 .menu-badge-display .badge-display-placeholder {
-  width: clamp(40px, min(6vh, 7vw), 60px);
-  height: clamp(40px, min(6vh, 7vw), 60px);
-  border-radius: 8px;
-  border: 2px solid #4DA2FF;
+  width: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  height: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  border-radius: min(1vh, 1.2vw);
+  border: min(0.2vw, 0.3vh) solid #4DA2FF;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(20px, min(3vh, 3.5vw), 30px);
+  font-size: clamp(min(2vh, 2.5vw), min(3vh, 3.5vw), min(3vh, 3.8vw));
   background: rgba(77, 162, 255, 0.1);
   margin: min(0.3vh, 0.4vw) 0;
 }
@@ -355,7 +355,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: min(0.2vh, 0.3vw);
-  font-size: clamp(8px, min(1.1vh, 1.3vw), 10px);
+  font-size: clamp(min(0.8vh, 1vw), min(1.1vh, 1.3vw), min(1vh, 1.2vw));
   color: rgba(255, 255, 255, 0.8);
   width: 100%;
   text-align: left;
@@ -380,12 +380,12 @@
   width: 100%;
   padding: min(0.8vh, 1vw);
   background: rgba(77, 162, 255, 0.1);
-  border: 1px solid rgba(77, 162, 255, 0.3);
-  border-radius: 8px;
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.3);
+  border-radius: min(1vh, 1.2vw);
 }
 
 .menu-badge-info h3 {
-  font-size: clamp(10px, min(1.4vh, 1.7vw), 13px);
+  font-size: clamp(min(1vh, 1.2vw), min(1.4vh, 1.7vw), min(1.3vh, 1.6vw));
   color: #4DA2FF;
   margin: 0;
   font-weight: 600;
@@ -397,23 +397,23 @@
 }
 
 .menu-badge-image {
-  width: clamp(40px, min(6vh, 7vw), 60px);
-  height: clamp(40px, min(6vh, 7vw), 60px);
-  border-radius: 8px;
-  border: 2px solid #4DA2FF;
+  width: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  height: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  border-radius: min(1vh, 1.2vw);
+  border: min(0.2vw, 0.3vh) solid #4DA2FF;
   object-fit: cover;
   margin: min(0.3vh, 0.4vw) 0;
 }
 
 .menu-badge-placeholder {
-  width: clamp(40px, min(6vh, 7vw), 60px);
-  height: clamp(40px, min(6vh, 7vw), 60px);
-  border-radius: 8px;
-  border: 2px solid #4DA2FF;
+  width: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  height: clamp(min(4vh, 5vw), min(6vh, 7vw), min(6vh, 7.5vw));
+  border-radius: min(1vh, 1.2vw);
+  border: min(0.2vw, 0.3vh) solid #4DA2FF;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(20px, min(3vh, 3.5vw), 30px);
+  font-size: clamp(min(2vh, 2.5vw), min(3vh, 3.5vw), min(3vh, 3.8vw));
   background: rgba(77, 162, 255, 0.1);
   margin: min(0.3vh, 0.4vw) 0;
 }
@@ -423,7 +423,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: min(0.2vh, 0.3vw);
-  font-size: clamp(8px, min(1.1vh, 1.3vw), 10px);
+  font-size: clamp(min(0.8vh, 1vw), min(1.1vh, 1.3vw), min(1vh, 1.2vw));
   color: rgba(255, 255, 255, 0.8);
   width: 100%;
 }

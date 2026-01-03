@@ -29,14 +29,15 @@
 /* Loading Modal Content */
 .loading-modal-content {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border: 2px solid #4DA2FF;
-  border-radius: 16px;
-  padding: 40px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  border: min(0.2vw, 0.3vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(4vh, 5vw);
+  width: min(90vw, 90vh);
+  max-width: min(40vh, 50vw);
+  box-shadow: 0 min(1.2vh, 1.5vw) min(5vh, 6vw) rgba(0, 0, 0, 0.5);
   position: relative;
   text-align: center;
+  box-sizing: border-box;
 }
 
 /* Loading Spinner Container */
@@ -44,15 +45,15 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: min(2vh, 2.5vw);
 }
 
 /* Loading Spinner */
 .loading-spinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid rgba(77, 162, 255, 0.3);
-  border-top: 4px solid #4DA2FF;
+  width: min(6vh, 7vw);
+  height: min(6vh, 7vw);
+  border: min(0.5vh, 0.6vw) solid rgba(77, 162, 255, 0.3);
+  border-top: min(0.5vh, 0.6vw) solid #4DA2FF;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -65,40 +66,22 @@
 /* Loading Message */
 .loading-modal-message {
   color: #ffffff;
-  font-size: 18px;
+  font-size: min(2.2vw, 2.8vh);
   font-weight: 500;
   margin: 0;
-  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .loading-modal-content {
-    padding: 30px 20px;
-    max-width: 90%;
-  }
-
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border-width: 3px;
-  }
-
-  .loading-modal-message {
-    font-size: 16px;
-  }
+  text-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.5);
 }
 
 /* Pulse animation for border glow effect */
 .loading-modal-content::before {
   content: '';
   position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
+  top: min(-0.3vh, -0.4vw);
+  left: min(-0.3vh, -0.4vw);
+  right: min(-0.3vh, -0.4vw);
+  bottom: min(-0.3vh, -0.4vw);
   background: linear-gradient(45deg, #4DA2FF, #00D4FF, #4DA2FF);
-  border-radius: 16px;
+  border-radius: min(2vh, 2.5vw);
   z-index: -1;
   opacity: 0.5;
   animation: pulse-border 2s ease-in-out infinite;

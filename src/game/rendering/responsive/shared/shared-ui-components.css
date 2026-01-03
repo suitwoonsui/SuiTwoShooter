@@ -212,14 +212,16 @@
 /* Panel Content */
 .settings-content {
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.9) 0%, rgba(15, 20, 25, 0.95) 100%);
-  border: 3px solid #4DA2FF;
-  border-radius: 25px;
-  padding: 30px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(3vh, 3.5vw);
+  padding: min(3vh, 4vw);
+  width: min(90vw, 90vh);
+  max-width: min(60vh, 70vw);
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   overflow-y: auto;
   position: relative;
+  box-sizing: border-box;
 }
 
 /* Instructions content - match pattern of .store, .tournament, .leaderboard */

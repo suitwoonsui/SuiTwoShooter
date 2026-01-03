@@ -26,9 +26,10 @@
   border: min(0.3vw, 0.4vh) solid #FFD700;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  max-height: 90vh;
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   overflow-y: auto;
   box-shadow: 0 0 min(5vh, 6vw) rgba(255, 215, 0, 0.5);
   position: relative;
@@ -81,7 +82,7 @@
 .tournament-creation-close:hover {
   background: rgba(255, 215, 0, 0.15);
   border-color: #FFD700;
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
 }
 
 /* Progress Bar */
@@ -266,7 +267,7 @@ select.tournament-creation-input option:hover,
 .tournament-creation-category-card:hover {
   border-color: #FFD700;
   background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
   box-shadow: 0 min(0.4vh, 0.5vw) min(0.8vh, 1vw) rgba(255, 215, 0, 0.2);
 }
 
@@ -333,7 +334,7 @@ select.tournament-creation-input option:hover,
 .reward-choice-card:hover {
   border-color: #FFD700;
   background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
 }
 
 .reward-choice-card.selected {
@@ -453,7 +454,7 @@ select.tournament-creation-input option:hover,
 .add-item-btn:hover {
   background: rgba(255, 215, 0, 0.25);
   border-color: #FFD700;
-  transform: translateY(-1px);
+  transform: translateY(min(-0.15vh, -0.2vw));
 }
 
 .reward-cost-display {
@@ -648,10 +649,13 @@ select.tournament-creation-input option:hover,
   border: min(0.3vw, 0.4vh) solid #FFD700;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(50vh, 60vw);
-  width: 90%;
+  max-height: min(90vh, 90vw);
   box-shadow: 0 0 min(5vh, 6vw) rgba(255, 215, 0, 0.5);
   z-index: 1;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .item-selector-header {
@@ -689,7 +693,7 @@ select.tournament-creation-input option:hover,
 .item-selector-close:hover {
   background: rgba(255, 215, 0, 0.15);
   border-color: #FFD700;
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
 }
 
 .item-selector-body {
@@ -756,33 +760,31 @@ select.tournament-creation-input option:hover,
   transform: none;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .tournament-creation-content {
-    width: 95%;
-    padding: min(1.5vh, 2vw);
-  }
+/* Responsive adjustments - always applied based on viewport */
+/* Category grid - responsive columns using auto-fit */
+.tournament-creation-category-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(20vh, 25vw), 1fr));
+}
 
-  .tournament-creation-category-grid {
-    grid-template-columns: 1fr;
-  }
+/* Reward choice - responsive with flex-wrap */
+.tournament-creation-reward-choice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(25vh, 30vw), 1fr));
+  gap: min(1.5vh, 2vw);
+  margin-top: min(1.5vh, 2vw);
+}
 
-  .tournament-creation-reward-choice {
-    grid-template-columns: 1fr;
-  }
+/* Schedule - responsive with flex-wrap */
+.tournament-creation-schedule {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(25vh, 30vw), 1fr));
+  gap: min(1.5vh, 2vw);
+  margin-top: min(1.5vh, 2vw);
+}
 
-  .tournament-creation-schedule {
-    grid-template-columns: 1fr;
-  }
-
-  .progress-step-label {
-    font-size: min(1vw, 1.2vh);
-  }
-
-  .item-selector-content {
-    width: 95%;
-    padding: min(2vh, 2.5vw);
-  }
+/* Progress step label - responsive sizing */
+.progress-step-label {
+  font-size: clamp(min(1vw, 1.2vh), min(1.2vw, 1.5vh), min(1.5vw, 2vh));
 }
 
 

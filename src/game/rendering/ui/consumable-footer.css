@@ -27,12 +27,12 @@ body > .consumable-footer,
   width: 100%;
   position: relative; /* Not fixed on mobile */
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 20, 25, 0.9) 100%);
-  border-top: 3px solid #4DA2FF;
-  box-shadow: 0 -4px 20px rgba(77, 162, 255, 0.3);
+  border-top: min(0.3vw, 0.4vh) solid #4DA2FF;
+  box-shadow: 0 min(-0.5vh, -0.6vw) min(2.5vh, 3vw) rgba(77, 162, 255, 0.3);
   backdrop-filter: blur(15px);
   min-height: max(6vh, fit-content);
   max-height: none;
-  padding: 1vh 1.5vw;
+  padding: min(1vh, 1.5vw);
   z-index: 10; /* Same as header */
   display: flex;
   justify-content: center;
@@ -41,7 +41,7 @@ body > .consumable-footer,
 
 /* Mobile compact footer (matches header mobile-compact) */
 .consumable-footer.mobile-compact {
-  padding: 0.8vh 1.2vw;
+  padding: min(0.8vh, 1.2vw);
   min-height: max(5vh, fit-content);
   max-height: none;
 }
@@ -56,12 +56,12 @@ body > .consumable-footer,
 }
 
 .consumable-button {
-  width: min(4vw, 5vh, 40px);
-  height: min(4vw, 5vh, 40px);
-  min-width: 28px;
-  min-height: 28px;
-  max-width: 40px;
-  max-height: 40px;
+  width: min(4vw, 5vh);
+  height: min(4vw, 5vh);
+  min-width: min(3.5vh, 4vw);
+  min-height: min(3.5vh, 4vw);
+  max-width: min(5vh, 6vw);
+  max-height: min(5vh, 6vw);
   border-radius: 50%;
   border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.5);
   background: rgba(15, 20, 25, 0.9);
@@ -75,19 +75,19 @@ body > .consumable-footer,
 }
 
 .consumable-button .consumable-icon {
-  font-size: min(3vw, 2.5vh, 20px);
+  font-size: min(3vw, 2.5vh);
   line-height: 1;
   user-select: none;
   pointer-events: none;
 }
 
-/* Keyboard shortcut label (desktop only) */
+/* Keyboard shortcut label (desktop only - hide on small viewports) */
 .consumable-button .keyboard-shortcut {
   position: absolute;
-  bottom: -min(2vh, 2.5vw);
+  bottom: min(-2vh, -2.5vw);
   left: 50%;
   transform: translateX(-50%);
-  font-size: min(2.5vw, 3vh, 10px);
+  font-size: min(1vw, 1.2vh);
   color: rgba(77, 162, 255, 0.8);
   font-weight: bold;
   white-space: nowrap;
@@ -95,7 +95,12 @@ body > .consumable-footer,
   text-shadow: 0 0 min(0.5vh, 0.6vw) rgba(77, 162, 255, 0.5);
 }
 
-/* Hide keyboard shortcut on mobile */
+/* Hide keyboard shortcut on small viewports (responsive without media query) */
+.consumable-button .keyboard-shortcut {
+  display: block;
+}
+
+/* On very small viewports, hide keyboard shortcuts */
 @media (max-width: 767px) {
   .consumable-button .keyboard-shortcut {
     display: none;
@@ -107,13 +112,13 @@ body > .consumable-footer,
   opacity: 1;
   background: rgba(77, 162, 255, 0.15);
   border-color: rgba(77, 162, 255, 0.5);
-  box-shadow: 0 0 10px rgba(77, 162, 255, 0.3);
+  box-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.3);
 }
 
 .consumable-button.available:active {
   transform: scale(0.9);
   background: rgba(77, 162, 255, 0.25);
-  box-shadow: 0 0 15px rgba(77, 162, 255, 0.5);
+  box-shadow: 0 0 min(2vh, 2.5vw) rgba(77, 162, 255, 0.5);
 }
 
 /* Unavailable state - darkened (matches desktop footer items) */
