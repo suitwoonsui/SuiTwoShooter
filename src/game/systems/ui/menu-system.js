@@ -334,6 +334,29 @@ function showInstructions() {
     instructionsPanel.classList.remove('instructions-panel-hidden');
     instructionsPanel.classList.add('instructions-panel-visible');
     _setupInstructionsClickOutside(instructionsPanel);
+    
+    // Initialize the enhanced modal if not already done
+    // Defer initialization slightly to allow modal to become visible first (better UX)
+    if (typeof initHowToPlayModal === 'function' && !instructionsPanel.dataset.initialized) {
+      // Use requestAnimationFrame to defer heavy operations until after modal is visible
+      requestAnimationFrame(() => {
+        initHowToPlayModal();
+        instructionsPanel.dataset.initialized = 'true';
+        
+        // Reset to first tab after initialization
+        if (window.howToPlayState) {
+          showHowToPlayTab(0);
+          showHowToPlayContent(0);
+        }
+      });
+    } else {
+      // Already initialized, just reset to first tab
+      if (window.howToPlayState) {
+        showHowToPlayTab(0);
+        showHowToPlayContent(0);
+      }
+    }
+    
     log.debug('MENU SYSTEM', 'Instructions panel shown');
   } else {
     log.warn('MENU SYSTEM', 'Instructions panel element not found!');

@@ -1,0 +1,493 @@
+/* ========================================== */
+/* HOW TO PLAY MODAL - Tabs and Accordions */
+/* ========================================== */
+
+/* Tab Carousel Navigation */
+.how-to-play-tab-carousel {
+  display: flex;
+  align-items: center;
+  gap: min(1.5vh, 2vw);
+  margin-bottom: min(2.5vh, 3vw);
+  padding-bottom: min(1.5vh, 2vw);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.how-to-play-tabs-container {
+  flex: 1;
+  display: flex;
+  gap: min(1vh, 1.2vw);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(77, 162, 255, 0.4) rgba(0, 0, 0, 0.3);
+  min-width: 0;
+  padding: min(0.5vh, 0.6vw) 0;
+}
+
+.how-to-play-tabs-container::-webkit-scrollbar {
+  height: min(0.6vh, 0.8vw);
+}
+
+.how-to-play-tabs-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: min(0.3vh, 0.4vw);
+}
+
+.how-to-play-tabs-container::-webkit-scrollbar-thumb {
+  background: rgba(77, 162, 255, 0.4);
+  border-radius: min(0.3vh, 0.4vw);
+}
+
+.how-to-play-tabs-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 162, 255, 0.6);
+}
+
+.how-to-play-tab-btn {
+  background: rgba(77, 162, 255, 0.1);
+  border: min(0.15vw, 0.2vh) solid rgba(77, 162, 255, 0.3);
+  border-radius: min(1vh, 1.2vw);
+  padding: min(1vh, 1.2vw) min(1.5vh, 2vw);
+  color: #ccc;
+  font-size: clamp(11px, min(1.6vh, 1.9vw), 15px);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.how-to-play-tab-btn:hover {
+  background: rgba(77, 162, 255, 0.2);
+  border-color: rgba(77, 162, 255, 0.5);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.how-to-play-tab-btn.active {
+  background: rgba(77, 162, 255, 0.3);
+  border-color: #4DA2FF;
+  color: #4DA2FF;
+  box-shadow: 0 0 min(1vh, 1.2vw) rgba(77, 162, 255, 0.4);
+  font-weight: 600;
+}
+
+/* Tab Content */
+.how-to-play-tab-content {
+  display: none;
+}
+
+.how-to-play-tab-content[style*="display: block"] {
+  display: block !important;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Reuse carousel arrow styles from leaderboard */
+.how-to-play-tab-carousel .carousel-arrow,
+.how-to-play-content-carousel .carousel-arrow {
+  background: rgba(77, 162, 255, 0.1);
+  border: min(0.2vw, 0.3vh) solid #4DA2FF;
+  border-radius: min(1vh, 1.2vw);
+  color: #4DA2FF;
+  cursor: pointer;
+  padding: min(1.5vh, 2vw) min(2vh, 2.5vw);
+  font-size: min(3vw, 3.5vh);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min(5vh, 6vw);
+  height: min(5vh, 6vw);
+  flex-shrink: 0;
+}
+
+.how-to-play-tab-carousel .carousel-arrow:hover,
+.how-to-play-content-carousel .carousel-arrow:hover {
+  background: rgba(77, 162, 255, 0.2);
+  transform: scale(1.1);
+  box-shadow: 0 0 min(1vh, 1.5vw) rgba(77, 162, 255, 0.5);
+}
+
+.how-to-play-tab-carousel .carousel-arrow:active,
+.how-to-play-content-carousel .carousel-arrow:active {
+  transform: scale(0.95);
+}
+
+.how-to-play-tab-carousel .carousel-arrow:disabled,
+.how-to-play-content-carousel .carousel-arrow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Content Carousel */
+.how-to-play-content-carousel {
+  display: flex;
+  align-items: center;
+  gap: min(1.5vh, 2vw);
+  margin-bottom: min(2vh, 2.5vw);
+  padding-bottom: min(1.5vh, 2vw);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.how-to-play-content-sections-nav {
+  flex: 1;
+  display: flex;
+  gap: min(0.8vh, 1vw);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(77, 162, 255, 0.4) rgba(0, 0, 0, 0.3);
+  min-width: 0;
+  padding: min(0.5vh, 0.6vw) 0;
+}
+
+.how-to-play-content-sections-nav::-webkit-scrollbar {
+  height: min(0.6vh, 0.8vw);
+}
+
+.how-to-play-content-sections-nav::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: min(0.3vh, 0.4vw);
+}
+
+.how-to-play-content-sections-nav::-webkit-scrollbar-thumb {
+  background: rgba(77, 162, 255, 0.4);
+  border-radius: min(0.3vh, 0.4vw);
+}
+
+.how-to-play-content-sections-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 162, 255, 0.6);
+}
+
+.how-to-play-content-section-btn {
+  background: rgba(77, 162, 255, 0.1);
+  border: min(0.15vw, 0.2vh) solid rgba(77, 162, 255, 0.3);
+  border-radius: min(0.8vh, 1vw);
+  padding: min(0.8vh, 1vw) min(1.2vh, 1.5vw);
+  color: #ccc;
+  font-size: clamp(10px, min(1.4vh, 1.7vw), 14px);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.how-to-play-content-section-btn:hover {
+  background: rgba(77, 162, 255, 0.2);
+  border-color: rgba(77, 162, 255, 0.5);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.how-to-play-content-section-btn.active {
+  background: rgba(77, 162, 255, 0.3);
+  border-color: #4DA2FF;
+  color: #4DA2FF;
+  box-shadow: 0 0 min(0.8vh, 1vw) rgba(77, 162, 255, 0.4);
+  font-weight: 600;
+}
+
+.how-to-play-content-container {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Content Section (replaces accordion) */
+.how-to-play-content-section {
+  display: none;
+  animation: fadeIn 0.3s ease;
+  width: 100%;
+}
+
+.how-to-play-content-section[style*="display: block"] {
+  display: block !important;
+}
+
+.how-to-play-section-header {
+  text-align: center;
+  margin-bottom: min(2vh, 2.5vw);
+  padding-bottom: min(1vh, 1.2vw);
+  border-bottom: min(0.15vw, 0.2vh) solid rgba(77, 162, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.how-to-play-section-header h3 {
+  color: #4DA2FF;
+  font-size: clamp(18px, min(2.5vw, 3vh), 24px);
+  margin: 0;
+  font-weight: 600;
+  text-shadow: 0 0 min(0.5vh, 0.6vw) rgba(77, 162, 255, 0.5);
+}
+
+.how-to-play-section-content {
+  padding: min(1.5vh, 2vw) 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Content Styles */
+.how-to-play-content-section {
+  margin-bottom: min(2vh, 2.5vw);
+}
+
+.how-to-play-content-section p {
+  color: #ccc;
+  line-height: 1.6;
+  margin-bottom: min(1vh, 1.2vw);
+  font-size: clamp(12px, min(1.6vh, 1.8vw), 16px);
+}
+
+.how-to-play-content-section ul,
+.how-to-play-content-section ol {
+  color: #ccc;
+  line-height: 1.8;
+  padding-left: min(2.5vh, 3vw);
+  margin-bottom: min(1vh, 1.2vw);
+  font-size: clamp(12px, min(1.6vh, 1.8vw), 16px);
+}
+
+.how-to-play-content-section li {
+  margin-bottom: min(0.8vh, 1vw);
+}
+
+.how-to-play-content-section strong {
+  color: #4DA2FF;
+  font-weight: 600;
+}
+
+/* Image Styles */
+.how-to-play-image {
+  width: 100%;
+  max-width: min(40vh, 50vw);
+  height: auto;
+  border-radius: min(1vh, 1.2vw);
+  border: min(0.15vw, 0.2vh) solid rgba(77, 162, 255, 0.3);
+  margin: min(1.5vh, 2vw) auto;
+  display: block;
+  box-shadow: 0 0 min(2vh, 2.5vw) rgba(77, 162, 255, 0.3);
+}
+
+.how-to-play-image-container {
+  text-align: center;
+  margin: min(2vh, 2.5vw) 0;
+}
+
+/* Split Layout (Image + Text Side by Side) */
+.how-to-play-split-layout {
+  display: flex;
+  gap: min(2vh, 2.5vw);
+  align-items: flex-start;
+  margin: min(2vh, 2.5vw) 0;
+}
+
+.how-to-play-split-image {
+  flex: 0 0 auto;
+  width: min(25vh, 30vw);
+  max-width: min(25vh, 30vw);
+  flex-shrink: 0;
+}
+
+.how-to-play-split-image .how-to-play-image {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
+
+.how-to-play-split-image canvas {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+}
+
+.how-to-play-split-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.how-to-play-split-content p {
+  margin-bottom: min(1.5vh, 2vw);
+}
+
+/* Abilities Layout (separate items for orb and force field) */
+.how-to-play-abilities-layout {
+  display: flex;
+  flex-direction: column;
+  gap: min(3vh, 4vw);
+  margin: min(2vh, 2.5vw) 0;
+}
+
+.how-to-play-ability-item {
+  display: flex;
+  gap: min(2vh, 2.5vw);
+  align-items: flex-start;
+}
+
+.how-to-play-ability-preview {
+  flex: 0 0 auto;
+  width: min(25vh, 30vw);
+  max-width: min(25vh, 30vw);
+  flex-shrink: 0;
+}
+
+.how-to-play-ability-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Stats Table */
+.how-to-play-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: min(1vh, 1.2vw);
+  margin: min(1.5vh, 2vw) 0;
+}
+
+.how-to-play-stat-item {
+  background: rgba(77, 162, 255, 0.1);
+  border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.2);
+  border-radius: min(0.8vh, 1vw);
+  padding: min(1vh, 1.2vw);
+  text-align: center;
+}
+
+.how-to-play-stat-label {
+  color: #4DA2FF;
+  font-size: clamp(10px, min(1.4vh, 1.6vw), 14px);
+  font-weight: 600;
+  margin-bottom: min(0.5vh, 0.6vw);
+}
+
+.how-to-play-stat-value {
+  color: #fff;
+  font-size: clamp(12px, min(1.8vh, 2.2vw), 18px);
+  font-weight: 700;
+}
+
+/* Narrative Text */
+.how-to-play-narrative {
+  font-style: italic;
+  color: #aaa;
+  border-left: min(0.3vw, 0.4vh) solid rgba(77, 162, 255, 0.4);
+  padding-left: min(1.5vh, 2vw);
+  margin: min(1.5vh, 2vw) 0;
+  font-size: clamp(12px, min(1.6vh, 1.8vw), 16px);
+}
+
+/* Gameplay Details */
+.how-to-play-gameplay {
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: min(0.8vh, 1vw);
+  padding: min(1.5vh, 2vw);
+  margin: min(1.5vh, 2vw) 0;
+}
+
+.how-to-play-gameplay h4 {
+  color: #4DA2FF;
+  font-size: clamp(13px, min(1.8vh, 2.2vw), 18px);
+  margin-bottom: min(1vh, 1.2vw);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .how-to-play-tabs-container {
+    gap: min(0.8vh, 1vw);
+  }
+  
+  .how-to-play-tab-btn {
+    font-size: clamp(10px, min(1.8vh, 2.2vw), 13px);
+    padding: min(1vh, 1.2vw) min(1.3vh, 1.6vw);
+  }
+  
+  .how-to-play-content-sections-nav {
+    gap: min(0.6vh, 0.8vw);
+  }
+  
+  .how-to-play-content-section-btn {
+    font-size: clamp(9px, min(1.6vh, 2vw), 12px);
+    padding: min(0.7vh, 0.9vw) min(1vh, 1.2vw);
+  }
+  
+  .how-to-play-section-header h3 {
+    font-size: clamp(13px, min(2.2vh, 2.8vw), 18px);
+  }
+  
+  .how-to-play-image {
+    max-width: 100%;
+  }
+  
+  .how-to-play-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .how-to-play-tab-carousel .carousel-arrow,
+  .how-to-play-content-carousel .carousel-arrow {
+    min-width: min(4vh, 5vw);
+    height: min(4vh, 5vw);
+    font-size: min(2.5vw, 3vh);
+  }
+  
+  /* Stack split layout on mobile */
+  .how-to-play-split-layout {
+    flex-direction: column;
+    gap: min(1.5vh, 2vw);
+  }
+  
+  .how-to-play-split-image {
+    width: 100%;
+    max-width: min(30vh, 40vw);
+    margin: 0 auto;
+  }
+  
+  /* Stack ability items on mobile */
+  .how-to-play-ability-item {
+    flex-direction: column;
+    gap: min(1.5vh, 2vw);
+  }
+  
+  .how-to-play-ability-preview {
+    width: 100%;
+    max-width: min(30vh, 40vw);
+    margin: 0 auto;
+  }
+}
+
+/* Scrollbar Styling */
+.how-to-play-tab-content::-webkit-scrollbar {
+  width: min(0.8vh, 1vw);
+}
+
+.how-to-play-tab-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: min(0.5vh, 0.6vw);
+}
+
+.how-to-play-tab-content::-webkit-scrollbar-thumb {
+  background: rgba(77, 162, 255, 0.4);
+  border-radius: min(0.5vh, 0.6vw);
+}
+
+.how-to-play-tab-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(77, 162, 255, 0.6);
+}

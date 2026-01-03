@@ -69,6 +69,10 @@ const MENU_SCRIPTS = [
   'src/game/systems/ui/tournament-modal.js',           // Tournament modal and UI
   'src/game/systems/ui/tournament-creation-modal.js',  // Tournament creation wizard
   
+  // How to Play Modal (NEW - enhanced instructions with tabs and accordions)
+  'src/game/systems/ui/how-to-play-content-generator.js',
+  'src/game/systems/ui/how-to-play-modal.js',
+  
   // Menu UI system (wallet integration setup, delegates to services)
   'src/game/systems/ui/menu-system.js',
   'src/game/systems/ui/settings-management.js',

@@ -91,6 +91,7 @@ const CSSLoader = {
     await this.loadCSS('src/game/rendering/responsive/shared/shared-ui-classes.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-viewport-container.css');
     await this.loadCSS('src/game/rendering/ui/tournament-creation-modal.css'); // Tournament creation modal styles
+    await this.loadCSS('src/game/rendering/ui/how-to-play-modal.css'); // How to Play modal with tabs and accordions
     
     // Feature-specific modules (front-page already loaded above)
     await this.loadCSS('src/game/rendering/responsive/shared/shared-main-menu.css');
