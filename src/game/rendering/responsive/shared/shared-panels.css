@@ -2168,7 +2168,8 @@
 
 .tournament-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(30vh, 35vw), 1fr));
+  /* Always 3 columns regardless of screen size */
+  grid-template-columns: repeat(3, 1fr);
   gap: min(1.5vh, 2vw);
   align-items: start;
   justify-items: start;
