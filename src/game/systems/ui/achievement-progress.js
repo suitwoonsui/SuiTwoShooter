@@ -1183,19 +1183,34 @@ async function claimMilestoneRewards(category) {
       eligibleMilestonesFetchPromise = null; // Clear any pending fetch promise
       log.debug('ACHIEVEMENT PROGRESS', 'Cleared eligible milestones cache after successful claims');
       
-      // Wait a moment for blockchain transaction to finalize before refreshing
-      // This ensures the claimed milestones are visible when we refresh
-      log.debug('ACHIEVEMENT PROGRESS', 'Waiting for transaction finalization before refresh');
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-      
       // Clear local cached state to force fresh render
       window._milestoneClaimedIds = null;
       window._milestoneClaimed = null;
       window._milestoneEligible = null;
       
+      // Check if leaderboard modal is open and on Milestones tab - refresh immediately if so
+      const leaderboardModal = document.getElementById('leaderboardModal');
+      const isLeaderboardOpen = leaderboardModal && leaderboardModal.classList.contains('leaderboard-modal-visible');
+      const milestonesTab = document.getElementById('milestoneTabMilestones');
+      const isMilestonesTabActive = milestonesTab && milestonesTab.classList.contains('active');
+      const currentSubTab = window._currentMilestoneSubTab || 'per-game';
+      
+      // If leaderboard modal is open on Milestones tab, refresh immediately for instant UI update
+      if (isLeaderboardOpen && isMilestonesTabActive) {
+        log.info('ACHIEVEMENT PROGRESS', 'Leaderboard modal is open on Milestones tab - refreshing immediately', {
+          currentSubTab
+        });
+        // Refresh the milestone progress immediately to update claim buttons
+        await loadMilestoneProgress(currentSubTab);
+      }
+      
+      // Wait a moment for blockchain transaction to finalize before refreshing again
+      // This ensures the claimed milestones are visible when we refresh (for accuracy)
+      log.debug('ACHIEVEMENT PROGRESS', 'Waiting for transaction finalization before refresh');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+      
       // Refresh milestone progress to update claimed status in the modal
       // This will fetch fresh data from the API with cache-busting
-      const currentSubTab = window._currentMilestoneSubTab || 'per-game';
       log.info('ACHIEVEMENT PROGRESS', 'Refreshing milestone progress after claim', { 
         currentSubTab, 
         claimedCount: claimed.length 
@@ -1219,9 +1234,14 @@ async function claimMilestoneRewards(category) {
       }, 500);
       
       // Additional refresh after a longer delay to ensure blockchain data is fully indexed
+      // Only if leaderboard modal is still open
       setTimeout(async () => {
-        log.debug('ACHIEVEMENT PROGRESS', 'Performing additional refresh after delay');
-        await loadMilestoneProgress(currentSubTab);
+        const modalStillOpen = document.getElementById('leaderboardModal') && 
+                               document.getElementById('leaderboardModal').classList.contains('leaderboard-modal-visible');
+        if (modalStillOpen) {
+          log.debug('ACHIEVEMENT PROGRESS', 'Performing additional refresh after delay');
+          await loadMilestoneProgress(currentSubTab);
+        }
       }, 3000);
     }
     
