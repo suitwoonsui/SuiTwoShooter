@@ -23,15 +23,17 @@ function initializeWalletStandardListener() {
         register(val) {
           console.log('✅ Wallet Standard: Wallet registered', val);
           
-          // Check if this is a Slush wallet (formerly Sui Wallet)
-          // Slush Wallet might register as "Sui Wallet" since it's the replacement
+          // Check if this is a Sui-compatible wallet
+          // Supports: Slush Wallet, Sui Wallet, Phantom, and other Sui wallets
           if (val.name && (
             val.name.toLowerCase().includes('slush') || 
             val.name.toLowerCase().includes('sui') ||
+            val.name.toLowerCase().includes('phantom') ||
             val.name === 'Sui Wallet' ||
-            val.name === 'Slush Wallet'
+            val.name === 'Slush Wallet' ||
+            val.name === 'Phantom'
           )) {
-            console.log('✅ Sui/Slush Wallet detected via Wallet Standard:', val.name);
+            console.log('✅ Sui-compatible wallet detected via Wallet Standard:', val.name);
             walletProvider = val;
             connectedWallet = val;
           }
@@ -58,20 +60,22 @@ function initializeWalletStandardListener() {
           console.log('  - Wallet:', w.name, 'Features:', Object.keys(w.features || {}));
         });
         
-        const slushWallet = walletsAPI.find(w => 
+        const suiWallet = walletsAPI.find(w => 
           w.name && (
             w.name.toLowerCase().includes('slush') || 
             w.name.toLowerCase().includes('sui') ||
+            w.name.toLowerCase().includes('phantom') ||
             w.name === 'Sui Wallet' ||
-            w.name === 'Slush Wallet'
+            w.name === 'Slush Wallet' ||
+            w.name === 'Phantom'
           )
         );
-        if (slushWallet) {
-          console.log('✅ Sui/Slush Wallet found in navigator.wallets:', slushWallet.name);
-          walletProvider = slushWallet;
-          connectedWallet = slushWallet;
+        if (suiWallet) {
+          console.log('✅ Sui-compatible wallet found in navigator.wallets:', suiWallet.name);
+          walletProvider = suiWallet;
+          connectedWallet = suiWallet;
         } else {
-          console.log('⚠️ No Sui/Slush Wallet found. Available wallets:', walletsAPI.map(w => w.name).join(', '));
+          console.log('⚠️ No Sui-compatible wallet found. Available wallets:', walletsAPI.map(w => w.name).join(', '));
         }
       }
     } else if (typeof walletsAPI.get === 'function') {
@@ -106,8 +110,9 @@ function initializeWalletStandardListener() {
 }
 
 /**
- * Check if Slush Wallet extension is available
+ * Check if a Sui-compatible wallet extension is available
  * Checks multiple possible injection points including Wallet Standard
+ * Supports: Slush Wallet, Sui Wallet, Phantom Wallet, and others
  * @returns {boolean}
  */
 function isSuiWalletAvailable() {
@@ -121,16 +126,18 @@ function isSuiWalletAvailable() {
     
     // Direct array access (synchronous check)
     if (Array.isArray(walletsAPI) && walletsAPI.length > 0) {
-      const slushWallet = walletsAPI.find(w => 
+      const suiWallet = walletsAPI.find(w => 
         w.name && (
           w.name.toLowerCase().includes('slush') || 
           w.name.toLowerCase().includes('sui') ||
+          w.name.toLowerCase().includes('phantom') ||
           w.name === 'Sui Wallet' ||
-          w.name === 'Slush Wallet'
+          w.name === 'Slush Wallet' ||
+          w.name === 'Phantom'
         )
       );
-      if (slushWallet) {
-        console.log('✅ Wallet available check: Found', slushWallet.name);
+      if (suiWallet) {
+        console.log('✅ Wallet available check: Found', suiWallet.name);
         return true;
       }
     }
@@ -141,6 +148,11 @@ function isSuiWalletAvailable() {
       // Will be checked in async functions
       return true; // Assume available if API exists
     }
+  }
+  
+  // Check Phantom Wallet (Phantom uses window.phantom.sui for Sui)
+  if (window.phantom && window.phantom.sui && window.phantom.sui.isPhantom) {
+    return true;
   }
   
   // Check direct injection points (Slush Wallet might use different properties)
@@ -157,7 +169,8 @@ function isSuiWalletAvailable() {
 }
 
 /**
- * Get the Slush Wallet instance
+ * Get a Sui-compatible wallet instance
+ * Supports: Slush Wallet, Sui Wallet, Phantom Wallet, and others
  * @returns {Object|null} Wallet instance
  */
 function getSuiWalletInstance() {
@@ -174,19 +187,27 @@ function getSuiWalletInstance() {
     const wallets = window.navigator.wallets;
     if (Array.isArray(wallets) && wallets.length > 0) {
       console.log('🔍 Found wallets via Wallet Standard:', wallets.map(w => w.name).join(', '));
-      const slushWallet = wallets.find(w => 
+      const suiWallet = wallets.find(w => 
         w.name && (
           w.name.toLowerCase().includes('slush') || 
           w.name.toLowerCase().includes('sui') ||
+          w.name.toLowerCase().includes('phantom') ||
           w.name === 'Sui Wallet' ||
-          w.name === 'Slush Wallet'
+          w.name === 'Slush Wallet' ||
+          w.name === 'Phantom'
         )
       );
-      if (slushWallet) {
-        console.log('✅ Found wallet via Wallet Standard:', slushWallet.name);
-        return slushWallet;
+      if (suiWallet) {
+        console.log('✅ Found wallet via Wallet Standard:', suiWallet.name);
+        return suiWallet;
       }
     }
+  }
+  
+  // Check Phantom Wallet (Phantom uses window.phantom.sui for Sui)
+  if (window.phantom && window.phantom.sui && window.phantom.sui.isPhantom) {
+    console.log('✅ Found Phantom Wallet at window.phantom.sui');
+    return window.phantom.sui;
   }
   
   // Check ALL window properties for anything that looks like a wallet
@@ -198,9 +219,10 @@ function getSuiWalletInstance() {
         const keyLower = key.toLowerCase();
         // Check if property name suggests it's a wallet
         if (keyLower.includes('slush') || 
+            keyLower.includes('phantom') ||
             (keyLower.includes('sui') && !keyLower.includes('walletconnection'))) {
           // Check if it has wallet-like methods
-          if (val.requestPermissions || val.connect || val.getAccounts || val.request) {
+          if (val.requestPermissions || val.connect || val.getAccounts || val.request || val.requestAccount) {
             console.log('🔍 Found potential wallet at window.' + key);
             return val;
           }
@@ -228,7 +250,7 @@ function getSuiWalletInstance() {
 }
 
 /**
- * Wait for Slush Wallet extension to load
+ * Wait for a Sui-compatible wallet extension to load
  * Some extensions inject asynchronously
  * @param {number} timeout - Maximum wait time in ms
  * @returns {Promise<Object|null>} Wallet instance or null
@@ -239,7 +261,7 @@ async function waitForSuiWallet(timeout = 5000) {
   while (Date.now() - startTime < timeout) {
     const wallet = getSuiWalletInstance();
     if (wallet) {
-      console.log('✅ Slush Wallet detected after wait');
+      console.log('✅ Sui-compatible wallet detected after wait');
       return wallet;
     }
     
@@ -248,17 +270,19 @@ async function waitForSuiWallet(timeout = 5000) {
       const wallets = window.navigator.wallets;
       if (Array.isArray(wallets) && wallets.length > 0) {
         console.log('🔍 Checking wallets during wait:', wallets.map(w => w.name).join(', '));
-        const slushWallet = wallets.find(w => 
+        const suiWallet = wallets.find(w => 
           w.name && (
             w.name.toLowerCase().includes('slush') || 
             w.name.toLowerCase().includes('sui') ||
+            w.name.toLowerCase().includes('phantom') ||
             w.name === 'Sui Wallet' ||
-            w.name === 'Slush Wallet'
+            w.name === 'Slush Wallet' ||
+            w.name === 'Phantom'
           )
         );
-        if (slushWallet) {
-          console.log('✅ Sui/Slush Wallet found in navigator.wallets during wait:', slushWallet.name);
-          return slushWallet;
+        if (suiWallet) {
+          console.log('✅ Sui-compatible wallet found in navigator.wallets during wait:', suiWallet.name);
+          return suiWallet;
         }
       }
     }
@@ -291,20 +315,22 @@ async function initializeWalletConnection() {
           console.log('  - Wallet:', w.name, 'Features:', Object.keys(w.features || {}));
         });
         
-        const slushWallet = wallets.find(w => 
+        const suiWallet = wallets.find(w => 
           w.name && (
             w.name.toLowerCase().includes('slush') || 
             w.name.toLowerCase().includes('sui') ||
+            w.name.toLowerCase().includes('phantom') ||
             w.name === 'Sui Wallet' ||
-            w.name === 'Slush Wallet'
+            w.name === 'Slush Wallet' ||
+            w.name === 'Phantom'
           )
         );
-        if (slushWallet) {
-          console.log('✅ Sui/Slush Wallet found in navigator.wallets.get():', slushWallet.name);
-          walletProvider = slushWallet;
-          connectedWallet = slushWallet;
+        if (suiWallet) {
+          console.log('✅ Sui-compatible wallet found in navigator.wallets.get():', suiWallet.name);
+          walletProvider = suiWallet;
+          connectedWallet = suiWallet;
         } else {
-          console.log('⚠️ No Sui/Slush Wallet found. Available wallets:', wallets.map(w => w.name).join(', '));
+          console.log('⚠️ No Sui-compatible wallet found. Available wallets:', wallets.map(w => w.name).join(', '));
         }
       }
     } catch (error) {
@@ -320,18 +346,18 @@ async function initializeWalletConnection() {
   
   // If not found, wait for it to load (increased timeout)
   if (!wallet) {
-    console.log('⏳ Waiting for Slush Wallet extension to load...');
+    console.log('⏳ Waiting for Sui-compatible wallet extension to load...');
     wallet = await waitForSuiWallet(10000); // Increased to 10 seconds
   }
   
   if (!wallet) {
-    console.warn('⚠️ Slush Wallet extension not detected');
+    console.warn('⚠️ Sui-compatible wallet extension not detected');
     console.log('📋 Troubleshooting steps:');
-    console.log('1. Make sure Slush Wallet extension is installed and enabled');
-    console.log('2. Open Slush Wallet extension and unlock it');
+    console.log('1. Make sure a Sui wallet extension is installed and enabled (Slush Wallet, Phantom, etc.)');
+    console.log('2. Open your wallet extension and unlock it');
     console.log('3. Refresh this page');
     console.log('4. Run WalletConnection.debug() in console to see what wallets are available');
-    console.log('5. Check browser console for any Slush Wallet errors');
+    console.log('5. Check browser console for any wallet errors');
     
     const suiKeys = typeof window !== 'undefined' ? Object.keys(window).filter(k => k.toLowerCase().includes('sui') || k.toLowerCase().includes('slush')) : [];
     const walletKeys = typeof window !== 'undefined' ? Object.keys(window).filter(k => k.toLowerCase().includes('wallet')) : [];
@@ -396,13 +422,23 @@ async function initializeWalletConnection() {
     
     return {
       success: false,
-      error: 'Please install Slush Wallet extension. Run WalletConnection.debug() in console for more info.',
+      error: 'Please install a Sui-compatible wallet extension (Slush Wallet, Phantom, etc.). Run WalletConnection.debug() in console for more info.',
       wallets: []
     };
   }
   
   // Store wallet instance
   connectedWallet = wallet;
+  
+  // Detect wallet name for better UX
+  let walletName = 'Sui Wallet';
+  if (wallet === window.phantom?.sui) {
+    walletName = 'Phantom';
+  } else if (wallet.name) {
+    walletName = wallet.name;
+  } else if (window.slushWallet === wallet || window.suiWallet === wallet) {
+    walletName = 'Slush Wallet';
+  }
   
   // Listen for wallet events
   setupWalletEventListeners();
@@ -412,7 +448,7 @@ async function initializeWalletConnection() {
   
   return {
     success: true,
-    wallets: [{ name: 'Slush Wallet', available: true }]
+    wallets: [{ name: walletName, available: true }]
   };
 }
 
@@ -504,38 +540,56 @@ async function connectWallet() {
     
     // If not found, wait for it
     if (!wallet) {
-      console.log('⏳ Waiting for Slush Wallet extension...');
+      console.log('⏳ Waiting for Sui-compatible wallet extension...');
       wallet = await waitForSuiWallet(3000);
     }
     
     if (!wallet) {
       return {
         success: false,
-        error: 'Slush Wallet extension not found. Please install it first.\n\nInstall from: https://slush.app'
+        error: 'Sui-compatible wallet extension not found. Please install Slush Wallet or Phantom Wallet.\n\nInstall Slush Wallet: https://slush.app\nInstall Phantom: https://phantom.app'
       };
     }
+
+    // Detect wallet type for better connection handling
+    const isPhantom = wallet === window.phantom?.sui || (wallet.isPhantom && wallet.isPhantom === true);
+    const walletName = isPhantom ? 'Phantom' : (wallet.name || 'Sui Wallet');
 
     // Request connection - try Wallet Standard API first
     let response = null;
     
     try {
-      // Method 1: Wallet Standard API (modern standard)
-      if (wallet.features && wallet.features['standard:connect']) {
+      // Method 1: Phantom Wallet API (requestAccount)
+      if (isPhantom && wallet.requestAccount) {
+        console.log('🔗 Using Phantom requestAccount() to connect');
+        const phantomResponse = await wallet.requestAccount();
+        // Phantom returns { publicKey, address }
+        if (phantomResponse && (phantomResponse.address || phantomResponse.publicKey)) {
+          response = {
+            accounts: [{
+              address: phantomResponse.address || phantomResponse.publicKey?.toString(),
+              publicKey: phantomResponse.publicKey
+            }]
+          };
+        }
+      }
+      // Method 2: Wallet Standard API (modern standard)
+      else if (wallet.features && wallet.features['standard:connect']) {
         console.log('🔗 Using Wallet Standard API to connect');
         const connectFeature = wallet.features['standard:connect'];
         response = await connectFeature.connect();
       }
-      // Method 2: requestPermissions (legacy Sui Wallet API)
+      // Method 3: requestPermissions (legacy Sui Wallet API)
       else if (wallet.requestPermissions) {
         console.log('🔗 Using requestPermissions to connect');
         response = await wallet.requestPermissions();
       }
-      // Method 3: request with method name
+      // Method 4: request with method name
       else if (wallet.request) {
         console.log('🔗 Using request() to connect');
         response = await wallet.request({ method: 'sui_requestPermissions' });
       }
-      // Method 4: connect method
+      // Method 5: connect method
       else if (wallet.connect) {
         console.log('🔗 Using connect() to connect');
         response = await wallet.connect();
@@ -568,7 +622,7 @@ async function connectWallet() {
       return {
         success: true,
         address: connectedAddress,
-        wallet: 'Slush Wallet'
+        wallet: walletName
       };
     } 
     // Handle legacy response format
@@ -584,7 +638,7 @@ async function connectWallet() {
       return {
         success: true,
         address: connectedAddress,
-        wallet: 'Slush Wallet'
+        wallet: walletName
       };
     } else {
       return {
@@ -710,13 +764,16 @@ if (typeof window !== 'undefined') {
       console.log('🔍 Wallet Debug Info:');
       console.log('Window properties with "slush":', Object.keys(window).filter(k => k.toLowerCase().includes('slush')));
       console.log('Window properties with "sui":', Object.keys(window).filter(k => k.toLowerCase().includes('sui') && !k.includes('WalletConnection')));
+      console.log('Window properties with "phantom":', Object.keys(window).filter(k => k.toLowerCase().includes('phantom')));
       console.log('Window properties with "wallet":', Object.keys(window).filter(k => k.toLowerCase().includes('wallet') && !k.includes('WalletConnection')));
+      console.log('window.phantom:', window.phantom);
+      console.log('window.phantom?.sui:', window.phantom?.sui);
       console.log('navigator.wallets:', window.navigator?.wallets);
       console.log('Potential wallet objects:', Object.keys(window).filter(k => {
         try {
           const val = window[k];
           return val && typeof val === 'object' && (
-            val.requestPermissions || val.connect || val.getAccounts || val.request
+            val.requestPermissions || val.connect || val.getAccounts || val.request || val.requestAccount
           );
         } catch (e) {
           return false;
@@ -760,12 +817,13 @@ if (typeof window !== 'undefined') {
       // Check if we need to load wallet adapter libraries
       console.log('\n💡 Note: Wallet Standard API (window.navigator.wallets) is not available.');
       console.log('This might require loading @mysten/wallet-adapter libraries.');
-      console.log('Slush Wallet might require @mysten/dapp-kit to enable Wallet Standard API.');
+      console.log('Supported wallets: Slush Wallet, Sui Wallet, Phantom Wallet, and others.');
       console.log('\n📋 Next steps:');
-      console.log('1. Check if Slush Wallet extension is unlocked');
+      console.log('1. Check if a Sui-compatible wallet extension is installed and unlocked');
       console.log('2. Try refreshing the page');
-      console.log('3. Check Slush Wallet documentation for vanilla JS integration');
-      console.log('4. Consider loading wallet adapter libraries if needed');
+      console.log('3. Install Slush Wallet: https://slush.app');
+      console.log('4. Install Phantom Wallet: https://phantom.app');
+      console.log('5. Consider loading wallet adapter libraries if needed');
     }
   };
 }

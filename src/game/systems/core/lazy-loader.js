@@ -195,7 +195,6 @@ const GAME_SCRIPTS = [
   // Mobile/Device modules (only needed when game starts)
   'src/game/systems/device/device-config.js',
   'src/game/systems/device/device-monitoring.js',
-  'src/game/systems/device/landscape-orientation.js',
   'src/game/shared/mobile-utils.js',
   'src/game/rendering/responsive/canvas-manager.js',
   'src/game/rendering/responsive/viewport-manager.js',
@@ -377,6 +376,7 @@ function loadScripts(scripts, type = 'scripts') {
               console.warn('⚠️ WalletService and initializeWalletIntegration not available - wallet scripts may not have loaded');
             }
           }, 200); // Wait a bit longer for wallet module to load
+          
         }
         
         // Initialize responsive canvas system after game scripts load

@@ -372,7 +372,39 @@ function loadDeferredScripts() {
   deviceScript.src = 'src/game/systems/device/device-detection.js';
   deviceScript.onload = () => {
     log.debug('UI INIT', 'Device detection loaded');
-    // After device detection, load CSS loader
+    
+    // Load landscape orientation immediately after device detection
+    const landscapeScript = document.createElement('script');
+    landscapeScript.src = 'src/game/systems/device/landscape-orientation.js';
+    landscapeScript.onload = () => {
+      log.debug('UI INIT', 'Landscape orientation loaded');
+      
+      // Initialize landscape orientation immediately
+      if (typeof LandscapeOrientation !== 'undefined' && typeof LandscapeOrientation.initialize === 'function') {
+        log.info('UI INIT', 'Initializing landscape orientation enforcement...');
+        try {
+          LandscapeOrientation.initialize();
+          log.info('UI INIT', '✅ Landscape orientation enforcement initialized');
+        } catch (error) {
+          log.error('UI INIT', 'Failed to initialize landscape orientation', error);
+        }
+      } else {
+        log.warn('UI INIT', 'LandscapeOrientation not available after script load');
+      }
+      
+      // After landscape orientation, load CSS loader
+      loadCSSLoader();
+    };
+    landscapeScript.onerror = () => {
+      log.error('UI INIT', 'Failed to load landscape orientation script');
+      // Continue anyway - load CSS loader
+      loadCSSLoader();
+    };
+    document.head.appendChild(landscapeScript);
+  };
+  deviceScript.onerror = () => {
+    log.error('UI INIT', 'Failed to load device detection script');
+    // Continue anyway - load CSS loader
     loadCSSLoader();
   };
   document.head.appendChild(deviceScript);
