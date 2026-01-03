@@ -116,6 +116,13 @@ const MenuService = {
     // Hide all panels first to ensure clean state
     this.hideAllPanels();
     
+    // Close any achievement popup that might be open (shouldn't happen, but safety check)
+    const achievementPopup = document.getElementById('achievementPopup');
+    if (achievementPopup && typeof window.closeAchievementPopup === 'function') {
+      log.debug('MENU SERVICE', 'Closing lingering achievement popup');
+      window.closeAchievementPopup();
+    }
+    
     // Hide game container
     this._hideGameContainer();
     
@@ -133,8 +140,20 @@ const MenuService = {
       mainMenu.style.visibility = '';
       mainMenu.style.opacity = '';
       
+      // CRITICAL: Re-enable all main menu buttons when showing the menu
+      // This fixes the issue where buttons remain disabled after claiming milestones
+      // (achievement popup disables buttons, and they need to be re-enabled when menu is shown)
+      const buttons = mainMenu.querySelectorAll('button');
+      buttons.forEach(btn => {
+        // Re-enable all buttons to clear any disabled state from achievement popup
+        // Start game buttons will have their state properly set by updateGameReadiness() below
+        btn.disabled = false;
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
+      });
+      
       this._isVisible = true;
-      log.debug('MENU SERVICE', 'Menu overlay shown');
+      log.debug('MENU SERVICE', 'Menu overlay shown, buttons re-enabled');
     } else {
       log.error('MENU SERVICE', 'Main menu element not found!');
         this._isShowing = false;
@@ -204,8 +223,13 @@ const MenuService = {
         }
         
         // Reset start game buttons (including test button) when returning to menu
-        if (typeof GameService !== 'undefined' && GameService.enableStartGameButton) {
-          // This will reset both regular and test buttons
+        // Use updateGameReadiness() to properly set button states based on game readiness
+        if (typeof updateGameReadiness === 'function') {
+          updateGameReadiness();
+        } else if (typeof GameService !== 'undefined' && GameService.updateGameReadiness) {
+          GameService.updateGameReadiness();
+        } else if (typeof GameService !== 'undefined' && GameService.enableStartGameButton) {
+          // Fallback: just enable the button
           GameService.enableStartGameButton();
         }
       } else {
@@ -237,6 +261,17 @@ const MenuService = {
           window.updateLeaderboardClaimBadge(null, true).catch(err => {
             log.warn('MENU SERVICE', 'Failed to update leaderboard claim badge', err);
           });
+        }
+        
+        // Reset start game buttons (including test button) when returning to menu
+        // Use updateGameReadiness() to properly set button states based on game readiness
+        if (typeof updateGameReadiness === 'function') {
+          updateGameReadiness();
+        } else if (typeof GameService !== 'undefined' && GameService.updateGameReadiness) {
+          GameService.updateGameReadiness();
+        } else if (typeof GameService !== 'undefined' && GameService.enableStartGameButton) {
+          // Fallback: just enable the button
+          GameService.enableStartGameButton();
         }
       } else {
         this._updateWalletUI(null);
