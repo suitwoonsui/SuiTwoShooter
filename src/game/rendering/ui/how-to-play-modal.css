@@ -409,68 +409,96 @@
   margin-bottom: min(1vh, 1.2vw);
 }
 
-/* Mobile Responsive */
-@media (max-width: 768px) {
-  .how-to-play-tabs-container {
-    gap: min(0.8vh, 1vw);
-  }
-  
-  .how-to-play-tab-btn {
-    font-size: clamp(10px, min(1.8vh, 2.2vw), 13px);
-    padding: min(1vh, 1.2vw) min(1.3vh, 1.6vw);
-  }
-  
-  .how-to-play-content-sections-nav {
-    gap: min(0.6vh, 0.8vw);
-  }
-  
-  .how-to-play-content-section-btn {
-    font-size: clamp(9px, min(1.6vh, 2vw), 12px);
-    padding: min(0.7vh, 0.9vw) min(1vh, 1.2vw);
-  }
-  
-  .how-to-play-section-header h3 {
-    font-size: clamp(13px, min(2.2vh, 2.8vw), 18px);
-  }
-  
-  .how-to-play-image {
-    max-width: 100%;
-  }
-  
-  .how-to-play-stats {
-    grid-template-columns: 1fr;
-  }
-  
-  .how-to-play-tab-carousel .carousel-arrow,
-  .how-to-play-content-carousel .carousel-arrow {
-    min-width: min(4vh, 5vw);
-    height: min(4vh, 5vw);
-    font-size: min(2.5vw, 3vh);
-  }
-  
-  /* Stack split layout on mobile */
-  .how-to-play-split-layout {
-    flex-direction: column;
-    gap: min(1.5vh, 2vw);
-  }
-  
-  .how-to-play-split-image {
-    width: 100%;
-    max-width: min(30vh, 40vw);
-    margin: 0 auto;
-  }
-  
-  /* Stack ability items on mobile */
-  .how-to-play-ability-item {
-    flex-direction: column;
-    gap: min(1.5vh, 2vw);
-  }
-  
-  .how-to-play-ability-preview {
-    width: 100%;
-    max-width: min(30vh, 40vw);
-    margin: 0 auto;
-  }
+/* Responsive adjustments - always applied based on viewport */
+/* Tabs container - tighter gap on smaller viewports */
+.how-to-play-tabs-container {
+  gap: min(0.8vh, 1vw);
+}
+
+/* Tab buttons - responsive sizing */
+.how-to-play-tab-btn {
+  font-size: clamp(10px, min(1.8vh, 2.2vw), 15px);
+  padding: min(1vh, 1.2vw) min(1.3vh, 1.6vw);
+}
+
+/* Content sections nav - responsive gap */
+.how-to-play-content-sections-nav {
+  gap: min(0.6vh, 0.8vw);
+}
+
+/* Content section buttons - responsive sizing */
+.how-to-play-content-section-btn {
+  font-size: clamp(9px, min(1.6vh, 2vw), 14px);
+  padding: min(0.7vh, 0.9vw) min(1vh, 1.2vw);
+}
+
+/* Section headers - responsive font size */
+.how-to-play-section-header h3 {
+  font-size: clamp(13px, min(2.2vh, 2.8vw), 24px);
+}
+
+/* Images - always responsive */
+.how-to-play-image {
+  max-width: 100%;
+}
+
+/* Stats grid - responsive columns using auto-fit */
+.how-to-play-stats {
+  grid-template-columns: repeat(auto-fit, minmax(min(120px, 15vw), 1fr));
+}
+
+/* Carousel arrows - responsive sizing */
+.how-to-play-tab-carousel .carousel-arrow,
+.how-to-play-content-carousel .carousel-arrow {
+  min-width: min(4vh, 5vw);
+  height: min(4vh, 5vw);
+  font-size: min(2.5vw, 3vh);
+}
+
+/* Split layout - responsive with flex-wrap for natural stacking */
+.how-to-play-split-layout {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: min(1.5vh, 2vw);
+  align-items: flex-start;
+}
+
+/* Split image - responsive sizing that adapts to container */
+.how-to-play-split-image {
+  flex: 0 1 auto;
+  width: min(25vh, 30vw, 100%);
+  max-width: min(30vh, 40vw, 100%);
+  min-width: min(15vh, 20vw);
+}
+
+/* Split content - takes remaining space */
+.how-to-play-split-content {
+  flex: 1 1 min(200px, 50%);
+  min-width: min(200px, 50%);
+}
+
+/* Ability items - responsive with flex-wrap */
+.how-to-play-ability-item {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: min(1.5vh, 2vw);
+  align-items: flex-start;
+}
+
+/* Ability preview - responsive sizing */
+.how-to-play-ability-preview {
+  flex: 0 1 auto;
+  width: min(25vh, 30vw, 100%);
+  max-width: min(30vh, 40vw, 100%);
+  min-width: min(15vh, 20vw);
+}
+
+/* Ability content - takes remaining space */
+.how-to-play-ability-content {
+  flex: 1 1 min(200px, 50%);
+  min-width: min(200px, 50%);
 }
 
 /* Scrollbar Styling */

@@ -724,9 +724,9 @@
   .leaderboard-content,
   .sound-test-content {
     background: rgba(0, 0, 0, 0.8) !important;
-    border: 2px solid rgba(77, 162, 255, 0.3) !important;
-    border-radius: 20px !important;
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5) !important;
+    border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3) !important;
+    border-radius: min(2vh, 2.5vw) !important;
+    box-shadow: 0 0 min(3vh, 4vw) rgba(0, 0, 0, 0.5) !important;
   }
   
   /* Mobile Panel Headers */
@@ -737,15 +737,15 @@
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
-    padding: 20px !important;
-    border-bottom: 1px solid rgba(77, 162, 255, 0.2) !important;
+    padding: min(2vh, 2.5vw) !important;
+    border-bottom: min(0.15vw, 0.2vh) solid rgba(77, 162, 255, 0.2) !important;
   }
   
   .settings-header h2,
   .instructions-header h2,
   .leaderboard-header h2,
   .sound-test-header h2 {
-    font-size: 1.5rem !important;
+    font-size: min(2.5vw, 3vh) !important;
     margin: 0 !important;
     color: #4DA2FF !important;
   }
@@ -1001,8 +1001,8 @@
   
   /* Mobile menu adjustments */
   .main-menu-content {
-    width: 95% !important;
-    max-width: 400px !important;
+    width: min(95vw, 95vh) !important;
+    max-width: min(90vw, 90vh) !important;
   }
   
   .game-title h1 {
@@ -1028,17 +1028,15 @@
   .settings-content,
   .instructions-content,
   .sound-test-content {
-    width: 95% !important;
-    max-width: 400px !important;
-    padding: 20px !important;
-    margin: 10px auto !important;
+    /* Size now handled by responsive parent panel - no fixed sizes */
+    padding: min(2vh, 2.5vw) !important;
   }
   
   .settings-content h2,
   .instructions-content h2,
   .sound-test-content h2 {
-    font-size: 1.4rem !important;
-    margin-bottom: 20px !important;
+    font-size: min(2.2vw, 2.8vh) !important;
+    margin-bottom: min(2vh, 2.5vw) !important;
     text-align: center !important;
   }
   
@@ -1095,28 +1093,28 @@
     display: inline-block !important;
   }
   
-  /* Compact close buttons for mobile - slightly larger than checkboxes */
+  /* Compact close buttons for mobile - responsive sizing */
   .settings-panel .close-btn,
   .instructions-panel .close-btn,
   .sound-test-panel .close-btn {
     position: absolute !important;
-    top: 6px !important;
-    right: 6px !important;
-    width: 24px !important;
-    height: 24px !important;
-    min-width: 24px !important;
-    min-height: 24px !important;
-    max-width: 24px !important;
-    max-height: 24px !important;
+    top: min(0.8vh, 1vw) !important;
+    right: min(0.8vh, 1vw) !important;
+    width: min(3vh, 3.5vw) !important;
+    height: min(3vh, 3.5vw) !important;
+    min-width: min(3vh, 3.5vw) !important;
+    min-height: min(3vh, 3.5vw) !important;
+    max-width: min(3vh, 3.5vw) !important;
+    max-height: min(3vh, 3.5vw) !important;
     border-radius: 50% !important;
-    font-size: 0.8rem !important;
+    font-size: min(1.2vw, 1.5vh) !important;
     padding: 0 !important;
     margin: 0 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     background: rgba(77, 162, 255, 0.2) !important;
-    border: 1px solid rgba(77, 162, 255, 0.4) !important;
+    border: min(0.15vw, 0.2vh) solid rgba(77, 162, 255, 0.4) !important;
     color: #fff !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
@@ -1160,19 +1158,17 @@
   
   /* Instructions content - match main menu style */
   .instructions-content {
-    width: 95% !important;
-    max-width: 400px !important;
-    padding: 20px !important;
-    margin: 10px auto !important;
+    /* Size now handled by responsive parent panel - no fixed sizes */
+    padding: min(2vh, 2.5vw) !important;
     background: rgba(0, 0, 0, 0.9) !important;
-    border-radius: 12px !important;
-    border: 2px solid rgba(77, 162, 255, 0.3) !important;
+    border-radius: min(1.5vh, 2vw) !important;
+    border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3) !important;
     position: relative !important;
   }
   
   .instructions-content h2 {
-    font-size: 1.4rem !important;
-    margin-bottom: 20px !important;
+    font-size: min(2.2vw, 2.8vh) !important;
+    margin-bottom: min(2vh, 2.5vw) !important;
     color: #4DA2FF !important;
     text-align: center !important;
   }

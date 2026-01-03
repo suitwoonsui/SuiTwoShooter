@@ -21,10 +21,10 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow-y: auto;
   box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
@@ -226,10 +226,10 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow-y: auto;
   overflow-x: hidden; /* Prevent horizontal scrollbar */
@@ -368,10 +368,10 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow-y: auto;
   box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
@@ -515,10 +515,10 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow-y: auto;
   box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
@@ -770,10 +770,10 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency across all tabs */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow: hidden; /* Changed from overflow-y: auto to prevent modal scrolling */
   box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
@@ -1979,10 +1979,10 @@
   border: min(0.3vw, 0.4vh) solid #FFD700;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow-y: auto;
   box-shadow: 0 0 min(5vh, 6vw) rgba(255, 215, 0, 0.5);
@@ -2792,10 +2792,10 @@
   border: min(0.3vw, 0.4vh) solid #FFD700;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(70vh, 80vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow-y: auto;
   box-shadow: 0 0 min(5vh, 6vw) rgba(255, 215, 0, 0.5);
