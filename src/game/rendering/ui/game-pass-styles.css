@@ -561,8 +561,8 @@
 .inventory-hyper-merge-btn:hover {
   background: linear-gradient(135deg, #ba68c8 0%, #9575cd 100%);
   border-color: #ba68c8;
-  box-shadow: 0 0 15px rgba(156, 39, 176, 0.7);
-  transform: translateY(-2px);
+  box-shadow: 0 0 min(2vh, 2.5vw) rgba(156, 39, 176, 0.7);
+  transform: translateY(min(-0.3vh, -0.4vw));
 }
 
 @keyframes hyperMergeGlow {

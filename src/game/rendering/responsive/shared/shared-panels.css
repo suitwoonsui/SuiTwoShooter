@@ -259,7 +259,7 @@
   right: 0;
   bottom: 0;
   background: linear-gradient(45deg, transparent 30%, rgba(77, 162, 255, 0.1) 50%, transparent 70%);
-  border-radius: 20px;
+  border-radius: min(2.5vh, 3vw);
   pointer-events: none;
 }
 
@@ -276,7 +276,7 @@
   color: #4DA2FF;
   font-size: min(4vw, 4.5vh);
   font-weight: bold;
-  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  text-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.5);
   margin: 0;
 }
 
@@ -288,14 +288,14 @@
   color: #39ff14;
   font-size: min(3vw, 3.5vh);
   font-weight: bold;
-  margin-bottom: 15px;
-  text-shadow: 0 0 5px rgba(57, 255, 20, 0.3);
+  margin-bottom: min(1.5vh, 2vw);
+  text-shadow: 0 0 min(0.6vh, 0.8vw) rgba(57, 255, 20, 0.3);
 }
 
 .sound-buttons {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(20vh, 25vw), 1fr));
+  gap: min(1vh, 1.2vw);
 }
 
 .sound-test-content .sound-btn {
@@ -323,12 +323,12 @@
 .sound-test-content .sound-btn:hover {
   background: linear-gradient(135deg, #4DA2FF 0%, #2a3a4a 100%) !important;
   border-color: #39ff14 !important;
-  box-shadow: 0 8px 25px rgba(77, 162, 255, 0.6), 0 0 20px rgba(57, 255, 20, 0.4) !important; /* Enhanced glow instead of scaling */
+  box-shadow: 0 min(1vh, 1.5vw) min(3vh, 4vw) rgba(77, 162, 255, 0.6), 0 0 min(2.5vh, 3vw) rgba(57, 255, 20, 0.4) !important; /* Enhanced glow instead of scaling */
   filter: brightness(1.1) !important; /* Subtle brightness increase */
 }
 
 .sound-test-content .sound-btn:active {
-  box-shadow: 0 2px 5px rgba(77, 162, 255, 0.2) !important;
+  box-shadow: 0 min(0.3vh, 0.4vw) min(0.8vh, 1vw) rgba(77, 162, 255, 0.2) !important;
   filter: brightness(0.95) !important; /* Subtle dimming for click feedback */
 }
 
@@ -436,7 +436,7 @@
   color: #4DA2FF;
   font-size: min(4vw, 4.5vh);
   margin: 0;
-  text-shadow: 0 0 10px rgba(77, 162, 255, 0.5);
+  text-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.5);
 }
 
 .instructions-section {
@@ -1007,7 +1007,7 @@
 .store-item-card:hover {
   background: rgba(77, 162, 255, 0.1);
   border-color: rgba(77, 162, 255, 0.4);
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
   box-shadow: 0 min(0.5vh, 0.6vw) min(1vh, 1.5vw) rgba(77, 162, 255, 0.2);
 }
 
@@ -1459,10 +1459,10 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
+  width: min(90vw, 90vh);
   max-width: min(80vh, 90vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   overflow: hidden; /* No scroll on modal itself - content handles scrolling */
   box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
@@ -1652,7 +1652,7 @@
 .consumption-level-btn:hover {
   background: rgba(77, 162, 255, 0.2);
   border-color: rgba(77, 162, 255, 0.5);
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
 }
 
 .consumption-level-btn.selected {
@@ -1772,10 +1772,10 @@
   border: min(0.3vw, 0.4vh) solid #ff6b6b;
   border-radius: min(2vh, 2.5vw);
   padding: min(3vh, 4vw);
+  width: min(90vw, 90vh);
   max-width: min(60vh, 70vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   box-shadow: 0 0 min(5vh, 6vw) rgba(255, 107, 107, 0.5);
   display: flex;
@@ -1908,10 +1908,10 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(3vh, 4vw);
+  width: min(90vw, 90vh);
   max-width: min(60vh, 70vw);
-  width: 90%;
-  height: 90vh; /* Fixed height for consistency */
-  max-height: 90vh; /* Ensure it doesn't exceed viewport */
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
   box-sizing: border-box;
   box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
   display: flex;
@@ -2129,7 +2129,7 @@
 
 .tournament-tab:hover {
   background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
 }
 
 .tournament-tab.active {
@@ -2221,7 +2221,7 @@
 .tournament-card-condensed:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: #FFD700;
-  transform: translateY(-2px);
+  transform: translateY(min(-0.3vh, -0.4vw));
   box-shadow: 0 0 min(1vh, 1.5vw) rgba(255, 215, 0, 0.2);
 }
 
