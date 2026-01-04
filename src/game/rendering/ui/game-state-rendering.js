@@ -82,6 +82,7 @@ function renderGameOverScreen(ctx) {
   ctx.strokeStyle = '#4DA2FF';
   ctx.lineWidth = 3;
   ctx.font = 'bold 36px Arial'; // Reduced font size
+  ctx.textAlign = 'center'; // Explicitly set text alignment to prevent shifting
   ctx.strokeText(`Final Score: ${displayScore.toLocaleString()}`, centerX, centerY + 40);
   ctx.fillText(`Final Score: ${displayScore.toLocaleString()}`, centerX, centerY + 40);
   ctx.restore();
