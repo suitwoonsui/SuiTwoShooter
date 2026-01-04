@@ -4,8 +4,8 @@
 // Returns player stats, claimed milestones, and eligible (claimable) milestones
 
 import { NextRequest } from 'next/server';
-import { withApiHandler } from '@/lib/api/api-handler';
-import { getAchievementService } from '@/lib/sui/achievement-service';
+import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
+import { getAchievementService } from '../../../../../../../backend/lib/sui/achievement-service';
 
 const EMPTY_STATS = {
   totalGames: 0,

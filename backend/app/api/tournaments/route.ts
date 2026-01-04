@@ -3,9 +3,9 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { withApiHandler } from '@/lib/api/api-handler';
-import { getTournamentService } from '@/lib/sui/tournament-service';
+import { handleCorsPreflight } from '../../../../../../base/backend/lib/cors';
+import { withApiHandler } from '../../../../../../base/backend/lib/api/api-handler';
+import { getTournamentService } from '../../../../../../backend/lib/sui/tournament-service';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -43,7 +43,7 @@ export const GET = withApiHandler(
 
     // If player address is provided, enrich tournaments with player-specific data
     if (playerAddress && tournaments.length > 0) {
-      const { getGamePassService } = await import('@/lib/sui/game-pass-service');
+      const { getGamePassService } = await import('../../../../../../backend/lib/sui/game-pass-service');
       const gamePassService = getGamePassService();
       
       // Get player's ticket count (this may use cache)

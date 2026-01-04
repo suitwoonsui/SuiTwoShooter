@@ -5,13 +5,13 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { withApiHandler } from '@/lib/api/api-handler';
-import { getTournamentService } from '@/lib/sui/tournament-service';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { handleCorsPreflight } from '../../../../../../../../base/backend/lib/cors';
+import { withApiHandler } from '../../../../../../../../base/backend/lib/api/api-handler';
+import { getTournamentService } from '../../../../../../../../backend/lib/sui/tournament-service';
+import { BadgeValidators } from '../../../../../../../../backend/lib/sui/badge-validators';
+import { BadgeLogger } from '../../../../../../../../base/backend/lib/sui/badge-logger';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { getConfig } from '@/config/config';
+import { getConfig } from '../../../../../../../../base/backend/config/config';
 
 /**
  * GET /api/scores/trace/[address]

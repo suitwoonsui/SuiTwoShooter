@@ -4,8 +4,8 @@
 // Returns milestones that are eligible to claim (does NOT auto-claim)
 
 import { NextRequest } from 'next/server';
-import { withApiHandler } from '@/lib/api/api-handler';
-import { getAchievementService } from '@/lib/sui/achievement-service';
+import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
+import { getAchievementService } from '../../../../../../../backend/lib/sui/achievement-service';
 
 export const GET = withApiHandler(
   async (request: NextRequest) => {

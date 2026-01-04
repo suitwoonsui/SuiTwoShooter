@@ -4,13 +4,13 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
-import { getBadgeService } from '@/lib/sui/badge-service';
-import { handleCorsPreflight } from '@/lib/cors';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { getAdminWalletService } from '../../../../../../../backend/lib/sui/admin-wallet-service';
+import { getBadgeService } from '../../../../../../../backend/lib/sui/badge-service';
+import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
+import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
+import { BadgeValidators } from '../../../../../../../backend/lib/sui/badge-validators';
+import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
 
 /**
  * POST /api/scores/submit

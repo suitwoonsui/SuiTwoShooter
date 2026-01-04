@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>" />
+  
+  <!-- Backend API URL - Auto-detects localhost in development -->
+  <!-- For production, uncomment and set your backend URL: -->
+  <!-- <meta name="backend-url" content="https://your-backend.vercel.app/api" /> -->
+  
+  <!-- Wallet Module URL - Auto-detects local file in development -->
+  <!-- For production, uncomment and set your wallet module URL: -->
+  <!-- <meta name="wallet-module-url" content="https://your-wallet-module.vercel.app/wallet-api.umd.cjs" /> -->
+  <script>
+    (function initializeAppViewportUnit() {
+      const getVV = () => ({
+        width: (window.visualViewport && typeof window.visualViewport.width === 'number') ? window.visualViewport.width : window.innerWidth,
+        height: (window.visualViewport && typeof window.visualViewport.height === 'number') ? window.visualViewport.height : window.innerHeight
+      });
+      const setAppVh = () => {
+        const { width, height } = getVV();
+        document.documentElement.style.setProperty('--app-vh', (height * 0.01) + 'px');
+        document.documentElement.style.setProperty('--vvh', height + 'px');
+        document.documentElement.style.setProperty('--vvw', width + 'px');
+      };
+      // Initial set after DOM is interactive to avoid zero heights
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setAppVh, { once: true });
+      } else {
+        setAppVh();
+      }
+      // Update on viewport changes
+      window.addEventListener('resize', setAppVh, { passive: true });
+      window.addEventListener('orientationchange', setAppVh);
+      window.addEventListener('pageshow', function (e) { if (e.persisted) setAppVh(); });
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) setAppVh(); });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setAppVh, { passive: true });
+        window.visualViewport.addEventListener('scroll', setAppVh, { passive: true });
+      }
+    })();
+  </script>
+  <title>SuiTwo - Modular CSS Test</title>
+  
+  <!-- CRITICAL CSS: Inlined for instant start screen display -->
+  <style>
+    /* ========================================== */
+    /* CRITICAL CSS - INLINED FOR INSTANT LOAD */
+    /* ========================================== */
+    
+    /* CSS Variables (Theme) */
+    :root {
+      --color-primary: #4DA2FF;
+      --color-secondary: #3A7BD5;
+      --color-accent: #39ff14;
+      --text-primary: white;
+      --text-secondary: #ccc;
+      --text-muted: #888;
+      --bg-primary: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
+      --bg-overlay: rgba(0, 0, 0, 0.8);
+    }
+    
+    /* Prevent body background animation from showing */
+    body::before {
+      display: none !important;
+      content: none !important;
+    }
+    
+    /* Body styling */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background: #0a0a0a;
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    
+    /* Viewport container */
+    .viewport-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      height: 100svh;
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0a0a0a;
+    }
+    
+    /* Front page overlay - CRITICAL: Must be visible immediately */
+    .front-page-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0a0a0a 0%, #0f1419 50%, #1a2332 100%);
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      backdrop-filter: blur(10px);
+      display: none; /* Hidden by default */
+    }
+    
+    .front-page-overlay[class*="-visible"] {
+      display: flex;
+    }
+    
+    .front-page-overlay[class*="-hidden"] {
+      display: none;
+    }
+    
+    /* Front page content */
+    .front-page-content {
+      text-align: center;
+      max-width: 90%;
+      max-height: 90vh;
+      width: 90%;
+      padding: 1vw;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 20px;
+      border: 2px solid #00d4ff;
+      box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .game-title {
+      font-size: 5vw;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(45deg, #4DA2FF, #39ff14);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 20px rgba(77, 162, 255, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5vw;
+    }
+    
+    .game-subtitle {
+      font-size: 2vw;
+      color: #888;
+      margin-bottom: 1vw;
+    }
+    
+    .game-description {
+      margin-bottom: 1vw;
+      line-height: 1.4;
+    }
+    
+    .game-description p {
+      margin-bottom: 0.3rem;
+      color: #ccc;
+      font-size: 1.5vw;
+    }
+    
+    .enter-game-btn {
+      background: linear-gradient(45deg, #00d4ff, #4ecdc4);
+      border: none;
+      color: white !important;
+      height: clamp(28px, min(7vh, 12vw), 56px);
+      padding-block: 0;
+      padding-inline: 3vw;
+      font-size: 2vw;
+      font-weight: bold;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+      margin-bottom: 1vw;
+    }
+    
+    .enter-game-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 212, 255, 0.5);
+      background: linear-gradient(45deg, #4ecdc4, #00d4ff);
+    }
+    
+    .enter-game-btn:active {
+      transform: translateY(0);
+    }
+    
+    .audio-note {
+      color: #666;
+      font-style: italic;
+    }
+    
+    .title-profile-image {
+      width: 8vw;
+      height: 8vw;
+      border-radius: 50%;
+      vertical-align: middle;
+      border: 3px solid #00d4ff;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+      flex-shrink: 0;
+    }
+    
+    /* Game container visibility is controlled by CSS classes (.game-container-visible / .game-container-hidden) */
+    /* The classes are handled by shared-viewport-container.css */
+    
+    /* Main menu is hidden by default via -hidden class, shown when class is removed */
+    /* No need for ID selector - class selector handles it */
+    
+    /* CRITICAL: Hide all panels/modals by default - use classes, not !important */
+    /* Panels are controlled by CSS classes (.panel-visible / .panel-hidden) */
+    /* The CSS classes handle visibility properly without !important */
+    
+    /* Hide game container images initially (they'll show when game starts) */
+    .game-container img {
+      opacity: 0;
+      visibility: hidden;
+    }
+  </style>
+  
+  <!-- DEFERRED: Load these after start screen is visible -->
+  <!-- Device Detection and CSS Loading - Deferred until after start screen -->
+  <!-- API Configuration - Deferred -->
+  <!-- Contract Configuration - Deferred -->
+
+  <!-- Stub functions for menu sounds (available immediately, will be replaced when audio loads) -->
+  <script>
+    // Define stub functions immediately so they're available when HTML onmouseover fires
+    if (typeof window.playMenuHoverSound === 'undefined') {
+      window.playMenuHoverSound = function() {
+        // Stub - will be replaced by audio-integration.js when it loads
+        if (typeof getGameAudio === 'function') {
+          const gameAudio = getGameAudio();
+          if (gameAudio && typeof gameAudio.playSound === 'function') {
+            gameAudio.playSound('menuHover');
+          }
+        }
+      };
+    }
+    if (typeof window.playMenuClickSound === 'undefined') {
+      window.playMenuClickSound = function() {
+        // Stub - will be replaced by audio-integration.js when it loads
+        if (typeof getGameAudio === 'function') {
+          const gameAudio = getGameAudio();
+          if (gameAudio && typeof gameAudio.playSound === 'function') {
+            gameAudio.playSound('menuClick');
+          }
+        }
+      };
+    }
+  </script>
+
+  <!-- Responsive modules - loaded last -->
+  <!-- Note: css-loader.js and device-detection.js already loaded in <head>, don't load again -->
+</head>
+<body>
+  <!-- Main Viewport Container - Contains all overlays -->
+  <div class="viewport-container" style="display: flex; position: relative; width: 100%; height: 100vh; background: #0a0a0a;">
+    <!-- Front Page Overlay - FIRST THING VISIBLE -->
+    <div id="frontPage" class="front-page-overlay front-page-overlay-visible">
+      <div class="front-page-content">
+        <h1 class="game-title"><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+        <p class="game-subtitle">Market Shooter Alpha v0.1</p>
+        <div class="game-description">
+          <p>Fight against the negative forces of the market chart! Defeat bearish enemies and dodge downward projectiles!</p>
+          <p>Use MOUSE to move and P to pause. Auto-fire is enabled!</p>
+        </div>
+        <button id="enterGameBtn" class="enter-game-btn">
+          🎮 Enter Game
+        </button>
+        <div class="audio-note">
+          <small>🔊 Audio will start after clicking Enter</small>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Game Container (lazy loaded with visibility toggle) -->
+    <div class="game-container game-container-hidden">
+      <!-- Enhanced Top information bar (only visible during game) -->
+      <header class="game-header">
+        <div class="title">
+          <img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="header-logo"> SuiTwo
+          <span class="alpha-badge">Alpha v0.1</span>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-icon">📏</span>
+            Distance: <span id="distance">0</span> m
+          </div>
+          <div class="stat">
+            <span class="stat-icon">🪙</span>
+            Coins: <span id="coins">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-icon">⚡</span>
+            Status: <span id="status">Ready</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Gameplay Area -->
+      <div class="gameplay-area">
+        <!-- Game canvas -->
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- In-game UI - Side-by-side with canvas -->
+        <div class="game-ui-overlay">
+          <div class="game-stats-panel">
+            <div class="stat-item">
+              <span class="stat-label">Score:</span>
+              <span class="stat-value" id="gameScore">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Tier:</span>
+              <span class="stat-value" id="gameTier">1</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Bosses Defeated:</span>
+              <span class="stat-value" id="bossesDefeated">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Magic Orb Level:</span>
+              <span class="stat-value" id="orbLevel">1</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Force Field:</span>
+              <span class="stat-value" id="forceFieldLevel">None</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Coin Streak:</span>
+              <span class="stat-value" id="coinStreak">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer will be loaded dynamically by footer-loader.js for desktop/tablet only -->
+      <!-- For mobile, footer is not needed and will not be inserted -->
+    </div>
+
+    <!-- Main Menu Overlay -->
+    <div class="main-menu-overlay main-menu-overlay-hidden" id="mainMenuOverlay">
+      <div class="main-menu-content">
+        <div class="game-title">
+          <div class="game-title-left">
+            <h1><img src="assets/SuiTwo_Profile.webp" alt="SuiTwo" class="title-profile-image"> SuiTwo</h1>
+            <div class="version-badge">Alpha v0.1</div>
+          </div>
+          <!-- Badge Display (if player has badge) - Left of wallet section -->
+          <div id="menuBadgeDisplay" class="menu-badge-display" style="display: none;"></div>
+          <!-- Wallet Connection Section - Upper Right (like Insomnia) -->
+          <div class="wallet-connection-section" id="walletConnectionSection">
+            <div class="wallet-status" id="walletStatus">
+              <div class="wallet-status-text" id="walletStatusText" style="display: none;">
+                <span class="wallet-icon">🔒</span>
+                <span>Connect Wallet</span>
+              </div>
+            </div>
+            <!-- Button container - button and connected state share the same space -->
+            <div class="wallet-button-container">
+              <button class="wallet-connect-btn" id="connectWalletBtn" onclick="handleConnectWallet()" onmouseover="playMenuHoverSound()">
+                <span class="btn-icon">🔗</span>
+                <span id="connectWalletBtnText">Connect</span>
+              </button>
+              <div class="wallet-connected-state wallet-connect-btn" id="walletConnectedState" style="display: none;">
+                <div class="wallet-connected-info">
+                  <div class="wallet-address-compact" id="walletAddressCompact"></div>
+                </div>
+                <button class="wallet-disconnect-btn-compact" onclick="handleDisconnectWallet()" title="Disconnect">✕</button>
+              </div>
+            </div>
+            <!-- Balance display - below the button -->
+            <div class="wallet-balance-display" id="mewsBalanceDisplay" style="display: none;">
+              <span class="wallet-balance-value" id="mewsBalance">--</span>
+            </div>
+            <!-- Minimum requirement notice -->
+            <div class="wallet-minimum-notice" id="walletMinimumNotice">
+              <span class="minimum-notice-icon">⚠️</span>
+              <span class="minimum-notice-text">Min: 500K Mews Required</span>
+            </div>
+            <!-- Legacy display elements (for backward compatibility) -->
+            <div class="wallet-address-display" id="walletAddressDisplay" style="display: none;">
+              <span class="wallet-address-label">Connected:</span>
+              <span class="wallet-address-value" id="walletAddressValue"></span>
+              <button class="wallet-disconnect-btn" onclick="handleDisconnectWallet()" title="Disconnect">✕</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="menu-buttons">
+          <button class="menu-btn primary" id="startGameBtn" onclick="startGame()" onmouseover="playMenuHoverSound()" disabled>
+            <span class="btn-icon">▶️</span>
+            Start Game
+          </button>
+          <button class="menu-btn" id="startGameTestBtn" onclick="startGameTest()" onmouseover="playMenuHoverSound()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border-color: #ff4444; opacity: 0.5;" title="Test Mode: Bypass gatekeeping (for development/testing)" disabled>
+            <span class="btn-icon">🧪</span>
+            Start Game (Test Mode)
+          </button>
+          <button class="menu-btn" onclick="showSettings()" onmouseover="playMenuHoverSound()">
+            <span class="btn-icon">⚙️</span>
+            Settings
+          </button>
+          <button class="menu-btn" onclick="showInstructions()" onmouseover="playMenuHoverSound()">
+            <span class="btn-icon">📖</span>
+            How to Play
+          </button>
+          <button class="menu-btn" id="leaderboardMenuBtn" onclick="showLeaderboard()" onmouseover="playMenuHoverSound()">
+            <span class="btn-icon">🏆</span>
+            Leaderboard
+            <span class="claim-badge" id="leaderboardClaimBadge" style="display: none;">0</span>
+          </button>
+          <button class="menu-btn" onclick="showTournaments()" onmouseover="playMenuHoverSound()">
+            <span class="btn-icon">🎯</span>
+            Tournaments
+          </button>
+          <button class="menu-btn" onclick="showStore()" onmouseover="playMenuHoverSound()">
+            <span class="btn-icon">🛒</span>
+            Store & Inventory
+          </button>
+          <button class="menu-btn" onclick="showSoundTest()" onmouseover="playMenuHoverSound()">
+            <span class="btn-icon">🔊</span>
+            Sound Test
+          </button>
+        </div>
+        
+        <div class="menu-footer">
+          <div class="game-stats">
+            <div class="stat-item">
+              <span class="stat-label">Best Score:</span>
+              <span class="stat-value" id="bestScoreDisplay">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Games Played:</span>
+              <span class="stat-value" id="gamesPlayedDisplay">0</span>
+            </div>
+            <div class="stat-item" id="gamePassCreditsDisplay" style="display: none;">
+              <span class="stat-label">🎮 Credits:</span>
+              <span class="stat-value" id="gamePassCreditsValue">0</span>
+            </div>
+            <div class="stat-item" id="gamePassTicketsDisplay" style="display: none;">
+              <span class="stat-label">🎫 Tickets:</span>
+              <span class="stat-value" id="gamePassTicketsValue">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel settings-panel-hidden" id="settingsPanel">
+      <div class="settings-content">
+        <div class="settings-header">
+          <h2>⚙️ Game Settings</h2>
+          <button class="close-btn" onclick="hideSettings()">✕</button>
+        </div>
+        
+        <div class="settings-section controls-section">
+          <h3>🎮 Controls</h3>
+          <div class="setting-item">
+            <label for="mouseSensitivity">Mouse Sensitivity:</label>
+            <input type="range" id="mouseSensitivity" min="0.1" max="0.5" step="0.05" value="0.2">
+            <span id="mouseSensitivityValue">0.2</span>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>🎨 Graphics</h3>
+          <div class="setting-item">
+            <label for="particleEffects">Particle Effects:</label>
+            <input type="checkbox" id="particleEffects" checked>
+          </div>
+          <div class="setting-item">
+            <label for="screenShake">Screen Shake:</label>
+            <input type="checkbox" id="screenShake" checked>
+          </div>
+          <div class="setting-item">
+            <label for="trailEffects">Player Trail:</label>
+            <input type="checkbox" id="trailEffects" checked>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>🔊 Audio</h3>
+          <div class="setting-item">
+            <label for="masterVolume">Master Volume:</label>
+            <input type="range" id="masterVolume" min="0" max="100" step="10" value="70">
+            <span id="masterVolumeValue">70%</span>
+          </div>
+          <div class="setting-item">
+            <label for="soundEffectsVolume">Sound Effects Volume:</label>
+            <input type="range" id="soundEffectsVolume" min="0" max="100" step="10" value="80">
+            <span id="soundEffectsVolumeValue">80%</span>
+          </div>
+          <div class="setting-item">
+            <label for="backgroundMusicVolume">Background Music Volume:</label>
+            <input type="range" id="backgroundMusicVolume" min="0" max="100" step="10" value="60">
+            <span id="backgroundMusicVolumeValue">60%</span>
+          </div>
+          <div class="setting-item">
+            <label for="soundEffects">Sound Effects:</label>
+            <input type="checkbox" id="soundEffects" checked>
+          </div>
+          <div class="setting-item">
+            <label for="backgroundMusic">Background Music:</label>
+            <input type="checkbox" id="backgroundMusic" checked>
+          </div>
+        </div>
+        
+        <div class="settings-buttons">
+          <button class="menu-btn" onclick="resetSettings()">Reset to Default</button>
+          <button class="menu-btn primary" onclick="saveSettings()">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions Panel -->
+    <div class="instructions-panel instructions-panel-hidden" id="instructionsPanel">
+      <div class="instructions-content">
+        <div class="instructions-header">
+          <h2>📖 How to Play</h2>
+          <button class="close-btn" onclick="hideInstructions()">✕</button>
+        </div>
+        
+        <div class="instructions-section">
+          <h3>🎯 Objective</h3>
+          <p>Survive as long as possible, defeat bosses, and achieve the highest score!</p>
+        </div>
+        
+        <div class="instructions-section">
+          <h3>🎮 Controls</h3>
+          <div class="control-item">
+            <span class="control-icon">🖱️</span>
+            <span class="control-text">Mouse: Move your character vertically</span>
+          </div>
+          <div class="control-item">
+            <span class="control-icon">⏸️</span>
+            <span class="control-text">P: Pause/Resume game</span>
+          </div>
+          <div class="control-item">
+            <span class="control-icon">🔫</span>
+            <span class="control-text">Auto-Fire: Your character shoots automatically</span>
+          </div>
+        </div>
+        
+        <div class="instructions-section">
+          <h3>🎯 Gameplay</h3>
+          <ul>
+            <li>Move your character to avoid enemies and collect power-ups</li>
+            <li>Collect coins to increase your score</li>
+            <li>Pick up green power-ups to increase firepower</li>
+            <li>Avoid red power-ups that decrease firepower</li>
+            <li>Defeat bosses to progress to higher tiers</li>
+            <li>Higher tiers feature stronger enemies and bosses</li>
+          </ul>
+        </div>
+        
+        <div class="instructions-section">
+          <h3>🏆 Scoring</h3>
+          <ul>
+            <li>Destroy enemies: 15 points × enemy tier</li>
+            <li>Collect coins: 10 points each</li>
+            <li>Defeat bosses: 5000 points × tier</li>
+            <li>Survival bonus: Continuous points based on speed</li>
+          </ul>
+        </div>
+        
+        <div class="instructions-buttons">
+          <button class="menu-btn primary" onclick="hideInstructions()">Got it!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sound Test Panel -->
+    <div class="sound-test-panel sound-test-panel-hidden" id="soundTestPanel">
+      <div class="sound-test-content">
+        <div class="sound-test-header">
+          <h2>🔊 Sound Test</h2>
+          <button class="close-btn" onclick="hideSoundTest()">✕</button>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🎵 Game Sounds</h3>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="testSound('shoot')">🔫 Shoot</button>
+            <button class="sound-btn" onclick="testSound('enemyHit')">💥 Enemy Hit</button>
+            <button class="sound-btn" onclick="testSound('enemyDestroyed')">💀 Enemy Destroyed</button>
+            <button class="sound-btn" onclick="testSound('coinCollect')">🪙 Coin Collect</button>
+            <button class="sound-btn" onclick="testSound('powerupCollect')">⚡ Power Up</button>
+            <button class="sound-btn" onclick="testSound('powerupNegative')">⚠️ Power Down</button>
+            <button class="sound-btn" onclick="testSound('bossHit')">🎯 Boss Hit</button>
+            <button class="sound-btn" onclick="testSound('bossDestroyed')">💀 Boss Destroyed</button>
+            <button class="sound-btn" onclick="testSound('gameOver')">💀 Game Over</button>
+            <button class="sound-btn" onclick="testSound('levelUp')">📈 Level Up</button>
+            <button class="sound-btn" onclick="testSound('playerHit')">💢 Player Hit</button>
+          </div>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🛡️ Force Field Sounds</h3>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="testForceFieldSound('activate')">🟢 Force Field Activate</button>
+            <button class="sound-btn" onclick="testForceFieldSound('powerUp')">🔵 Force Field Power Up</button>
+            <button class="sound-btn" onclick="testForceFieldSound('powerDown')">🟡 Force Field Power Down</button>
+            <button class="sound-btn" onclick="testForceFieldSound('destroyed')">🔴 Force Field Destroyed</button>
+          </div>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🎼 Musical Sequences</h3>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="testSequence('ascending')">📈 Ascending Sequence</button>
+            <button class="sound-btn" onclick="testSequence('descending')">📉 Descending Sequence</button>
+            <button class="sound-btn" onclick="testSequence('destruction')">💥 Destruction Sequence</button>
+          </div>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🎵 Gameplay Music</h3>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="testGameplayMusic()">🎶 Play Gameplay Music</button>
+            <button class="sound-btn" onclick="testBossMusic()">👹 Play Boss Music</button>
+            <button class="sound-btn" onclick="stopBackgroundMusic()">⏹️ Stop Music</button>
+          </div>
+          
+          <h4>🎵 Theme Testing</h4>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(1)">🌌 Theme 1: Atmospheric</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(2)">⚡ Theme 2: Driving Action</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(3)">🔇 Theme 3: Minimalist</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(4)">🌃 Theme 4: Neo-Tokyo Cyberpunk</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(5)">🚀 Theme 5: Action Packed</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(6)">🎖️ Theme 6: Militaristic</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(7)">⚡ Theme 7: High Energy</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(8)">💥 Theme 8: Aggressive</button>
+          </div>
+          
+          <h4>🌙 Menu Themes (Soothing)</h4>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(9)">🌸 Theme 9: Gentle Ambient</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(10)">🕊️ Theme 10: Peaceful Melody</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(11)">✨ Theme 11: Soft Harmony</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testTheme(12)">🌌 Theme 12: Tranquil Space</button>
+          </div>
+          
+          <h4>🎼 Instrument Testing</h4>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('sine')">🔔 Sine Wave (Pure)</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('square')">📦 Square Wave (Digital)</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('sawtooth')">🔺 Sawtooth Wave (Buzzy)</button>
+            <button class="sound-btn" onclick="if(gameAudio) gameAudio.testInstrument('triangle')">🔺 Triangle Wave (Soft)</button>
+          </div>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🎮 UI & Feedback Sounds</h3>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="testSound('menuClick')">🖱️ Menu Click</button>
+            <button class="sound-btn" onclick="testSound('menuHover')">👆 Menu Hover</button>
+            <button class="sound-btn" onclick="testSound('achievement')">🏆 Achievement</button>
+            <button class="sound-btn" onclick="testSound('warning')">⚠️ Warning</button>
+            <button class="sound-btn" onclick="testSound('success')">✅ Success</button>
+          </div>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🎚️ Audio Buffer Generator (Enhanced Sounds)</h3>
+          <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">
+            These use pre-computed audio buffers for richer, more complex sounds
+          </p>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="testBufferSound('explosion')">💥 Enhanced Explosion</button>
+            <button class="sound-btn" onclick="testBufferSound('explosionIntense')">💣 Intense Explosion</button>
+            <button class="sound-btn" onclick="testBufferSound('impact')">⚡ Enhanced Impact</button>
+            <button class="sound-btn" onclick="testBufferSound('impactHeavy')">🔨 Heavy Impact</button>
+            <button class="sound-btn" onclick="testBufferSound('coinJingle')">🪙 Coin Jingle (Buffer)</button>
+            <button class="sound-btn" onclick="testBufferSound('gameOver')">💀 Game Over (Buffer)</button>
+          </div>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🎵 Audio Samples (Pre-recorded Files)</h3>
+          <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">
+            Realistic sounds from audio files. Falls back to buffers/oscillators if files not found.
+          </p>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="testSampleSound('explosion')">💥 Explosion (Sample)</button>
+            <button class="sound-btn" onclick="testSampleSound('explosionLarge')">💣 Large Explosion (Sample)</button>
+            <button class="sound-btn" onclick="testSampleSound('impact')">⚡ Impact (Sample)</button>
+            <button class="sound-btn" onclick="testSampleSound('impactHeavy')">🔨 Heavy Impact (Sample)</button>
+            <button class="sound-btn" onclick="testSampleSound('bossDestroyed')">💀 Boss Destroyed (Sample)</button>
+            <button class="sound-btn" onclick="testSampleSound('gameOver')">💀 Game Over (Sample)</button>
+          </div>
+          <div class="sound-buttons" style="margin-top: 10px;">
+            <button class="sound-btn" onclick="preloadAllSamples()">📦 Preload All Samples</button>
+          </div>
+        </div>
+        
+        <div class="sound-test-section">
+          <h3>🔧 Audio Debug</h3>
+          <div class="sound-buttons">
+            <button class="sound-btn" onclick="showAudioStats()">📊 Audio Stats</button>
+            <button class="sound-btn" onclick="testAllSounds()">🎵 Test All Sounds</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Name input modal -->
+    <div class="name-input-modal name-input-modal-hidden" id="nameInputModal">
+      <div class="name-input-content">
+        <h2>🎉 New High Score!</h2>
+        <div class="score-display">
+          Final Score: <span id="finalScoreDisplay">0</span>
+        </div>
+        <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20">
+        <div class="name-input-buttons">
+          <button class="menu-btn primary" onclick="saveScore()">Save Score</button>
+          <button class="menu-btn" onclick="skipSave()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- End viewport-container -->
+
+  <!-- ========================================== -->
+  <!-- BASE INFRASTRUCTURE - Load First -->
+  <!-- ========================================== -->
+  <!-- Config files from base (must load before game scripts) -->
+  <script src="../../base/frontend/src/config/api-config.js"></script>
+  <script src="../../base/frontend/src/config/contract-config.js"></script>
+  <!-- App-specific contract config (extends base) -->
+  <script src="src/config/contract-config.js"></script>
+  
+  <!-- ========================================== -->
+  <!-- ESSENTIAL SCRIPTS FOR START SCREEN ONLY -->
+  <!-- ========================================== -->
+  <!-- Only these scripts load on initial page load -->
+  <!-- Everything else loads when user clicks "Enter Game" -->
+  
+  <!-- Lazy Loader - Handles loading all game scripts on demand -->
+  <script src="src/game/systems/core/lazy-loader.js"></script>
+  
+  <!-- UI Initialization - Handles start screen display and Enter Game button -->
+  <!-- This is the ONLY script needed for the start screen to work -->
+  <!-- Note: CSS Loader and Device Detection already loaded in <head> -->
+  <script src="src/game/systems/ui/ui-initialization.js"></script>
+  
+  <!-- ========================================== -->
+  <!-- ALL OTHER SCRIPTS ARE LOADED LAZILY -->
+  <!-- (via lazy-loader.js when user clicks "Enter Game") -->
+  <!-- This includes: game logic, audio, images, rendering, etc. -->
+  <!-- Wallet API is loaded and initialized when menu scripts load -->
+  <!-- ========================================== -->
+</body>
+</html>

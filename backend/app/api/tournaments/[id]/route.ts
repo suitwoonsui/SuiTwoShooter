@@ -3,9 +3,9 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { getTournamentService } from '@/lib/sui/tournament-service';
-import { withApiHandler } from '@/lib/api/api-handler';
+import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
+import { getTournamentService } from '../../../../../../../backend/lib/sui/tournament-service';
+import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

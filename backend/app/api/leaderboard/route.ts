@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { suiService } from '@/lib/sui/suiService';
-import { handleCorsPreflight } from '@/lib/cors';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler } from '@/lib/api/api-handler';
+import { suiService } from '../../../../base/backend/lib/sui/suiService';
+import { handleCorsPreflight } from '../../../../base/backend/lib/cors';
+import { BadgeLogger } from '../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler } from '../../../../base/backend/lib/api/api-handler';
 
 /**
  * Generate mock leaderboard data for testing

@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
-import { storeService } from '@/lib/sui/store-service';
-import { handleCorsPreflight } from '@/lib/cors';
-import { verifyApiKey, getAdminIdentifier } from '@/lib/auth';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { storeService } from '../../../../../../../../backend/lib/sui/store-service';
+import { handleCorsPreflight } from '../../../../../../../../base/backend/lib/cors';
+import { verifyApiKey, getAdminIdentifier } from '../../../../../../../../backend/lib/auth';
+import { BadgeLogger } from '../../../../../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '../../../../../../../../base/backend/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '../../../../../../../../base/backend/lib/sui/badge-errors';
+import { BadgeValidators } from '../../../../../../../../backend/lib/sui/badge-validators';
 
 /**
  * POST /api/store/admin/add-items

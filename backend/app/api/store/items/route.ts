@@ -4,11 +4,11 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { priceConverter } from '@/lib/services/price-converter';
-import { ITEM_CATALOG } from '@/lib/services/item-catalog';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler } from '@/lib/api/api-handler';
+import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
+import { priceConverter } from '../../../../../../../backend/lib/services/price-converter';
+import { ITEM_CATALOG } from '../../../../../../../backend/lib/services/item-catalog';
+import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

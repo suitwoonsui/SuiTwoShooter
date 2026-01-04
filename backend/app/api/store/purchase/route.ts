@@ -4,16 +4,16 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { storeService } from '@/lib/sui/store-service';
-import { priceConverter } from '@/lib/services/price-converter';
-import { calculateTotalUSD } from '@/lib/services/item-catalog';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { getBadgeService } from '@/lib/sui/badge-service';
-import { getDiscounts } from '@/lib/sui/badge-service/badge-utilities';
+import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
+import { storeService } from '../../../../../../../backend/lib/sui/store-service';
+import { priceConverter } from '../../../../../../../backend/lib/services/price-converter';
+import { calculateTotalUSD } from '../../../../../../../backend/lib/services/item-catalog';
+import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
+import { BadgeValidators } from '../../../../../../../backend/lib/sui/badge-validators';
+import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
+import { getBadgeService } from '../../../../../../../backend/lib/sui/badge-service';
+import { getDiscounts } from '../../../../../../../backend/lib/sui/badge-service/badge-utilities';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

@@ -4,12 +4,12 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { storeService } from '@/lib/sui/store-service';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
+import { storeService } from '../../../../../../../backend/lib/sui/store-service';
+import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
+import { BadgeValidators } from '../../../../../../../backend/lib/sui/badge-validators';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

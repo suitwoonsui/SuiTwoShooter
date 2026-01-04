@@ -1,12 +1,12 @@
 // Tournament Migration API endpoint
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { adminWalletService } from '@/lib/sui/admin-wallet-service';
-import { TournamentMigrationService } from '@/lib/sui/migration-service';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { getConfig } from '@/config/config';
+import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
+import { adminWalletService } from '../../../../../../../backend/lib/sui/admin-wallet-service';
+import { TournamentMigrationService } from '../../../../../../../backend/lib/sui/migration-service';
+import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
+import { getConfig } from '../../../../../../../base/backend/config/config';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

@@ -4,9 +4,9 @@
 // User-triggered claim for a specific milestone
 
 import { NextRequest, NextResponse } from 'next/server';
-import { withApiHandler } from '@/lib/api/api-handler';
-import { getAchievementService } from '@/lib/sui/achievement-service';
-import { getCorsHeaders } from '@/lib/cors';
+import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
+import { getAchievementService } from '../../../../../../../backend/lib/sui/achievement-service';
+import { getCorsHeaders } from '../../../../../../../base/backend/lib/cors';
 
 // Handle CORS preflight request
 export async function OPTIONS(request: NextRequest) {

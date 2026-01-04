@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { suiService } from '@/lib/sui/suiService';
-import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { suiService } from '../../../../../base/backend/lib/sui/suiService';
+import { withApiHandler, getRequestBody } from '../../../../../base/backend/lib/api/api-handler';
 
 /**
  * POST /api/scores/verify

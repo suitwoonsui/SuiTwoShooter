@@ -4,10 +4,10 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '@/lib/cors';
-import { storeService } from '@/lib/sui/store-service';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
-import { withApiHandler, getDigestParam } from '@/lib/api/api-handler';
+import { handleCorsPreflight } from '../../../../../../../../base/backend/lib/cors';
+import { storeService } from '../../../../../../../../backend/lib/sui/store-service';
+import { BadgeLogger } from '../../../../../../../../base/backend/lib/sui/badge-logger';
+import { withApiHandler, getDigestParam } from '../../../../../../../../base/backend/lib/api/api-handler';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
