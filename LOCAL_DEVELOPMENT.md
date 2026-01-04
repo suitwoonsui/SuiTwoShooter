@@ -61,7 +61,7 @@ npm install  # First time only
 npm run dev
 ```
 
-Frontend will run on `http://localhost:8000`
+Frontend will run on `http://localhost:8000` and serve from `apps/shooter-game/frontend/`
 
 Open `http://localhost:8000` in your browser.
 

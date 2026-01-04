@@ -1,0 +1,210 @@
+// ==========================================
+// PROPOSED CHANGES FOR MILESTONE_ID
+// ==========================================
+// This file shows the changes needed to add milestone_id support
+// Apply these changes to achievement_system.move
+
+// CHANGE 1: Update MilestoneDefinition struct (around line 67)
+struct MilestoneDefinition has store, drop, copy {
+    milestone_id: u64,        // NEW: Stable unique identifier (never changes)
+    milestone_level: u8,      // Level within category (can change during reorganization)
+    category: u8,
+    threshold: u64,      // The value needed (e.g., 5 games, 100 coins) - can be changed
+    credits: u64,        // Free credits awarded
+    items: vector<ItemReward>,  // Item rewards
+}
+
+// CHANGE 2: Update AchievementRegistry struct (around line 97)
+struct AchievementRegistry has key {
+    id: UID,
+    admin: address,
+    
+    // NEW: Auto-incrementing counter for milestone IDs
+    next_milestone_id: u64,
+    
+    // Milestone definitions: category -> Table<milestone_level, MilestoneDefinition>
+    milestone_definitions: Table<u8, Table<u8, MilestoneDefinition>>,
+    
+    // Sorted milestone levels per category for efficient querying
+    category_milestone_levels: Table<u8, vector<u8>>,
+    
+    // NEW: Index by milestone_id for efficient lookup
+    milestone_by_id: Table<u64, (u8, u8)>, // milestone_id -> (category, level)
+    
+    // Player achievements: player address -> PlayerAchievements ID
+    player_achievements: Table<address, ID>,
+    
+    // Claimed milestones: player address -> category -> vector of claimed milestone levels
+    claimed_milestones: Table<address, Table<u8, vector<u8>>>,
+    
+    // NEW: ID-based claimed milestones tracking
+    claimed_milestone_ids: Table<address, vector<u64>>, // All claimed milestone IDs
+}
+
+// CHANGE 3: Update initialize_achievement_registry (around line 169)
+public entry fun initialize_achievement_registry(admin_address: address, ctx: &mut TxContext) {
+    let registry = AchievementRegistry {
+        id: object::new(ctx),
+        admin: admin_address,
+        next_milestone_id: 1,  // NEW: Start at 1
+        milestone_definitions: table::new(ctx),
+        category_milestone_levels: table::new(ctx),
+        milestone_by_id: table::new(ctx),  // NEW
+        player_achievements: table::new(ctx),
+        claimed_milestones: table::new(ctx),
+        claimed_milestone_ids: table::new(ctx),  // NEW
+    };
+    transfer::share_object(registry);
+}
+
+// CHANGE 4: Update add_milestone_definition (around line 234)
+public fun add_milestone_definition(
+    _admin_cap: &AdminCapability,
+    registry: &mut AchievementRegistry,
+    category: u8,
+    milestone_level: u8,
+    threshold: u64,
+    credits: u64,
+    items: vector<ItemReward>,
+    clock: &Clock,
+    ctx: &mut TxContext
+) {
+    assert!(category >= CATEGORY_GAMES_PLAYED && category <= CATEGORY_COIN_STREAK, E_INVALID_CATEGORY);
+    assert!(milestone_level > 0, E_INVALID_MILESTONE_LEVEL);
+    assert!(threshold > 0, E_INVALID_THRESHOLD);
+    
+    // NEW: Get and increment milestone_id
+    let milestone_id = registry.next_milestone_id;
+    registry.next_milestone_id = milestone_id + 1;
+    
+    let milestone = MilestoneDefinition {
+        milestone_id,  // NEW
+        milestone_level,
+        category,
+        threshold,
+        credits,
+        items,
+    };
+    
+    // Get or create category table
+    if (!table::contains(&registry.milestone_definitions, category)) {
+        let category_table = table::new(ctx);
+        table::add(&mut registry.milestone_definitions, category, category_table);
+    };
+    
+    let category_table = table::borrow_mut(&mut registry.milestone_definitions, category);
+    assert!(!table::contains(category_table, milestone_level), E_MILESTONE_ALREADY_EXISTS);
+    table::add(category_table, milestone_level, milestone);
+    
+    // NEW: Add to milestone_by_id index
+    table::add(&mut registry.milestone_by_id, milestone_id, (category, milestone_level));
+    
+    // Maintain sorted milestone levels list
+    if (!table::contains(&registry.category_milestone_levels, category)) {
+        let levels = vector::empty<u8>();
+        table::add(&mut registry.category_milestone_levels, category, levels);
+    };
+    let levels = table::borrow_mut(&mut registry.category_milestone_levels, category);
+    insert_milestone_level_sorted(levels, milestone_level);
+    
+    sui::event::emit(MilestoneDefinitionAdded {
+        category,
+        milestone_level,
+        milestone_id,  // NEW: Include in event
+        threshold,
+        credits,
+        items_count: vector::length(&milestone.items),
+        timestamp: clock::timestamp_ms(clock),
+    });
+}
+
+// CHANGE 5: Add new lookup functions (add after get_milestone_definition_full)
+/// Get milestone by stable ID
+public fun get_milestone_by_id(
+    registry: &AchievementRegistry,
+    milestone_id: u64
+): (bool, MilestoneDefinition) {
+    if (!table::contains(&registry.milestone_by_id, milestone_id)) {
+        return (false, MilestoneDefinition {
+            milestone_id: 0,
+            milestone_level: 0,
+            category: 0,
+            threshold: 0,
+            credits: 0,
+            items: vector::empty(),
+        });
+    };
+    
+    let (category, milestone_level) = *table::borrow(&registry.milestone_by_id, milestone_id);
+    get_milestone_definition_full(registry, category, milestone_level)
+}
+
+/// Get milestone_id for a category/level
+public fun get_milestone_id(
+    registry: &AchievementRegistry,
+    category: u8,
+    milestone_level: u8
+): (bool, u64) {
+    if (!table::contains(&registry.milestone_definitions, category)) {
+        return (false, 0);
+    };
+    
+    let category_table = table::borrow(&registry.milestone_definitions, category);
+    if (!table::contains(category_table, milestone_level)) {
+        return (false, 0);
+    };
+    
+    let milestone = table::borrow(category_table, milestone_level);
+    (true, milestone.milestone_id)
+}
+
+// CHANGE 6: Update claim_milestone to also track by ID (around line 939)
+// In claim_milestone function, after adding to claimed_milestones:
+// Also add milestone_id to claimed_milestone_ids
+
+// CHANGE 7: Update events to include milestone_id
+struct MilestoneDefinitionAdded has copy, drop {
+    category: u8,
+    milestone_level: u8,
+    milestone_id: u64,  // NEW
+    threshold: u64,
+    credits: u64,
+    items_count: u64,
+    timestamp: u64,
+}
+
+struct AchievementClaimed has copy, drop {
+    player: address,
+    category: u8,
+    milestone_level: u8,
+    milestone_id: u64,  // NEW
+    threshold: u64,
+    credits_awarded: u64,
+    timestamp: u64,
+}
+
+// CHANGE 8: Add function to update milestone_id for existing milestones (migration)
+public entry fun update_milestone_id(
+    _admin_cap: &AdminCapability,
+    registry: &mut AchievementRegistry,
+    category: u8,
+    milestone_level: u8,
+    milestone_id: u64,
+    clock: &Clock
+) {
+    assert!(category >= CATEGORY_GAMES_PLAYED && category <= CATEGORY_COIN_STREAK, E_INVALID_CATEGORY);
+    
+    let category_table = table::borrow_mut(&mut registry.milestone_definitions, category);
+    let milestone = table::borrow_mut(category_table, milestone_level);
+    
+    // Update milestone_id
+    milestone.milestone_id = milestone_id;
+    
+    // Add to index
+    table::add(&mut registry.milestone_by_id, milestone_id, (category, milestone_level));
+    
+    // Update counter if needed
+    if (milestone_id >= registry.next_milestone_id) {
+        registry.next_milestone_id = milestone_id + 1;
+    };
+}

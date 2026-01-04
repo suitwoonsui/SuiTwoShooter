@@ -1,0 +1,9 @@
+[package]
+name = "suitwo_game"
+version = "1.0.0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+suitwo_game = "0x0"

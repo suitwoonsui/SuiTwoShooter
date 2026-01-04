@@ -1,0 +1,23 @@
+/* ========================================== */
+/* DESKTOP GAMEPLAY MODULE */
+/* Extracted from game-styles.css lines 647-704 */
+/* ========================================== */
+
+
+/* Loading Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.game-container {
+  animation: fadeIn 0.8s ease-out;
+}
+
+.leaderboard {
+  animation: fadeIn 1s ease-out 0.2s both;
+}
+
+.suitch-footer {
+  animation: fadeIn 1.2s ease-out 0.4s both;
+}

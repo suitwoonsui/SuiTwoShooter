@@ -7,8 +7,8 @@
     "start": "node server.js",
     "dev:all": "node scripts/dev-all.js",
     "dev:backend": "cd backend && npm run dev",
-    "dev:wallet": "cd wallet-module && npm run build",
-    "build:wallet": "cd wallet-module && npm run build"
+    "dev:wallet": "cd base/wallet-module && npm run build",
+    "build:wallet": "cd base/wallet-module && npm run build"
   },
   "keywords": [],
   "author": "",

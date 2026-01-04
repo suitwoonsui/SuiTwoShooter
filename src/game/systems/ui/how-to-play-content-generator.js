@@ -704,7 +704,56 @@ function generateTournamentsTab() {
   `;
 }
 
+/**
+ * Construct badge image URL for How to Play modal
+ * @param {string} tierName - Badge tier name (Standard, Common, Uncommon, Rare, Epic, Legendary)
+ * @returns {string} Badge image URL
+ */
+function getBadgeImageUrlForHowToPlay(tierName) {
+  // Try to use existing constructBadgeImageUrl function if available
+  if (typeof window !== 'undefined' && typeof window.constructBadgeImageUrl === 'function') {
+    const tierMap = { 'Standard': 0, 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5 };
+    const tier = tierMap[tierName] !== undefined ? tierMap[tierName] : 0;
+    return window.constructBadgeImageUrl(tier);
+  }
+  
+  // Fallback: construct URL manually
+  const apiBaseUrl = typeof window !== 'undefined' && window.GAME_CONFIG?.API_BASE_URL 
+    ? window.GAME_CONFIG.API_BASE_URL 
+    : 'http://localhost:3000/api';
+  const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+  return `${baseUrl}/Badges/${tierName}.webp`;
+}
+
 function generateProgressionTab() {
+  // Badge tier data with images
+  const badgeTiers = [
+    { name: 'Standard', games: '1-4', storeDiscount: '0%', gameplayDiscount: '0%', description: 'Your journey begins' },
+    { name: 'Common', games: '5-14', storeDiscount: '5%', gameplayDiscount: '0%', description: '' },
+    { name: 'Uncommon', games: '15-34', storeDiscount: '10%', gameplayDiscount: '5%', description: '' },
+    { name: 'Rare', games: '35-74', storeDiscount: '15%', gameplayDiscount: '10%', description: '' },
+    { name: 'Epic', games: '75-149', storeDiscount: '20%', gameplayDiscount: '15%', description: '' },
+    { name: 'Legendary', games: '150+', storeDiscount: '25%', gameplayDiscount: '20%', description: '' }
+  ];
+
+  const badgeTiersHtml = badgeTiers.map(tier => {
+    const badgeImageUrl = getBadgeImageUrlForHowToPlay(tier.name);
+    const discountText = `${tier.storeDiscount} store discount, ${tier.gameplayDiscount} gameplay discount`;
+    const descriptionText = tier.description ? ` - ${tier.description}` : '';
+    
+    return `
+      <li style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <img src="${badgeImageUrl}" 
+             alt="${tier.name} Badge" 
+             style="width: 48px; height: 48px; object-fit: contain; flex-shrink: 0;"
+             onerror="this.style.display='none';">
+        <div>
+          <strong>${tier.name} (${tier.games} games):</strong> ${discountText}${descriptionText}
+        </div>
+      </li>
+    `;
+  }).join('');
+
   return `
     <div id="tab-progression" class="how-to-play-tab-content" data-tab-index="8">
       ${createContentSection('Badge System', '🏅', `
@@ -713,13 +762,8 @@ function generateProgressionTab() {
         </p>
         <div class="how-to-play-gameplay">
           <h4>Badge Tiers</h4>
-          <ul>
-            <li><strong>Standard (1-4 games):</strong> 0% discounts - Your journey begins</li>
-            <li><strong>Common (5-14 games):</strong> 5% store discount, 0% gameplay discount</li>
-            <li><strong>Uncommon (15-34 games):</strong> 10% store discount, 5% gameplay discount</li>
-            <li><strong>Rare (35-74 games):</strong> 15% store discount, 10% gameplay discount</li>
-            <li><strong>Epic (75-149 games):</strong> 20% store discount, 15% gameplay discount</li>
-            <li><strong>Legendary (150+ games):</strong> 25% store discount, 20% gameplay discount</li>
+          <ul style="list-style: none; padding-left: 0;">
+            ${badgeTiersHtml}
           </ul>
           <h4>Benefits</h4>
           <ul>

@@ -1,0 +1,262 @@
+/* ========================================== */
+/* MOBILE INTERACTIONS MODULE */
+/* ========================================== */
+/* Touch effects and mobile interactions */
+/* Converted from mobile-ui-styles.css - removed media queries, using viewport units */
+
+/* Mobile Touch Feedback */
+.mobile-touch-active {
+  transform: scale(0.95);
+  opacity: 0.8;
+  transition: all 0.1s ease;
+}
+
+/* Mobile Close Buttons */
+.mobile-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: min(0.2vw, 0.3vh) solid rgba(255, 255, 255, 0.3); /* Dynamic border */
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: min(1vh, 1.5vw); /* Dynamic padding */
+  font-size: min(1.2vw, 1.8vh); /* Dynamic font size */
+  min-height: min(5vh, 3.5vw); /* Dynamic minimum height */
+  min-width: min(5vh, 3.5vw); /* Dynamic minimum width */
+  border-radius: min(0.8vh, 1.2vw); /* Dynamic border radius */
+  transition: all 0.2s ease;
+}
+
+.mobile-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+}
+
+.mobile-close-btn:active {
+  transform: scale(0.9);
+}
+
+/* Mobile Back Buttons */
+.mobile-back-button {
+  background: linear-gradient(135deg, rgba(77, 162, 255, 0.2), rgba(58, 123, 213, 0.2));
+  border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.4); /* Dynamic border */
+  position: relative;
+}
+
+.mobile-back-button::before {
+  content: '←';
+  margin-right: 0.8vw; /* Converted from 8px */
+  font-size: 1.2vw; /* Converted from 1.2rem */
+}
+
+/* Mobile Panel Animations */
+.mobile-optimized {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.mobile-optimized.slide-in {
+  animation: mobileSlideIn 0.3s ease-out;
+}
+
+.mobile-optimized.slide-out {
+  animation: mobileSlideOut 0.3s ease-in;
+}
+
+@keyframes mobileSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes mobileSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Mobile Menu State Indicators */
+.mobile-menu-active {
+  background: rgba(77, 162, 255, 0.1);
+  border-color: #4DA2FF;
+  box-shadow: 0 0 2vh rgba(77, 162, 255, 0.3); /* Converted from 20px */
+}
+
+/* Mobile Gesture Hints */
+.mobile-gesture-hint {
+  position: absolute;
+  bottom: 2vh; /* Converted from 20px */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.8vh 1.6vw; /* Converted from 8px 16px */
+  border-radius: 2vh; /* Converted from 20px */
+  font-size: 0.9vw; /* Converted from 0.9rem */
+  opacity: 0.7;
+  animation: mobileHintPulse 2s ease-in-out infinite;
+}
+
+@keyframes mobileHintPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Mobile Panel Overlays - Converted from media query */
+.settings-panel,
+.instructions-panel,
+.leaderboard-modal,
+.sound-test-panel {
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(min(1vh, 1.5vw)); /* Dynamic blur */
+  -webkit-backdrop-filter: blur(min(1vh, 1.5vw)); /* Dynamic blur */
+}
+
+.settings-content,
+.instructions-content,
+.leaderboard-content,
+.sound-test-content {
+  background: rgba(0, 0, 0, 0.8);
+  border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3); /* Dynamic border */
+  border-radius: 2vh; /* Converted from 20px */
+  box-shadow: 0 0 3vh rgba(0, 0, 0, 0.5); /* Converted from 30px */
+}
+
+/* Mobile Panel Headers */
+.settings-header,
+.instructions-header,
+.leaderboard-header,
+.sound-test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2vh; /* Converted from 20px */
+  border-bottom: 1px solid rgba(77, 162, 255, 0.2);
+}
+
+.settings-header h2,
+.instructions-header h2,
+.leaderboard-header h2,
+.sound-test-header h2 {
+  font-size: 1.5vw; /* Converted from 1.5rem */
+  margin: 0;
+  color: #4DA2FF;
+}
+
+/* Touch-friendly button enhancements */
+.mobile-btn {
+  min-height: min(6vh, 4vw); /* Dynamic minimum touch target size */
+  min-width: min(6vh, 4vw); /* Dynamic minimum touch target size */
+  padding: min(1.5vh, 2vw); /* Dynamic padding */
+  font-size: min(1.4vw, 2vh); /* Dynamic font size */
+  border: min(0.2vw, 0.3vh) solid; /* Dynamic border */
+  border-radius: min(1vh, 1.5vw); /* Dynamic border radius */
+  touch-action: manipulation; /* Prevent double-tap zoom */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: all 0.3s ease;
+}
+
+.mobile-btn:active {
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
+}
+
+/* Mobile-specific hover states (for devices that support hover) */
+@media (hover: hover) {
+  .mobile-btn:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
+  }
+}
+
+/* Mobile gesture support */
+.mobile-swipeable {
+  touch-action: pan-x pan-y;
+  overflow: hidden;
+}
+
+.mobile-scrollable {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/* Mobile focus states for accessibility */
+.mobile-btn:focus {
+  outline: 2px solid #4DA2FF;
+  outline-offset: 2px;
+}
+
+/* Mobile loading states */
+.mobile-loading {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2vh;
+  height: 2vh;
+  margin: -1vh 0 0 -1vh;
+  border: min(0.2vw, 0.3vh) solid transparent; /* Dynamic border */
+  border-top: min(0.2vw, 0.3vh) solid #4DA2FF; /* Dynamic border */
+  border-radius: 50%;
+  animation: mobileSpin 1s linear infinite;
+}
+
+@keyframes mobileSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ========================================== */
+/* MOBILE TEST PANEL STYLES */
+/* ========================================== */
+
+.mobile-test-panel {
+  position: fixed;
+  top: min(10vh, 12vw);
+  left: min(2vw, 3vh);
+  width: min(30vw, 40vh);
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.9);
+  border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.5);
+  border-radius: min(1vh, 1.5vw);
+  padding: min(1.5vh, 2vw);
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.test-panel-title {
+  margin: 0 0 min(1vh, 1.5vw) 0;
+  font-size: min(1.6vw, 2.2vh);
+  color: #4DA2FF;
+  font-weight: bold;
+}
+
+.test-panel-info p {
+  margin: min(0.5vh, 0.8vw) 0;
+  font-size: min(1.2vw, 1.6vh);
+  line-height: 1.3;
+}
+
+.test-panel-buttons {
+  margin-top: min(1.5vh, 2vw);
+  display: flex;
+  flex-direction: column;
+  gap: min(0.8vh, 1.2vw);
+}
