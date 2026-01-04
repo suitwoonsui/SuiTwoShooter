@@ -73,7 +73,7 @@ setTimeout(() => {
   // 2. Build wallet module first, then watch
   log('wallet', 'Building wallet module...');
   const walletBuild = spawn('npm', ['run', 'build'], {
-    cwd: path.join(__dirname, '..', 'base', 'wallet-module'),
+    cwd: path.join(__dirname, '..', 'wallet-module'),
     stdio: 'inherit',
     shell: true,
   });

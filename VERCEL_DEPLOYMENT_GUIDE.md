@@ -1,12 +1,11 @@
 # Vercel Deployment Guide
 
-This guide explains how to deploy both the frontend and backend to Vercel with the new multi-app architecture.
+This guide explains how to deploy both the frontend and backend to Vercel from the `sui-integration` branch.
 
 ## Overview
 
-- **Frontend**: Static site (`apps/shooter-game/frontend/`) - serves the game with wallet connection
-- **Backend**: Next.js API (`backend/` directory) - handles SUI blockchain interactions
-- **Base Infrastructure**: Shared code in `base/` (included in deployments)
+- **Frontend**: Static site (root directory) - serves the game with wallet connection
+- **Backend**: Next.js API (backend/ directory) - handles SUI blockchain interactions
 
 ## Option 1: Two Separate Vercel Projects (Recommended)
 
@@ -51,11 +50,11 @@ This is the cleanest approach - deploy frontend and backend as separate projects
 2. Import the same repository: `suitwoonsui/SuiTwoShooter`
 3. Configure the project:
    - **Project Name**: `suitwo-game` (or your preferred name)
-   - **Framework Preset**: Other (static site)
-   - **Root Directory**: `apps/shooter-game/frontend`
-   - **Branch**: `sui-integration` (or your main branch)
+   - **Framework Preset**: Other (or Vite if detected)
+   - **Root Directory**: `.` (root)
+   - **Branch**: `sui-integration`
    - **Build Command**: Leave empty (static site)
-   - **Output Directory**: `.` (serves from root directory)
+   - **Output Directory**: `.` (root)
    - **Install Command**: Leave empty or `npm install` if needed
 
 4. **Environment Variables** (Optional - the frontend will auto-detect):
@@ -64,27 +63,24 @@ This is the cleanest approach - deploy frontend and backend as separate projects
      ```html
      <meta name="backend-url" content="https://suitwo-backend.vercel.app/api">
      ```
-   - The base config is in `base/frontend/src/config/api-config.js` (loaded automatically)
+   - Or set `VITE_BACKEND_URL` if you want to use environment variables
 
 5. **Backend URL Configuration**:
-   - The frontend uses `base/frontend/src/config/api-config.js` for base configuration
-   - App-specific config is in `apps/shooter-game/frontend/src/config/contract-config.js`
-   - All API calls use `window.GAME_CONFIG.API_BASE_URL`
-   - Production automatically detects from meta tags or uses configured URLs
-   - Development uses `http://localhost:3000/api`
+   - The frontend uses `src/config/api-config.js` to set the backend URL
+   - It automatically uses `https://suitwo-backend.vercel.app/api` in production
+   - Update the backend URL in `src/config/api-config.js` if your backend has a different URL
 
 6. Click **"Deploy"**
 
 ### Step 3: Verify Configuration
 
 The frontend is already configured to use the backend URL automatically:
-- `base/frontend/src/config/api-config.js` handles backend URL detection (base config)
-- `apps/shooter-game/frontend/src/config/contract-config.js` handles app-specific contracts
+- `src/config/api-config.js` handles backend URL detection
 - All API calls use `window.GAME_CONFIG.API_BASE_URL`
-- Production automatically uses meta tags or configured URLs
+- Production automatically uses `https://suitwo-backend.vercel.app/api`
 - Development uses `http://localhost:3000/api`
 
-**Important**: After deploying the backend, update the backend URL via meta tag in `apps/shooter-game/frontend/index.html` or ensure the base config detects it correctly.
+**Important**: After deploying the backend, update the backend URL in `src/config/api-config.js` to match your actual Vercel backend URL (replace `suitwo-backend` with your actual project name).
 
 ## Option 2: Single Vercel Project with Monorepo
 
@@ -124,10 +120,8 @@ Make sure all required environment variables are set in Vercel dashboard for the
 
 ### API Not Found
 - Verify backend URL is correct
-- Check that base API routes are in `base/backend/app/api/` directory
-- Check that game API routes are in `apps/shooter-game/backend/app/api/` directory
+- Check that API routes are in `backend/app/api/` directory
 - Ensure Next.js build completed successfully
-- Verify imports use correct relative paths to base services
 
 ## Custom Domains
 
