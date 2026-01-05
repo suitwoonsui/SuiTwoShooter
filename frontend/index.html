@@ -732,8 +732,10 @@
   <!-- BASE INFRASTRUCTURE - Load First -->
   <!-- ========================================== -->
   <!-- Config files from base (must load before game scripts) -->
-  <script src="../../base/frontend/src/config/api-config.js"></script>
-  <script src="../../base/frontend/src/config/contract-config.js"></script>
+  <!-- Uses copied files in base-config/ (created by build script) -->
+  <!-- For local dev: Run "npm run build:frontend" first, or server.js will handle fallback -->
+  <script src="base-config/api-config.js"></script>
+  <script src="base-config/contract-config.js"></script>
   <!-- App-specific contract config (extends base) -->
   <script src="src/config/contract-config.js"></script>
   
