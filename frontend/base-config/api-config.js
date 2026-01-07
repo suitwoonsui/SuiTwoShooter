@@ -38,8 +38,26 @@ const getConfig = () => {
       config.walletModuleUrl = '../../../base/wallet-module/dist/wallet-api.umd.cjs';
     } else {
       // 2. For production, try meta tags first (for static HTML configuration)
-      const backendMeta = document.querySelector('meta[name="backend-url"]');
-      const walletMeta = document.querySelector('meta[name="wallet-module-url"]');
+      // Use a more robust method to read meta tags (in case script runs before DOM is fully parsed)
+      let backendMeta = document.querySelector('meta[name="backend-url"]');
+      let walletMeta = document.querySelector('meta[name="wallet-module-url"]');
+      
+      // If meta tags not found immediately, try reading from head directly
+      if (!backendMeta || !walletMeta) {
+        const head = document.head || document.getElementsByTagName('head')[0];
+        if (head) {
+          const allMetas = head.getElementsByTagName('meta');
+          for (let i = 0; i < allMetas.length; i++) {
+            const meta = allMetas[i];
+            if (meta.getAttribute('name') === 'backend-url' && !backendMeta) {
+              backendMeta = meta;
+            }
+            if (meta.getAttribute('name') === 'wallet-module-url' && !walletMeta) {
+              walletMeta = meta;
+            }
+          }
+        }
+      }
       
       if (backendMeta) {
         config.backendUrl = backendMeta.getAttribute('content');
@@ -49,18 +67,15 @@ const getConfig = () => {
       }
       
       // 3. Set defaults based on environment (if meta tags not set)
-      // Apps should provide their own defaults via meta tags or environment variables
+      // Use production URLs as defaults for production environments
       if (!config.backendUrl) {
-        // Default: try to detect from environment or use localhost
-        // Apps should override via meta tags
-        config.backendUrl = 'http://localhost:3000/api';
+        // Default production backend URL
+        config.backendUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app/api';
       }
       
       if (!config.walletModuleUrl) {
-        // Default: relative path to base wallet module
-        // Apps should override via meta tags if using CDN
-        // Path from app frontend to base wallet module (apps/app-name/frontend/ -> base/wallet-module/dist/)
-        config.walletModuleUrl = '../../../base/wallet-module/dist/wallet-api.umd.cjs';
+        // Default production wallet module URL
+        config.walletModuleUrl = 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs';
       }
     }
   } else {
