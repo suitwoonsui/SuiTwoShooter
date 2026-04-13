@@ -5,12 +5,12 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../../base/backend/lib/cors';
-import { withApiHandler, getRequestBody } from '../../../../../../../../base/backend/lib/api/api-handler';
-import { getTournamentService } from '../../../../../../../../backend/lib/sui/tournament-service';
-import { BadgeError, BadgeErrorCode } from '../../../../../../../../base/backend/lib/sui/badge-errors';
-import { BadgeValidators } from '../../../../../../../../backend/lib/sui/badge-validators';
-import { BadgeLogger } from '../../../../../../../../base/backend/lib/sui/badge-logger';
+import { handleCorsPreflight } from '@/lib/cors';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { getTournamentService } from '@/lib/sui/tournament-service';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
 
 /**
  * POST /api/tournaments/[id]/submit-score
@@ -181,7 +181,7 @@ export const POST = withApiHandler(
               return;
             }
 
-            const { getRewardsService } = await import('../../../../../../../../backend/lib/sui/rewards-service');
+            const { getRewardsService } = await import('@/lib/sui/rewards-service');
             const rewardsService = getRewardsService();
 
             // Get leaderboard (top 10)
@@ -192,9 +192,9 @@ export const POST = withApiHandler(
 
             if (leaderboardResult.success && leaderboardResult.leaderboard && leaderboardResult.leaderboard.length > 0) {
               // Calculate rewards
-              const distributions = await rewardsService.calculateTournamentRewards(
-                recheckTournament.prizePoolUSDCents,
-                leaderboardResult.leaderboard.map((entry, index) => ({
+                const distributions = await rewardsService.calculateTournamentRewards(
+                  recheckTournament.prizePoolUSDCents,
+                  leaderboardResult.leaderboard.map((entry: any, index: number) => ({
                   rank: index + 1,
                   playerAddress: entry.playerAddress,
                   playerName: entry.playerName,
@@ -217,9 +217,9 @@ export const POST = withApiHandler(
 
                 // CRITICAL: Update distribution status on contract to prevent duplicate distributions
                 try {
-                  const { getConfig } = await import('../../../../../../../../base/backend/config/config');
-                  const { getAdminWalletService } = await import('../../../../../../../../backend/lib/sui/admin-wallet-service');
-                  const { executeTransactionWithFinalization } = await import('../../../../../../../../backend/lib/sui/transaction-helpers');
+                  const { getConfig } = await import('@/config/config');
+                  const { getAdminWalletService } = await import('@/lib/sui/admin-wallet-service');
+                  const { executeTransactionWithFinalization } = await import('@/lib/sui/transaction-helpers');
                   
                   const config = getConfig();
                   const packageId = config.contracts.gameScore?.split('::')[0] || config.contracts.gameScore;
@@ -262,15 +262,15 @@ export const POST = withApiHandler(
                     txb,
                     {
                       logger: {
-                        info: (msg, data) => BadgeLogger.info(`🎁 [TOURNAMENT SCORE API] ${msg}`, data),
-                        warn: (msg, data) => BadgeLogger.warn(`🎁 [TOURNAMENT SCORE API] ${msg}`, data),
-                        error: (msg, data) => BadgeLogger.error(`🎁 [TOURNAMENT SCORE API] ${msg}`, data),
+                        info: (msg: string, data?: unknown) => BadgeLogger.info(`🎁 [TOURNAMENT SCORE API] ${msg}`, data),
+                        warn: (msg: string, data?: unknown) => BadgeLogger.warn(`🎁 [TOURNAMENT SCORE API] ${msg}`, data),
+                        error: (msg: string, data?: unknown) => BadgeLogger.error(`🎁 [TOURNAMENT SCORE API] ${msg}`, data),
                       },
                     }
                   );
                   
                   // Verify the transaction actually succeeded
-                  if (statusResult.effects?.status?.status === 'success') {
+                  if ((statusResult as any).effects?.status?.status === 'success') {
                     BadgeLogger.info('🎁 [TOURNAMENT SCORE API] Distribution status updated on contract successfully', {
                       tournamentId: recheckTournament.tournamentId,
                       status: 1,
@@ -279,7 +279,7 @@ export const POST = withApiHandler(
 
                     // Move tournament to past table after successful reward distribution
                     try {
-                      const { getTournamentService } = await import('../../../../../../../../backend/lib/sui/tournament-service');
+                      const { getTournamentService } = await import('@/lib/sui/tournament-service');
                       const tournamentService = getTournamentService();
                       const moveResult = await tournamentService.moveTournamentToPast(recheckTournament.tournamentId);
                       if (moveResult.success) {
@@ -301,7 +301,7 @@ export const POST = withApiHandler(
                       });
                     }
                   } else {
-                    const errorMsg = statusResult.effects?.status?.error || 'Transaction did not succeed';
+                    const errorMsg = (statusResult as any).effects?.status?.error || 'Transaction did not succeed';
                     BadgeLogger.error('🎁 [TOURNAMENT SCORE API] Distribution status update transaction failed', {
                       tournamentId: recheckTournament.tournamentId,
                       error: errorMsg,

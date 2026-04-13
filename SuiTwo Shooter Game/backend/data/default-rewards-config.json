@@ -1,0 +1,67 @@
+{
+  "rewardDepth": 5,
+  "poolDepth": 3,
+  "poolDistribution": [
+    50,
+    30,
+    20
+  ],
+  "poolSource": 0,
+  "itemRewards": {
+    "1": [
+      {
+        "itemId": "destroy_all",
+        "level": 1,
+        "quantity": 1
+      },
+      {
+        "itemId": "boss_kill_shot",
+        "level": 1,
+        "quantity": 1
+      },
+      {
+        "itemId": "random",
+        "level": 1,
+        "quantity": 1
+      }
+    ],
+    "2": [
+      {
+        "itemId": "boss_kill_shot",
+        "level": 1,
+        "quantity": 1
+      },
+      {
+        "itemId": "random",
+        "level": 1,
+        "quantity": 1
+      }
+    ],
+    "3": [
+      {
+        "itemId": "destroy_all",
+        "level": 1,
+        "quantity": 1
+      },
+      {
+        "itemId": "random",
+        "level": 1,
+        "quantity": 1
+      }
+    ],
+    "4": [
+      {
+        "itemId": "random",
+        "level": 1,
+        "quantity": 1
+      }
+    ],
+    "5": [
+      {
+        "itemId": "random",
+        "level": 1,
+        "quantity": 1
+      }
+    ]
+  }
+}

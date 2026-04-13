@@ -5,12 +5,12 @@
 // to immediately schedule reward distribution
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
-import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
-import { getTournamentService } from '../../../../../../../backend/lib/sui/tournament-service';
-import { TournamentScheduler } from '../../../../../../../backend/lib/services/tournament-scheduler';
-import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
-import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { handleCorsPreflight } from '@/lib/cors';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { getTournamentService } from '@/lib/sui/tournament-service';
+import { TournamentScheduler } from '@/lib/services/tournament-scheduler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

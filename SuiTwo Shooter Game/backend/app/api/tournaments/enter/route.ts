@@ -4,13 +4,13 @@
 // ==========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
-import { getTournamentService } from '../../../../../../../backend/lib/sui/tournament-service';
-import { getGamePassService } from '../../../../../../../backend/lib/sui/game-pass-service';
-import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
-import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
-import { BadgeValidators } from '../../../../../../../backend/lib/sui/badge-validators';
-import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { handleCorsPreflight } from '@/lib/cors';
+import { getTournamentService } from '@/lib/sui/tournament-service';
+import { getGamePassService } from '@/lib/sui/game-pass-service';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

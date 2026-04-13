@@ -4,8 +4,8 @@
 
 import { NextRequest } from 'next/server';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { handleCorsPreflight } from '../../../../../../base/backend/lib/cors';
-import { withApiHandler, getDigestParam } from '../../../../../../base/backend/lib/api/api-handler';
+import { handleCorsPreflight } from '@/lib/cors';
+import { withApiHandler, getDigestParam } from '@/lib/api/api-handler';
 
 // Type guard for created object changes
 // SuiObjectChange is a union type, we need to check for the 'created' variant

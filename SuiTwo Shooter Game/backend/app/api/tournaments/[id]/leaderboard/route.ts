@@ -3,10 +3,10 @@
 // ==========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../../base/backend/lib/cors';
-import { getTournamentService } from '../../../../../../../../backend/lib/sui/tournament-service';
-import { withApiHandler } from '../../../../../../../../base/backend/lib/api/api-handler';
-import { BadgeLogger } from '../../../../../../../../base/backend/lib/sui/badge-logger';
+import { handleCorsPreflight } from '@/lib/cors';
+import { getTournamentService } from '@/lib/sui/tournament-service';
+import { withApiHandler } from '@/lib/api/api-handler';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -98,7 +98,7 @@ export const GET = withApiHandler(
       tournamentName: tournamentResult.tournament.name,
       leaderboardEntries: leaderboardResult.leaderboard?.length || 0,
       limit,
-      entries: leaderboardResult.leaderboard?.map((e, i) => ({
+      entries: leaderboardResult.leaderboard?.map((e: any, i: number) => ({
         rank: e.rank,
         playerAddress: e.playerAddress,
         playerName: e.playerName || '(no name)',

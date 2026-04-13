@@ -4,10 +4,10 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
-import { priceConverter } from '../../../../../../../backend/lib/services/price-converter';
-import { getItemPrice, ITEM_CATALOG } from '../../../../../../../backend/lib/services/item-catalog';
-import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
+import { handleCorsPreflight } from '@/lib/cors';
+import { priceConverter } from '@/lib/services/price-converter';
+import { getItemPrice, ITEM_CATALOG } from '@/lib/services/item-catalog';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -83,14 +83,25 @@ export const GET = withApiHandler(
     // Test item catalog conversions
     const itemTests = await Promise.all(
       Object.values(ITEM_CATALOG).slice(0, 3).map(async (item) => {
-        const level = item.levels[0]; // Test first level
-        const conversionResult = await priceConverter.convertItemPriceToTokens(level.usdPrice);
+        const level = (item.levels ?? [])[0]; // Test first level
+        if (!level) {
+          return {
+            itemId: item.id,
+            itemName: item.name,
+            level: null,
+            usdPrice: null,
+            conversion: null,
+            error: 'Item has no levels',
+          };
+        }
+
+        const conversionResult = await priceConverter.convertItemPriceToTokens((level as any).usdPrice ?? 0);
         
         return {
           itemId: item.id,
           itemName: item.name,
           level: level.level,
-          usdPrice: level.usdPrice,
+          usdPrice: (level as any).usdPrice ?? null,
           conversion: conversionResult.success ? conversionResult.prices : null,
           error: conversionResult.error,
         };

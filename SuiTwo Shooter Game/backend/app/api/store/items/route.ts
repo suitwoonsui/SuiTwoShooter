@@ -4,11 +4,11 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
-import { priceConverter } from '../../../../../../../backend/lib/services/price-converter';
-import { ITEM_CATALOG } from '../../../../../../../backend/lib/services/item-catalog';
-import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
-import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
+import { handleCorsPreflight } from '@/lib/cors';
+import { priceConverter } from '@/lib/services/price-converter';
+import { ITEM_CATALOG } from '@/lib/services/item-catalog';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler } from '@/lib/api/api-handler';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -29,10 +29,10 @@ export const GET = withApiHandler(
     const items = await Promise.all(
       Object.values(ITEM_CATALOG).map(async (item) => {
         const levels = await Promise.all(
-          item.levels.map(async (level) => {
+          (item.levels ?? []).map(async (level) => {
             // Pass prices directly to avoid redundant fetch
             const conversionResult = await priceConverter.convertItemPriceToTokens(
-              level.usdPrice,
+              (level as any).usdPrice ?? 0,
               pricesResult.prices
             );
             

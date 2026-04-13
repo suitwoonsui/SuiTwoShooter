@@ -3,9 +3,9 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
-import { withApiHandler } from '../../../../../../../base/backend/lib/api/api-handler';
-import { getTournamentService } from '../../../../../../../backend/lib/sui/tournament-service';
+import { handleCorsPreflight } from '@/lib/cors';
+import { withApiHandler } from '@/lib/api/api-handler';
+import { getTournamentService } from '@/lib/sui/tournament-service';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -51,7 +51,7 @@ export const GET = withApiHandler(
       const tournaments = await tournamentService.getTournamentsByIds(tournamentIds);
 
       // Get player's ticket count
-      const { getGamePassService } = await import('../../../../../../../backend/lib/sui/game-pass-service');
+      const { getGamePassService } = await import('@/lib/sui/game-pass-service');
       const gamePassService = getGamePassService();
       
       let ticketCount = 0;
@@ -64,7 +64,7 @@ export const GET = withApiHandler(
 
       // Enrich tournaments with player data (rank, score, etc.)
       const enrichedTournaments = await Promise.allSettled(
-        tournaments.map(async (tournament) => {
+        tournaments.map(async (tournament: any) => {
           try {
             // Get player's rank and score in this tournament
             const playerRankResult = await tournamentService.getPlayerRank(

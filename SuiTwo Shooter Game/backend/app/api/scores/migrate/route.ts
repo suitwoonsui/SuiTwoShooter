@@ -1,13 +1,13 @@
 // Score Migration API endpoint
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
-import { adminWalletService } from '../../../../../../../backend/lib/sui/admin-wallet-service';
-import { MigrationService } from '../../../../../../../backend/lib/sui/migration-service';
-import { getConfig } from '../../../../../../../base/backend/config/config';
-import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
-import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
-import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
-import { BadgeValidators } from '../../../../../../../backend/lib/sui/badge-validators';
+import { handleCorsPreflight } from '@/lib/cors';
+import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
+import { MigrationService } from '@/lib/sui/migration-service';
+import { getConfig } from '@/config/config';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -59,7 +59,7 @@ export const POST = withApiHandler(
     });
 
     // Create migration service and migrate
-    const migrationService = new MigrationService(adminWalletService);
+    const migrationService = new MigrationService(getAdminWalletService());
     const result = await migrationService.migratePlayerStats(
       playerAddress,
       finalOldPackageId,
@@ -112,7 +112,7 @@ export const GET = withApiHandler(
     });
 
     // Create migration service and get wallets
-    const migrationService = new MigrationService(adminWalletService);
+    const migrationService = new MigrationService(getAdminWalletService());
     const result = await migrationService.getAllWalletsWithStats(finalOldPackageId, finalOldStatsRegistryId);
 
     if (!result.success) {
@@ -142,7 +142,7 @@ export const DELETE = withApiHandler(
     const clearAll = searchParams.get('clearAll') === 'true';
 
     // Create migration service
-    const migrationService = new MigrationService(adminWalletService);
+    const migrationService = new MigrationService(getAdminWalletService());
 
     if (clearAll) {
       // Clear all players' stats

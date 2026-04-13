@@ -4,12 +4,12 @@
 // ==========================================
 
 import { NextRequest } from 'next/server';
-import { handleCorsPreflight } from '../../../../../../../base/backend/lib/cors';
-import { withApiHandler, getRequestBody } from '../../../../../../../base/backend/lib/api/api-handler';
-import { calculateRewardCost, calculateTotalPayment, TournamentRewardConfig } from '../../../../../../../backend/lib/services/reward-cost-calculator';
-import { BadgeError, BadgeErrorCode } from '../../../../../../../base/backend/lib/sui/badge-errors';
-import { BadgeValidators } from '../../../../../../../backend/lib/sui/badge-validators';
-import { BadgeLogger } from '../../../../../../../base/backend/lib/sui/badge-logger';
+import { handleCorsPreflight } from '@/lib/cors';
+import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { calculateRewardCost, calculateTotalPayment, TournamentRewardConfig } from '@/lib/services/reward-cost-calculator';
+import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
+import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { BadgeLogger } from '@/lib/sui/badge-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
