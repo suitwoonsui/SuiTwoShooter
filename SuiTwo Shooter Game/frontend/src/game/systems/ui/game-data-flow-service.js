@@ -18,6 +18,55 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
       error: (cat, msg, data) => console.error(`[${cat}] ${msg}`, data || ''),
     };
 
+/** High-resolution clock for connect-load profiling (falls back to Date.now). */
+function _connectTimingNow() {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+}
+
+/**
+ * Wrap a parallel leg promise: logs duration and writes connectTiming[key] when settled.
+ */
+function wrapConnectLoadLeg(legLabel, connectTiming, timingKey, promise) {
+  const t0 = _connectTimingNow();
+  return Promise.resolve(promise).finally(function () {
+    const ms = Math.round(_connectTimingNow() - t0);
+    if (connectTiming && timingKey) connectTiming[timingKey] = ms;
+    log.info('FLOW SERVICE', '[CONNECT-TIMING] parallel leg settled', { leg: legLabel, durationMs: ms });
+  });
+}
+
+function getGameApiBase() {
+  try {
+    if (typeof window !== 'undefined' && window.GAME_CONFIG?.getBackendUrl) {
+      return window.GAME_CONFIG.getBackendUrl('/api').replace(/\/?$/, '');
+    }
+  } catch (_) {}
+  return window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+}
+
+/**
+ * Fire-and-forget background drift repair for Insignia tier after login loading UI is dismissed.
+ * MUST NOT block the loading modal.
+ */
+function scheduleBackgroundInsigniaTierSync(walletAddress) {
+  try {
+    const addr = (walletAddress || '').trim();
+    if (!addr || !addr.startsWith('0x') || addr.length !== 66) return;
+    const API_BASE = getGameApiBase();
+    // Defer so UI has already hidden the loading modal.
+    setTimeout(function () {
+      fetch(`${API_BASE}/insignia/${addr}/sync-tier`, { method: 'POST' })
+        .then((r) => (r.ok ? r.json() : r.json().catch(() => null)))
+        .then((data) => {
+          log.info('FLOW SERVICE', 'Background Insignia sync finished', { address: addr, success: data?.success, repaired: data?.repaired });
+        })
+        .catch((err) => {
+          log.warn('FLOW SERVICE', 'Background Insignia sync failed (non-blocking)', err?.message || String(err));
+        });
+    }, 0);
+  } catch (_) {}
+}
+
 const GameDataFlowService = {
   // Track in-flight loads to prevent duplicates
   _activeLoads: new Map(), // Map<address, Promise>
@@ -93,7 +142,8 @@ const GameDataFlowService = {
   /**
    * Main entry point for loading game data
    * @param {string} walletAddress - Wallet address to load data for
-   * @param {Object} options - Options { skipBalance: boolean, skipBadge: boolean }
+   * @param {Object} options - Options { skipBalance?: boolean, skipBadge?: boolean, force?: boolean, checkBadgeUpgrade?: boolean }
+   *   checkBadgeUpgrade: when true, may call the badge upgrade API and show the upgrade modal (wallet login or after-game return only).
    * @returns {Promise<void>}
    */
   async load(walletAddress, options = {}) {
@@ -129,14 +179,18 @@ const GameDataFlowService = {
     }
     
     // Check if already loaded for this address (BEFORE showing loading modal)
-    if (GameDataState.isLoadedForAddress(walletAddress)) {
+    // When `force` is true, we intentionally refresh menu data and show the same loader used on wallet connect.
+    if (!options.force && GameDataState.isLoadedForAddress(walletAddress)) {
       log.debug('FLOW SERVICE', 'Already loaded for this address');
+      if (typeof window.scheduleMilestoneProgressPrefetchAfterLoadingUi === 'function') {
+        window.scheduleMilestoneProgressPrefetchAfterLoadingUi();
+      }
       return; // No need to show loading modal
     }
     
     // Check if badge is loaded but display is hidden (e.g., after returning from game)
     // Do this BEFORE showing loading modal
-    if (GameDataState.isBadgeLoadedButHidden(walletAddress)) {
+    if (!options.force && GameDataState.isBadgeLoadedButHidden(walletAddress)) {
       log.debug('FLOW SERVICE', 'Badge loaded but display hidden - making visible');
       if (typeof window.showBadgeDisplay === 'function') {
         window.showBadgeDisplay();
@@ -147,12 +201,13 @@ const GameDataFlowService = {
       if (typeof gameReadinessState !== 'undefined') {
         const readiness = GameDataState.getReadinessState();
         gameReadinessState.dataLoaded = readiness.dataLoaded;
-        gameReadinessState.migrationCheckComplete = readiness.migrationCheckComplete;
-        gameReadinessState.migrationModalClosed = readiness.migrationModalClosed;
       }
       
       if (typeof updateGameReadiness === 'function') {
         updateGameReadiness();
+      }
+      if (typeof window.scheduleMilestoneProgressPrefetchAfterLoadingUi === 'function') {
+        window.scheduleMilestoneProgressPrefetchAfterLoadingUi();
       }
       return; // No need to show loading modal
     }
@@ -208,6 +263,16 @@ const GameDataFlowService = {
       log.debug('FLOW SERVICE', 'Badge modal is visible in _performLoad - hiding loading modal and returning');
       LoadingManager.hide(); // Hide loading modal that was shown in load()
       GameDataState.setLoading(false);
+      try {
+        if (walletAddress && typeof window.prefetchBadge === 'function') {
+          window.prefetchBadge(walletAddress);
+        }
+        if (typeof window.scheduleMilestoneProgressPrefetchAfterLoadingUi === 'function') {
+          window.scheduleMilestoneProgressPrefetchAfterLoadingUi();
+        } else if (typeof window.prefetchMilestoneProgress === 'function') {
+          queueMicrotask(() => window.prefetchMilestoneProgress());
+        }
+      } catch (_) {}
       return; // Don't load while badge modal is visible
     }
     
@@ -222,118 +287,242 @@ const GameDataFlowService = {
       // ==========================================
       // ASYNC OPERATIONS START - Loading modal is visible
       // ==========================================
-      // Load balance, badge, stats, and game pass credits in parallel
-      // Loading modal stays visible throughout these async operations
-      // LoadingManager.update() is called during these operations to update the message
-      const results = await Promise.allSettled([
-        options.skipBalance ? Promise.resolve(null) : (typeof window.loadBalance === 'function' ? window.loadBalance(walletAddress) : Promise.resolve(null)),
-        options.skipBadge ? Promise.resolve(null) : (typeof window.loadBadge === 'function' ? window.loadBadge(walletAddress) : Promise.resolve(null)),
-        typeof window.loadStats === 'function' ? window.loadStats(walletAddress) : Promise.resolve(null), // Always load stats (no skip option)
-        // Load game pass credits
-        (window.GamePassDisplay && typeof window.GamePassDisplay.refresh === 'function') 
-          ? window.GamePassDisplay.refresh(walletAddress, true, false).catch(err => {
-              log.warn('FLOW SERVICE', 'Game pass credits load failed (non-critical)', err);
-              return null;
+      // Modal stays up until stats, game pass, and badge all settle (Promise.allSettled below).
+      const connectTiming = {
+        startedAt: Date.now(),
+        walletAddressShort: walletAddress ? String(walletAddress).slice(0, 12) + '…' : '',
+      };
+      const parallelStart = _connectTimingNow();
+
+      LoadingManager.update('Loading your stats, credits, and profile...');
+      if (typeof window.warmPlayerSessionOnBackend === 'function') {
+        await window.warmPlayerSessionOnBackend(walletAddress, { forceRefresh: options.force === true });
+      }
+      const statsP = wrapConnectLoadLeg(
+        'stats',
+        connectTiming,
+        'statsMs',
+        typeof window.loadStats === 'function'
+          ? window.loadStats(walletAddress, {
+              updateLoadingMessage: false,
+              forceRefresh: options.force === true,
             })
           : Promise.resolve(null)
-      ]);
-      // ==========================================
-      // ASYNC OPERATIONS COMPLETE - Still processing results
-      // ==========================================
-      
-      const balanceResult = results[0];
-      const badgeResult = results[1];
-      const statsResult = results[2];
-      const gamePassResult = results[3];
-      
-      // Handle balance result
-      if (balanceResult.status === 'fulfilled' && balanceResult.value) {
-        GameDataState.setBalance(balanceResult.value);
-        if (typeof window.updateBalanceUIFromFlow === 'function') {
-          window.updateBalanceUIFromFlow(balanceResult.value);
-        }
-      } else if (balanceResult.status === 'rejected') {
-        log.error('FLOW SERVICE', 'Balance load failed', balanceResult.reason);
+      );
+      const prefetch = window.__gamePassPrefetch && window.__gamePassPrefetch.address === walletAddress
+        ? window.__gamePassPrefetch
+        : null;
+      if (prefetch) {
+        try {
+          delete window.__gamePassPrefetch;
+        } catch (_) {}
       }
-      
-      // Handle badge result
+      const gamePassP = wrapConnectLoadLeg(
+        'gamePass',
+        connectTiming,
+        'gamePassMs',
+        prefetch
+          ? prefetch.promise.then((result) => {
+              if (result && result.success && window.GamePassDisplay) {
+                window.GamePassDisplay.updateMainMenuDisplay(result.credits ?? 0, result.ticketCount ?? 0);
+                if (typeof GameService !== 'undefined' && GameService.updateStartButtonText) {
+                  GameService.updateStartButtonText((result.credits ?? 0) > 0).catch(() => {});
+                }
+              }
+              return result;
+            }).catch(err => {
+              log.warn('FLOW SERVICE', 'Game pass prefetch failed, falling back to refresh', err);
+              return (window.GamePassDisplay && window.GamePassDisplay.refresh(walletAddress, true, false)).catch(e => {
+                log.warn('FLOW SERVICE', 'Game pass credits load failed (non-critical)', e);
+                return null;
+              });
+            })
+          : (window.GamePassDisplay && typeof window.GamePassDisplay.refresh === 'function')
+            ? window.GamePassDisplay.refresh(walletAddress, true, false).catch(err => {
+                log.warn('FLOW SERVICE', 'Game pass credits load failed (non-critical)', err);
+                return null;
+              })
+            : Promise.resolve(null)
+      );
+      const badgeP = wrapConnectLoadLeg(
+        'badge',
+        connectTiming,
+        'badgeMs',
+        options.skipBadge ? Promise.resolve(null) : (typeof window.loadBadge === 'function' ? window.loadBadge(walletAddress) : Promise.resolve(null))
+      );
+
+      const runDeferredBalance = () => {
+        if (options.skipBalance || typeof window.loadBalance !== 'function') {
+          return Promise.resolve();
+        }
+        return (async () => {
+          try {
+            const result = await window.loadBalance(walletAddress, { silent: true });
+            if (result) {
+              GameDataState.setBalance(result);
+              if (typeof window.updateBalanceUIFromFlow === 'function') {
+                window.updateBalanceUIFromFlow(result);
+              }
+            }
+          } catch (balanceErr) {
+            log.error('FLOW SERVICE', 'Deferred balance load failed', balanceErr);
+          }
+          if (typeof updateGameReadiness === 'function') {
+            updateGameReadiness();
+          }
+        })();
+      };
+
+      const parallelResults = await Promise.allSettled([statsP, gamePassP, badgeP]);
+      const statsResult = parallelResults[0];
+      const gamePassResult = parallelResults[1];
+      const badgeResult = parallelResults[2];
+      connectTiming.parallelWallMs = Math.round(_connectTimingNow() - parallelStart);
+      connectTiming.legOutcome = {
+        stats: statsResult.status,
+        gamePass: gamePassResult.status,
+        badge: badgeResult.status,
+      };
+      log.info('FLOW SERVICE', '[CONNECT-TIMING] parallel phase complete (stats + gamePass + badge)', {
+        wallClockMs: connectTiming.parallelWallMs,
+        statsMs: connectTiming.statsMs,
+        gamePassMs: connectTiming.gamePassMs,
+        badgeMs: connectTiming.badgeMs,
+        legOutcome: connectTiming.legOutcome,
+        addressShort: connectTiming.walletAddressShort,
+      });
+      try {
+        if (typeof window !== 'undefined') window.__lastConnectLoadTiming = connectTiming;
+      } catch (_) {}
+      if (statsResult.status === 'rejected') {
+        log.warn('FLOW SERVICE', 'Stats load failed', statsResult.reason);
+      }
+      if (gamePassResult.status === 'rejected') {
+        log.warn('FLOW SERVICE', 'Game pass load failed', gamePassResult.reason);
+      }
+
+      const postParallelStart = _connectTimingNow();
+
+      /** Open mint modal after loading UI hides (handleNoBadge only adds menu chip; modal must be scheduled here). */
+      let autoShowMintModalAfterLoad = false;
+
+      // Handle badge result (loadBadge never throws; returns { success, hasBadge } or we get rejected if something else threw)
+      let badgeData = null;
       if (badgeResult.status === 'fulfilled' && badgeResult.value) {
-        const badgeData = badgeResult.value;
-        
+        badgeData = badgeResult.value;
+      } else if (badgeResult.status === 'rejected') {
+        log.error('FLOW SERVICE', 'Badge load failed', badgeResult.reason);
+        // Treat failed load like no badge: clear display and allow game to proceed
+        if (typeof window.handleNoBadge === 'function') {
+          const noBadgeRes = await window.handleNoBadge(walletAddress);
+          if (noBadgeRes?.autoShowMintModal) autoShowMintModalAfterLoad = true;
+        } else {
+          GameDataState.setBadge(null);
+          GameDataState.setBadgeDisplayVisible(false);
+          GameDataState.markDataLoaded();
+        }
+      }
+
+      if (badgeData) {
         if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
-          // Player has a badge - check for pending upgrade first
-          // This is an async operation - loading modal stays visible during check
           const upgradeHandled = typeof window.handlePendingUpgrade === 'function'
-            ? await window.handlePendingUpgrade(walletAddress, badgeData)
+            ? await window.handlePendingUpgrade(walletAddress, badgeData, {
+                checkBadgeUpgrade: options.checkBadgeUpgrade === true,
+              })
             : false;
           if (upgradeHandled) {
-            // Upgrade modal was shown, don't display badge yet
-            // Don't mark as loaded - wait for upgrade to complete
-            // Loading modal is hidden by handlePendingUpgrade when upgrade modal is shown
+            connectTiming.badgeUiMs = Math.round(_connectTimingNow() - postParallelStart);
+            connectTiming.totalToHideMs = Math.round(_connectTimingNow() - parallelStart);
+            connectTiming.closedFor = 'pendingUpgradeModal';
+            log.info('FLOW SERVICE', '[CONNECT-TIMING] loader closed for upgrade modal', {
+              badgeUiMs: connectTiming.badgeUiMs,
+              totalToHideMs: connectTiming.totalToHideMs,
+              parallelWallMs: connectTiming.parallelWallMs,
+            });
+            try {
+              if (typeof window !== 'undefined') window.__lastConnectLoadTiming = connectTiming;
+            } catch (_) {}
             GameDataState.setLoading(false);
+            void runDeferredBalance();
             return;
           }
-          
-          // No upgrade needed, display badge
           GameDataState.setBadge(badgeData);
           GameDataState.markDataLoaded();
           if (typeof window.displayBadge === 'function') {
-            await window.displayBadge(badgeData);
+            void window.displayBadge(badgeData).catch((err) => {
+              log.warn('FLOW SERVICE', 'displayBadge failed (non-blocking)', err);
+            });
           }
         } else {
-          // Player doesn't have a badge - check for migration
-          // This is an async operation - loading modal stays visible during migration check
+          // User has no badge or API returned success: false – clear display and proceed
           if (typeof window.handleNoBadge === 'function') {
-            await window.handleNoBadge(walletAddress);
-          }
-          // handleNoBadge should have set all flags via markDataLoaded()
-          // But ensure dataLoaded is true if migration check completed
-          if (GameDataState.migrationCheckComplete && GameDataState.migrationModalClosed && !GameDataState.dataLoaded) {
-            GameDataState.dataLoaded = true;
+            const noBadgeRes = await window.handleNoBadge(walletAddress);
+            if (noBadgeRes?.autoShowMintModal) autoShowMintModalAfterLoad = true;
+          } else {
+            GameDataState.setBadge(null);
+            GameDataState.setBadgeDisplayVisible(false);
+            GameDataState.markDataLoaded();
           }
         }
-      } else if (badgeResult.status === 'rejected') {
-        log.error('FLOW SERVICE', 'Badge load failed', badgeResult.reason);
-        // Still mark as loaded to allow game to proceed
-        GameDataState.markDataLoaded();
       }
-      
-      // Handle stats result (non-critical - don't block on failure)
-      if (statsResult.status === 'fulfilled') {
-        log.debug('FLOW SERVICE', 'Stats loaded successfully');
-      } else if (statsResult.status === 'rejected') {
-        log.warn('FLOW SERVICE', 'Stats load failed (non-critical)', statsResult.reason);
-      }
-      
-      // Handle game pass credits result (non-critical - don't block on failure)
-      if (gamePassResult.status === 'fulfilled') {
-        log.debug('FLOW SERVICE', 'Game pass credits loaded successfully');
-      } else if (gamePassResult.status === 'rejected') {
-        log.warn('FLOW SERVICE', 'Game pass credits load failed (non-critical)', gamePassResult.reason);
-      }
-      
-      // ==========================================
-      // ALL ASYNC OPERATIONS COMPLETE
-      // ==========================================
-      // Sync readiness state to local gameReadinessState (for backward compatibility)
+
+      connectTiming.badgeUiMs = Math.round(_connectTimingNow() - postParallelStart);
+      log.info('FLOW SERVICE', '[CONNECT-TIMING] post-parallel (badge handlers / display)', {
+        durationMs: connectTiming.badgeUiMs,
+      });
+      connectTiming.totalToHideMs = Math.round(_connectTimingNow() - parallelStart);
+      try {
+        if (typeof window !== 'undefined') window.__lastConnectLoadTiming = connectTiming;
+      } catch (_) {}
+
+      // Sync readiness and hide loading modal once essentials (stats, game pass, badge) are done
       if (typeof gameReadinessState !== 'undefined') {
         const readiness = GameDataState.getReadinessState();
         gameReadinessState.dataLoaded = readiness.dataLoaded;
-        gameReadinessState.migrationCheckComplete = readiness.migrationCheckComplete;
-        gameReadinessState.migrationModalClosed = readiness.migrationModalClosed;
       }
-      
-      // Hide loading modal AFTER all async operations complete
-      // Small delay to ensure badge is rendered before hiding loading modal
-      await new Promise(resolve => setTimeout(resolve, 100));
       LoadingManager.hide();
-      
-      // Update readiness AFTER loading modal is hidden
-      // This ensures buttons are enabled only after loading is complete and modal is hidden
       if (typeof updateGameReadiness === 'function') {
         updateGameReadiness();
       }
-      
+
+      // Background-only: after the loading UI is hidden, ensure Insignia tier matches badge tier.
+      // This should never slow login, and logs will confirm build/execute on the backend.
+      scheduleBackgroundInsigniaTierSync(walletAddress);
+
+      if (
+        autoShowMintModalAfterLoad &&
+        typeof window.showBadgeMintingModal === 'function' &&
+        !(typeof GameDataState !== 'undefined' && GameDataState.shouldSkipAutoMintModal && GameDataState.shouldSkipAutoMintModal())
+      ) {
+        const mintModalDelayMs = 450;
+        setTimeout(() => {
+          if (typeof window.isBadgeModalVisible === 'function' && window.isBadgeModalVisible()) {
+            return;
+          }
+          if (typeof GameDataState !== 'undefined' && GameDataState.shouldSkipAutoMintModal && GameDataState.shouldSkipAutoMintModal()) {
+            return;
+          }
+          void window.showBadgeMintingModal();
+        }, mintModalDelayMs);
+      }
+
+      void runDeferredBalance();
+
+      if (typeof window.prefetchPlayerInventoryReservoir === 'function' && walletAddress) {
+        window.prefetchPlayerInventoryReservoir(walletAddress);
+      }
+
+      // Warm store token balances after menu load (non-blocking).
+      try {
+        if (window.TokenBalanceUtils?.prefetchTokenBalancesIfStale) {
+          window.TokenBalanceUtils.prefetchTokenBalancesIfStale(walletAddress, 'testnet', ['mews', 'sui']);
+        }
+      } catch (_) {}
+
+      if (typeof updateGameReadiness === 'function') {
+        updateGameReadiness();
+      }
+
     } catch (error) {
       log.error('FLOW SERVICE', 'Error loading game data', error);
       // Hide loading modal on error
@@ -342,8 +531,6 @@ const GameDataFlowService = {
       if (typeof gameReadinessState !== 'undefined') {
         const readiness = GameDataState.getReadinessState();
         gameReadinessState.dataLoaded = readiness.dataLoaded;
-        gameReadinessState.migrationCheckComplete = readiness.migrationCheckComplete;
-        gameReadinessState.migrationModalClosed = readiness.migrationModalClosed;
       }
       if (typeof updateGameReadiness === 'function') {
         updateGameReadiness();
@@ -356,6 +543,16 @@ const GameDataFlowService = {
       if (LoadingManager.isVisible) {
         LoadingManager.hide();
       }
+      try {
+        if (walletAddress && typeof window.prefetchBadge === 'function') {
+          window.prefetchBadge(walletAddress);
+        }
+        if (typeof window.scheduleMilestoneProgressPrefetchAfterLoadingUi === 'function') {
+          window.scheduleMilestoneProgressPrefetchAfterLoadingUi();
+        } else if (typeof window.prefetchMilestoneProgress === 'function') {
+          queueMicrotask(() => window.prefetchMilestoneProgress());
+        }
+      } catch (_) {}
     }
   }
 };
@@ -365,3 +562,4 @@ if (typeof window !== 'undefined') {
   window.GameDataFlowService = GameDataFlowService;
 }
 
+      

@@ -36,6 +36,254 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
+const MENU_BOOTSTRAP_MAX_ATTEMPTS = 12;
+const MENU_BOOTSTRAP_RETRY_DELAY_MS = 750;
+/** Must match GAME_CONFIG_BOOTSTRAP_CACHE_TTL_MS in apps/shooter-game/backend/app/api/menu/bootstrap/route.ts */
+const GAME_CONFIG_BOOTSTRAP_TTL_MS = 6 * 60 * 60 * 1000;
+/** Store catalog: shared by StoreDataSources, store-item-loader prefetch, apiRequestCache `storeItems:` (see ttlByType). Must match STORE_BOOTSTRAP_CACHE_TTL_MS in menu/bootstrap/route.ts */
+const STORE_CATALOG_CACHE_TTL_MS = 60 * 60 * 1000;
+
+if (typeof window !== 'undefined') {
+  window.STORE_CATALOG_CACHE_TTL_MS = STORE_CATALOG_CACHE_TTL_MS;
+}
+
+function sleepUi(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Game backend API root (shared by initializeUI and the Enter-button handler in initializeFrontPage). */
+function getGameApiBase() {
+  if (typeof window === 'undefined') return 'http://localhost:3001/api';
+  if (window.GameApi && typeof window.GameApi.getBaseUrl === 'function') return window.GameApi.getBaseUrl();
+  const cfg = window.GAME_CONFIG;
+  if (!cfg) return 'http://localhost:3001/api';
+  return cfg.GAME_BACKEND_URL || cfg.API_BASE_URL || 'http://localhost:3001/api';
+}
+
+function setStartScreenProgress(visible, percent) {
+  const container = document.getElementById('startScreenProgress');
+  const fill = document.getElementById('startScreenProgressFill');
+  if (!container || !fill) return;
+  if (visible) {
+    container.classList.add('start-screen-progress-visible');
+    const bounded = Math.max(0, Math.min(100, Number(percent) || 0));
+    fill.style.width = `${bounded}%`;
+  } else {
+    container.classList.remove('start-screen-progress-visible');
+    fill.style.width = '0%';
+  }
+}
+
+/**
+ * While a long async step runs (e.g. menu bootstrap), creep the bar from `fromPct` toward `capPct`
+ * so the UI does not look frozen. Call the returned stopper in `finally` when the work completes.
+ */
+function startStartScreenProgressCreep(fromPct, capPct, opts) {
+  const stepMs = (opts && opts.stepMs) || 380;
+  const step = (opts && opts.step) || 1.1;
+  let current = Math.min(capPct, fromPct);
+  const id = setInterval(() => {
+    current = Math.min(capPct, current + step);
+    setStartScreenProgress(true, Math.round(current * 10) / 10);
+    if (current >= capPct) clearInterval(id);
+  }, stepMs);
+  return function stopStartScreenProgressCreep() {
+    clearInterval(id);
+  };
+}
+
+/**
+ * Menu bootstrap always includes milestone definitions (non-blocking on server). Apply to window
+ * cache on any successful JSON body so Enter/menu is not blocked on store/tournaments readiness.
+ */
+function applyMilestoneDefinitionsFromBootstrapIfPresent(bootstrapData, now) {
+  if (typeof window === 'undefined' || !bootstrapData) return;
+  const defData = bootstrapData.milestones;
+  if (!defData || defData.success !== true) return;
+  const defs = defData.definitions ?? defData.fullDefinitions;
+  if (defs && typeof defs === 'object') {
+    window.__prefetchedMilestoneDefinitions = defs;
+    window.__prefetchedMilestoneDefinitionsTimestamp = now;
+    if (typeof window.__syncMilestoneDefinitionsFromBootstrapCache === 'function') {
+      window.__syncMilestoneDefinitionsFromBootstrapCache();
+    }
+  }
+}
+
+function applyMenuBootstrapPrefetchData(bootstrapData, now) {
+  if (typeof window !== 'undefined') {
+    window.GAME_CONFIG_BOOTSTRAP_TTL_MS = GAME_CONFIG_BOOTSTRAP_TTL_MS;
+  }
+  const storeData = bootstrapData?.store || null;
+  const tournamentsData = bootstrapData?.tournaments || null;
+  const leaderboardData = bootstrapData?.leaderboard || null;
+  const gameConfigData = bootstrapData?.gameConfig || null;
+
+  applyMilestoneDefinitionsFromBootstrapIfPresent(bootstrapData, now);
+  if (storeData && storeData.success) {
+    const itemCount = Array.isArray(storeData.items) ? storeData.items.length : 0;
+    const offerKeys =
+      storeData.offers && typeof storeData.offers === 'object' ? Object.keys(storeData.offers).length : 0;
+    // Menu bootstrap includes GET /api/store/catalog (Provisions items + Stockroom offers). Warm StoreDataSources
+    // and store state even when items[] is empty but offers exist (bundles/packs live in offers).
+    if (itemCount > 0 || offerKeys > 0) {
+      let itemsForPrefetch = Array.isArray(storeData.items) ? storeData.items : [];
+      if (
+        typeof window !== 'undefined' &&
+        window.StoreDataSources &&
+        typeof window.StoreDataSources.mergeBundlesIntoStoreItems === 'function'
+      ) {
+        itemsForPrefetch = window.StoreDataSources.mergeBundlesIntoStoreItems(itemsForPrefetch, storeData);
+      }
+      window.__prefetchedStoreItems =
+        itemCount > 0 || itemsForPrefetch.length > 0
+          ? { success: true, items: itemsForPrefetch, prices: storeData.prices || null, at: now }
+          : { success: true, items: [], prices: storeData.prices || null, at: now };
+      window.__prefetchedStoreCatalog = { ...storeData, at: now };
+    }
+  }
+  // Store tabs derive packs/bundles from /api/store/catalog; game-config still supplies badge thresholds/discounts/fees + min balance.
+  if (gameConfigData && gameConfigData.success === true && gameConfigData.config) {
+    window.__prefetchedGameConfig = { response: gameConfigData, at: now };
+  }
+  if (tournamentsData && tournamentsData.success && Array.isArray(tournamentsData.tournaments)) {
+    window.__prefetchedTournaments = {
+      success: true,
+      tournaments: tournamentsData.tournaments,
+      at: now,
+      playerAddress: null,
+      playerTicketCount: tournamentsData.playerTicketCount,
+    };
+  } else {
+    window.__prefetchedTournaments = { success: true, tournaments: [], at: now, playerAddress: null };
+  }
+  // After bootstrap store catalog and tournaments: prefetch "My tournaments" if wallet is connected
+  if (typeof window.prefetchMyTournamentsIfStale === 'function') {
+    window.prefetchMyTournamentsIfStale();
+  }
+  if (typeof window.prefetchBadgeIfStale === 'function') {
+    window.prefetchBadgeIfStale();
+  }
+
+  // Refresh user balances (credits + tournament tickets) on main menu load if wallet is connected.
+  // Non-blocking: store/UI can render while this hydrates in background.
+  try {
+    const address = (window.getWalletAddress && typeof window.getWalletAddress === 'function' && window.getWalletAddress()) ||
+      (window.walletAPIInstance && window.walletAPIInstance.isConnected() && window.walletAPIInstance.getAddress());
+    if (address && window.GamePassService && typeof window.GamePassService.getGamePassStatus === 'function') {
+      window.GamePassService.getGamePassStatus(address, true)
+        .then((status) => {
+          if (!window._preloadedGamePassStatus) window._preloadedGamePassStatus = {};
+          window._preloadedGamePassStatus[address] = status;
+        })
+        .catch(() => {});
+    }
+  } catch (_) {}
+
+  if (leaderboardData && leaderboardData.success && Array.isArray(leaderboardData.leaderboard)) {
+    window.__prefetchedLeaderboard = { success: true, leaderboard: leaderboardData.leaderboard, at: now, limit: leaderboardData.limit };
+  } else {
+    window.__prefetchedLeaderboard = { success: true, leaderboard: [], at: now };
+  }
+}
+
+function beginMenuBootstrapPrefetch(gameApiBase, forceRefresh) {
+  const hadTerminalFailure =
+    window.__menuBootstrapState?.status === 'error' && window.__menuBootstrapState?.ready !== true;
+  if (!forceRefresh && !hadTerminalFailure && window.__menuBootstrapPromise) {
+    return window.__menuBootstrapPromise;
+  }
+
+  window.__menuBootstrapState = {
+    status: 'loading',
+    at: Date.now(),
+    attempts: forceRefresh ? ((window.__menuBootstrapState?.attempts || 0) + 1) : (window.__menuBootstrapState?.attempts || 1),
+    ready: false,
+    data: null,
+    error: null,
+  };
+
+  window.__menuBootstrapPromise = fetch(`${gameApiBase}/menu/bootstrap?ts=${Date.now()}`, { cache: 'no-store' })
+    .then((res) => res.ok ? res.json() : null)
+    .catch(() => null)
+    .then((bootstrapData) => {
+      const now = Date.now();
+      applyMilestoneDefinitionsFromBootstrapIfPresent(bootstrapData, now);
+      const readiness = bootstrapData?.readiness?.blocking || {};
+      const ready = Boolean(
+        bootstrapData?.ready === true ||
+        (readiness.store === true && readiness.tournaments === true)
+      );
+      if (!bootstrapData?.success || !ready) {
+        const reason = bootstrapData?.success
+          ? 'Blocking bootstrap dependencies are not ready yet'
+          : 'Menu bootstrap failed';
+        window.__menuBootstrapState = {
+          status: 'error',
+          at: now,
+          attempts: window.__menuBootstrapState?.attempts || 1,
+          ready: false,
+          data: bootstrapData || null,
+          error: reason,
+        };
+        return window.__menuBootstrapState;
+      }
+
+      applyMenuBootstrapPrefetchData(bootstrapData, now);
+      window.__menuBootstrapState = {
+        status: 'ready',
+        at: now,
+        attempts: window.__menuBootstrapState?.attempts || 1,
+        ready: true,
+        data: bootstrapData,
+        error: null,
+      };
+      return window.__menuBootstrapState;
+    })
+    .catch((err) => {
+      window.__menuBootstrapState = {
+        status: 'error',
+        at: Date.now(),
+        attempts: window.__menuBootstrapState?.attempts || 1,
+        ready: false,
+        data: null,
+        error: err instanceof Error ? err.message : String(err || 'Menu bootstrap failed'),
+      };
+      return window.__menuBootstrapState;
+    });
+
+  return window.__menuBootstrapPromise;
+}
+
+async function ensureMenuBootstrapReady(gameApiBase, enterBtn) {
+  for (let attempt = 1; attempt <= MENU_BOOTSTRAP_MAX_ATTEMPTS; attempt++) {
+    // One HTTP call loads catalog, tournaments, milestones, leaderboard, and game config in parallel;
+    // the button can’t know sub-task order client-side—show a single accurate label for this step.
+    if (enterBtn) {
+      enterBtn.textContent =
+        attempt > 1
+          ? `Fetching menu data… (retry ${attempt}/${MENU_BOOTSTRAP_MAX_ATTEMPTS})`
+          : 'Fetching menu data…';
+    }
+
+    setStartScreenProgress(true, Math.min(95, 68 + attempt * 2));
+    const state = await beginMenuBootstrapPrefetch(gameApiBase, attempt > 1);
+
+    if (state && state.ready) {
+      if (enterBtn) enterBtn.textContent = 'Almost ready…';
+      return state;
+    }
+
+    if (enterBtn) {
+      enterBtn.textContent = `Couldn’t load menu data (retry ${attempt}/${MENU_BOOTSTRAP_MAX_ATTEMPTS})`;
+    }
+    if (attempt < MENU_BOOTSTRAP_MAX_ATTEMPTS) {
+      await sleepUi(MENU_BOOTSTRAP_RETRY_DELAY_MS);
+    }
+  }
+  throw new Error(window.__menuBootstrapState?.error || 'Menu bootstrap did not complete');
+}
+
 // Removed loadUIImages() - images now load normally via HTML
 // No need for dynamic image creation
 
@@ -95,6 +343,185 @@ function initializeUI() {
   // Images will load normally when their containers become visible
   // No need to preload them
   
+  // Prefetch static/catalog data (game-only) so Store and Milestones load fast later
+  const gameApiBase = getGameApiBase();
+
+  // Leaderboard: short TTL for new submissions. Tournaments change less often — longer prefetch TTL.
+  var LEADERBOARD_PREFETCH_TTL_MS = 30 * 1000;
+  var TOURNAMENTS_PREFETCH_TTL_MS = 2 * 60 * 1000;
+  if (typeof window !== 'undefined') {
+    window.LEADERBOARD_PREFETCH_TTL_MS = LEADERBOARD_PREFETCH_TTL_MS;
+    window.TOURNAMENTS_PREFETCH_TTL_MS = TOURNAMENTS_PREFETCH_TTL_MS;
+
+    /** One in-flight merged-list fetch per (base, wallet key); menu + modal share it to avoid duplicate GETs. */
+    var tournamentsListPrefetchInFlight = null;
+    var tournamentsListPrefetchInflightKey = null;
+    var myTournamentsPrefetchInFlight = null;
+    var myTournamentsPrefetchInflightKey = null;
+
+    window.prefetchTournamentsIfStale = function prefetchTournamentsIfStale() {
+      const base = (window.GAME_CONFIG && (window.GAME_CONFIG.GAME_BACKEND_URL || window.GAME_CONFIG.API_BASE_URL)) || gameApiBase;
+      const ttl = window.TOURNAMENTS_PREFETCH_TTL_MS || 120000;
+      const prev = window.__prefetchedTournaments;
+      const address =
+        (window.getWalletAddress && typeof window.getWalletAddress === 'function' && window.getWalletAddress()) ||
+        (window.walletAPIInstance && window.walletAPIInstance.isConnected() && window.walletAPIInstance.getAddress()) ||
+        null;
+      const addrKey = address ? String(address) : '';
+      const prevAddr =
+        prev && prev.playerAddress != null && prev.playerAddress !== '' ? String(prev.playerAddress) : '';
+      if (
+        prev &&
+        prev.success !== false &&
+        prev.at &&
+        Date.now() - prev.at < ttl &&
+        prevAddr === addrKey
+      ) {
+        return Promise.resolve();
+      }
+      const inflightKey = String(base) + '\0' + addrKey;
+      if (tournamentsListPrefetchInFlight && tournamentsListPrefetchInflightKey === inflightKey) {
+        return tournamentsListPrefetchInFlight;
+      }
+      const qs = address ? '?playerAddress=' + encodeURIComponent(address) : '';
+      const url = base + '/tournaments' + qs;
+      var p = fetch(url)
+        .then(function (res) {
+          return res.ok ? res.json() : null;
+        })
+        .then(function (data) {
+          if (data && data.success && Array.isArray(data.tournaments)) {
+            window.__prefetchedTournaments = {
+              success: true,
+              tournaments: data.tournaments,
+              at: Date.now(),
+              playerAddress: address || null,
+              playerTicketCount: data.playerTicketCount,
+            };
+          } else {
+            window.__prefetchedTournaments = {
+              success: true,
+              tournaments: [],
+              at: Date.now(),
+              playerAddress: address || null,
+            };
+          }
+        })
+        .catch(function () {
+          window.__prefetchedTournaments = {
+            success: false,
+            tournaments: [],
+            at: Date.now(),
+            playerAddress: address || null,
+          };
+        })
+        .finally(function () {
+          if (tournamentsListPrefetchInFlight === p) {
+            tournamentsListPrefetchInFlight = null;
+            tournamentsListPrefetchInflightKey = null;
+          }
+        });
+      tournamentsListPrefetchInflightKey = inflightKey;
+      tournamentsListPrefetchInFlight = p;
+      return p;
+    };
+    window.prefetchMyTournamentsIfStale = function prefetchMyTournamentsIfStale() {
+      const address = (window.getWalletAddress && typeof window.getWalletAddress === 'function' && window.getWalletAddress()) ||
+        (window.walletAPIInstance && window.walletAPIInstance.isConnected() && window.walletAPIInstance.getAddress());
+      if (!address) return Promise.resolve();
+      const base = (window.GAME_CONFIG && (window.GAME_CONFIG.GAME_BACKEND_URL || window.GAME_CONFIG.API_BASE_URL)) || gameApiBase;
+      const ttl = window.TOURNAMENTS_PREFETCH_TTL_MS || 120000;
+      const prev = window.__prefetchedMyTournaments;
+      if (
+        prev &&
+        prev.success !== false &&
+        prev.address === address &&
+        prev.at &&
+        Date.now() - prev.at < ttl
+      ) {
+        return Promise.resolve();
+      }
+      const inflightKey = String(base) + '\0' + String(address);
+      if (myTournamentsPrefetchInFlight && myTournamentsPrefetchInflightKey === inflightKey) {
+        return myTournamentsPrefetchInFlight;
+      }
+      var p = fetch(base + '/tournaments/my-tournaments?playerAddress=' + encodeURIComponent(address))
+        .then(function (res) {
+          return res.ok ? res.json() : null;
+        })
+        .then(function (data) {
+          if (data && data.success && Array.isArray(data.tournaments)) {
+            window.__prefetchedMyTournaments = {
+              success: true,
+              tournaments: data.tournaments,
+              address: address,
+              at: Date.now(),
+              playerTicketCount: data.playerTicketCount,
+            };
+          } else {
+            window.__prefetchedMyTournaments = {
+              success: true,
+              tournaments: [],
+              address: address,
+              at: Date.now(),
+              playerTicketCount: 0,
+            };
+          }
+        })
+        .catch(function () {
+          window.__prefetchedMyTournaments = {
+            success: false,
+            tournaments: [],
+            address: address,
+            at: Date.now(),
+          };
+        })
+        .finally(function () {
+          if (myTournamentsPrefetchInFlight === p) {
+            myTournamentsPrefetchInFlight = null;
+            myTournamentsPrefetchInflightKey = null;
+          }
+        });
+      myTournamentsPrefetchInflightKey = inflightKey;
+      myTournamentsPrefetchInFlight = p;
+      return p;
+    };
+    /** Non-blocking: warm badge + pending-upgrade (same query as loadBadge / menu flow). Deduped in BadgeService in-flight + PU cache. */
+    window.prefetchBadgeIfStale = function prefetchBadgeIfStale() {
+      const addr = (window.getWalletAddress && typeof window.getWalletAddress === 'function' && window.getWalletAddress()) ||
+        (window.walletAPIInstance && window.walletAPIInstance.isConnected() && window.walletAPIInstance.getAddress());
+      if (!addr) return;
+      const zero = '0x0000000000000000000000000000000000000000000000000000000000000000';
+      if (addr === zero || String(addr).toLowerCase() === zero) return;
+      if (!window.BadgeService || typeof window.BadgeService.getBadge !== 'function') return;
+      window.BadgeService.getBadge(addr, { includePendingUpgrade: true }).catch(function () {});
+    };
+    window.prefetchLeaderboardIfStale = function prefetchLeaderboardIfStale() {
+      var base = (window.GAME_CONFIG && (window.GAME_CONFIG.GAME_BACKEND_URL || window.GAME_CONFIG.API_BASE_URL)) || gameApiBase;
+      var ttl = window.LEADERBOARD_PREFETCH_TTL_MS || 30000;
+      var prev = window.__prefetchedLeaderboard;
+      if (prev && prev.at && (Date.now() - prev.at) < ttl) return;
+      var useMock = window.GAME_CONFIG && window.GAME_CONFIG.USE_MOCK_LEADERBOARD === true;
+      var limit = useMock ? 200 : 1000;
+      var mockParam = useMock ? '&mock=true' : '';
+      fetch(base + '/leaderboard?limit=' + limit + mockParam)
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (data && data.success && Array.isArray(data.leaderboard)) {
+            window.__prefetchedLeaderboard = { success: true, leaderboard: data.leaderboard, at: Date.now(), limit: data.limit };
+          } else {
+            window.__prefetchedLeaderboard = { success: true, leaderboard: [], at: Date.now() };
+          }
+        })
+        .catch(function () {
+          window.__prefetchedLeaderboard = { success: false, leaderboard: [], at: Date.now() };
+        });
+    };
+  }
+
+  // Kick bootstrap prefetch early; Enter flow will gate on readiness before opening the main menu.
+  beginMenuBootstrapPrefetch(gameApiBase).catch(() => {});
+
   // Load game data if available (from game-state-manager.js)
   // This happens AFTER UI is set up so it doesn't block the start screen
   if (typeof loadGameData === 'function') {
@@ -154,7 +581,8 @@ function initializeFrontPage() {
     
     // Disable button to prevent multiple clicks
     newBtn.disabled = true;
-    newBtn.textContent = 'Loading...';
+    newBtn.textContent = 'Preparing…';
+    setStartScreenProgress(true, 10);
     
     // CRITICAL: Wait for CSS to load before showing menu
     log.debug('UI INIT', 'Ensuring CSS is loaded before showing menu...');
@@ -164,6 +592,7 @@ function initializeFrontPage() {
     // Wait for CSSLoader to become available (it's loaded by loadDeferredScripts)
     let attempts = 0;
     while (attempts < 40 && typeof window.CSSLoader === 'undefined') {
+      if (attempts === 0) newBtn.textContent = 'Waiting for style loader…';
       await new Promise(resolve => setTimeout(resolve, 50));
       attempts++;
     }
@@ -172,6 +601,7 @@ function initializeFrontPage() {
     if (typeof window.CSSLoader !== 'undefined' && typeof window.CSSLoader.init === 'function') {
       if (!window.CSSLoader.isLoaded) {
         log.debug('UI INIT', 'CSS not loaded yet, initializing CSS loader now...');
+        newBtn.textContent = 'Loading styles…';
         try {
           await window.CSSLoader.init();
           // CSS loaded successfully
@@ -188,14 +618,17 @@ function initializeFrontPage() {
     // Wait a moment for styles to cascade and apply
     // Optimized: 200ms → 100ms (CSS transitions are usually faster)
     await new Promise(resolve => setTimeout(resolve, 100));
+    setStartScreenProgress(true, 25);
     
     // Load only menu scripts (much faster - only ~17 scripts instead of 77)
     if (typeof window.loadMenuScripts === 'function') {
       try {
         log.debug('UI INIT', 'Loading menu scripts (needed for main menu)...');
         log.debug('UI INIT', 'Menu scripts to load', window.MENU_SCRIPTS?.length || 'unknown');
+        newBtn.textContent = 'Loading menu scripts…';
         const startTime = performance.now();
         await window.loadMenuScripts();
+        setStartScreenProgress(true, 45);
         const loadTime = performance.now() - startTime;
         // All menu scripts loaded
         log.debug('UI INIT', 'Loaded menu scripts count', window.MENU_SCRIPTS?.length || 'unknown');
@@ -211,9 +644,12 @@ function initializeFrontPage() {
     // Wait a moment for scripts to initialize
     // Optimized: 100ms → 50ms (script initialization is usually faster)
     await new Promise(resolve => setTimeout(resolve, 50));
+    setStartScreenProgress(true, 55);
     
     // CRITICAL: Wait for wallet API to be ready before showing menu
     log.debug('UI INIT', 'Waiting for wallet API to be ready...');
+    // In-app wallet adapter / UI loading — not the user connecting a wallet yet
+    newBtn.textContent = 'Loading wallet support…';
     let walletReady = false;
     let walletAttempts = 0;
     const maxWalletAttempts = 100; // 10 seconds max wait (100 * 100ms)
@@ -228,7 +664,9 @@ function initializeFrontPage() {
           break;
         }
       }
-      
+      if (walletAttempts % 4 === 0) {
+        setStartScreenProgress(true, Math.min(64, 55 + Math.floor(walletAttempts / 10)));
+      }
       // Wait a bit before checking again
       await new Promise(resolve => setTimeout(resolve, 100));
       walletAttempts++;
@@ -238,6 +676,26 @@ function initializeFrontPage() {
       log.warn('UI INIT', 'Wallet API not ready after waiting, proceeding anyway (wallet may initialize later)');
     } else {
       log.debug('UI INIT', 'Wallet API ready, proceeding to show menu');
+    }
+    setStartScreenProgress(true, 65);
+
+    // Block menu transition until store catalog + tournaments are ready (bootstrap polls until both succeed).
+    try {
+      setStartScreenProgress(true, 66);
+      const stopCreep = startStartScreenProgressCreep(66, 93, { stepMs: 400, step: 1.15 });
+      try {
+        await ensureMenuBootstrapReady(getGameApiBase(), newBtn);
+      } finally {
+        stopCreep();
+      }
+      setStartScreenProgress(true, 100);
+      log.debug('UI INIT', 'Menu bootstrap ready');
+    } catch (bootstrapErr) {
+      log.error('UI INIT', 'Menu bootstrap not ready; keeping start screen visible', bootstrapErr);
+      setStartScreenProgress(false, 0);
+      newBtn.disabled = false;
+      newBtn.textContent = 'Retry Loading';
+      return;
     }
     
     // Hide the front page - use CSS classes only
@@ -340,6 +798,7 @@ function initializeFrontPage() {
     // Re-enable button
     newBtn.disabled = false;
     newBtn.textContent = '🎮 Enter Game';
+    setStartScreenProgress(false, 0);
   });
   
   log.debug('UI INIT', 'Front page button event listener attached - user MUST click to proceed');

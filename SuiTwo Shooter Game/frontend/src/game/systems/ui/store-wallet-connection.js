@@ -73,9 +73,12 @@ async function handleStoreWalletConnect() {
   if (typeof WalletService !== 'undefined' && WalletService.connect) {
     try {
       await WalletService.connect();
-      // After connection, show the store
+      const ctx =
+        typeof StoreService !== 'undefined' && StoreService._state && StoreService._state.context
+          ? StoreService._state.context
+          : 'main-menu';
       if (typeof showStore === 'function') {
-        await showStore();
+        await showStore(ctx);
       }
     } catch (error) {
       console.error('❌ [STORE WALLET CONNECTION] Wallet connection failed:', error);
@@ -93,9 +96,12 @@ async function handleStoreWalletConnect() {
   if (typeof handleConnectWallet === 'function') {
     try {
       await handleConnectWallet();
-      // After connection, show the store
+      const ctx =
+        typeof StoreService !== 'undefined' && StoreService._state && StoreService._state.context
+          ? StoreService._state.context
+          : 'main-menu';
       if (typeof showStore === 'function') {
-        await showStore();
+        await showStore(ctx);
       }
     } catch (error) {
       console.error('❌ [STORE WALLET CONNECTION] Wallet connection failed:', error);
@@ -117,10 +123,50 @@ async function handleStoreWalletConnect() {
 }
 
 /**
- * Cancel wallet connection
+ * Cancel wallet connection — close modal and return to prior UI (main menu when opened from menu).
+ * MenuService.showPanel('store') hides the main menu before showStore(); without this, Cancel left a blank screen.
  */
 function cancelStoreWalletConnect() {
   closeStoreWalletConnectModal();
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+    MenuPanelLoading.hide();
+  }
+  const ctx =
+    typeof StoreService !== 'undefined' && StoreService._state && StoreService._state.context
+      ? StoreService._state.context
+      : 'main-menu';
+  if (ctx === 'credits-only') {
+    return;
+  }
+  if (typeof window.isPrepLoadoutStoreContext === 'function' && window.isPrepLoadoutStoreContext(ctx)) {
+    if (ctx === 'tournament-entry') {
+      if (typeof cancelTournamentEntryStore === 'function') {
+        cancelTournamentEntryStore();
+      } else if (typeof hideStore === 'function') {
+        hideStore({ returnToTournaments: true });
+      }
+    } else {
+      if (typeof MenuService !== 'undefined' && MenuService.show) {
+        void MenuService.show({ fromMenuPanel: true });
+      } else {
+        const mainMenu = document.getElementById('mainMenuOverlay');
+        if (mainMenu) {
+          mainMenu.classList.add('main-menu-overlay-visible');
+          mainMenu.classList.remove('main-menu-overlay-hidden');
+        }
+      }
+    }
+    return;
+  }
+  if (typeof MenuService !== 'undefined' && MenuService.show) {
+    void MenuService.show({ fromMenuPanel: true });
+  } else {
+    const mainMenu = document.getElementById('mainMenuOverlay');
+    if (mainMenu) {
+      mainMenu.classList.add('main-menu-overlay-visible');
+      mainMenu.classList.remove('main-menu-overlay-hidden');
+    }
+  }
 }
 
 /**

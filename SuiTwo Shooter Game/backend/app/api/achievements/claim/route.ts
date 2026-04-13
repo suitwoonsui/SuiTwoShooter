@@ -1,11 +1,11 @@
-// ==========================================
+﻿// ==========================================
 // API - Claim a Milestone Reward
 // ==========================================
 // User-triggered claim for a specific milestone
 
 import { NextRequest, NextResponse } from 'next/server';
 import { withApiHandler } from '@/lib/api/api-handler';
-import { getAchievementService } from '@/lib/sui/achievement-service';
+import { getAchievementService } from '@/lib/services/achievements/core/achievement-service';
 import { getCorsHeaders } from '@/lib/cors';
 
 // Handle CORS preflight request
@@ -100,3 +100,4 @@ export const POST = withApiHandler(
     }
   }
 );
+

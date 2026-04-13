@@ -20,6 +20,13 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
       error: (cat, msg, data) => console.error(`[${cat}] ${msg}`, data || ''),
     };
 
+/** @param {string} ctx */
+function _storeServiceIsPrepLoadout(ctx) {
+  return typeof window !== 'undefined' && typeof window.isPrepLoadoutStoreContext === 'function'
+    ? window.isPrepLoadoutStoreContext(ctx)
+    : ctx === 'tournament-entry' || ctx === 'regular-entry';
+}
+
 const StoreService = {
   // State
   _initialized: false,
@@ -28,11 +35,14 @@ const StoreService = {
   
   // Store state
   _state: {
-    selectedItems: {}, // Format: { itemId_level: quantity }
+    selectedOffers: {}, // Preferred: { offerId: quantity }
     paymentToken: 'mews', // 'mews', 'sui', or 'usdc'
     isLoading: false,
     tokenPrices: null,
-    context: 'main-menu' // Store context: 'main-menu', 'credits-only', 'gamePass'
+    tokenPricesTimestamp: null,
+    storeItems: null, // Items from backend (has correct USD prices)
+    storeOffers: null, // Offers map from backend (Stockroom offerId -> offer data)
+    context: 'main-menu' // 'main-menu' | 'regular-entry' | 'tournament-entry' | 'credits-only' | …
   },
   
   /**
@@ -46,10 +56,13 @@ const StoreService = {
     
     // Reset state
     this._state = {
-      selectedItems: {},
+      selectedOffers: {},
       paymentToken: 'mews',
       isLoading: false,
       tokenPrices: null,
+      tokenPricesTimestamp: null,
+      storeItems: null, // Items from backend (has correct USD prices)
+      storeOffers: null,
       context: 'main-menu'
     };
     
@@ -61,14 +74,16 @@ const StoreService = {
    * Get store state (for external access)
    */
   getState() {
-    return { ...this._state };
+    // MVP: return the live mutable state reference so UI modules can update it.
+    // (Some modules intentionally mutate state via getStoreState()/updateStoreStateReference().)
+    return this._state;
   },
   
   /**
-   * Get selected items
+   * Get selected offers
    */
-  getSelectedItems() {
-    return { ...this._state.selectedItems };
+  getSelectedOffers() {
+    return { ...this._state.selectedOffers };
   },
   
   /**
@@ -80,11 +95,14 @@ const StoreService = {
   
   /**
    * Show store modal
-   * Main entry point - checks wallet connection and badge upgrades
+   * Main entry point - checks wallet connection
+   * Pending badge upgrades are handled only during main-menu data load (bootstrap / after game), not from the store.
    * @param {string} context - Context for showing store ('main-menu' | 'gameplay-paywall' | 'gamePass')
+   * @param {boolean} [_skipUpgradeCheck] - Deprecated, ignored (kept for call-site compatibility)
    */
-  async show(context = 'main-menu') {
-    log.debug('STORE SERVICE', 'show() called');
+  async show(context = 'main-menu', _skipUpgradeCheck = false) {
+    log.debug('STORE SERVICE', 'show() called', { context });
+    this._state.context = context;
     
     // Check if wallet is connected
     let walletAddress = null;
@@ -95,55 +113,16 @@ const StoreService = {
     }
     
     if (!walletAddress) {
-      // Show wallet connection modal
+      // showStore() shows MenuPanelLoading first; dismiss it when we only open the wallet gate
+      if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+        MenuPanelLoading.hide();
+      }
       if (typeof showStoreWalletConnectModal === 'function') {
         showStoreWalletConnectModal();
       }
       return;
     }
     
-    // Check for pending badge upgrade BEFORE showing store
-    if (window.BadgeService && window.BadgeService.checkPendingUpgrade) {
-      const upgradeCheck = await window.BadgeService.checkPendingUpgrade(walletAddress);
-      if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.badgeId) {
-        log.debug('STORE SERVICE', 'Pending badge upgrade detected - showing upgrade modal first');
-        
-        // Get current badge to get old tier
-        const badgeData = await window.BadgeService.getBadge(walletAddress);
-        if (badgeData && badgeData.success && badgeData.hasBadge && badgeData.badge) {
-          const oldTier = badgeData.badge.tier;
-          const newTier = upgradeCheck.newTier || oldTier + 1;
-          const newTierName = window.BadgeService.getTierName(newTier);
-          
-          // Generate session ID for upgrade transaction
-          const sessionId = `upgrade_${walletAddress}_${Date.now()}`;
-          
-          // Show upgrade modal with callback to show store after upgrade
-          if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
-            window.BadgeUI.showTierUpgradeModal({
-              oldTier,
-              newTier,
-              newTierName,
-              badgeId: upgradeCheck.badgeId,
-              sessionId: sessionId,
-              onUpgradeComplete: async (upgraded) => {
-                // After upgrade modal closes (whether upgraded or declined), show store
-                if (upgraded) {
-                  // Small delay to let badge cache clear
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                }
-                await this._showInternal(context);
-              },
-            });
-            
-            // Return early - store will be shown via callback
-            return;
-          }
-        }
-      }
-    }
-    
-    // Wallet is connected, proceed to show store
     await this._showInternal(context);
   },
   
@@ -194,19 +173,31 @@ const StoreService = {
         this._setupClickOutsideHandler(storeModal);
         
         // Show loading modal while refreshing
-        if (typeof showLoadingModal === 'function') {
-          showLoadingModal('Refreshing store... Please wait', 'storeLoadingModal');
+        if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+          MenuPanelLoading.show('Refreshing store... Please wait');
         }
         // Wait for cards to exist, then load inventory and balance
         setTimeout(async () => {
           try {
+            if (typeof window.applyStoreContextChrome === 'function') {
+              window.applyStoreContextChrome(context);
+            }
+            if (
+              (context === 'tournament-entry' || context === 'regular-entry') &&
+              typeof window.switchStoreTab === 'function'
+            ) {
+              await window.switchStoreTab('inventory');
+            }
+            if (typeof window.updateStoreButtons === 'function') {
+              window.updateStoreButtons('inventory', context);
+            }
             await this._loadInventoryDisplay();
             await this._updateBalance();
             await this._updateUI();
           } finally {
             // Hide loading modal when refresh is complete
-            if (typeof hideLoadingModal === 'function') {
-              hideLoadingModal('storeLoadingModal');
+            if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+              MenuPanelLoading.hide();
             }
           }
         }, 100);
@@ -224,15 +215,16 @@ const StoreService = {
     
     // Fallback: If showStoreInternal is not available, show error
     log.error('STORE SERVICE', 'showStoreInternal() not available');
-    if (typeof hideLoadingModal === 'function') {
-      hideLoadingModal('storeLoadingModal');
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
     }
   },
   
   /**
    * Hide store modal
+   * @param {{ returnToTournaments?: boolean; skipMainMenuReveal?: boolean }} [options]
    */
-  hide() {
+  hide(options = {}) {
     const storeModal = document.getElementById('storeModal');
     if (storeModal) {
       storeModal.classList.remove('store-modal-visible');
@@ -249,13 +241,28 @@ const StoreService = {
       this._clickOutsideHandler = null;
     }
     
-    // Check context - don't show main menu if in credits-only mode (from End Demo modal)
     const context = this._state.context || 'main-menu';
-    
+    this._state.context = 'main-menu';
+    this._isVisible = false;
+
+    if (options.returnToTournaments) {
+      if (typeof showTournaments === 'function') {
+        showTournaments();
+      } else if (typeof window.showTournaments === 'function') {
+        window.showTournaments();
+      }
+      return;
+    }
+
+    if (options.skipMainMenuReveal) {
+      return;
+    }
+
+    // Check context - don't show main menu if in credits-only mode (from End Demo modal)
     if (context !== 'credits-only') {
       // Show main menu again after closing store (only if not in credits-only mode)
       if (typeof MenuService !== 'undefined' && MenuService.show) {
-        MenuService.show();
+        MenuService.show({ fromMenuPanel: true });
       } else {
         // Fallback: manual show
         const mainMenu = document.getElementById('mainMenuOverlay');
@@ -269,8 +276,6 @@ const StoreService = {
       // The End Demo modal should handle showing itself again if needed
       log.debug('STORE SERVICE', 'Store closed in credits-only mode - staying in game');
     }
-    
-    this._isVisible = false;
   },
   
   /**
@@ -317,6 +322,11 @@ const StoreService = {
       
       // Check if click is outside the modal
       if (!storeModal.contains(event.target)) {
+        const ctx = this._state.context || 'main-menu';
+        if (ctx === 'credits-only' || _storeServiceIsPrepLoadout(ctx)) {
+          log.debug('STORE SERVICE', 'Click outside ignored (credits-only or prep loadout)');
+          return;
+        }
         log.debug('STORE SERVICE', 'Click was outside store modal - closing');
         this.hide();
       }
@@ -384,6 +394,7 @@ const StoreService = {
   async _refreshActiveTab(paymentToken) {
     // Check which tab is currently active
     const itemsTab = document.getElementById('storeTabContentItems');
+    const bundlesTab = document.getElementById('storeTabContentBundles');
     const gamePassTab = document.getElementById('storeTabContentGamePass');
     const ticketsTab = document.getElementById('storeTabContentTickets');
     const inventoryTab = document.getElementById('storeTabContentInventory');
@@ -391,6 +402,8 @@ const StoreService = {
     let activeTab = null;
     if (itemsTab && itemsTab.classList.contains('active')) {
       activeTab = 'items';
+    } else if (bundlesTab && bundlesTab.classList.contains('active')) {
+      activeTab = 'bundles';
     } else if (gamePassTab && gamePassTab.classList.contains('active')) {
       activeTab = 'gamePass';
     } else if (ticketsTab && ticketsTab.classList.contains('active')) {
@@ -400,7 +413,7 @@ const StoreService = {
     }
     
     // Refresh tabs that need re-rendering (Items tab updates via updateItemPrices)
-    if (activeTab === 'gamePass' || activeTab === 'tickets' || activeTab === 'inventory') {
+    if (activeTab === 'bundles' || activeTab === 'gamePass' || activeTab === 'tickets' || activeTab === 'inventory') {
       log.debug('STORE SERVICE', `Refreshing ${activeTab} tab after payment token change`);
       if (typeof switchStoreTab === 'function') {
         // Re-render the active tab with new payment token
@@ -410,62 +423,61 @@ const StoreService = {
   },
   
   /**
-   * Add item to selection
+   * Add offer to selection
    */
-  async addItemToSelection(itemId, level) {
-    const key = this._getItemKey(itemId, level);
-    const currentQuantity = this._state.selectedItems[key] || 0;
-    this._state.selectedItems[key] = currentQuantity + 1;
+  async addOfferToSelection(offerId) {
+    const id = String(offerId || '').trim();
+    if (!id) return;
+    const currentQuantity = this._state.selectedOffers[id] || 0;
+    this._state.selectedOffers[id] = currentQuantity + 1;
     await this._updateUI();
   },
   
   /**
-   * Remove item from selection
-   * @param {string} itemId - Item ID
-   * @param {number} level - Item level
+   * Remove offer from selection
    * @param {Event} event - Click event (optional, used to stop propagation)
    */
-  async removeItemFromSelection(itemId, level, event) {
+  async removeOfferFromSelection(offerId, event) {
     // Stop event propagation to prevent click-outside handler from closing the store
     if (event) {
       event.stopPropagation();
       event.preventDefault();
     }
     
-    const key = this._getItemKey(itemId, level);
-    const currentQuantity = this._state.selectedItems[key] || 0;
+    const id = String(offerId || '').trim();
+    const currentQuantity = this._state.selectedOffers[id] || 0;
     if (currentQuantity > 0) {
-      this._state.selectedItems[key] = currentQuantity - 1;
-      if (this._state.selectedItems[key] === 0) {
-        delete this._state.selectedItems[key];
+      this._state.selectedOffers[id] = currentQuantity - 1;
+      if (this._state.selectedOffers[id] === 0) {
+        delete this._state.selectedOffers[id];
       }
       await this._updateUI();
     }
   },
   
   /**
-   * Set item quantity
+   * Set offer quantity
    */
-  async setItemQuantity(itemId, level, quantity) {
-    const key = this._getItemKey(itemId, level);
+  async setOfferQuantity(offerId, quantity) {
+    const key = String(offerId || '').trim();
     if (quantity <= 0) {
-      delete this._state.selectedItems[key];
+      delete this._state.selectedOffers[key];
     } else {
-      this._state.selectedItems[key] = quantity;
+      this._state.selectedOffers[key] = quantity;
     }
     await this._updateUI();
   },
   
   /**
-   * Clear level selection (remove all of a specific item/level)
+   * Clear selection for an offer (remove all quantity)
    */
-  clearLevelSelection(itemId, level, event) {
+  clearOfferSelection(offerId, event) {
     if (event) {
       event.stopPropagation();
       event.preventDefault();
     }
-    const key = this._getItemKey(itemId, level);
-    delete this._state.selectedItems[key];
+    const key = String(offerId || '').trim();
+    delete this._state.selectedOffers[key];
     this._updateUI();
   },
   
@@ -473,24 +485,16 @@ const StoreService = {
    * Clear all selections
    */
   clearStoreSelection() {
-    this._state.selectedItems = {};
+    this._state.selectedOffers = {};
     this._updateUI();
   },
   
   /**
-   * Get item quantity
+   * Get offer quantity
    */
-  getItemQuantity(itemId, level) {
-    const key = this._getItemKey(itemId, level);
-    return this._state.selectedItems[key] || 0;
-  },
-  
-  /**
-   * Get item key (itemId_level format)
-   * @private
-   */
-  _getItemKey(itemId, level) {
-    return `${itemId}_${level}`;
+  getOfferQuantity(offerId) {
+    const key = String(offerId || '').trim();
+    return this._state.selectedOffers[key] || 0;
   },
   
   /**

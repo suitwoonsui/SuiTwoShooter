@@ -28,7 +28,16 @@ async function handleBadgeMint() {
     log.debug('⏭️ [BADGE MINT] Mint already in progress, ignoring duplicate call');
     return;
   }
-  
+
+  const confirmed = window.confirm(
+    'Mint your soulbound badge? It will be sent to your connected wallet. ' +
+    'You will be asked to sign in your wallet to complete the mint.'
+  );
+  if (!confirmed) {
+    log.debug('BADGE MINT', 'User cancelled mint confirmation');
+    return;
+  }
+
   const btn = document.getElementById('badgeMintBtn');
   if (btn) {
     btn.disabled = true;
@@ -69,11 +78,8 @@ async function handleBadgeMint() {
       log.error('BADGE MINT', 'Transaction build failed', result.error);
       throw new Error(result.error || 'Failed to build mint transaction');
     }
-    
-    log.debug('BADGE MINT', 'Step 1 complete: Transaction built successfully');
-    log.debug('BADGE MINT', 'Step 2: Requesting wallet signature...');
 
-    // Sign and execute transaction (result.transaction is Transaction object)
+    log.debug('BADGE MINT', 'Shipyard mint tx ready; requesting wallet signature...');
     const txResult = await window.BadgeService.signAndExecuteBadgeTransaction(result.transaction);
     
     log.debug('BADGE MINT', 'Execution result', {
@@ -108,21 +114,8 @@ async function handleBadgeMint() {
         log.debug('✅ [BADGE MINT] API cache invalidated for badge mint');
       }
       
-      // Mark that we just minted a badge (prevents migration check from running immediately)
-      if (window.BadgeService) {
-        window.BadgeService._lastMintTime = Date.now();
-        log.debug('BADGE MINT', 'Set _lastMintTime to prevent migration check');
-      }
-      
       if (window.BadgeUIService) {
         window.BadgeUIService.setLastTransactionTime('mint', Date.now());
-      }
-      
-      // Hide any existing migration modal (in case it was shown before mint)
-      const migrationModal = document.getElementById('badgeMigrationModal');
-      if (migrationModal && typeof window.hideBadgeModal === 'function') {
-        log.debug('BADGE MINT', 'Hiding migration modal after successful mint');
-        window.hideBadgeModal('badgeMigrationModal');
       }
       
       // Wait for transaction to be indexed on blockchain using smart polling
@@ -224,16 +217,15 @@ async function handleBadgeMint() {
 function handleBadgeMaybeLater() {
   log.debug('BADGE MINT', 'User chose "Maybe Later"');
   
-  // Mark data as loaded so game can proceed
   if (typeof GameDataState !== 'undefined') {
     GameDataState.markDataLoaded();
-    log.debug('BADGE MINT', 'User clicked "Maybe Later" - data marked as loaded, will prompt again on next game completion');
+    GameDataState.setSkipAutoMintModal(true);
+    log.debug('BADGE MINT', 'Skip auto mint modal until wallet reset or explicit mint from menu');
   }
   
   if (typeof window.hideBadgeModal === 'function') {
     window.hideBadgeModal('badgeMintingModal');
   }
-  // Note: Will prompt again on next game completion
 }
 
 // Expose globally

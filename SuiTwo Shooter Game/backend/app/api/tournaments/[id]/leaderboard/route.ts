@@ -4,9 +4,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
-import { getTournamentService } from '@/lib/sui/tournament-service';
+import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
 import { withApiHandler } from '@/lib/api/api-handler';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -18,13 +18,13 @@ export const GET = withApiHandler(
     const { id } = await params;
     const tournamentObjectId = id;
 
-    BadgeLogger.info('🏆 [LEADERBOARD API] Leaderboard request received', {
+    PlatformLogger.info('🏆 [LEADERBOARD API] Leaderboard request received', {
       tournamentObjectId,
       url: request.url,
     });
 
     if (!tournamentObjectId) {
-      BadgeLogger.error('🏆 [LEADERBOARD API] Tournament ID missing');
+      PlatformLogger.error('🏆 [LEADERBOARD API] Tournament ID missing');
       return NextResponse.json(
         { success: false, error: 'Tournament ID is required' },
         { status: 400 }
@@ -35,7 +35,7 @@ export const GET = withApiHandler(
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '100', 10);
 
-    BadgeLogger.info('🏆 [LEADERBOARD API] Request parameters', {
+    PlatformLogger.info('🏆 [LEADERBOARD API] Request parameters', {
       tournamentObjectId,
       limit,
     });
@@ -43,24 +43,25 @@ export const GET = withApiHandler(
     const tournamentService = getTournamentService();
     
     // Get tournament info first
-    BadgeLogger.info('🏆 [LEADERBOARD API] Fetching tournament details', {
+    PlatformLogger.info('🏆 [LEADERBOARD API] Fetching tournament details', {
       tournamentObjectId,
     });
     
     const tournamentResult = await tournamentService.getTournament(tournamentObjectId);
     
     if (!tournamentResult.success || !tournamentResult.tournament) {
-      BadgeLogger.error('🏆 [LEADERBOARD API] Tournament not found', {
+      // Not-found is expected when no tournaments/events exist yet (or when callers pass a placeholder ID).
+      PlatformLogger.warn('🏆 [LEADERBOARD API] Tournament not found', {
         tournamentObjectId,
         error: tournamentResult.error,
       });
       return NextResponse.json(
-        { success: false, error: tournamentResult.error || 'Tournament not found' },
-        { status: 404 }
+        { success: false, error: tournamentResult.error || 'Tournament not found', leaderboard: [], limit },
+        { status: 200 }
       );
     }
 
-    BadgeLogger.info('🏆 [LEADERBOARD API] Tournament details retrieved', {
+    PlatformLogger.info('🏆 [LEADERBOARD API] Tournament details retrieved', {
       tournamentObjectId,
       tournamentId: tournamentResult.tournament.tournamentId,
       tournamentName: tournamentResult.tournament.name,
@@ -70,7 +71,7 @@ export const GET = withApiHandler(
     });
 
     // Get leaderboard
-    BadgeLogger.info('🏆 [LEADERBOARD API] Fetching leaderboard', {
+    PlatformLogger.info('🏆 [LEADERBOARD API] Fetching leaderboard', {
       tournamentObjectId,
       tournamentId: tournamentResult.tournament.tournamentId,
       limit,
@@ -82,7 +83,7 @@ export const GET = withApiHandler(
     );
 
     if (!leaderboardResult.success) {
-      BadgeLogger.error('🏆 [LEADERBOARD API] Failed to get leaderboard', {
+      PlatformLogger.error('🏆 [LEADERBOARD API] Failed to get leaderboard', {
         tournamentObjectId,
         error: leaderboardResult.error,
       });
@@ -92,13 +93,13 @@ export const GET = withApiHandler(
       );
     }
 
-    BadgeLogger.info('🏆 [LEADERBOARD API] Leaderboard retrieved successfully', {
+    PlatformLogger.info('🏆 [LEADERBOARD API] Leaderboard retrieved successfully', {
       tournamentObjectId,
       tournamentId: tournamentResult.tournament.tournamentId,
       tournamentName: tournamentResult.tournament.name,
       leaderboardEntries: leaderboardResult.leaderboard?.length || 0,
       limit,
-      entries: leaderboardResult.leaderboard?.map((e: any, i: number) => ({
+      entries: leaderboardResult.leaderboard?.map((e, i) => ({
         rank: e.rank,
         playerAddress: e.playerAddress,
         playerName: e.playerName || '(no name)',

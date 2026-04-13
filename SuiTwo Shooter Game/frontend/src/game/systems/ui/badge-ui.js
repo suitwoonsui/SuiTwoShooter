@@ -8,7 +8,7 @@
 // - badge-ui-modals.js: Modal creation and display
 // - badge-ui-mint.js: Badge minting flow
 // - badge-ui-upgrade.js: Badge upgrade flow
-// - badge-ui-migration.js: Badge migration flow
+// - (removed) badge migration flow (upgradable contracts)
 
 console.log('✅ [BADGE UI] Legacy delegation module loaded');
 
@@ -17,10 +17,9 @@ console.log('✅ [BADGE UI] Legacy delegation module loaded');
 // any remaining references continue to work
 
 // The refactored modules expose all necessary functions globally:
-// - showBadgeMintingModal, showTierUpgradeModal, showBadgeMigrationModal, hideBadgeModal (from badge-ui-modals.js)
+// - showBadgeMintingModal, showTierUpgradeModal, hideBadgeModal (from badge-ui-modals.js)
 // - handleBadgeMint, handleBadgeMaybeLater (from badge-ui-mint.js)
 // - handleBadgeUpgrade, showUpgradeError (from badge-ui-upgrade.js)
-// - handleBadgeMigration (from badge-ui-migration.js)
 // - displayBadgeInUI (from badge-ui-display.js)
 // - arrayBufferToBase64, fetchRegistryGames (from badge-ui-utils.js)
 
@@ -33,7 +32,6 @@ if (typeof window !== 'undefined') {
   // Expose functions via BadgeUI object (functions are already exposed globally by modules)
   window.BadgeUI.showBadgeMintingModal = window.showBadgeMintingModal;
   window.BadgeUI.showTierUpgradeModal = window.showTierUpgradeModal;
-  window.BadgeUI.showBadgeMigrationModal = window.showBadgeMigrationModal;
   window.BadgeUI.displayBadgeInUI = window.displayBadgeInUI;
   window.BadgeUI.hideBadgeModal = window.hideBadgeModal;
   window.BadgeUI.arrayBufferToBase64 = window.arrayBufferToBase64;

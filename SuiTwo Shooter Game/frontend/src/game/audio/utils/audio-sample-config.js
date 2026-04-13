@@ -1,20 +1,15 @@
 // ==========================================
-// AUDIO SAMPLE CONFIGURATION
+// AUDIO SAMPLE CONFIGURATION (optional / legacy)
 // ==========================================
-
-/**
- * Configuration for audio samples
- * Add your audio file paths here
- * 
- * Place audio files in: assets/sounds/ or your preferred directory
- * Supported formats: WAV, MP3, OGG
- */
+//
+// The game uses procedural sounds (sound-effects.js, oscillators) by default.
+// This config is only used if something explicitly requests WAV samples (e.g. sound test UI).
+// No .wav files are required for normal gameplay.
 
 const AUDIO_SAMPLE_CONFIG = {
-  // Explosion sounds
   explosion: {
     url: 'assets/sounds/explosion.wav',
-    fallback: 'buffer', // Fallback to buffer generator if file not found
+    fallback: 'buffer',
     volume: 1.0
   },
   explosionLarge: {
@@ -22,8 +17,6 @@ const AUDIO_SAMPLE_CONFIG = {
     fallback: 'buffer',
     volume: 1.0
   },
-  
-  // Impact sounds
   impact: {
     url: 'assets/sounds/impact.wav',
     fallback: 'buffer',
@@ -34,27 +27,16 @@ const AUDIO_SAMPLE_CONFIG = {
     fallback: 'buffer',
     volume: 0.9
   },
-  
-  // Boss sounds
   bossDestroyed: {
     url: 'assets/sounds/boss-destroyed.wav',
-    fallback: 'oscillator', // Fallback to oscillator if file not found
+    fallback: 'oscillator',
     volume: 1.0
   },
-  
-  // Game state sounds
   gameOver: {
     url: 'assets/sounds/game-over.wav',
     fallback: 'oscillator',
     volume: 1.0
   },
-  
-  // Optional: Add more samples as needed
-  // coinCollect: {
-  //   url: 'assets/sounds/coin-collect.wav',
-  //   fallback: 'oscillator',
-  //   volume: 0.6
-  // }
 };
 
 /**

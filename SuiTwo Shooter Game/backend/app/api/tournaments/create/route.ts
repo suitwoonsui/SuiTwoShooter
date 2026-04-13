@@ -1,16 +1,18 @@
 // ==========================================
-// Create Tournament API Route (User)
-// Creates a tournament with payment
+// Create Tournament API Route (User-created flow)
+// Build and execute via platform Channel: app's CorridorCap, admin signs, POST /api/channel/execute.
+// createdBy = playerAddress for attribution. No user signing; transaction is submitted through the channel.
+// Separate from admin-created tournaments (POST /api/admin/tournaments/create).
 // ==========================================
 
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { getTournamentService } from '@/lib/sui/tournament-service';
-import { calculateRewardCost, calculateTotalPayment, TournamentRewardConfig } from '@/lib/services/reward-cost-calculator';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
+import { TournamentRewardConfig } from '@/lib/services/tournament/cost/reward-cost-calculator';
+import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
+import { PlatformValidators } from '@/lib/services/platform/validators/platform-validators';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -27,6 +29,8 @@ export const POST = withApiHandler(
       entryFeeTickets: number;
       rewardConfig?: TournamentRewardConfig | null;
       startingAnteUSDCents: number;
+      /** Token type for ante/vault when ante > 0 (same as admin flow). When set, used for reward distribution. */
+      startingAnteToken?: 'SUI' | 'MEWS' | 'USDC';
       paymentToken: 'SUI' | 'MEWS' | 'USDC';
       playerAddress: string;
       badgeDiscount?: number; // Optional: if provided, won't fetch from badge service
@@ -40,112 +44,113 @@ export const POST = withApiHandler(
       entryFeeTickets,
       rewardConfig,
       startingAnteUSDCents,
+      startingAnteToken,
       paymentToken,
       playerAddress,
-      badgeDiscount,
     } = body;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'name is required and must not be empty'
       );
     }
 
     if (name.length > 100) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'name must be 100 characters or less'
       );
     }
 
     if (!category || !['totalCoins', 'longestStreak', 'highestScore', 'longestDistance', 'mostBosses', 'mostEnemies'].includes(category)) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'category must be one of: totalCoins, longestStreak, highestScore, longestDistance, mostBosses, mostEnemies'
       );
     }
 
     if (!startTime || typeof startTime !== 'number' || startTime <= 0) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'startTime must be a valid Unix timestamp (milliseconds)'
       );
     }
 
     if (!endTime || typeof endTime !== 'number' || endTime <= 0) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'endTime must be a valid Unix timestamp (milliseconds)'
       );
     }
 
     if (endTime <= startTime) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'endTime must be after startTime'
       );
     }
 
     const now = Date.now();
     if (endTime <= now) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'endTime must be in the future'
       );
     }
 
     if (!entryFeeTickets || typeof entryFeeTickets !== 'number' || entryFeeTickets < 1) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'entryFeeTickets must be at least 1'
       );
     }
 
     if (startingAnteUSDCents === undefined || typeof startingAnteUSDCents !== 'number' || startingAnteUSDCents < 0) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'startingAnteUSDCents must be a non-negative number'
       );
     }
 
     if (!paymentToken || !['SUI', 'MEWS', 'USDC'].includes(paymentToken)) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'paymentToken must be SUI, MEWS, or USDC'
       );
     }
 
-    BadgeValidators.validateAddress(playerAddress);
+    PlatformValidators.validateAddress(playerAddress);
 
     // Validate reward config if provided
     if (rewardConfig) {
       if (!rewardConfig.rewardDepth || rewardConfig.rewardDepth < 1 || rewardConfig.rewardDepth > 255) {
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
+        throw new PlatformError(
+          PlatformErrorCode.INVALID_ADDRESS,
           'rewardDepth must be between 1 and 255'
         );
       }
 
       if (!rewardConfig.poolDepth || rewardConfig.poolDepth < 1 || rewardConfig.poolDepth > 255) {
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
+        throw new PlatformError(
+          PlatformErrorCode.INVALID_ADDRESS,
           'poolDepth must be between 1 and 255'
         );
       }
 
-      // Validate pool distribution sums to 100
-      const poolSum = rewardConfig.poolDistribution.reduce((sum, pct) => sum + pct, 0);
+      // Validate pool distribution sums to 100 (guard against undefined)
+      const poolDist = rewardConfig.poolDistribution ?? [];
+      const poolSum = poolDist.reduce((sum, pct) => sum + pct, 0);
       if (Math.abs(poolSum - 100) > 0.01) {
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
+        throw new PlatformError(
+          PlatformErrorCode.INVALID_ADDRESS,
           'poolDistribution must sum to 100'
         );
       }
     }
 
-    BadgeLogger.info('🏆 [TOURNAMENT CREATE] Creating tournament', {
+    PlatformLogger.info('🏆 [TOURNAMENT CREATE] Creating tournament', {
       name,
       category,
       playerAddress,
@@ -157,30 +162,8 @@ export const POST = withApiHandler(
       paymentToken,
     });
 
-    // Calculate reward cost
-    const costResult = await calculateRewardCost(
-      rewardConfig || null,
-      playerAddress,
-      badgeDiscount
-    );
-
-    // Calculate total payment
-    const totalPayment = calculateTotalPayment(
-      startingAnteUSDCents,
-      costResult.totalCostUSDCents
-    );
-
-    BadgeLogger.info('🏆 [TOURNAMENT CREATE] Payment calculated', {
-      creationFeeUSDCents: totalPayment.creationFeeUSDCents,
-      startingAnteUSDCents: totalPayment.startingAnteUSDCents,
-      rewardCostUSDCents: totalPayment.rewardCostUSDCents,
-      totalUSDCents: totalPayment.totalUSDCents,
-      totalUSD: totalPayment.totalUSD,
-    });
-
-    // Build tournament creation transaction
     const tournamentService = getTournamentService();
-    const transactionResult = await tournamentService.buildTournamentCreationTransaction(
+    const createResult = await tournamentService.createTournamentViaPlatformChannel(
       {
         name,
         category,
@@ -189,51 +172,50 @@ export const POST = withApiHandler(
         entryFeeTickets,
         rewardConfig: rewardConfig || null,
         startingAnteUSDCents,
-        creationFeeUSDCents: totalPayment.creationFeeUSDCents,
-        rewardCostUSDCents: costResult.totalCostUSDCents,
+        startingAnteToken,
       },
-      {
-        playerAddress,
-        paymentToken,
-      }
+      { playerAddress, paymentToken }
     );
 
-    if (!transactionResult.success) {
-      BadgeLogger.error('🏆 [TOURNAMENT CREATE] Failed to build transaction', {
-        error: transactionResult.error,
-      });
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
-        transactionResult.error || 'Failed to build tournament creation transaction'
+    if (!createResult.success) {
+      PlatformLogger.error('🏆 [TOURNAMENT CREATE] Channel create failed', { error: createResult.error });
+      const isDefaultRewards = createResult.error?.includes('Default rewards have not been set') === true;
+      throw new PlatformError(
+        isDefaultRewards ? PlatformErrorCode.CONFIG_MISSING : PlatformErrorCode.INVALID_ADDRESS,
+        createResult.error || 'Failed to create tournament via platform channel'
       );
     }
 
-    BadgeLogger.info('🏆 [TOURNAMENT CREATE] Transaction built successfully', {
-      gasEstimate: transactionResult.gasEstimate,
-    });
-
+    const creationFeeUSDCents = createResult.appCreationFeeUsdCents ?? 500;
+    // Note: rewardCostUSDCents is currently not recomputed here; the player payment
+    // flow uses /api/tournaments/build-payment + /api/tournaments/calculate-reward-cost
+    // to include custom reward cost in the wallet-approved amount. For now we surface
+    // rewardCostUSDCents as 0 in this response and let the UI use the values from
+    // build-payment / calculate-reward-cost for detailed breakdown.
+    const rewardCostUSDCents = 0;
+    const totalUSDCents = creationFeeUSDCents + startingAnteUSDCents + rewardCostUSDCents;
     return {
       success: true,
-      transaction: transactionResult.transaction,
-      gasEstimate: transactionResult.gasEstimate,
+      digest: createResult.digest,
       payment: {
-        creationFeeUSDCents: totalPayment.creationFeeUSDCents,
-        startingAnteUSDCents: totalPayment.startingAnteUSDCents,
-        rewardCostUSDCents: totalPayment.rewardCostUSDCents,
-        totalUSDCents: totalPayment.totalUSDCents,
-        totalUSD: totalPayment.totalUSD,
+        creationFeeUSDCents,
+        startingAnteUSDCents,
+        rewardCostUSDCents,
+        totalUSDCents,
+        totalUSD: totalUSDCents / 100,
       },
       cost: {
-        baseCost: costResult.baseCost,
-        specialItemCost: costResult.specialItemCost,
-        level2PlusCost: costResult.level2PlusCost,
-        totalCost: costResult.totalCost,
-        totalCostUSDCents: costResult.totalCostUSDCents,
-        discountApplied: costResult.discountApplied,
-        badgeDiscountApplied: costResult.badgeDiscountApplied,
+        baseCost: 0,
+        specialItemCost: 0,
+        level2PlusCost: 0,
+        totalCost: 0,
+        totalCostUSDCents: 0,
+        discountApplied: 0,
+        badgeDiscountApplied: 0,
       },
     };
   }
 );
+
 
 

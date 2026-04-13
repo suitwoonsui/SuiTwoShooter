@@ -41,18 +41,26 @@ class AudioSampleLoader {
       return buffer;
     } catch (error) {
       delete this.loadingPromises[url];
+      // 404 is handled in _fetchAndDecode (returns null); other errors still log and throw
       console.error(`Failed to load audio sample: ${url}`, error);
       throw error;
     }
   }
 
   /**
-   * Internal method to fetch and decode audio file
+   * Internal method to fetch and decode audio file.
+   * On 404 (file missing), returns null and logs at debug so fallback (oscillator/buffer) can be used.
    * @private
    */
   async _fetchAndDecode(url) {
     try {
       const response = await fetch(url);
+      if (response.status === 404) {
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug(`Audio sample not found (404), will use fallback: ${url}`);
+        }
+        return null;
+      }
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

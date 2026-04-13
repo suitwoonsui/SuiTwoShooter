@@ -27,6 +27,15 @@ class ApiRequestCache {
   constructor(defaultTTL = 30000) {
     // Cache storage: key → { data, timestamp, ttl, version }
     this.cache = new Map();
+
+    /** Same-key concurrent callers share one fetcher() promise. */
+    this._inFlightGet = new Map();
+
+    /** staleWhileRevalidate: at most one background refresh per key at a time. */
+    this._inFlightSwr = new Map();
+
+    /** Per-key epoch; incremented on invalidate so in-flight writes do not repopulate stale entries. */
+    this._fetchGeneration = new Map();
     
     // Transaction tracking: walletAddress → [{ digest, type, timestamp }, ...]
     this.transactionDigests = new Map();
@@ -37,15 +46,82 @@ class ApiRequestCache {
     // Default TTL (30 seconds)
     this.defaultTTL = defaultTTL;
     
-    // Default TTLs by data type
+    // Default TTLs by data type (user-mutable data relies on explicit invalidation; TTL is a safety net.)
     this.ttlByType = {
-      inventory: 30000,      // 30 seconds
-      badge: 60000,          // 60 seconds
-      stats: 30000,          // 30 seconds
-      leaderboard: 60000,    // 60 seconds
-      balance: 10000,         // 10 seconds
-      storeItems: 300000,    // 5 minutes
+      inventory: 900000,     // 15 minutes (aligned with PlayerInventoryCache)
+      badge: 86400000,       // 24 hours (mint/upgrade invalidates badge:)
+      stats: 86400000,       // 24 hours (invalidated on game over / score pipeline)
+      leaderboard: 30000,    // 30 seconds (off-chain list; catch new submissions)
+      balance: 10000,        // 10 seconds
+      storeItems: 900000,    // 15 minutes (aligned with STORE_CATALOG_CACHE_TTL_MS / menu bootstrap store)
+      tournamentEntry: 15000 // 15 seconds (player mutable; explicit invalidation on enter/score)
     };
+  }
+
+  /** Bump generation so in-flight fetches skip set() for this key (invalidate / pattern clear). */
+  _bumpFetchGeneration(key) {
+    this._fetchGeneration.set(key, (this._fetchGeneration.get(key) || 0) + 1);
+  }
+
+  /**
+   * Single shared fetch for a key (dedupes concurrent get/bypass callers).
+   * @private
+   */
+  _getDedupedFetch(key, fetcher, ttl, walletAddress) {
+    const existing = this._inFlightGet.get(key);
+    if (existing) {
+      log.debug('API CACHE', `Joining in-flight fetch: ${key}`);
+      return existing;
+    }
+
+    const cacheTTL = ttl || this._getTTLForKey(key) || this.defaultTTL;
+    const genAtStart = this._fetchGeneration.get(key) || 0;
+
+    const p = (async () => {
+      try {
+        const data = await fetcher();
+        if ((this._fetchGeneration.get(key) || 0) === genAtStart) {
+          this.set(key, data, cacheTTL, walletAddress);
+        } else {
+          log.debug('API CACHE', `Skipped cache set (superseded): ${key}`);
+        }
+        return data;
+      } catch (error) {
+        const entry = this.cache.get(key);
+        if (entry) {
+          log.warn('API CACHE', 'Fetch failed, using stale cache', { key, error });
+          return entry.data;
+        }
+        throw error;
+      } finally {
+        this._inFlightGet.delete(key);
+      }
+    })();
+
+    this._inFlightGet.set(key, p);
+    return p;
+  }
+
+  /** One background SWR refresh per key at a time. */
+  _scheduleSwrRefresh(key, fetcher, cacheTTL, walletAddress) {
+    if (this._inFlightSwr.has(key)) return;
+
+    const genAtStart = this._fetchGeneration.get(key) || 0;
+    const bg = fetcher()
+      .then((freshData) => {
+        if ((this._fetchGeneration.get(key) || 0) === genAtStart) {
+          this.set(key, freshData, cacheTTL, walletAddress);
+          log.debug('API CACHE', `Background refresh complete: ${key}`);
+        }
+      })
+      .catch((error) => {
+        log.warn('API CACHE', 'Background refresh failed, keeping stale cache', { key, error });
+      })
+      .finally(() => {
+        this._inFlightSwr.delete(key);
+      });
+
+    this._inFlightSwr.set(key, bg);
   }
 
   /**
@@ -67,27 +143,16 @@ class ApiRequestCache {
       staleWhileRevalidate = false
     } = options;
 
-    // If bypassing cache, fetch fresh data
+    const cacheTTL = ttl || this._getTTLForKey(key) || this.defaultTTL;
+
+    // Bypass read cache but dedupe concurrent bypass calls for the same key
     if (bypassCache) {
-      log.debug('API CACHE', `Bypassing cache for key: ${key}`);
-      try {
-        const data = await fetcher();
-        this.set(key, data, ttl, walletAddress);
-        return data;
-      } catch (error) {
-        // If fetch fails and we have stale cache, use it
-        const cached = this.cache.get(key);
-        if (cached) {
-          log.warn('API CACHE', 'Fetch failed, using stale cache', { key, error });
-          return cached.data;
-        }
-        throw error;
-      }
+      log.debug('API CACHE', `Bypassing read cache (deduped fetch): ${key}`);
+      return this._getDedupedFetch(key, fetcher, ttl, walletAddress);
     }
 
     const cached = this.cache.get(key);
     const now = Date.now();
-    const cacheTTL = ttl || this._getTTLForKey(key) || this.defaultTTL;
     const isStale = cached && (now - cached.timestamp > cacheTTL);
 
     // Check if cache is stale due to recent transactions
@@ -103,31 +168,29 @@ class ApiRequestCache {
       // Return stale data immediately, refresh in background
       log.debug('API CACHE', `Returning stale cache, refreshing in background: ${key}`);
       const staleData = cached.data;
-      
-      // Refresh in background (don't await)
-      fetcher().then(freshData => {
-        this.set(key, freshData, cacheTTL, walletAddress);
-        log.debug('API CACHE', `Background refresh complete: ${key}`);
-      }).catch(error => {
-        log.warn('API CACHE', 'Background refresh failed, keeping stale cache', { key, error });
-      });
-      
+      this._scheduleSwrRefresh(key, fetcher, cacheTTL, walletAddress);
       return staleData;
     }
 
-    // No valid cache, fetch fresh data
-    try {
-      const data = await fetcher();
-      this.set(key, data, cacheTTL, walletAddress);
-      return data;
-    } catch (error) {
-      // Fallback to stale cache if available
-      if (cached) {
-        log.warn('API CACHE', 'Fetch failed, using stale cache', { key, error });
-        return cached.data;
-      }
-      throw error;
+    return this._getDedupedFetch(key, fetcher, ttl, walletAddress);
+  }
+
+  /**
+   * Return cached data if entry exists and is still fresh (same rules as get() read path), without fetching.
+   * @param {string} key
+   * @param {string|null} walletAddress - When set, respects transaction-based staleness for this wallet.
+   * @returns {any|null}
+   */
+  peekFresh(key, walletAddress = null) {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    const cacheTTL = cached.ttl || this._getTTLForKey(key) || this.defaultTTL;
+    const now = Date.now();
+    if (now - cached.timestamp > cacheTTL) return null;
+    if (walletAddress && this._isCacheStaleByTransaction(key, walletAddress, cached.timestamp)) {
+      return null;
     }
+    return cached.data;
   }
 
   /**
@@ -157,6 +220,7 @@ class ApiRequestCache {
     if (this.cache.delete(key)) {
       log.debug('API CACHE', `Invalidated: ${key}`);
     }
+    this._bumpFetchGeneration(key);
   }
 
   /**
@@ -165,11 +229,19 @@ class ApiRequestCache {
    */
   invalidateByPattern(pattern) {
     let count = 0;
+    const keysToBump = new Set();
     for (const key of this.cache.keys()) {
       if (key.includes(pattern)) {
         this.cache.delete(key);
+        keysToBump.add(key);
         count++;
       }
+    }
+    for (const key of this._inFlightGet.keys()) {
+      if (key.includes(pattern)) keysToBump.add(key);
+    }
+    for (const key of keysToBump) {
+      this._bumpFetchGeneration(key);
     }
     if (count > 0) {
       log.debug('API CACHE', `Invalidated ${count} entries matching pattern: ${pattern}`);
@@ -197,20 +269,20 @@ class ApiRequestCache {
       case 'badge_mint':
       case 'badge_migration':
         this.invalidate(`badge:${walletAddress}`);
-        this.invalidate(`stats:${walletAddress}`);
-        log.debug('API CACHE', `Invalidated badge and stats for transaction: ${transactionType}`);
+        log.debug('API CACHE', `Invalidated badge for transaction: ${transactionType}`);
         break;
         
       case 'store_purchase':
+      case 'store_cart_purchase':
         this.invalidate(`inventory:${walletAddress}`);
         this.invalidate(`balance:${walletAddress}`);
         log.debug('API CACHE', `Invalidated inventory and balance for purchase`);
         break;
         
       case 'item_consume':
-        this.invalidate(`inventory:${walletAddress}`);
-        this.invalidate(`stats:${walletAddress}`);
-        log.debug('API CACHE', `Invalidated inventory and stats for item consumption`);
+        // On-chain consume is immediate; UI uses optimistic cache updates.
+        // Full refetch runs on game over (see PlayerInventoryCache.runPendingGameOverRefetchIfAny).
+        log.debug('API CACHE', 'item_consume: skipping inventory/stats invalidation (game-over refetch)');
         break;
         
       default:
@@ -261,11 +333,12 @@ class ApiRequestCache {
    */
   _isTransactionRelevant(transactionType, key) {
     const relevantTypes = {
-      badge_upgrade: ['badge:', 'stats:'],
-      badge_mint: ['badge:', 'stats:'],
-      badge_migration: ['badge:', 'stats:'],
+      badge_upgrade: ['badge:'],
+      badge_mint: ['badge:'],
+      badge_migration: ['badge:'],
       store_purchase: ['inventory:', 'balance:'],
-      item_consume: ['inventory:', 'stats:']
+      store_cart_purchase: ['inventory:', 'balance:'],
+      item_consume: []
     };
     
     const patterns = relevantTypes[transactionType] || [];
@@ -283,6 +356,7 @@ class ApiRequestCache {
     if (key.includes('leaderboard:')) return this.ttlByType.leaderboard;
     if (key.includes('balance:')) return this.ttlByType.balance;
     if (key.includes('storeItems:')) return this.ttlByType.storeItems;
+    if (key.includes('tournamentEntry:')) return this.ttlByType.tournamentEntry;
     return null;
   }
 
@@ -293,6 +367,8 @@ class ApiRequestCache {
     this.cache.clear();
     this.transactionDigests.clear();
     this.version = 0;
+    this._fetchGeneration.clear();
+    this._inFlightSwr.clear();
     log.info('API CACHE', 'Cache cleared');
   }
 

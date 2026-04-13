@@ -20,6 +20,14 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
 
 log.info('ACHIEVEMENT PROGRESS', 'Achievement progress module loaded');
 
+/** Client-side freshness for milestone definitions + prefetched progress (invalidated on score submit, claim, wallet change). */
+const MILESTONE_DEFINITIONS_CACHE_TTL = 24 * 60 * 60 * 1000;
+const MILESTONE_PROGRESS_PREFETCH_TTL_MS = MILESTONE_DEFINITIONS_CACHE_TTL;
+
+/** Dedupe concurrent prefetch; skip if __prefetchedMilestoneProgress is still fresh. */
+var milestoneProgressPrefetchInFlight = null;
+var milestoneProgressPrefetchInflightKey = null;
+
 /**
  * Add milestone progress tabs to leaderboard modal
  */
@@ -32,9 +40,12 @@ function addMilestoneProgressToLeaderboard() {
     return;
   }
 
-  // Check if tabs already exist
+  // Leaderboard modal may embed tabs in HTML (leaderboard-modal.js); only refresh badge.
   if (document.getElementById('leaderboardMilestoneTabs')) {
-    log.debug('ACHIEVEMENT PROGRESS', 'Milestone tabs already exist');
+    log.debug('ACHIEVEMENT PROGRESS', 'Milestone tabs already in DOM (modal template)');
+    if (typeof updateClaimCountBadge === 'function') {
+      updateClaimCountBadge();
+    }
     return;
   }
 
@@ -57,7 +68,7 @@ function addMilestoneProgressToLeaderboard() {
        </button>
        <button class="milestone-tab" onclick="switchMilestoneTab('milestones')" id="milestoneTabMilestones">
          <span class="tab-icon">⭐</span> Milestones
-         <span class="milestone-tab-badge" id="milestonesTabBadge" style="display: none;">0</span>
+         <span class="milestone-tab-claim-count-badge" id="milestonesTabClaimCountBadge" style="display: none;">0</span>
        </button>
      </div>
    `;
@@ -138,11 +149,15 @@ function addMilestoneProgressToLeaderboard() {
   }
 
   // Update the milestone tab badge when tabs are created
-  if (typeof updateLeaderboardClaimBadge === 'function') {
-    updateLeaderboardClaimBadge();
+  if (typeof updateClaimCountBadge === 'function') {
+    updateClaimCountBadge();
   }
 
   log.info('ACHIEVEMENT PROGRESS', 'Milestone tabs added to leaderboard');
+}
+
+function getLeaderboardModalScope() {
+  return document.getElementById('leaderboardModal') || document;
 }
 
  /**
@@ -151,28 +166,33 @@ function addMilestoneProgressToLeaderboard() {
  function switchMilestoneTab(tab) {
    log.debug('ACHIEVEMENT PROGRESS', 'switchMilestoneTab() called', { tab });
 
-   // Update tab buttons
-   const tabs = document.querySelectorAll('.milestone-tab');
-   tabs.forEach(t => t.classList.remove('active'));
-   
+   const scope = getLeaderboardModalScope();
+
+   // Update tab buttons (scoped so we never toggle tabs outside this modal)
+   scope.querySelectorAll('.milestone-tab').forEach((t) => {
+     t.classList.remove('active');
+     t.setAttribute('aria-selected', 'false');
+   });
+
    const activeTab = document.getElementById(`milestoneTab${tab === 'leaderboard' ? 'Leaderboard' : 'Milestones'}`);
    if (activeTab) {
      activeTab.classList.add('active');
+     activeTab.setAttribute('aria-selected', 'true');
    }
 
-   // Update main header title
-   const mainTitleElement = document.getElementById('leaderboardMainTitle');
-   if (mainTitleElement) {
-     if (tab === 'leaderboard') {
-       mainTitleElement.textContent = '🏆 Leaderboard';
+   // Category label lives inside the leaderboard panel only (hidden with that panel on Milestones)
+   const headerTitleEl = document.getElementById('leaderboardCategoryTitle');
+   if (headerTitleEl && tab === 'leaderboard') {
+     if (window.LeaderboardService && typeof window.LeaderboardService.getCurrentCategory === 'function') {
+       const cat = window.LeaderboardService.getCurrentCategory();
+       headerTitleEl.textContent = `${cat.icon} ${cat.name}`;
      } else {
-       mainTitleElement.textContent = '⭐ Milestones';
+       headerTitleEl.textContent = '🏆 Leaderboard';
      }
    }
 
    // Update tab content
-   const contents = document.querySelectorAll('.milestone-tab-content');
-   contents.forEach(c => c.classList.remove('active'));
+   scope.querySelectorAll('.milestone-tab-content').forEach((c) => c.classList.remove('active'));
 
    const activeContent = document.getElementById(`milestoneTabContent${tab === 'leaderboard' ? 'Leaderboard' : 'Milestones'}`);
    if (activeContent) {
@@ -196,18 +216,18 @@ function addMilestoneProgressToLeaderboard() {
    // Store current sub-tab
    window._currentMilestoneSubTab = subTab;
 
+   const scope = getLeaderboardModalScope();
+
    // Update sub-tab buttons
-   const subTabs = document.querySelectorAll('.milestone-sub-tab');
-   subTabs.forEach(t => t.classList.remove('active'));
-   
+   scope.querySelectorAll('.milestone-sub-tab').forEach((t) => t.classList.remove('active'));
+
    const activeSubTab = document.getElementById(`milestoneSubTab${subTab === 'per-game' ? 'PerGame' : 'Cumulative'}`);
    if (activeSubTab) {
      activeSubTab.classList.add('active');
    }
 
    // Update sub-tab content
-   const subContents = document.querySelectorAll('.milestone-sub-tab-content');
-   subContents.forEach(c => c.classList.remove('active'));
+   scope.querySelectorAll('.milestone-sub-tab-content').forEach((c) => c.classList.remove('active'));
 
    const activeSubContent = document.getElementById(`milestoneSubTabContent${subTab === 'per-game' ? 'PerGame' : 'Cumulative'}`);
    if (activeSubContent) {
@@ -219,21 +239,26 @@ function addMilestoneProgressToLeaderboard() {
  }
 
 /**
- * Refresh milestone progress for current sub-tab
+ * Refresh milestone progress for current sub-tab (stats via menu path + claims fetch)
  */
-function refreshMilestoneProgress() {
+async function refreshMilestoneProgress() {
   const currentSubTab = window._currentMilestoneSubTab || 'per-game';
-  loadMilestoneProgress(currentSubTab);
-  
-  // Also refresh the badge count when manually refreshing milestone progress
+  try {
+    if (typeof updateMenuStats === 'function') {
+      await updateMenuStats({ forceRefresh: true });
+    }
+    await loadMilestoneProgress(currentSubTab);
+  } catch (err) {
+    log.warn('ACHIEVEMENT PROGRESS', 'refreshMilestoneProgress failed', { error: err?.message });
+  }
+
   if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
-    if (typeof window.updateLeaderboardClaimBadge === 'function') {
-      // Clear cache and force refresh to get latest count
+    if (typeof window.updateClaimCountBadge === 'function') {
       if (typeof window.clearEligibleMilestonesCache === 'function') {
         window.clearEligibleMilestonesCache();
       }
-      window.updateLeaderboardClaimBadge(null, true).catch(err => {
-        console.warn('⚠️ [ACHIEVEMENT PROGRESS] Failed to update badge on refresh:', err);
+      window.updateClaimCountBadge(null, true).catch((e) => {
+        console.warn('⚠️ [ACHIEVEMENT PROGRESS] Failed to update badge on refresh:', e);
       });
     }
   }
@@ -267,10 +292,46 @@ const MILESTONE_CATEGORIES = {
   ],
 };
 
-// Cache for milestone definitions fetched from API
+/**
+ * Numeric threshold from a definition row (API returns objects; legacy may use bare numbers).
+ */
+function milestoneEntryThreshold(entry) {
+  if (entry == null) return null;
+  if (typeof entry === 'number' && Number.isFinite(entry)) return entry;
+  if (typeof entry === 'string') {
+    const n = Number(entry);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof entry === 'object') {
+    const t = entry.threshold;
+    if (typeof t === 'number' && Number.isFinite(t)) return t;
+    if (typeof t === 'string') {
+      const n = Number(t);
+      return Number.isFinite(n) ? n : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Sorted list of { threshold, def } for one category (def is the raw row for milestoneId, rewards, etc.).
+ */
+function normalizeMilestoneDefinitionList(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const entry of raw) {
+    const threshold = milestoneEntryThreshold(entry);
+    if (threshold == null) continue;
+    const def = typeof entry === 'object' && entry !== null ? entry : { threshold };
+    out.push({ threshold, def });
+  }
+  out.sort((a, b) => a.threshold - b.threshold);
+  return out;
+}
+
+// Cache for milestone definitions (static – only player stats and claimed state change)
 let milestoneDefinitionsCache = null;
 let milestoneDefinitionsCacheTimestamp = 0;
-const MILESTONE_DEFINITIONS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Request deduplication: prevent multiple concurrent fetches
 let milestoneDefinitionsFetchPromise = null;
@@ -279,20 +340,33 @@ let milestoneDefinitionsFetchPromise = null;
 let eligibleMilestonesCache = null;
 let eligibleMilestonesCacheTimestamp = 0;
 let eligibleMilestonesFetchPromise = null;
-const ELIGIBLE_MILESTONES_CACHE_TTL = 30 * 1000; // 30 seconds (shorter since this changes more frequently)
+const ELIGIBLE_MILESTONES_CACHE_TTL = 30 * 60 * 1000; // 30 minutes (invalidate after game/claim)
 
 /**
  * Fetch milestone definitions from API
+ * Returns null if API fails (caller should handle error gracefully)
  */
 async function fetchMilestoneDefinitions() {
   const now = Date.now();
-  
+
+  // Use prefetch from game start page if still valid (definitions are static)
+  const prefetched = typeof window !== 'undefined' && window.__prefetchedMilestoneDefinitions;
+  const prefetchedAt = typeof window !== 'undefined' && window.__prefetchedMilestoneDefinitionsTimestamp;
+  if (prefetched && prefetchedAt && (now - prefetchedAt) < MILESTONE_DEFINITIONS_CACHE_TTL) {
+    milestoneDefinitionsCache = prefetched;
+    milestoneDefinitionsCacheTimestamp = prefetchedAt;
+    log.info('ACHIEVEMENT PROGRESS', 'Using milestone definitions from menu bootstrap prefetch', {
+      categoryKeys: prefetched && typeof prefetched === 'object' ? Object.keys(prefetched).length : 0,
+    });
+    return milestoneDefinitionsCache;
+  }
+
   // Return cached definitions if still valid
   if (milestoneDefinitionsCache && (now - milestoneDefinitionsCacheTimestamp) < MILESTONE_DEFINITIONS_CACHE_TTL) {
     log.debug('ACHIEVEMENT PROGRESS', 'Using cached milestone definitions');
     return milestoneDefinitionsCache;
   }
-  
+
   // If a fetch is already in progress, wait for it
   if (milestoneDefinitionsFetchPromise) {
     log.debug('ACHIEVEMENT PROGRESS', 'Milestone definitions fetch already in progress, waiting for existing request');
@@ -302,18 +376,14 @@ async function fetchMilestoneDefinitions() {
   // Start new fetch
   milestoneDefinitionsFetchPromise = (async () => {
     try {
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      log.debug('ACHIEVEMENT PROGRESS', 'Fetching milestone definitions from API', { API_BASE_URL });
+      // Milestone definitions: call game backend (it proxies to platform using env APP_ID/ECOSYSTEM_ID so keys stay server-side)
+      const DEFINITIONS_API_BASE = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+      log.debug('ACHIEVEMENT PROGRESS', 'Fetching milestone definitions from API', { DEFINITIONS_API_BASE });
       
-      const response = await fetch(`${API_BASE_URL}/milestones/definitions`);
+      const response = await fetch(`${DEFINITIONS_API_BASE}/milestones/definitions`);
       
       if (!response.ok) {
-        log.warn('ACHIEVEMENT PROGRESS', 'Failed to fetch milestone definitions, using fallback', {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        // Return fallback definitions if API fails
-        return getFallbackMilestoneDefinitions();
+        throw new Error(`API returned ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
@@ -326,14 +396,19 @@ async function fetchMilestoneDefinitions() {
         });
         return data.definitions;
       } else {
-        log.warn('ACHIEVEMENT PROGRESS', 'API response missing definitions, using fallback');
-        return getFallbackMilestoneDefinitions();
+        throw new Error('Invalid API response format: missing definitions data');
       }
     } catch (error) {
-      log.error('ACHIEVEMENT PROGRESS', 'Error fetching milestone definitions, using fallback', {
+      log.error('ACHIEVEMENT PROGRESS', 'Error fetching milestone definitions', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
-      return getFallbackMilestoneDefinitions();
+      
+      // Clear cache on error to force retry on next attempt
+      milestoneDefinitionsCache = null;
+      milestoneDefinitionsCacheTimestamp = 0;
+      
+      // Return null to indicate error (caller should handle gracefully)
+      return null;
     } finally {
       // Clear the promise so future calls can start a new fetch if needed
       milestoneDefinitionsFetchPromise = null;
@@ -341,26 +416,6 @@ async function fetchMilestoneDefinitions() {
   })();
   
   return milestoneDefinitionsFetchPromise;
-}
-
-/**
- * Get fallback milestone definitions (used when API is unavailable)
- */
-function getFallbackMilestoneDefinitions() {
-  return {
-    gamesPlayed: [5, 15, 35, 75, 150, 300, 500],
-    scorePerGame: [10000, 25000, 50000, 100000, 150000, 200000],
-    scoreCumulative: [50000, 100000, 250000, 500000, 1000000, 2500000, 5000000],
-    distancePerGame: [5000, 10000, 15000, 25000, 40000, 60000],
-    distanceCumulative: [25000, 50000, 100000, 250000, 500000, 1000000, 2500000],
-    coinsPerGame: [25, 50, 75, 100, 125, 150],
-    coinsCumulative: [250, 500, 1000, 2500, 5000, 10000, 25000],
-    bossesPerGame: [2, 4, 6, 8, 10, 12],
-    bossesCumulative: [5, 10, 25, 50, 100, 200, 500],
-    enemiesPerGame: [25, 50, 100, 250, 400, 500],
-    enemiesCumulative: [100, 250, 500, 1000, 2500, 5000, 10000],
-    coinStreak: [10, 20, 30, 40, 50],
-  };
 }
 
 /**
@@ -423,18 +478,79 @@ function updateMilestoneCategoryDisplay(type) {
   // Re-render current category if data is loaded
   const listEl = document.getElementById(`milestoneList${type === 'per-game' ? 'PerGame' : 'Cumulative'}`);
   if (listEl && listEl.style.display !== 'none' && window._milestoneStats && window._milestoneClaimed) {
-    // Data is already loaded, just re-render all categories (will use cached definitions)
+    const pending =
+      window._milestoneClaimsPendingByType && window._milestoneClaimsPendingByType[type] === true;
     renderMilestoneProgress(
-      listEl, 
-      window._milestoneStats, 
-      window._milestoneClaimed, 
+      listEl,
+      window._milestoneStats,
+      window._milestoneClaimed,
       type,
       window._milestoneClaimedIds || [],
-      window._milestoneEligible || []
+      window._milestoneEligible || [],
+      { claimsPending: pending }
     ).catch(err => {
       log.error('ACHIEVEMENT PROGRESS', 'Error re-rendering milestone progress', { error: err });
     });
   }
+}
+
+/**
+ * Build stats object for per-game or cumulative from raw API stats response
+ */
+function buildStatsFromRawStatsData(type, statsData) {
+  const hasStats = statsData && statsData.success && statsData.hasStats;
+  if (type === 'per-game') {
+    return hasStats ? {
+      bestScore: statsData.bestScore || 0,
+      bestDistance: statsData.bestDistance || 0,
+      bestCoins: statsData.bestCoins || 0,
+      bestBossesDefeated: statsData.bestBossesDefeated || 0,
+      bestEnemiesDefeated: statsData.bestEnemiesDefeated || 0,
+      bestCoinStreak: statsData.bestCoinStreak || 0,
+    } : {
+      bestScore: 0, bestDistance: 0, bestCoins: 0,
+      bestBossesDefeated: 0, bestEnemiesDefeated: 0, bestCoinStreak: 0,
+    };
+  }
+  return hasStats ? {
+    totalGames: statsData.totalGames || 0,
+    totalScore: statsData.totalScore || 0,
+    totalDistance: statsData.totalDistance || 0,
+    totalCoins: statsData.totalCoins || 0,
+    totalBossesDefeated: statsData.totalBossesDefeated || 0,
+    totalEnemiesDefeated: statsData.totalEnemiesDefeated || 0,
+    bestScore: statsData.bestScore || 0,
+    bestDistance: statsData.bestDistance || 0,
+    bestCoins: statsData.bestCoins || 0,
+    bestBossesDefeated: statsData.bestBossesDefeated || 0,
+    bestEnemiesDefeated: statsData.bestEnemiesDefeated || 0,
+    bestCoinStreak: statsData.bestCoinStreak || 0,
+  } : {
+    totalGames: 0, totalScore: 0, totalDistance: 0,
+    totalCoins: 0, totalBossesDefeated: 0, totalEnemiesDefeated: 0,
+    bestScore: 0, bestDistance: 0, bestCoins: 0,
+    bestBossesDefeated: 0, bestEnemiesDefeated: 0, bestCoinStreak: 0,
+  };
+}
+
+function emptyClaimedStateForMilestoneType(type) {
+  return type === 'per-game'
+    ? {
+        scorePerGame: [],
+        distancePerGame: [],
+        coinsPerGame: [],
+        bossesPerGame: [],
+        enemiesPerGame: [],
+        coinStreak: [],
+      }
+    : {
+        gamesPlayed: [],
+        scoreCumulative: [],
+        distanceCumulative: [],
+        coinsCumulative: [],
+        bossesCumulative: [],
+        enemiesCumulative: [],
+      };
 }
 
 /**
@@ -475,296 +591,99 @@ async function loadMilestoneProgress(type) {
       return;
     }
 
-    // For per-game milestones, extract best stats from leaderboard data (same as leaderboard does)
-    if (type === 'per-game') {
-      if (!window.LeaderboardService) {
-        throw new Error('LeaderboardService not available');
-      }
-
-      // Ensure leaderboard data is loaded (same as leaderboard modal does)
-      const state = window.LeaderboardService.getState();
-      
-      // If leaderboard data is empty, trigger a load
-      if (!state.currentLeaderboardData || state.currentLeaderboardData.length === 0) {
-        log.debug('ACHIEVEMENT PROGRESS', 'Leaderboard data not loaded, triggering load');
-        if (typeof window.fetchBlockchainLeaderboard === 'function') {
-          await window.fetchBlockchainLeaderboard();
-          // Wait a bit for data to load
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-
-      const leaderboardData = window.LeaderboardService.getState().currentLeaderboardData || [];
-      
-      log.debug('ACHIEVEMENT PROGRESS', 'Extracting stats from leaderboard', {
-        totalEntries: leaderboardData.length,
-        playerAddress,
-      });
-      
-      // Find all entries for this player and extract best values
-      const playerEntries = leaderboardData.filter(entry => {
-        const entryAddress = entry.walletAddress || entry.playerAddress || '';
-        return entryAddress.toLowerCase() === playerAddress.toLowerCase();
-      });
-
-      log.debug('ACHIEVEMENT PROGRESS', 'Player entries found', {
-        entryCount: playerEntries.length,
-        entries: playerEntries.map(e => ({
-          score: e.score,
-          distance: e.distance,
-          coins: e.coins,
-        })),
-      });
-
-      // Extract best values from player's entries
-      const stats = {
-        bestScore: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.score || 0)) : 0,
-        bestDistance: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.distance || 0)) : 0,
-        bestCoins: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.coins || 0)) : 0,
-        bestBossesDefeated: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.bossesDefeated || 0)) : 0,
-        bestEnemiesDefeated: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.enemiesDefeated || 0)) : 0,
-        bestCoinStreak: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.longestCoinStreak || 0)) : 0,
-      };
-
-      log.debug('ACHIEVEMENT PROGRESS', 'Extracted best stats', stats);
-
-      // Fetch claimed milestones and eligible milestones from API
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      let claimed = {
-        scorePerGame: [],
-        distancePerGame: [],
-        coinsPerGame: [],
-        bossesPerGame: [],
-        enemiesPerGame: [],
-        coinStreak: [],
-      };
-      let claimedIds = [];
-      let eligible = [];
-
-      try {
-        // Add cache-busting parameter to ensure fresh data
-        const timestamp = Date.now();
-        const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}&clearCache=true&_t=${timestamp}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            claimed = data.claimed || claimed;
-            claimedIds = data.claimedIds || [];
-            eligible = data.eligible || [];
-            log.debug('ACHIEVEMENT PROGRESS', 'Fetched milestone data from API', {
-              claimedKeys: Object.keys(claimed),
-              claimedIdsCount: claimedIds.length,
-              eligibleCount: eligible.length,
-            });
-          }
-        }
-      } catch (error) {
-        log.warn('ACHIEVEMENT PROGRESS', 'Failed to fetch milestone data, using empty', { error: error.message });
-      }
-
-      // Render milestones with stats from leaderboard and claimed/eligible from API
-      await renderMilestoneProgress(listEl, stats, claimed, type, claimedIds, eligible);
+    // Use prefetched progress (loaded after wallet login) if valid
+    const prefetched = window.__prefetchedMilestoneProgress;
+    if (prefetched && prefetched.address === playerAddress && (Date.now() - prefetched.at) < MILESTONE_PROGRESS_PREFETCH_TTL_MS) {
+      const stats = buildStatsFromRawStatsData(type, prefetched.statsData);
+      const claimed = prefetched.claimed || emptyClaimedStateForMilestoneType(type);
+      const claimedIds = prefetched.claimedIds || [];
+      const eligible = prefetched.eligible || [];
+      window._milestoneClaimsPendingByType = window._milestoneClaimsPendingByType || {};
+      window._milestoneClaimsPendingByType[type] = false;
+      await renderMilestoneProgress(listEl, stats, claimed, type, claimedIds, eligible, { claimsPending: false });
       loadingEl.style.display = 'none';
       listEl.style.display = 'block';
       return;
     }
 
-    // For cumulative milestones, calculate from leaderboard entries (same data source)
-    if (type === 'cumulative') {
-      if (!window.LeaderboardService) {
-        throw new Error('LeaderboardService not available');
+    // Stats: only from apiRequestCache peek or shared menu path (loadStatsPayloadForWallet) — no separate /stats fetch here
+    const statsKey = `stats:${playerAddress}`;
+    let stats;
+
+    try {
+      let statsData =
+        window.apiRequestCache && typeof window.apiRequestCache.peekFresh === 'function'
+          ? window.apiRequestCache.peekFresh(statsKey, playerAddress)
+          : null;
+      if (statsData == null && typeof window.loadStatsPayloadForWallet === 'function') {
+        statsData = await window.loadStatsPayloadForWallet(playerAddress, { forceRefresh: false });
+        log.debug('ACHIEVEMENT PROGRESS', 'Loaded stats via menu stats path for milestones', { type });
+      } else if (statsData != null) {
+        log.debug('ACHIEVEMENT PROGRESS', 'Using peek-cached stats for milestones', { type });
       }
-
-      // Ensure leaderboard data is loaded
-      const state = window.LeaderboardService.getState();
-      
-      // If leaderboard data is empty, trigger a load
-      if (!state.currentLeaderboardData || state.currentLeaderboardData.length === 0) {
-        log.debug('ACHIEVEMENT PROGRESS', 'Leaderboard data not loaded, triggering load');
-        if (typeof window.fetchBlockchainLeaderboard === 'function') {
-          await window.fetchBlockchainLeaderboard();
-          // Wait a bit for data to load
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+      stats = buildStatsFromRawStatsData(type, statsData);
+      if (!(statsData && statsData.success && statsData.hasStats)) {
+        log.warn('ACHIEVEMENT PROGRESS', 'No stats available for player');
       }
-
-      const leaderboardData = window.LeaderboardService.getState().currentLeaderboardData || [];
-      
-      log.debug('ACHIEVEMENT PROGRESS', 'Calculating cumulative stats from leaderboard', {
-        totalEntries: leaderboardData.length,
-        playerAddress,
-      });
-      
-      // Find all entries for this player and sum them up
-      const playerEntries = leaderboardData.filter(entry => {
-        const entryAddress = entry.walletAddress || entry.playerAddress || '';
-        return entryAddress.toLowerCase() === playerAddress.toLowerCase();
-      });
-
-      log.debug('ACHIEVEMENT PROGRESS', 'Player entries for cumulative stats', {
-        entryCount: playerEntries.length,
-      });
-
-      // Calculate cumulative stats by summing all player entries
-      const stats = {
-        totalGames: playerEntries.length,
-        totalScore: playerEntries.reduce((sum, e) => sum + (e.score || 0), 0),
-        totalDistance: playerEntries.reduce((sum, e) => sum + (e.distance || 0), 0),
-        totalCoins: playerEntries.reduce((sum, e) => sum + (e.coins || 0), 0),
-        totalBossesDefeated: playerEntries.reduce((sum, e) => sum + (e.bossesDefeated || 0), 0),
-        totalEnemiesDefeated: playerEntries.reduce((sum, e) => sum + (e.enemiesDefeated || 0), 0),
-        // Also include best values (needed for the stats object structure)
-        bestScore: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.score || 0)) : 0,
-        bestDistance: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.distance || 0)) : 0,
-        bestCoins: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.coins || 0)) : 0,
-        bestBossesDefeated: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.bossesDefeated || 0)) : 0,
-        bestEnemiesDefeated: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.enemiesDefeated || 0)) : 0,
-        bestCoinStreak: playerEntries.length > 0 ? Math.max(...playerEntries.map(e => e.longestCoinStreak || 0)) : 0,
-      };
-
-      log.debug('ACHIEVEMENT PROGRESS', 'Calculated cumulative stats', stats);
-
-      // Fetch claimed milestones and eligible milestones from API
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      let claimed = {
-        gamesPlayed: [],
-        scoreCumulative: [],
-        distanceCumulative: [],
-        coinsCumulative: [],
-        bossesCumulative: [],
-        enemiesCumulative: [],
-      };
-      let claimedIds = [];
-      let eligible = [];
-
-      try {
-        // Add cache-busting parameter to ensure fresh data
-        const timestamp = Date.now();
-        const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}&clearCache=true&_t=${timestamp}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            claimed = data.claimed || claimed;
-            claimedIds = data.claimedIds || [];
-            eligible = data.eligible || [];
-            log.debug('ACHIEVEMENT PROGRESS', 'Fetched milestone data from API', {
-              claimedKeys: Object.keys(claimed),
-              claimedIdsCount: claimedIds.length,
-              eligibleCount: eligible.length,
-            });
-          }
-        }
-      } catch (error) {
-        log.warn('ACHIEVEMENT PROGRESS', 'Failed to fetch milestone data, using empty', { error: error.message });
-      }
-
-      // Render milestones with cumulative stats from leaderboard and claimed/eligible from API
-      await renderMilestoneProgress(listEl, stats, claimed, type, claimedIds, eligible);
-      loadingEl.style.display = 'none';
-      listEl.style.display = 'block';
-      return;
+    } catch (error) {
+      log.error('ACHIEVEMENT PROGRESS', 'Failed to load stats for milestones', { error: error.message });
+      stats = buildStatsFromRawStatsData(type, null);
     }
 
-    // Fallback: If we somehow get here, fetch from API
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-    log.debug('ACHIEVEMENT PROGRESS', 'Fetching milestone progress from API (fallback)', { playerAddress, type, API_BASE_URL });
-    
-    // Add cache-busting parameter to ensure fresh data
-    const timestamp = Date.now();
-    const response = await fetch(`${API_BASE_URL}/achievements/progress?address=${playerAddress}&clearCache=true&_t=${timestamp}`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error('ACHIEVEMENT PROGRESS', 'API response not OK', {
-        status: response.status,
-        statusText: response.statusText,
-        errorText,
-      });
-      
-      // Handle 404 - contract not deployed yet
-      if (response.status === 404) {
-        listEl.innerHTML = `
-          <div class="milestone-error">
-            <p>🎯 Milestone system is being set up!</p>
-            <p style="margin-top: 1em; font-size: 0.9em; color: #888;">
-              The achievement contract is not yet deployed. Milestone progress will be available once the contract is live.
-            </p>
-          </div>
-        `;
-        loadingEl.style.display = 'none';
-        listEl.style.display = 'block';
-        return;
-      }
-      
-      throw new Error(`Failed to fetch progress: ${response.status} ${response.statusText}`);
-    }
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+    const emptyClaimed = emptyClaimedStateForMilestoneType(type);
 
-    const data = await response.json();
-    log.debug('ACHIEVEMENT PROGRESS', 'API response received', {
-      success: data.success,
-      hasStats: !!data.stats,
-      hasClaimed: !!data.claimed,
-      statsKeys: data.stats ? Object.keys(data.stats) : [],
-      claimedKeys: data.claimed ? Object.keys(data.claimed) : [],
-      stats: data.stats ? {
-        totalGames: data.stats.totalGames,
-        bestScore: data.stats.bestScore,
-        totalScore: data.stats.totalScore,
-        bestCoins: data.stats.bestCoins,
-        totalCoins: data.stats.totalCoins,
-      } : null,
-    });
+    window._milestoneClaimsGenByType = window._milestoneClaimsGenByType || {};
+    window._milestoneClaimsGenByType[type] = (window._milestoneClaimsGenByType[type] || 0) + 1;
+    const claimsGen = window._milestoneClaimsGenByType[type];
 
-    if (!data.success) {
-      // Check if it's a contract not configured error
-      const errorMsg = data.error || 'Failed to load progress';
-      if (errorMsg.includes('not configured') || errorMsg.includes('not found') || errorMsg.includes('registry')) {
-        listEl.innerHTML = `
-          <div class="milestone-error">
-            <p>🎯 Milestone system is being set up!</p>
-            <p style="margin-top: 1em; font-size: 0.9em; color: #888;">
-              The achievement contract is not yet deployed. Milestone progress will be available once the contract is live.
-            </p>
-          </div>
-        `;
-        loadingEl.style.display = 'none';
-        listEl.style.display = 'block';
-        return;
-      }
-      throw new Error(errorMsg);
-    }
+    window._milestoneClaimsPendingByType = window._milestoneClaimsPendingByType || {};
+    window._milestoneClaimsPendingByType[type] = true;
 
-    if (!data.stats || !data.claimed) {
-      throw new Error('Invalid response format: missing stats or claimed data');
-    }
-
-    // EXTENSIVE LOGGING
-    console.log('🔍 [FRONTEND] Fetched milestone data from API (fallback):', {
-      playerAddress,
-      claimed: data.claimed,
-      claimedIds: data.claimedIds || [],
-      claimedIdsCount: (data.claimedIds || []).length,
-      eligible: data.eligible || [],
-      eligibleCount: (data.eligible || []).length,
-      eligibleDetails: (data.eligible || []).map(e => ({
-        category: e.category,
-        milestoneId: e.milestoneId,
-        threshold: e.threshold,
-      })),
-    });
-
-    // Render milestones with claimedIds and eligible from API
-    await renderMilestoneProgress(
-      listEl, 
-      data.stats, 
-      data.claimed, 
-      type, 
-      data.claimedIds || [], 
-      data.eligible || []
-    );
-
+    await renderMilestoneProgress(listEl, stats, emptyClaimed, type, [], [], { claimsPending: true });
     loadingEl.style.display = 'none';
     listEl.style.display = 'block';
+
+    const timestamp = Date.now();
+    const progressUrl = `${API_BASE_URL}/achievements/progress?address=${playerAddress}&clearCache=true&_t=${timestamp}`;
+    fetch(progressUrl)
+      .then((response) => {
+        if (!response.ok) return null;
+        return response.json().catch(() => null);
+      })
+      .catch(() => null)
+      .then(async (data) => {
+        if (window._milestoneClaimsGenByType[type] !== claimsGen) return;
+
+        let claimed = emptyClaimed;
+        let claimedIds = [];
+        let eligible = [];
+        if (data && data.success) {
+          claimed = data.claimed || emptyClaimed;
+          claimedIds = data.claimedIds || [];
+          eligible = data.eligible || [];
+          log.debug('ACHIEVEMENT PROGRESS', 'Fetched milestone claims from API', {
+            claimedKeys: Object.keys(claimed),
+            claimedIdsCount: claimedIds.length,
+            eligibleCount: eligible.length,
+          });
+        }
+
+        window._milestoneClaimsPendingByType[type] = false;
+
+        const list = document.getElementById(`milestoneList${type === 'per-game' ? 'PerGame' : 'Cumulative'}`);
+        if (!list || window._milestoneClaimsGenByType[type] !== claimsGen) return;
+
+        await renderMilestoneProgress(list, stats, claimed, type, claimedIds, eligible, { claimsPending: false });
+      })
+      .catch(async (error) => {
+        log.warn('ACHIEVEMENT PROGRESS', 'Failed to fetch milestone claims', { error: error.message });
+        if (window._milestoneClaimsGenByType[type] !== claimsGen) return;
+        window._milestoneClaimsPendingByType[type] = false;
+        const list = document.getElementById(`milestoneList${type === 'per-game' ? 'PerGame' : 'Cumulative'}`);
+        if (!list || window._milestoneClaimsGenByType[type] !== claimsGen) return;
+        await renderMilestoneProgress(list, stats, emptyClaimed, type, [], [], { claimsPending: false });
+      });
   } catch (error) {
     log.error('ACHIEVEMENT PROGRESS', 'Error loading milestone progress', { type, error: error.message });
     
@@ -790,8 +709,14 @@ async function loadMilestoneProgress(type) {
 /**
  * Render milestone progress
  */
-async function renderMilestoneProgress(container, stats, claimed, type, claimedIds = [], eligible = []) {
-  log.debug('ACHIEVEMENT PROGRESS', 'renderMilestoneProgress() called', { type, claimedIdsCount: claimedIds.length, eligibleCount: eligible.length });
+async function renderMilestoneProgress(container, stats, claimed, type, claimedIds = [], eligible = [], options = {}) {
+  const claimsPending = options.claimsPending === true;
+  log.debug('ACHIEVEMENT PROGRESS', 'renderMilestoneProgress() called', {
+    type,
+    claimedIdsCount: claimedIds.length,
+    eligibleCount: eligible.length,
+    claimsPending,
+  });
 
   // Store stats and claimed
   window._milestoneStats = stats;
@@ -802,20 +727,44 @@ async function renderMilestoneProgress(container, stats, claimed, type, claimedI
   // Get all categories for this type
   const categories = MILESTONE_CATEGORIES[type] || [];
   if (categories.length === 0) {
+    log.warn('ACHIEVEMENT PROGRESS', 'No categories found for type', { type });
     container.innerHTML = '<div class="milestone-empty"><p>No milestones available for this category.</p></div>';
     return;
   }
 
-  // Render all categories (now async to fetch definitions)
-  await renderAllMilestoneCategories(container, stats, claimed, type, categories, claimedIds, eligible);
+  await renderAllMilestoneCategories(container, stats, claimed, type, categories, claimedIds, eligible, {
+    claimsPending,
+  });
 }
 
 /**
  * Render all milestone categories
  */
-async function renderAllMilestoneCategories(container, stats, claimed, type, categories, claimedIds = [], eligible = []) {
-  // Fetch milestone definitions from API (or use cached/fallback)
+async function renderAllMilestoneCategories(
+  container,
+  stats,
+  claimed,
+  type,
+  categories,
+  claimedIds = [],
+  eligible = [],
+  renderOpts = {}
+) {
+  const claimsPending = renderOpts.claimsPending === true;
+  // Fetch milestone definitions from API
   const milestoneDefinitions = await fetchMilestoneDefinitions();
+  
+  // Handle error case gracefully
+  if (!milestoneDefinitions) {
+    container.innerHTML = `
+      <div class="milestone-error-message" style="padding: 2rem; text-align: center; color: #ff6b6b;">
+        <h3 style="margin-bottom: 1rem;">⚠️ Unable to Load Milestone Definitions</h3>
+        <p style="margin-bottom: 0.5rem;">Failed to fetch milestone data from the server.</p>
+        <p style="font-size: 0.9em; opacity: 0.8;">Please check your connection and try again later.</p>
+      </div>
+    `;
+    return;
+  }
   
   // Create a Set of claimed milestone IDs for fast lookup
   const claimedIdsSet = new Set(claimedIds);
@@ -831,64 +780,67 @@ async function renderAllMilestoneCategories(container, stats, claimed, type, cat
 
   const categoriesHtml = categories.map(category => {
     // Get current value from stats
-    const currentValue = stats[category.value] || 0;
-    const milestones = milestoneDefinitions[category.key] || [];
+    const lookupKey = category.value;
+    const statsValue = stats ? stats[lookupKey] : undefined;
+    const currentValue = statsValue !== undefined && statsValue !== null ? statsValue : 0;
+    
+    const normalizedDefs = normalizeMilestoneDefinitionList(milestoneDefinitions[category.key] || []);
     const claimedList = claimed[category.key] || []; // Keep for backward compatibility
     
     // Get eligible milestones for this category (from API, which uses milestoneId for stable tracking)
     // The API already filters out claimed milestones using milestoneId, so this is the source of truth
     const eligibleForCategory = eligibleByCategory[category.key] || [];
+    const eligibleCount = eligibleForCategory.length;
     
-    // EXTENSIVE LOGGING
-    console.log(`🔍 [RENDER] Rendering category: ${category.key}`, {
-      categoryName: category.name,
-      currentValue,
-      milestonesCount: milestones.length,
-      milestones: milestones,
-      claimedList: claimedList,
-      claimedIds: Array.from(claimedIdsSet),
-      eligibleForCategory: eligibleForCategory,
-      eligibleForCategoryCount: eligibleForCategory.length,
-    });
-    
-    // Use the eligible array from API as primary source (already filtered by milestoneId)
-    // This ensures we show the correct claimable milestones even if levels are reorganized
-    const eligibleMilestones = eligibleForCategory.map(e => e.threshold);
-    
-    console.log(`🔍 [RENDER] Eligible milestones (thresholds) for ${category.key}:`, eligibleMilestones);
-    
-    // Find next unclaimed milestone (using milestoneId check)
-    const nextMilestone = milestones.find(milestoneThreshold => {
-      if (currentValue >= milestoneThreshold) return false; // Already reached
-      
-      const definition = milestoneDefinitions[category.key]?.find(d => d.threshold === milestoneThreshold);
-      if (!definition) return true; // Include if definition not found
-      
-      // Check if claimed using milestoneId (preferred) or threshold (fallback)
-      if (definition.milestoneId !== undefined && definition.milestoneId !== null) {
-        return !claimedIdsSet.has(definition.milestoneId);
-      } else {
-        return !claimedList.includes(milestoneThreshold);
+    // Next target: first tier where stat is below threshold and that tier is not yet claimed
+    const nextEntry = normalizedDefs.find(({ threshold, def }) => {
+      if (currentValue >= threshold) return false;
+      const milestoneId = def && def.milestoneId;
+      if (milestoneId !== undefined && milestoneId !== null) {
+        return !claimedIdsSet.has(milestoneId);
       }
+      return !claimedList.includes(threshold);
     });
+    const nextThreshold = nextEntry ? nextEntry.threshold : null;
     
-    const hasEligibleMilestones = eligibleMilestones.length > 0;
-    
+    const hasEligibleMilestones = !claimsPending && eligibleCount > 0;
+
+    let claimButtonHtml = '';
+    if (claimsPending) {
+      claimButtonHtml = `<button type="button" class="milestone-claim-btn milestone-claim-btn--pending" disabled data-category="${category.key}" title="Loading claim status…"><span class="btn-icon">⏳</span> Loading…</button>`;
+    } else if (hasEligibleMilestones) {
+      claimButtonHtml = `<button type="button" class="milestone-claim-btn" data-category="${category.key}" onclick="claimMilestoneRewards('${category.key}')" title="Claim ${eligibleCount} milestone reward${eligibleCount > 1 ? 's' : ''}"><span class="btn-icon">🎁</span> Claim ${eligibleCount}</button>`;
+    }
+
     log.debug('ACHIEVEMENT PROGRESS', 'Rendering milestone category', {
       category: category.name,
       categoryKey: category.key,
       categoryValue: category.value,
       currentValue,
-      nextMilestone,
-      milestonesCount: milestones.length,
+      nextThreshold,
+      milestonesCount: normalizedDefs.length,
       claimedCount: claimedList.length,
-      eligibleCount: eligibleMilestones.length,
+      eligibleCount,
     });
 
-    // Calculate progress percentage
-    const progress = nextMilestone 
-      ? Math.min(100, (currentValue / nextMilestone) * 100)
-      : currentValue >= (milestones[milestones.length - 1] || 0) ? 100 : 0;
+    // Calculate progress percentage (must be a finite number — invalid CSS width can look "full")
+    const hasMilestones = normalizedDefs.length > 0;
+    const lastThreshold = hasMilestones ? normalizedDefs[normalizedDefs.length - 1].threshold : 0;
+    let progress = 0;
+    if (hasMilestones) {
+      if (nextThreshold != null && nextThreshold > 0) {
+        const pct = (currentValue / nextThreshold) * 100;
+        progress = Math.min(100, Number.isFinite(pct) ? pct : 0);
+      } else {
+        progress = currentValue >= lastThreshold ? 100 : 0;
+      }
+    }
+
+    const targetLabel = !hasMilestones
+      ? '<span class="milestone-target-none">—</span>'
+      : nextThreshold != null
+        ? `<span class="milestone-target-number">${formatValue(nextThreshold)}</span>`
+        : '<span class="milestone-target-complete">🏆 Complete</span>';
 
     return `
       <div class="milestone-category-row">
@@ -901,18 +853,14 @@ async function renderAllMilestoneCategories(container, stats, claimed, type, cat
               <span class="milestone-category-icon">${category.icon}</span>
               <h3 class="milestone-category-name">${category.name}</h3>
             </div>
-            ${hasEligibleMilestones ? `
-              <button class="milestone-claim-btn" data-category="${category.key}" onclick="claimMilestoneRewards('${category.key}')" title="Claim ${eligibleMilestones.length} milestone reward${eligibleMilestones.length > 1 ? 's' : ''}">
-                <span class="btn-icon">🎁</span> Claim ${eligibleMilestones.length}
-              </button>
-            ` : ''}
+            ${claimButtonHtml}
           </div>
           <div class="milestone-progress-bar">
             <div class="milestone-progress-fill" style="width: ${progress}%"></div>
           </div>
         </div>
         <div class="milestone-next-target-box">
-          ${nextMilestone ? `<span class="milestone-target-number">${formatValue(nextMilestone)}</span>` : '<span class="milestone-target-complete">🏆 Complete</span>'}
+          ${targetLabel}
         </div>
       </div>
     `;
@@ -925,12 +873,15 @@ async function renderAllMilestoneCategories(container, stats, claimed, type, cat
  * Format value for display
  */
 function formatValue(value) {
-  if (value >= 1000000) {
-    return (value / 1000000).toFixed(1) + 'M';
-  } else if (value >= 1000) {
-    return (value / 1000).toFixed(1) + 'K';
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return '—';
+  if (n >= 1000000) {
+    return (n / 1000000).toFixed(1) + 'M';
   }
-  return value.toLocaleString();
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1) + 'K';
+  }
+  return n.toLocaleString();
 }
 
 /**
@@ -951,15 +902,17 @@ async function claimMilestoneRewards(category) {
     return;
   }
 
-  // Find and disable the claim button to prevent double-clicks
-  const claimBtns = document.querySelectorAll(`.milestone-claim-btn[data-category="${category}"]`);
+  // Find and disable the claim button to prevent double-clicks (skip loading placeholder)
+  const claimBtns = document.querySelectorAll(
+    `.milestone-claim-btn[data-category="${category}"]:not(.milestone-claim-btn--pending)`
+  );
   claimBtns.forEach(btn => {
     btn.disabled = true;
     btn.innerHTML = '<span class="btn-icon">⏳</span> Claiming...';
   });
 
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
     
     // First, get eligible milestones
     log.debug('ACHIEVEMENT PROGRESS', 'Getting eligible milestones', { playerAddress, API_BASE_URL });
@@ -1043,96 +996,21 @@ async function claimMilestoneRewards(category) {
           rewardsDistributed: claimData.rewardsDistributed,
         });
       } else {
-        // Batch claim failed - fall back to individual claims
-        log.warn('ACHIEVEMENT PROGRESS', 'Batch claim failed, falling back to individual claims', {
+        log.warn('ACHIEVEMENT PROGRESS', 'Batch claim failed', {
           error: claimData.error,
           milestoneCount: eligibleForCategory.length,
         });
-
-        // Fallback: claim one by one
         for (const milestone of eligibleForCategory) {
-          try {
-            log.debug('ACHIEVEMENT PROGRESS', 'Claiming milestone individually (fallback)', { 
-              category: milestone.category, 
-              threshold: milestone.threshold 
-            });
-
-            const individualResponse = await fetch(`${API_BASE_URL}/achievements/claim`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                playerAddress,
-                category: milestone.category,
-                threshold: milestone.threshold,
-              }),
-            });
-
-            const individualData = await individualResponse.json();
-
-            if (individualData.success) {
-              // API returns claimed as array (for consistency), but single claim has one item
-              const claimedMilestone = Array.isArray(individualData.claimed) 
-                ? individualData.claimed[0] 
-                : individualData.claimed;
-              
-              if (individualData.rewardsDistributed === false) {
-                rewardsNotDistributed.push({
-                  milestone: claimedMilestone,
-                  error: individualData.rewardsError || 'Admin wallet issue',
-                });
-              }
-              if (claimedMilestone) {
-                claimed.push(claimedMilestone);
-              }
-            } else {
-              errors.push({ milestone, error: individualData.error });
-            }
-          } catch (err) {
-            errors.push({ milestone, error: err.message });
-          }
+          errors.push({ milestone, error: claimData.error || 'Batch claim failed' });
         }
       }
     } catch (err) {
-      // Network or other error - try individual claims as fallback
-      log.error('ACHIEVEMENT PROGRESS', 'Batch claim request failed, falling back to individual claims', {
+      log.error('ACHIEVEMENT PROGRESS', 'Batch claim request failed', {
         error: err.message,
         milestoneCount: eligibleForCategory.length,
       });
-
       for (const milestone of eligibleForCategory) {
-        try {
-          const individualResponse = await fetch(`${API_BASE_URL}/achievements/claim`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              playerAddress,
-              category: milestone.category,
-              threshold: milestone.threshold,
-            }),
-          });
-
-          const individualData = await individualResponse.json();
-          if (individualData.success) {
-            // API returns claimed as array (for consistency), but single claim has one item
-            const claimedMilestone = Array.isArray(individualData.claimed) 
-              ? individualData.claimed[0] 
-              : individualData.claimed;
-            
-            if (individualData.rewardsDistributed === false) {
-              rewardsNotDistributed.push({
-                milestone: claimedMilestone,
-                error: individualData.rewardsError || 'Admin wallet issue',
-              });
-            }
-            if (claimedMilestone) {
-              claimed.push(claimedMilestone);
-            }
-          } else {
-            errors.push({ milestone, error: individualData.error });
-          }
-        } catch (individualErr) {
-          errors.push({ milestone, error: individualErr.message });
-        }
+        errors.push({ milestone, error: err.message });
       }
     }
 
@@ -1177,11 +1055,20 @@ async function claimMilestoneRewards(category) {
 
     // Clear caches after successful claims to force fresh data
     if (claimed.length > 0) {
-      // Clear cache immediately to force fresh fetch
-      eligibleMilestonesCache = null;
-      eligibleMilestonesCacheTimestamp = 0;
-      eligibleMilestonesFetchPromise = null; // Clear any pending fetch promise
-      log.debug('ACHIEVEMENT PROGRESS', 'Cleared eligible milestones cache after successful claims');
+      if (typeof window.invalidateMilestoneProgressCaches === 'function') {
+        window.invalidateMilestoneProgressCaches();
+      } else {
+        eligibleMilestonesCache = null;
+        eligibleMilestonesCacheTimestamp = 0;
+        eligibleMilestonesFetchPromise = null;
+        try {
+          delete window.__prefetchedMilestoneProgress;
+        } catch (_) {}
+      }
+      if (typeof window.prefetchMilestoneProgress === 'function') {
+        void window.prefetchMilestoneProgress();
+      }
+      log.debug('ACHIEVEMENT PROGRESS', 'Invalidated milestone progress + eligible caches after successful claims');
       
       // Clear local cached state to force fresh render
       window._milestoneClaimedIds = null;
@@ -1216,6 +1103,11 @@ async function claimMilestoneRewards(category) {
         claimedCount: claimed.length 
       });
       await loadMilestoneProgress(currentSubTab);
+
+      // Milestones can grant items / credits — refresh reservoir inventory cache + store UI (same idea as post-purchase).
+      if (playerAddress && window.PlayerInventoryCache?.refreshAfterRewardBackground) {
+        window.PlayerInventoryCache.refreshAfterRewardBackground(playerAddress);
+      }
       
       // Force a fresh fetch for the badge count (don't use cache)
       // Clear cache again before fetching to ensure fresh data
@@ -1226,11 +1118,11 @@ async function claimMilestoneRewards(category) {
       // Update the leaderboard badge with forced fresh fetch (bypass cache)
       // Add a small delay to ensure DOM is ready
       await new Promise(resolve => setTimeout(resolve, 100));
-      await updateLeaderboardClaimBadge(null, true);
+      await updateClaimCountBadge(null, true);
       
       // Also update again after a short delay to ensure badges are visible
       setTimeout(async () => {
-        await updateLeaderboardClaimBadge(null, true);
+        await updateClaimCountBadge(null, true);
       }, 500);
       
       // Additional refresh after a longer delay to ensure blockchain data is fully indexed
@@ -1258,15 +1150,15 @@ async function claimMilestoneRewards(category) {
 }
 
 /**
- * Update the claim badge on the Leaderboard button
+ * Update the claim count badge on the Leaderboard button (pending rewards to claim)
  * @param {number|null} count - Number of eligible milestones (or null to fetch)
  * @param {boolean} forceRefresh - If true, bypass cache and force fresh fetch
  */
-async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
-  console.log('🏆 [CLAIM BADGE] updateLeaderboardClaimBadge called', { count, forceRefresh });
+async function updateClaimCountBadge(count = null, forceRefresh = false) {
+  console.log('🏆 [Claim count] updateClaimCountBadge called', { count, forceRefresh });
   
-  const menuBadge = document.getElementById('leaderboardClaimBadge');
-  const tabBadge = document.getElementById('milestonesTabBadge');
+  const menuBadge = document.getElementById('leaderboardClaimCountBadge');
+  const tabBadge = document.getElementById('milestonesTabClaimCountBadge');
 
   // If count not provided, fetch from API (with caching and deduplication)
   if (count === null) {
@@ -1278,7 +1170,7 @@ async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
       }
 
       if (!playerAddress) {
-        console.log('🏆 [CLAIM BADGE] No wallet connected, hiding badges');
+        console.log('🏆 [Claim count] No wallet connected, hiding badges');
         if (menuBadge) menuBadge.style.display = 'none';
         if (tabBadge) tabBadge.style.display = 'none';
         return;
@@ -1288,7 +1180,7 @@ async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
       const now = Date.now();
       if (!forceRefresh && eligibleMilestonesCache !== null && 
           (now - eligibleMilestonesCacheTimestamp) < ELIGIBLE_MILESTONES_CACHE_TTL) {
-        console.log('🏆 [CLAIM BADGE] Using cached eligible milestones count:', eligibleMilestonesCache);
+        console.log('🏆 [Claim count] Using cached eligible milestones count:', eligibleMilestonesCache);
         count = eligibleMilestonesCache;
       } else {
         // If forceRefresh is true, clear any pending fetch and cache
@@ -1300,23 +1192,23 @@ async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
         
         // If a fetch is already in progress and not forcing refresh, wait for it
         if (eligibleMilestonesFetchPromise && !forceRefresh) {
-          console.log('🏆 [CLAIM BADGE] Fetch already in progress, waiting for existing request');
+          console.log('🏆 [Claim count] Fetch already in progress, waiting for existing request');
           count = await eligibleMilestonesFetchPromise;
         } else {
           // Start new fetch
           eligibleMilestonesFetchPromise = (async () => {
             try {
-              console.log('🏆 [CLAIM BADGE] Fetching eligible milestones for', playerAddress);
-              const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+              console.log('🏆 [Claim count] Fetching eligible milestones for', playerAddress);
+              const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
               const response = await fetch(`${API_BASE_URL}/achievements/check?address=${playerAddress}`);
               
               let fetchedCount = 0;
               if (response.ok) {
                 const data = await response.json();
-                console.log('🏆 [CLAIM BADGE] API response:', data);
+                console.log('🏆 [Claim count] API response:', data);
                 fetchedCount = data.eligible?.length || data.count || 0;
               } else {
-                console.warn('🏆 [CLAIM BADGE] API error:', response.status);
+                console.warn('🏆 [Claim count] API error:', response.status);
                 fetchedCount = 0;
               }
               
@@ -1326,7 +1218,7 @@ async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
               
               return fetchedCount;
             } catch (error) {
-              console.error('🏆 [CLAIM BADGE] Error fetching eligible count:', error);
+              console.error('🏆 [Claim count] Error fetching eligible count:', error);
               log.warn('ACHIEVEMENT PROGRESS', 'Error fetching eligible count for badge', { error: error.message });
               eligibleMilestonesCache = 0;
               eligibleMilestonesCacheTimestamp = Date.now();
@@ -1340,27 +1232,27 @@ async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
         }
       }
     } catch (error) {
-      console.error('🏆 [CLAIM BADGE] Error in updateLeaderboardClaimBadge:', error);
-      log.warn('ACHIEVEMENT PROGRESS', 'Error in updateLeaderboardClaimBadge', { error: error.message });
+      console.error('🏆 [Claim count] Error in updateClaimCountBadge:', error);
+      log.warn('ACHIEVEMENT PROGRESS', 'Error in updateClaimCountBadge', { error: error.message });
       count = 0;
     }
   }
 
   // Ensure count is a number
   if (count === null || count === undefined) {
-    console.warn('🏆 [CLAIM BADGE] Count is null/undefined, defaulting to 0');
+    console.warn('🏆 [Claim count] Count is null/undefined, defaulting to 0');
     count = 0;
   }
   
   // Convert to number if it's not already
   count = Number(count);
   if (isNaN(count)) {
-    console.warn('🏆 [CLAIM BADGE] Count is NaN, defaulting to 0');
+    console.warn('🏆 [Claim count] Count is NaN, defaulting to 0');
     count = 0;
   }
 
   // Update badge visibility and count
-  console.log('🏆 [CLAIM BADGE] Setting badge count:', count, {
+  console.log('🏆 [Claim count] Setting badge count:', count, {
     menuBadgeExists: !!menuBadge,
     tabBadgeExists: !!tabBadge,
     menuBadgeId: menuBadge?.id,
@@ -1374,13 +1266,13 @@ async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
     if (count > 0) {
       menuBadge.textContent = badgeText;
       menuBadge.style.display = 'flex';
-      console.log('🏆 [CLAIM BADGE] Updated menu badge:', badgeText);
+      console.log('🏆 [Claim count] Updated menu badge:', badgeText);
     } else {
       menuBadge.style.display = 'none';
-      console.log('🏆 [CLAIM BADGE] Hid menu badge (count is 0)');
+      console.log('🏆 [Claim count] Hid menu badge (count is 0)');
     }
   } else {
-    console.warn('🏆 [CLAIM BADGE] Menu badge element not found (id: leaderboardClaimBadge)');
+    console.warn('🏆 [Claim count] Menu badge element not found (id: leaderboardClaimCountBadge)');
   }
   
   // Update Milestones tab badge (inside leaderboard modal)
@@ -1388,13 +1280,14 @@ async function updateLeaderboardClaimBadge(count = null, forceRefresh = false) {
     if (count > 0) {
       tabBadge.textContent = badgeText;
       tabBadge.style.display = 'flex';
-      console.log('🏆 [CLAIM BADGE] Updated tab badge:', badgeText);
+      console.log('🏆 [Claim count] Updated tab badge:', badgeText);
     } else {
       tabBadge.style.display = 'none';
-      console.log('🏆 [CLAIM BADGE] Hid tab badge (count is 0)');
+      console.log('🏆 [Claim count] Hid tab badge (count is 0)');
     }
   } else {
-    console.warn('🏆 [CLAIM BADGE] Tab badge element not found (id: milestonesTabBadge)');
+    // Tab badge lives inside leaderboard modal; may not be in DOM until that tab is opened
+    log.debug('ACHIEVEMENT PROGRESS', 'Tab badge element not in DOM (id: milestonesTabClaimCountBadge)');
   }
   
   log.debug('ACHIEVEMENT PROGRESS', 'Claim badges updated', { count, menuBadgeExists: !!menuBadge, tabBadgeExists: !!tabBadge });
@@ -1408,7 +1301,7 @@ function showMilestoneNotification(count) {
   log.debug('ACHIEVEMENT PROGRESS', 'showMilestoneNotification() called', { count });
   
   // Always update the badge
-  updateLeaderboardClaimBadge(count);
+  updateClaimCountBadge(count);
   
   if (count <= 0) return;
   
@@ -1529,10 +1422,147 @@ function closeMilestoneNotification() {
   }
 }
 
+ /**
+  * Copy menu-bootstrap milestone definitions into this module's cache (when achievement-progress
+  * loads after bootstrap has already written window.__prefetchedMilestoneDefinitions).
+  */
+ function syncMilestoneDefinitionsCacheFromBootstrap() {
+   const prefetched = typeof window !== 'undefined' && window.__prefetchedMilestoneDefinitions;
+   const prefetchedAt = typeof window !== 'undefined' && window.__prefetchedMilestoneDefinitionsTimestamp;
+   if (!prefetched || !prefetchedAt) return;
+   const age = Date.now() - prefetchedAt;
+   if (age < 0 || age >= MILESTONE_DEFINITIONS_CACHE_TTL) return;
+   milestoneDefinitionsCache = prefetched;
+   milestoneDefinitionsCacheTimestamp = prefetchedAt;
+ }
+
+ /** Prefetch definitions from API (fallback if menu bootstrap did not cache them). */
+ function prefetchMilestoneDefinitions() {
+   fetchMilestoneDefinitions().catch(() => {});
+ }
+
+ /**
+  * Wait until the session loading overlay is gone, then prefetch stats + achievements/progress
+  * so the Milestones tab can render from cache without waiting on first open.
+  */
+ function scheduleMilestoneProgressPrefetchAfterLoadingUi() {
+   if (typeof window === 'undefined') return;
+   if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) return;
+
+   const run = () => {
+     try {
+       if (typeof window.prefetchMilestoneProgress === 'function') {
+         window.prefetchMilestoneProgress();
+       }
+     } catch (_) {}
+   };
+
+   let frames = 0;
+   const maxFrames = 180;
+   const tick = () => {
+     const busy =
+       typeof window.LoadingManager !== 'undefined' && window.LoadingManager.isVisible;
+     if (!busy || frames >= maxFrames) {
+       if (typeof queueMicrotask === 'function') {
+         queueMicrotask(run);
+       } else {
+         setTimeout(run, 0);
+       }
+       return;
+     }
+     frames += 1;
+     if (typeof requestAnimationFrame === 'function') {
+       requestAnimationFrame(tick);
+     } else {
+       setTimeout(tick, 32);
+     }
+   };
+
+   if (typeof requestAnimationFrame === 'function') {
+     requestAnimationFrame(tick);
+   } else {
+     tick();
+   }
+ }
+
+ /**
+  * Prefetch milestone progress (stats + claimed/eligible) after wallet login.
+  * Prefer scheduleMilestoneProgressPrefetchAfterLoadingUi so work starts after the loading modal closes.
+  */
+ function prefetchMilestoneProgress() {
+   if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) return;
+   const playerAddress = window.walletAPIInstance.getAddress();
+   if (!playerAddress) return;
+
+   const prev = window.__prefetchedMilestoneProgress;
+   if (prev && prev.address === playerAddress && (Date.now() - prev.at) < MILESTONE_PROGRESS_PREFETCH_TTL_MS) {
+     return;
+   }
+
+   if (milestoneProgressPrefetchInFlight && milestoneProgressPrefetchInflightKey === playerAddress) {
+     return milestoneProgressPrefetchInFlight;
+   }
+
+  const API_BASE = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+   const inflightKey = playerAddress;
+   const statsKey = `stats:${playerAddress}`;
+   const statsP = (async () => {
+     if (window.apiRequestCache && typeof window.apiRequestCache.peekFresh === 'function') {
+       const hit = window.apiRequestCache.peekFresh(statsKey, playerAddress);
+       if (hit != null) return hit;
+     }
+     if (typeof window.loadStatsPayloadForWallet === 'function') {
+       return await window.loadStatsPayloadForWallet(playerAddress, { forceRefresh: false });
+     }
+     return null;
+   })();
+   const p = Promise.all([
+     statsP,
+     fetch(`${API_BASE}/achievements/progress?address=${playerAddress}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+   ])
+     .then(([statsData, progressData]) => {
+       const statsOk = statsData != null;
+       const progressOk = !!(progressData && progressData.success);
+       if (!statsOk && !progressOk) return;
+       const at = Date.now();
+       window.__prefetchedMilestoneProgress = {
+         address: playerAddress,
+         statsData: statsOk ? statsData : { success: true, hasStats: false },
+         claimed: progressOk ? progressData.claimed || {} : {},
+         claimedIds: progressOk ? progressData.claimedIds || [] : [],
+         eligible: progressOk ? progressData.eligible || [] : [],
+         at,
+       };
+     })
+     .catch(() => {})
+     .finally(() => {
+       if (milestoneProgressPrefetchInflightKey === inflightKey) {
+         milestoneProgressPrefetchInFlight = null;
+         milestoneProgressPrefetchInflightKey = null;
+       }
+     });
+
+   milestoneProgressPrefetchInFlight = p;
+   milestoneProgressPrefetchInflightKey = inflightKey;
+   return p;
+ }
+
  // Make functions globally available
+ syncMilestoneDefinitionsCacheFromBootstrap();
+ window.__syncMilestoneDefinitionsFromBootstrapCache = syncMilestoneDefinitionsCacheFromBootstrap;
+ window.scheduleMilestoneProgressPrefetchAfterLoadingUi = scheduleMilestoneProgressPrefetchAfterLoadingUi;
+ window.prefetchMilestoneDefinitions = prefetchMilestoneDefinitions;
+ window.prefetchMilestoneProgress = prefetchMilestoneProgress;
  window.addMilestoneProgressToLeaderboard = addMilestoneProgressToLeaderboard;
- window.switchMilestoneTab = switchMilestoneTab;
- window.switchMilestoneSubTab = switchMilestoneSubTab;
+ window.__switchMilestoneTabImpl = switchMilestoneTab;
+ window.__switchMilestoneSubTabImpl = switchMilestoneSubTab;
+ if (typeof window.__bindMilestoneTabImplementations === 'function') {
+   window.__bindMilestoneTabImplementations();
+ }
+ if (typeof window.switchMilestoneTab !== 'function') {
+   window.switchMilestoneTab = switchMilestoneTab;
+   window.switchMilestoneSubTab = switchMilestoneSubTab;
+ }
  window.loadMilestoneProgress = loadMilestoneProgress;
  window.refreshMilestoneProgress = refreshMilestoneProgress;
  window.claimMilestoneRewards = claimMilestoneRewards;
@@ -1546,9 +1576,34 @@ function clearEligibleMilestonesCache() {
   eligibleMilestonesCache = null;
   eligibleMilestonesCacheTimestamp = 0;
   eligibleMilestonesFetchPromise = null;
-  console.log('🏆 [CLAIM BADGE] Cleared eligible milestones cache');
+  milestoneProgressPrefetchInFlight = null;
+  milestoneProgressPrefetchInflightKey = null;
+  try {
+    delete window.__prefetchedMilestoneProgress;
+    delete window.__prefetchedInventory;
+    delete window.__prefetchedBadge;
+    if (window.PlayerInventoryCache) window.PlayerInventoryCache.invalidate(null);
+  } catch (_) {}
+  console.log('🏆 [Claim count] Cleared eligible milestones cache');
 }
 
-window.updateLeaderboardClaimBadge = updateLeaderboardClaimBadge;
+window.updateClaimCountBadge = updateClaimCountBadge;
 window.clearEligibleMilestonesCache = clearEligibleMilestonesCache;
+
+/**
+ * Game-over / post-claim invalidation (milestones only).
+ * Keep this narrowly scoped so we don't blow away inventory/badge caches.
+ */
+function invalidateMilestoneProgressCaches() {
+  eligibleMilestonesCache = null;
+  eligibleMilestonesCacheTimestamp = 0;
+  eligibleMilestonesFetchPromise = null;
+  milestoneProgressPrefetchInFlight = null;
+  milestoneProgressPrefetchInflightKey = null;
+  try {
+    delete window.__prefetchedMilestoneProgress;
+  } catch (_) {}
+}
+
+window.invalidateMilestoneProgressCaches = invalidateMilestoneProgressCaches;
 

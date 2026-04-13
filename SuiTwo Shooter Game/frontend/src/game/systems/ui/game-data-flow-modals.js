@@ -9,7 +9,7 @@ console.log('✅ [GAME DATA FLOW MODALS] Game data flow modals module loaded');
  * @returns {boolean}
  */
 function isBadgeModalVisible() {
-  const modals = ['badgeMintingModal', 'badgeMigrationModal', 'badgeUpgradeModal'];
+  const modals = ['badgeMintingModal', 'badgeUpgradeModal'];
   return modals.some(id => {
     const modal = document.getElementById(id);
     return modal && modal.classList.contains('badge-modal-visible');
@@ -28,13 +28,6 @@ function onBadgeModalShown() {
  */
 function onBadgeModalHidden() {
   GameDataState.setBadgeModalVisible(false);
-  
-  // If migration modal was closed with "Maybe Later", don't reload
-  // This prevents the migration check from running again
-  if (GameDataState.migrationCheckComplete && GameDataState.migrationModalClosed) {
-    console.log('⏭️ [FLOW MODALS] Migration modal was dismissed - skipping reload to prevent loop');
-    return;
-  }
   
   // If we have a wallet address, reload data after badge modal is fully closed
   // Use a longer delay to ensure badge modal is completely hidden before showing loading modal

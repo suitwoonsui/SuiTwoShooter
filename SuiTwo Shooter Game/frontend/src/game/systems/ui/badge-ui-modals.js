@@ -51,10 +51,11 @@ async function showBadgeMintingModal(badgePreview = null) {
   // Get tier name
   const tierName = window.BadgeService ? window.BadgeService.getTierName(0) : 'Standard';
   
-  // Construct badge image URL for Standard tier (tier 0)
+  // Construct badge image URL for Standard tier (tier 0) - served from frontend origin
+  const badgeBase = window.GAME_CONFIG?.BADGE_IMAGE_BASE_URL || window.location?.origin || '';
   const badgeImageUrl = typeof window.constructBadgeImageUrl === 'function'
     ? window.constructBadgeImageUrl(0)
-    : `${window.GAME_CONFIG?.API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:3000'}/Badges/Standard.webp`;
+    : badgeBase ? `${badgeBase.replace(/\/api\/?$/, '')}/Badges/Standard.webp` : '';
 
   modal.innerHTML = `
     <div class="badge-modal-content">
@@ -140,15 +141,15 @@ async function showTierUpgradeModal(upgradeData) {
     GameDataFlow.onBadgeModalShown();
   }
 
+  // Destructure onUpgradeComplete early so it's available in both paths
+  const { onUpgradeComplete } = upgradeData || {};
+
   // Check if modal already exists
   let modal = document.getElementById('badgeUpgradeModal');
   if (modal) {
-    modal.classList.add('badge-modal-visible');
-    modal.classList.remove('badge-modal-hidden');
-    if (window.BadgeUIService) {
-      window.BadgeUIService.setModalVisible('upgrade', true);
-    }
-    return;
+    // Modal exists - remove it so we can recreate with new context/content
+    log.debug('BADGE MODALS', 'Removing existing modal to recreate with new context');
+    modal.remove();
   }
 
   // Create modal
@@ -156,17 +157,42 @@ async function showTierUpgradeModal(upgradeData) {
   modal.className = 'badge-modal badge-modal-visible';
   modal.id = 'badgeUpgradeModal';
 
-  const { oldTier, newTier, newTierName, imageData, transactionData, badgeId, sessionId, onUpgradeComplete } = upgradeData;
+  // Destructure all properties including context
+  const { oldTier, newTier, newTierName, imageData, transactionData, badgeId, sessionId, context } = upgradeData || {};
+  log.debug('BADGE MODALS', 'Modal context:', context, 'upgradeData:', upgradeData);
   const oldTierName = window.BadgeService ? window.BadgeService.getTierName(oldTier) : 'Unknown';
-  const discounts = window.BadgeService ? window.BadgeService.getDiscountsForTier(newTier) : { store: 0, gameplay: 0 };
+  const discounts =
+    upgradeData && upgradeData.discounts && typeof upgradeData.discounts === 'object'
+      ? upgradeData.discounts
+      : { store: 0, gameplay: 0 };
   // Need transaction if we have badgeId, newTier, and sessionId (new flow) or transactionData (old flow)
   const needsTransaction = !!(badgeId && newTier !== undefined && sessionId) || !!transactionData;
+  
+  // Different messages based on context
+  const isStoreContext = context === 'store';
+  const headerTitle = isStoreContext 
+    ? '💰 Unlock Exclusive Store Savings!'
+    : '🎉 Badge Upgrade Available!';
+  const headerSubtitle = isStoreContext
+    ? `Upgrade to ${newTierName} and save ${discounts.store > 0 ? discounts.store + '%' : 'big'} on every purchase!`
+    : `Your badge can evolve to ${newTierName}!`;
+  const introText = isStoreContext
+    ? `<p class="badge-upgrade-intro">🎯 <strong>Perfect timing!</strong> Upgrade your badge now and instantly unlock <strong>${discounts.store}% off</strong> on everything in the store. Your savings start immediately!</p>`
+    : '';
+  const benefitsTitle = isStoreContext
+    ? '💎 Upgrade Benefits:'
+    : '✨ New Benefits:';
+  const storeDiscountEmphasis = isStoreContext && discounts.store > 0
+    ? `<li class="badge-perk-highlight">🎁 <strong>${discounts.store}% Store Discount:</strong> Save on every item you buy - applies instantly after upgrade!</li>`
+    : discounts.store > 0 
+      ? `<li>🎁 <strong>Store Discount:</strong> ${discounts.store}% off all purchases</li>`
+      : '';
 
   modal.innerHTML = `
     <div class="badge-modal-content">
       <div class="badge-modal-header">
-        <h2>🎉 Badge Upgrade Available!</h2>
-        <p class="badge-modal-subtitle">Your badge can evolve to ${newTierName}!</p>
+        <h2>${headerTitle}</h2>
+        <p class="badge-modal-subtitle">${headerSubtitle}</p>
       </div>
       
       <div class="badge-modal-body">
@@ -177,13 +203,15 @@ async function showTierUpgradeModal(upgradeData) {
               // Old flow: base64 image data
               return `<img src="data:image/webp;base64,${typeof window.arrayBufferToBase64 === 'function' ? window.arrayBufferToBase64(imageData) : ''}" alt="Badge Preview" class="badge-preview-image" />`;
             } else {
-              // New flow: construct image URL from tier name
+              // New flow: construct image URL from tier name - served from frontend origin
+              const badgeBase = window.GAME_CONFIG?.BADGE_IMAGE_BASE_URL || window.location?.origin || '';
+              const baseUrl = badgeBase.replace(/\/api\/?$/, '');
               const imageUrl = typeof window.constructBadgeImageUrl === 'function'
                 ? window.constructBadgeImageUrl(newTier)
-                : `${window.GAME_CONFIG?.API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:3000'}/Badges/${newTierName}.webp`;
+                : baseUrl ? `${baseUrl}/Badges/${newTierName}.webp` : '';
               const fallbackUrl = typeof window.constructBadgeImageUrl === 'function'
                 ? window.constructBadgeImageUrl(0)
-                : `${window.GAME_CONFIG?.API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:3000'}/Badges/Standard.webp`;
+                : baseUrl ? `${baseUrl}/Badges/Standard.webp` : '';
               return `<img src="${imageUrl}" alt="Badge Preview" class="badge-preview-image" onerror="this.onerror=null; this.src='${fallbackUrl}';" />`;
             }
           })()}
@@ -191,11 +219,12 @@ async function showTierUpgradeModal(upgradeData) {
         </div>
         
         <div class="badge-upgrade-info">
+          ${introText}
           <p><strong>Upgrade from:</strong> ${oldTierName} → ${newTierName}</p>
           
-          <h3>✨ New Benefits:</h3>
+          <h3>${benefitsTitle}</h3>
           <ul class="badge-perks-list">
-            ${discounts.store > 0 ? `<li>🎁 <strong>Store Discount:</strong> ${discounts.store}% off all purchases</li>` : ''}
+            ${storeDiscountEmphasis}
             ${discounts.gameplay > 0 ? `<li>🎮 <strong>Gameplay Discount:</strong> ${discounts.gameplay}% off game start costs</li>` : ''}
           </ul>
           
@@ -203,6 +232,7 @@ async function showTierUpgradeModal(upgradeData) {
             <div class="badge-cost-info">
               <p><strong>Upgrade Fee:</strong> $0.10 USD (paid in SUI)</p>
               <p class="badge-cost-note">Plus network gas fees (~$0.01)</p>
+              ${isStoreContext ? `<p class="badge-cost-highlight">💡 <strong>Tip:</strong> The discount you'll save will quickly pay for this upgrade!</p>` : ''}
             </div>
           ` : ''}
         </div>
@@ -211,10 +241,10 @@ async function showTierUpgradeModal(upgradeData) {
       <div class="badge-modal-actions">
         ${needsTransaction ? `
           <button id="badgeUpgradeBtn" class="badge-btn badge-btn-primary">
-            Upgrade Badge ($0.10)
+            ${isStoreContext ? `Upgrade & Save ${discounts.store > 0 ? discounts.store + '%' : 'Now'} ($0.10)` : 'Upgrade Badge ($0.10)'}
           </button>
           <button id="badgeUpgradeLaterBtn" class="badge-btn badge-btn-secondary">
-            Maybe Later
+            ${isStoreContext ? 'Continue to Store' : 'Maybe Later'}
           </button>
         ` : `
           <button id="badgeUpgradeCloseBtn" class="badge-btn badge-btn-primary">
@@ -253,146 +283,50 @@ async function showTierUpgradeModal(upgradeData) {
         }
       }
     });
-    document.getElementById('badgeUpgradeLaterBtn').addEventListener('click', () => {
+    document.getElementById('badgeUpgradeLaterBtn').addEventListener('click', (event) => {
+      // Prevent event from bubbling up to avoid triggering store modal's click-outside handler
+      event.stopPropagation();
+      event.preventDefault();
+      
       // Set flag to skip upgrade check on next reload
       if (typeof GameDataState !== 'undefined' && GameDataState.setSkipUpgradeCheck) {
         GameDataState.setSkipUpgradeCheck(true);
         log.debug('⏭️ [BADGE MODALS] User clicked "Maybe Later" - will skip upgrade check on next reload');
       }
       hideBadgeModal('badgeUpgradeModal');
-      // If callback provided and user declined, we can still call it (e.g., to show store)
-      if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
-        onUpgradeComplete(false); // false = upgrade declined
-      }
+      
+      // Small delay before calling callback to ensure modal is fully closed and click events have settled
+      setTimeout(() => {
+        // If callback provided and user declined, we can still call it (e.g., to show store)
+        if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
+          onUpgradeComplete(false); // false = upgrade declined
+        }
+      }, 100);
     });
   } else {
-    document.getElementById('badgeUpgradeCloseBtn').addEventListener('click', () => {
+    document.getElementById('badgeUpgradeCloseBtn').addEventListener('click', (event) => {
+      // Prevent event from bubbling up to avoid triggering store modal's click-outside handler
+      event.stopPropagation();
+      event.preventDefault();
+      
       // Set flag to skip upgrade check on next reload
       if (typeof GameDataState !== 'undefined' && GameDataState.setSkipUpgradeCheck) {
         GameDataState.setSkipUpgradeCheck(true);
         log.debug('⏭️ [BADGE MODALS] User closed upgrade modal - will skip upgrade check on next reload');
       }
       hideBadgeModal('badgeUpgradeModal');
-      if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
-        onUpgradeComplete(false);
-      }
+      
+      // Small delay before calling callback to ensure modal is fully closed and click events have settled
+      setTimeout(() => {
+        if (onUpgradeComplete && typeof onUpgradeComplete === 'function') {
+          onUpgradeComplete(false);
+        }
+      }, 100);
     });
   }
   
   if (window.BadgeUIService) {
     window.BadgeUIService.setModalVisible('upgrade', true);
-  }
-}
-
-/**
- * Show badge migration modal
- * @param {Object} migrationData - Migration data {oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData}
- */
-async function showBadgeMigrationModal(migrationData) {
-    log.debug('BADGE MODALS', 'Showing badge migration modal', migrationData);
-  
-  // Notify flow controller
-  if (typeof GameDataFlow !== 'undefined') {
-    GameDataFlow.onBadgeModalShown();
-  }
-
-  // Check if modal already exists
-  let modal = document.getElementById('badgeMigrationModal');
-  if (modal) {
-    modal.classList.add('badge-modal-visible');
-    modal.classList.remove('badge-modal-hidden');
-    if (window.BadgeUIService) {
-      window.BadgeUIService.setModalVisible('migration', true);
-    }
-    return;
-  }
-
-  // Create modal
-  modal = document.createElement('div');
-  modal.className = 'badge-modal badge-modal-visible';
-  modal.id = 'badgeMigrationModal';
-
-  const { oldBadgeId, oldTier, oldGamesPlayed, oldMintDate, imageData } = migrationData;
-  const oldTierName = window.BadgeService ? window.BadgeService.getTierName(oldTier) : 'Unknown';
-  
-  // Construct badge image URL for the old tier
-  const badgeImageUrl = typeof window.constructBadgeImageUrl === 'function'
-    ? window.constructBadgeImageUrl(oldTier)
-    : `${window.GAME_CONFIG?.API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:3000'}/Badges/${oldTierName}.webp`;
-
-  modal.innerHTML = `
-    <div class="badge-modal-content">
-      <div class="badge-modal-header">
-        <h2>🔄 Badge Migration Required</h2>
-        <p class="badge-modal-subtitle">Migrate your badge to the new contract</p>
-      </div>
-      
-      <div class="badge-modal-body">
-        <div class="badge-preview-container">
-          ${imageData 
-            ? `<img src="data:image/webp;base64,${typeof window.arrayBufferToBase64 === 'function' ? window.arrayBufferToBase64(imageData) : ''}" alt="Badge Preview" class="badge-preview-image" />`
-            : `<img src="${badgeImageUrl}" alt="${oldTierName} Badge" class="badge-preview-image" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='block';" />
-               <div class="badge-preview-placeholder" style="display: none;">🎖️</div>`
-          }
-          <p class="badge-tier-name">${oldTierName} Badge</p>
-        </div>
-        
-        <div class="badge-info-section">
-          <h3>What is migration?</h3>
-          <p>Your badge was created with an older version of the contract. To continue using it, you need to migrate it to the new contract.</p>
-          
-          <h3>What happens during migration?</h3>
-          <ul class="badge-perks-list">
-            <li>✅ Your badge data is preserved (tier, games played, mint date)</li>
-            <li>✅ A new badge is created in your wallet</li>
-            <li>✅ Your old badge will be automatically deleted (if the old contract supports it)</li>
-            <li>✅ All your progress is maintained</li>
-          </ul>
-          
-          <div class="badge-cost-info">
-            <p><strong>Gas Fee:</strong> ~$0.001-0.01 USD (paid in SUI)</p>
-            <p class="badge-cost-note">You'll need to sign a transaction to migrate your badge</p>
-          </div>
-        </div>
-      </div>
-      
-      <div class="badge-modal-actions">
-        <button id="badgeMigrateBtn" class="badge-btn badge-btn-primary">
-          Migrate Badge
-        </button>
-        <button id="badgeMigrateLaterBtn" class="badge-btn badge-btn-secondary">
-          Maybe Later
-        </button>
-      </div>
-    </div>
-  `;
-
-  // Append to viewport container
-  const viewportContainer = document.querySelector('.viewport-container');
-  if (viewportContainer) {
-    viewportContainer.appendChild(modal);
-  } else {
-    document.body.appendChild(modal);
-  }
-
-  // Add event listeners
-  document.getElementById('badgeMigrateBtn').addEventListener('click', () => {
-    if (typeof window.handleBadgeMigration === 'function') {
-      window.handleBadgeMigration(migrationData);
-    }
-  });
-  document.getElementById('badgeMigrateLaterBtn').addEventListener('click', () => {
-    // Set flag to skip migration check and mark data as loaded
-    if (typeof GameDataState !== 'undefined') {
-      GameDataState.migrationModalClosed = true;
-      GameDataState.markDataLoaded();
-      log.debug('⏭️ [BADGE MODALS] User clicked "Maybe Later" - migration check skipped, data marked as loaded');
-    }
-    hideBadgeModal('badgeMigrationModal');
-  });
-  
-  if (window.BadgeUIService) {
-    window.BadgeUIService.setModalVisible('migration', true);
   }
 }
 
@@ -412,37 +346,12 @@ function hideBadgeModal(modalId) {
         window.BadgeUIService.setModalVisible('minting', false);
       } else if (modalId === 'badgeUpgradeModal') {
         window.BadgeUIService.setModalVisible('upgrade', false);
-      } else if (modalId === 'badgeMigrationModal') {
-        window.BadgeUIService.setModalVisible('migration', false);
       }
     }
     
     // Notify flow controller
     if (typeof GameDataFlow !== 'undefined') {
       GameDataFlow.onBadgeModalHidden();
-    }
-    
-    // Track migration modal closure for game readiness (backward compatibility)
-    if (modalId === 'badgeMigrationModal') {
-      // Set flag in GameDataState to exit the loop
-      if (typeof GameDataState !== 'undefined') {
-        GameDataState.migrationModalClosed = true;
-        // If migration check is complete and modal is closed, mark data as loaded
-        if (GameDataState.migrationCheckComplete && !GameDataState.dataLoaded) {
-          GameDataState.markDataLoaded();
-          log.debug('✅ [BADGE MODALS] Migration modal closed - data marked as loaded');
-        }
-      }
-      
-      // Also update gameReadinessState for backward compatibility
-      if (typeof gameReadinessState !== 'undefined') {
-        gameReadinessState.migrationModalClosed = true;
-        log.debug('✅ [GAME READINESS] Migration modal closed - button can now enable');
-        
-        if (typeof updateGameReadiness === 'function') {
-          updateGameReadiness();
-        }
-      }
     }
     
     // Track minting modal closure - mark data as loaded so game can proceed
@@ -467,7 +376,6 @@ function hideBadgeModal(modalId) {
 if (typeof window !== 'undefined') {
   window.showBadgeMintingModal = showBadgeMintingModal;
   window.showTierUpgradeModal = showTierUpgradeModal;
-  window.showBadgeMigrationModal = showBadgeMigrationModal;
   window.hideBadgeModal = hideBadgeModal;
   
   // Also expose via BadgeUI for backward compatibility
@@ -476,7 +384,6 @@ if (typeof window !== 'undefined') {
   }
   window.BadgeUI.showBadgeMintingModal = showBadgeMintingModal;
   window.BadgeUI.showTierUpgradeModal = showTierUpgradeModal;
-  window.BadgeUI.showBadgeMigrationModal = showBadgeMigrationModal;
   window.BadgeUI.hideBadgeModal = hideBadgeModal;
 }
 

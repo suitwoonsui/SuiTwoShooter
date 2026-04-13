@@ -6,10 +6,10 @@
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler } from '@/lib/api/api-handler';
-import { getTournamentsByCreator } from '@/lib/services/creator-reward-service';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { getTournamentsByCreator } from '@/lib/services/tournament/creator/creator-reward-service';
+import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
+import { PlatformValidators } from '@/lib/services/platform/validators/platform-validators';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -23,15 +23,15 @@ export const GET = withApiHandler(
 
     // Validate address format
     if (!creatorAddress) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'Creator address is required'
       );
     }
 
-    BadgeValidators.validateAddress(creatorAddress);
+    PlatformValidators.validateAddress(creatorAddress);
 
-    BadgeLogger.info('🏆 [CREATOR REWARDS] Getting creator rewards', {
+    PlatformLogger.info('🏆 [CREATOR REWARDS] Getting creator rewards', {
       creatorAddress,
     });
 
@@ -39,17 +39,17 @@ export const GET = withApiHandler(
     const result = await getTournamentsByCreator(creatorAddress);
 
     if (!result.success) {
-      BadgeLogger.error('🏆 [CREATOR REWARDS] Failed to get creator rewards', {
+      PlatformLogger.error('🏆 [CREATOR REWARDS] Failed to get creator rewards', {
         creatorAddress,
         error: result.error,
       });
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         result.error || 'Failed to get creator rewards'
       );
     }
 
-    BadgeLogger.info('🏆 [CREATOR REWARDS] Creator rewards retrieved', {
+    PlatformLogger.info('🏆 [CREATOR REWARDS] Creator rewards retrieved', {
       creatorAddress,
       tournamentCount: result.tournaments?.length || 0,
       totalRewardsUSD: result.totalRewardsUSD,

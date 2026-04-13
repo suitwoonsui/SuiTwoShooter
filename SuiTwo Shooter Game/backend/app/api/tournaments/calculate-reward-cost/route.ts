@@ -6,10 +6,10 @@
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { calculateRewardCost, calculateTotalPayment, TournamentRewardConfig } from '@/lib/services/reward-cost-calculator';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { calculateRewardCost, calculateTotalPayment, TournamentRewardConfig } from '@/lib/services/tournament/cost/reward-cost-calculator';
+import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
+import { PlatformValidators } from '@/lib/services/platform/validators/platform-validators';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -29,36 +29,37 @@ export const POST = withApiHandler(
 
     // Validate player address if provided
     if (playerAddress) {
-      BadgeValidators.validateAddress(playerAddress);
+      PlatformValidators.validateAddress(playerAddress);
     }
 
     // Validate reward config if provided
     if (rewardConfig) {
       if (!rewardConfig.rewardDepth || rewardConfig.rewardDepth < 1 || rewardConfig.rewardDepth > 255) {
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
+        throw new PlatformError(
+          PlatformErrorCode.INVALID_ADDRESS,
           'rewardDepth must be between 1 and 255'
         );
       }
 
       if (!rewardConfig.poolDepth || rewardConfig.poolDepth < 1 || rewardConfig.poolDepth > 255) {
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
+        throw new PlatformError(
+          PlatformErrorCode.INVALID_ADDRESS,
           'poolDepth must be between 1 and 255'
         );
       }
 
-      // Validate pool distribution sums to 100
-      const poolSum = rewardConfig.poolDistribution.reduce((sum, pct) => sum + pct, 0);
+      // Validate pool distribution sums to 100 (guard against undefined)
+      const poolDist = rewardConfig.poolDistribution ?? [];
+      const poolSum = poolDist.reduce((sum, pct) => sum + pct, 0);
       if (Math.abs(poolSum - 100) > 0.01) { // Allow small floating point errors
-        throw new BadgeError(
-          BadgeErrorCode.INVALID_ADDRESS,
+        throw new PlatformError(
+          PlatformErrorCode.INVALID_ADDRESS,
           'poolDistribution must sum to 100'
         );
       }
     }
 
-    BadgeLogger.info('🏆 [REWARD COST] Calculating reward cost', {
+    PlatformLogger.info('🏆 [REWARD COST] Calculating reward cost', {
       playerAddress,
       hasRewardConfig: !!rewardConfig,
       rewardDepth: rewardConfig?.rewardDepth,
@@ -81,7 +82,7 @@ export const POST = withApiHandler(
       );
     }
 
-    BadgeLogger.info('🏆 [REWARD COST] Cost calculated', {
+    PlatformLogger.info('🏆 [REWARD COST] Cost calculated', {
       totalCost: costResult.totalCost,
       totalCostUSDCents: costResult.totalCostUSDCents,
       baseCost: costResult.baseCost,
@@ -113,6 +114,7 @@ export const POST = withApiHandler(
     };
   }
 );
+
 
 
 

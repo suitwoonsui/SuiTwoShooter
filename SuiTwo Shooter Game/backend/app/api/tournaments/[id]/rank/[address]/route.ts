@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
-import { getTournamentService } from '@/lib/sui/tournament-service';
+import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {

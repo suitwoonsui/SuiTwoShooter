@@ -505,7 +505,7 @@ function generateCollectiblesTab() {
 function generatePremiumStoreTab() {
   const items = [
     {
-      id: 'extraLives',
+      id: 'extra_lives',
       name: 'Extra Lives',
       icon: '❤️',
       narrative: 'Extra Lives represent market resilience—the ability to recover from setbacks and continue trading. Starting with additional lives gives you more chances to prove your skill against market volatility.',
@@ -516,7 +516,7 @@ function generatePremiumStoreTab() {
       ]
     },
     {
-      id: 'forceField',
+      id: 'force_field',
       name: 'Force Field Start',
       icon: '🛡️',
       narrative: 'Begin your journey with active market protection. This item represents starting with market stability already established, giving you an immediate advantage against bearish forces.',
@@ -527,7 +527,7 @@ function generatePremiumStoreTab() {
       ]
     },
     {
-      id: 'orbLevel',
+      id: 'orb_level',
       name: 'Orb Level Start',
       icon: '🔮',
       narrative: 'Enhanced market power from the start. This item represents beginning your journey with already-developed trading skills, skipping the initial learning curve.',
@@ -538,7 +538,7 @@ function generatePremiumStoreTab() {
       ]
     },
     {
-      id: 'coinTractorBeam',
+      id: 'coin_tractor_beam',
       name: 'Coin Tractor Beam',
       icon: '🧲',
       narrative: 'The Coin Tractor Beam harnesses the magnetic pull of market momentum. When activated, it draws coins from across the battlefield toward you, representing the power of strategic positioning in volatile markets.',
@@ -549,7 +549,7 @@ function generatePremiumStoreTab() {
       ]
     },
     {
-      id: 'slowTime',
+      id: 'slow_time',
       name: 'Slow Time Power',
       icon: '⏱️',
       narrative: 'Time manipulation in volatile markets. This power slows the game speed, giving you more time to react to market movements—representing the ability to analyze situations when markets move too fast.',
@@ -560,7 +560,7 @@ function generatePremiumStoreTab() {
       ]
     },
     {
-      id: 'destroyAll',
+      id: 'destroy_all',
       name: 'Destroy All Enemies',
       icon: '💥',
       narrative: 'Market clearing power—an instant wave of destruction that eliminates all enemies on screen. This represents the ability to clear market volatility in a single decisive action.',
@@ -569,7 +569,7 @@ function generatePremiumStoreTab() {
       ]
     },
     {
-      id: 'bossKillShot',
+      id: 'boss_kill_shot',
       name: 'Boss Kill Shot',
       icon: '🎯',
       narrative: 'Ultimate market dominance—a powerful screen-wide attack that instantly defeats any boss regardless of remaining HP. This represents the ability to overcome even the most powerful market forces through decisive action.',
@@ -717,12 +717,10 @@ function getBadgeImageUrlForHowToPlay(tierName) {
     return window.constructBadgeImageUrl(tier);
   }
   
-  // Fallback: construct URL manually
-  const apiBaseUrl = typeof window !== 'undefined' && window.GAME_CONFIG?.API_BASE_URL 
-    ? window.GAME_CONFIG.API_BASE_URL 
-    : 'http://localhost:3000/api';
-  const baseUrl = apiBaseUrl.replace(/\/api$/, '');
-  return `${baseUrl}/Badges/${tierName}.webp`;
+  // Fallback: construct URL manually - badge images from frontend origin
+  const badgeBase = typeof window !== 'undefined' && (window.GAME_CONFIG?.BADGE_IMAGE_BASE_URL || window.location?.origin);
+  const baseUrl = badgeBase ? String(badgeBase).replace(/\/api\/?$/, '') : '';
+  return baseUrl ? `${baseUrl}/Badges/${tierName}.webp` : '';
 }
 
 function generateProgressionTab() {

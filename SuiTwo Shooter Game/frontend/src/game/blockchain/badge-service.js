@@ -11,14 +11,52 @@ let badgeCache = {
   data: null,
   address: null, // Track which address the cache is for
   timestamp: 0,
-  cacheDuration: 60000, // 1 minute cache
+  cacheDuration: 30 * 60 * 1000, // 30 minutes cache (badges rarely change)
 };
+// In-flight request dedupe by address to avoid duplicate badge fetches
+// when multiple UI systems ask for badge state at the same time.
+const badgeInFlightByAddress = new Map();
+
+// Short-lived full response for includePendingUpgrade=1 (not persisted; avoids duplicate Hydroscope-backed work after prefetch).
+let badgePuCache = { address: null, data: null, timestamp: 0, ttlMs: 120000 };
+
+const BADGE_CACHE_VERSION = 1;
+function badgeStorageKey(address) {
+  return `badgeCache:v${BADGE_CACHE_VERSION}:${String(address || '').toLowerCase()}`;
+}
+
+function loadBadgeFromStorage(address, now) {
+  try {
+    const raw = window?.localStorage?.getItem(badgeStorageKey(address));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.data || typeof parsed.at !== 'number') return null;
+    if ((now - parsed.at) > badgeCache.cacheDuration) return null;
+    return { data: parsed.data, at: parsed.at };
+  } catch {
+    return null;
+  }
+}
+
+function saveBadgeToStorage(address, data, at) {
+  try {
+    window?.localStorage?.setItem(badgeStorageKey(address), JSON.stringify({ data, at }));
+  } catch {
+    // Ignore storage failures (quota, disabled, etc).
+  }
+}
 
 /**
- * Get API base URL
+ * Get API base URL - routes to correct backend based on endpoint
  */
-function getApiBaseUrl() {
-  return window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+function getApiBaseUrl(endpoint = '/api/badges/') {
+  // Use getBackendUrl helper if available, otherwise fallback to API_BASE_URL
+  if (window.GAME_CONFIG?.getBackendUrl) {
+    return window.GAME_CONFIG.getBackendUrl(endpoint);
+  }
+  // Frontend should always talk to the game backend.
+  return window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
 }
 
 /**
@@ -36,7 +74,7 @@ function getPlayerAddress() {
  * @param {string} playerAddress - Player's wallet address (optional, uses connected wallet if not provided)
  * @returns {Promise<Object>} Badge data or null if no badge
  */
-async function getBadge(playerAddress = null) {
+async function getBadge(playerAddress = null, options = {}) {
   const address = playerAddress || getPlayerAddress();
   if (!address) {
     return {
@@ -44,25 +82,48 @@ async function getBadge(playerAddress = null) {
       error: 'Wallet not connected',
     };
   }
+  const bypassCache = Boolean(options && options.bypassCache);
+  const includePendingUpgrade = Boolean(options && options.includePendingUpgrade);
 
   // Check cache (only use if it's for the same address)
   const now = Date.now();
-  if (badgeCache.data && badgeCache.address === address && (now - badgeCache.timestamp) < badgeCache.cacheDuration) {
+  if (!bypassCache && includePendingUpgrade && badgePuCache.address === address && badgePuCache.data && (now - badgePuCache.timestamp) < badgePuCache.ttlMs) {
+    console.log('📋 [BADGE] Using in-memory PU badge cache for address:', address);
+    return badgePuCache.data;
+  }
+  if (!bypassCache && !includePendingUpgrade && badgeCache.data && badgeCache.address === address && (now - badgeCache.timestamp) < badgeCache.cacheDuration) {
     console.log('📋 [BADGE] Using cached badge data for address:', address);
     return badgeCache.data;
+  }
+
+  // Check persistent cache (localStorage) for fast, cross-refresh loads.
+  if (!bypassCache && !includePendingUpgrade) {
+    const stored = loadBadgeFromStorage(address, now);
+    if (stored?.data) {
+      badgeCache.data = stored.data;
+      badgeCache.address = address;
+      badgeCache.timestamp = stored.at;
+      console.log('📋 [BADGE] Using stored badge data for address:', address);
+      return stored.data;
+    }
   }
   
   // If cache is for a different address, clear it
   if (badgeCache.address && badgeCache.address !== address) {
     console.log('📋 [BADGE] Cache is for different address, clearing cache');
-    badgeCache.data = null;
-    badgeCache.address = null;
-    badgeCache.timestamp = 0;
+    clearBadgeCache({ address: badgeCache.address });
   }
 
-  try {
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/badges/${address}`, {
+  const inFlightKey = includePendingUpgrade ? `${address}\0pu` : address;
+  if (!bypassCache) {
+    const inFlight = badgeInFlightByAddress.get(inFlightKey);
+    if (inFlight) return inFlight;
+  }
+
+  const requestPromise = (async () => {
+    const API_BASE_URL = getApiBaseUrl('/api/badges/');
+    const qs = includePendingUpgrade ? '?includePendingUpgrade=1' : '';
+    const response = await fetch(`${API_BASE_URL}/badges/${address}${qs}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -78,62 +139,48 @@ async function getBadge(playerAddress = null) {
     }
 
     const data = await response.json();
-    
-    // Update cache with address
-    badgeCache.data = data;
+
+    // Persist badge display fields only (pendingUpgrade is session-specific / short-lived).
+    const cachePayload =
+      includePendingUpgrade && data && typeof data === 'object'
+        ? (() => {
+            const { pendingUpgrade: _pu, ...rest } = data;
+            return rest;
+          })()
+        : data;
+
+    badgeCache.data = cachePayload;
     badgeCache.address = address;
     badgeCache.timestamp = now;
+    saveBadgeToStorage(address, cachePayload, now);
+
+    if (includePendingUpgrade && data && typeof data === 'object') {
+      badgePuCache = { address, data, timestamp: now, ttlMs: badgePuCache.ttlMs };
+    }
 
     return data;
-  } catch (error) {
+  })().catch((error) => {
     console.error('❌ [BADGE] Error fetching badge:', error);
     return {
       success: false,
       error: error.message || 'Failed to fetch badge',
     };
+  }).finally(() => {
+    if (!bypassCache) {
+      badgeInFlightByAddress.delete(inFlightKey);
+    }
+  });
+
+  if (!bypassCache) {
+    badgeInFlightByAddress.set(inFlightKey, requestPromise);
   }
+
+  return requestPromise;
 }
 
-/**
- * Check if player needs to migrate their badge
- * @param {string} playerAddress - Player's wallet address (optional)
- * @returns {Promise<Object>} Migration data if migration needed, null otherwise
- */
-async function checkBadgeMigration(playerAddress = null) {
-  const address = playerAddress || getPlayerAddress();
-  if (!address) {
-    return {
-      success: false,
-      error: 'Wallet not connected',
-    };
-  }
-
-  try {
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/badges/${address}/migrate-data`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      return {
-        success: false,
-        error: errorData.error || `HTTP ${response.status}`,
-      };
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('❌ [BADGE] Error checking migration:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to check migration',
-    };
-  }
+// Badge migration removed (upgradable contracts). Keep a stable API for any legacy callers.
+async function checkBadgeMigration() {
+  return { success: true, needsMigration: false, message: 'Badge migration is no longer supported' };
 }
 
 /**
@@ -146,19 +193,52 @@ async function hasBadge(playerAddress = null) {
   return result.success && result.hasBadge === true;
 }
 
+/** Game backend API root (same pattern as store-purchase-flow). */
+function getBadgeBackendRoot() {
+  if (window.GAME_CONFIG?.getBackendUrl) {
+    return window.GAME_CONFIG.getBackendUrl('/api/badges/').replace(/\/badges\/?$/, '');
+  }
+  return window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+}
+
+function getTokenPricesSnapshot() {
+  let prices = null;
+  let pricesTimestamp = null;
+  if (typeof StoreService !== 'undefined' && StoreService.getState) {
+    const s = StoreService.getState();
+    prices = s.tokenPrices;
+    pricesTimestamp = s.tokenPricesTimestamp;
+  } else if (typeof getStoreState === 'function') {
+    const s = getStoreState();
+    prices = s?.tokenPrices;
+    pricesTimestamp = s?.tokenPricesTimestamp;
+  }
+  return { prices, pricesTimestamp };
+}
+
+async function pollPaymentConfirmed(paymentDigest, maxAttempts = 30) {
+  const root = getBadgeBackendRoot();
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    try {
+      const res = await fetch(`${root}/store/transaction/${paymentDigest}`);
+      if (res.ok) {
+        const j = await res.json();
+        if (j.confirmed) return true;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return false;
+}
+
 /**
- * Build mint badge transaction (fully client-side, no backend needed)
- * 
- * Flow:
- * 1. Wallet module finds a coin with sufficient balance (≥0.1 SUI)
- * 2. Estimates gas budget (0.01 SUI)
- * 3. Calculates fee = 0.1 SUI - gas
- * 4. Splits fee from coin, uses remainder for gas
- * 5. Builds transaction with contract addresses from config
- * 
- * @returns {Promise<Object>} Transaction object ready for signing
+ * Build Shipyard mint tx: optional Channel game-fee payment (player → game admin), then POST .../mint/fulfill.
+ * @param {Object} [options]
+ * @param {string} [options.paymentToken] - SUI | MEWS | USDC when Helm minting fee is set (default SUI)
  */
-async function buildMintBadgeTransaction() {
+async function buildMintBadgeTransaction(options = {}) {
   const address = getPlayerAddress();
   if (!address) {
     return {
@@ -167,7 +247,6 @@ async function buildMintBadgeTransaction() {
     };
   }
 
-  // Validate wallet API is available
   if (!window.walletAPIInstance) {
     return {
       success: false,
@@ -175,49 +254,87 @@ async function buildMintBadgeTransaction() {
     };
   }
 
+  const paymentToken = (options.paymentToken || 'SUI').toUpperCase();
+  const root = getBadgeBackendRoot();
+  const { prices, pricesTimestamp } = getTokenPricesSnapshot();
+
   try {
-    console.log('🔨 [BADGE] Building mint transaction (backend)...');
-    
-    // Call backend to build transaction (like store does)
-    // This ensures we use the same code path as admin_mint_badge which works
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/badges/mint`, {
+    console.log('🔨 [BADGE] Mint: purchase step (game fee via Channel if configured)...');
+    const purchaseRes = await fetch(`${root}/badges/mint/purchase`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         playerAddress: address,
-        // paymentCoinId is optional - backend will use txb.gas
+        paymentToken,
+        prices,
+        pricesTimestamp,
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    if (!purchaseRes.ok) {
+      const err = await purchaseRes.json().catch(() => ({}));
       return {
         success: false,
-        error: errorData.error || `HTTP ${response.status}`,
+        error: err.error || err.message || `HTTP ${purchaseRes.status}`,
       };
     }
 
-    const data = await response.json();
-
-    if (!data.success || !data.transaction) {
+    const purchaseData = await purchaseRes.json();
+    if (!purchaseData.success) {
       return {
         success: false,
-        error: data.error || 'Failed to build mint transaction',
+        error: purchaseData.error || purchaseData.message || 'Mint purchase step failed',
       };
     }
 
-    console.log('✅ [BADGE] Transaction built successfully by backend');
-    
-    // Return base64 transaction string (frontend just signs it, like store)
-    return {
-      success: true,
-      transaction: data.transaction, // Base64 string
-    };
+    let paymentDigest = null;
+    if (purchaseData.requiresPayment && purchaseData.transaction) {
+      console.log('🔨 [BADGE] Signing game fee payment (Channel)...');
+      const payResult = await window.walletAPIInstance.signAndExecuteTransaction(purchaseData.transaction);
+      if (!payResult.success) {
+        return { success: false, error: payResult.error || 'Payment transaction failed' };
+      }
+      paymentDigest = payResult.digest;
+      const confirmed = await pollPaymentConfirmed(paymentDigest);
+      if (!confirmed) {
+        return {
+          success: false,
+          error:
+            'Payment not confirmed in time. If it succeeded on-chain, wait and try mint again (fulfill step only).',
+        };
+      }
+    }
+
+    console.log('🔨 [BADGE] Mint: fulfill step (Shipyard mint tx)...');
+    const fulfillRes = await fetch(`${root}/badges/mint/fulfill`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerAddress: address,
+        ...(paymentDigest ? { paymentDigest } : {}),
+      }),
+    });
+
+    if (!fulfillRes.ok) {
+      const err = await fulfillRes.json().catch(() => ({}));
+      return {
+        success: false,
+        error: err.error || err.message || `HTTP ${fulfillRes.status}`,
+      };
+    }
+
+    const fulfillData = await fulfillRes.json();
+    if (!fulfillData.success || !fulfillData.transaction) {
+      return {
+        success: false,
+        error: fulfillData.error || fulfillData.message || 'Failed to build mint transaction',
+      };
+    }
+
+    console.log('✅ [BADGE] Shipyard mint transaction ready for wallet signature');
+    return { success: true, transaction: fulfillData.transaction };
   } catch (error) {
-    console.error('❌ [BADGE] Error building mint transaction:', error);
+    console.error('❌ [BADGE] Error in mint flow:', error);
     return {
       success: false,
       error: error.message || 'Failed to build mint transaction',
@@ -241,7 +358,7 @@ async function checkPendingUpgrade(playerAddress = null) {
   }
 
   try {
-    const API_BASE_URL = getApiBaseUrl();
+    const API_BASE_URL = getApiBaseUrl('/api/badges/');
     const response = await fetch(`${API_BASE_URL}/badges/${address}/check-upgrade`, {
       method: 'GET',
       headers: {
@@ -271,15 +388,14 @@ async function checkPendingUpgrade(playerAddress = null) {
 }
 
 /**
- * Build upgrade badge transaction (similar to buildMintBadgeTransaction)
- * Follows the same flow as badge minting - backend builds transaction, frontend signs it
- * 
- * @param {string} badgeId - Badge object ID to upgrade
- * @param {number} newTier - New tier number
- * @param {string} sessionId - Session ID for idempotency
- * @returns {Promise<Object>} Transaction object ready for signing
+ * Build upgrade badge transaction: optional game fee (Helm badge_upgrade_fee), then Shipyard upgrade tx.
+ * @param {string} badgeId
+ * @param {number} newTier
+ * @param {string} sessionId
+ * @param {Object} [options]
+ * @param {string} [options.paymentToken] - SUI | MEWS | USDC when upgrade fee is set
  */
-async function buildUpgradeBadgeTransaction(badgeId, newTier, sessionId) {
+async function buildUpgradeBadgeTransaction(badgeId, newTier, sessionId, options = {}) {
   const address = getPlayerAddress();
   if (!address) {
     return {
@@ -288,7 +404,6 @@ async function buildUpgradeBadgeTransaction(badgeId, newTier, sessionId) {
     };
   }
 
-  // Validate wallet API is available
   if (!window.walletAPIInstance) {
     return {
       success: false,
@@ -310,55 +425,87 @@ async function buildUpgradeBadgeTransaction(badgeId, newTier, sessionId) {
     };
   }
 
-  if (!sessionId) {
-    return {
-      success: false,
-      error: 'Session ID is required',
-    };
-  }
+  const paymentToken = (options.paymentToken || 'SUI').toUpperCase();
+  const root = getBadgeBackendRoot();
+  const { prices, pricesTimestamp } = getTokenPricesSnapshot();
 
   try {
-    console.log('🔨 [BADGE] Building upgrade transaction (backend)...');
-    
-    // Call backend to build transaction (like mint does)
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/badges/upgrade`, {
+    console.log('🔨 [BADGE] Upgrade: purchase step (game fee via Channel if configured)...');
+    const purchaseRes = await fetch(`${root}/badges/upgrade/purchase`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         playerAddress: address,
-        badgeId: badgeId,
-        newTier: newTier,
-        sessionId: sessionId,
+        paymentToken,
+        prices,
+        pricesTimestamp,
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    if (!purchaseRes.ok) {
+      const err = await purchaseRes.json().catch(() => ({}));
       return {
         success: false,
-        error: errorData.error || `HTTP ${response.status}`,
+        error: err.error || err.message || `HTTP ${purchaseRes.status}`,
       };
     }
 
-    const data = await response.json();
-
-    if (!data.success || !data.transaction) {
+    const purchaseData = await purchaseRes.json();
+    if (!purchaseData.success) {
       return {
         success: false,
-        error: data.error || 'Failed to build upgrade transaction',
+        error: purchaseData.error || purchaseData.message || 'Upgrade purchase step failed',
       };
     }
 
-    console.log('✅ [BADGE] Upgrade transaction built successfully by backend');
-    
-    // Return base64 transaction string (frontend just signs it, like mint)
-    return {
-      success: true,
-      transaction: data.transaction, // Base64 string
-    };
+    let paymentDigest = null;
+    if (purchaseData.requiresPayment && purchaseData.transaction) {
+      const payResult = await window.walletAPIInstance.signAndExecuteTransaction(purchaseData.transaction);
+      if (!payResult.success) {
+        return { success: false, error: payResult.error || 'Upgrade payment transaction failed' };
+      }
+      paymentDigest = payResult.digest;
+      const confirmed = await pollPaymentConfirmed(paymentDigest);
+      if (!confirmed) {
+        return {
+          success: false,
+          error:
+            'Payment not confirmed in time. If it succeeded on-chain, wait and try upgrade again.',
+        };
+      }
+    }
+
+    console.log('🔨 [BADGE] Upgrade: fulfill step (Shipyard upgrade tx)...');
+    const fulfillRes = await fetch(`${root}/badges/upgrade/fulfill`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerAddress: address,
+        badgeId,
+        newTier,
+        sessionId: sessionId || '',
+        ...(paymentDigest ? { paymentDigest } : {}),
+      }),
+    });
+
+    if (!fulfillRes.ok) {
+      const err = await fulfillRes.json().catch(() => ({}));
+      return {
+        success: false,
+        error: err.error || err.message || `HTTP ${fulfillRes.status}`,
+      };
+    }
+
+    const fulfillData = await fulfillRes.json();
+    if (!fulfillData.success || !fulfillData.transaction) {
+      return {
+        success: false,
+        error: fulfillData.error || fulfillData.message || 'Failed to build upgrade transaction',
+      };
+    }
+
+    console.log('✅ [BADGE] Shipyard upgrade transaction ready for wallet signature');
+    return { success: true, transaction: fulfillData.transaction };
   } catch (error) {
     console.error('❌ [BADGE] Error building upgrade transaction:', error);
     return {
@@ -393,7 +540,7 @@ async function checkAndBuildBadgeUpdate(sessionId) {
   }
 
   try {
-    const API_BASE_URL = getApiBaseUrl();
+    const API_BASE_URL = getApiBaseUrl('/api/badges/');
     const response = await fetch(`${API_BASE_URL}/badges/update`, {
       method: 'POST',
       headers: {
@@ -515,9 +662,7 @@ async function signAndExecuteBadgeTransaction(transaction) {
       
       // Clear cache BEFORE waiting/verifying to ensure fresh data
       console.log('🗑️ [BADGE] Clearing badge cache before verification...');
-      badgeCache.data = null;
-      badgeCache.address = null;
-      badgeCache.timestamp = 0;
+      clearBadgeCache({ address: getPlayerAddress() });
       console.log('✅ [BADGE] Badge cache cleared');
       
       // Wait a moment for the transaction to be indexed, then verify badge was updated
@@ -547,9 +692,7 @@ async function signAndExecuteBadgeTransaction(transaction) {
           }
           
           // Clear cache before each attempt to ensure fresh query
-          badgeCache.data = null;
-          badgeCache.address = null;
-          badgeCache.timestamp = 0;
+          clearBadgeCache({ address: playerAddress });
           
           console.log(`📡 [BADGE] Querying badge from blockchain (attempt ${attempt + 1}/${maxRetries})...`);
           const badgeResponse = await getBadge(playerAddress);
@@ -619,23 +762,6 @@ async function signAndExecuteBadgeTransaction(transaction) {
 }
 
 /**
- * Get discount percentages for a tier
- * @param {number} tier - Badge tier (0-5)
- * @returns {Object} Discount percentages {store: number, gameplay: number}
- */
-function getDiscountsForTier(tier) {
-  const discounts = [
-    { store: 0, gameplay: 0 },    // Standard
-    { store: 5, gameplay: 0 },     // Common
-    { store: 10, gameplay: 5 },    // Uncommon
-    { store: 15, gameplay: 10 },   // Rare
-    { store: 20, gameplay: 15 },   // Epic
-    { store: 25, gameplay: 20 },   // Legendary
-  ];
-  return discounts[tier] || discounts[0];
-}
-
-/**
  * Get tier name
  * @param {number} tier - Badge tier (0-5)
  * @returns {string} Tier name
@@ -655,99 +781,19 @@ function getTierName(tier) {
 /**
  * Clear badge cache
  */
-function clearBadgeCache() {
+function clearBadgeCache(options = {}) {
+  const address = options.address || badgeCache.address;
+  if (address) {
+    try {
+      window?.localStorage?.removeItem(badgeStorageKey(address));
+    } catch {
+      // ignore
+    }
+  }
   badgeCache.data = null;
   badgeCache.address = null;
   badgeCache.timestamp = 0;
-}
-
-/**
- * Build migration transaction for player to sign
- * @param {string} oldBadgeId - Object ID of the old badge (optional - if provided, will attempt to delete it)
- * @param {number} oldTier - Tier from old badge
- * @param {number} oldGamesPlayed - Games played from old badge
- * @param {number} oldMintDate - Original mint date from old badge
- * @param {string} imageUrl - URL to badge image (or null to construct from tier)
- * @param {string} oldPackageId - Package ID of the old badge contract (optional - if provided, will attempt to delete old badge)
- * @returns {Promise<Object>} Transaction data (base64 string)
- */
-/**
- * Migrate badge from old system to new system
- * Creates a new badge preserving old tier, games played, and mint date
- * @param {string} playerAddress - Player's wallet address
- * @param {number} oldTier - Tier from old badge (0-5)
- * @param {number} oldGamesPlayed - Games played from old badge
- * @param {number} oldMintDate - Original mint date from old badge
- * @returns {Promise<{success: boolean, transaction?: string, digest?: string, error?: string}>}
- */
-async function migrateBadge(playerAddress, oldTier, oldGamesPlayed = 0, oldMintDate = 0) {
-  try {
-    // Validate inputs
-    if (!playerAddress || typeof playerAddress !== 'string' || !playerAddress.startsWith('0x')) {
-      return {
-        success: false,
-        error: 'Invalid player address',
-      };
-    }
-
-    if (oldTier === undefined || oldTier === null || typeof oldTier !== 'number' || oldTier < 0 || oldTier > 5) {
-      return {
-        success: false,
-        error: 'Invalid tier. Must be a number between 0 and 5',
-      };
-    }
-
-    // Get API base URL
-    const API_BASE_URL = getApiBaseUrl();
-    
-    // Call backend API to migrate badge
-    // The backend will use migrate_badge() function to preserve old tier, games played, and mint date
-    // NO payment required (free migration)
-    const response = await fetch(`${API_BASE_URL}/badges/migrate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        playerAddress,
-        oldTier,
-        oldGamesPlayed: oldGamesPlayed || 0,
-        oldMintDate: oldMintDate || 0,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      return {
-        success: false,
-        error: errorData.error || `HTTP ${response.status}`,
-      };
-    }
-
-    const data = await response.json();
-    
-    if (!data.success) {
-      return {
-        success: false,
-        error: data.error || 'Failed to migrate badge',
-      };
-    }
-
-    // Return success with transaction (for player to sign) or digest (if already executed)
-    return {
-      success: true,
-      transaction: data.transaction, // Base64 transaction string for player to sign
-      digest: data.digest, // Transaction digest if already executed
-      message: data.message,
-      gasEstimate: data.gasEstimate,
-    };
-  } catch (error) {
-    console.error('❌ [BADGE] Error migrating badge:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to migrate badge',
-    };
-  }
+  badgePuCache = { address: null, data: null, timestamp: 0, ttlMs: badgePuCache.ttlMs };
 }
 
 // Export functions
@@ -761,8 +807,6 @@ if (typeof window !== 'undefined') {
     buildUpgradeBadgeTransaction,
     checkAndBuildBadgeUpdate,
     signAndExecuteBadgeTransaction,
-    migrateBadge,
-    getDiscountsForTier,
     getTierName,
     clearBadgeCache,
   };

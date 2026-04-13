@@ -1,13 +1,11 @@
 import { NextRequest } from 'next/server';
-import { suiService } from '@/lib/sui/suiService';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
+import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
+import { platformGameScoreClient } from '@/lib/services/platform/client/platform-client';
 
 /**
  * POST /api/scores/verify
- * Verify a transaction hash for score submission
- * 
- * Frontend sends transaction hash after user signs and submits score.
- * Backend verifies the transaction exists and succeeded on-chain.
+ * Verify via platform only. Requires PLATFORM_BACKEND_URL, ECOSYSTEM_ID, APP_ID.
  */
 export const POST = withApiHandler(
   async (request: NextRequest) => {
@@ -18,14 +16,12 @@ export const POST = withApiHandler(
       throw new Error('Transaction hash is required');
     }
 
-    // Validate hash format (basic check)
     if (!txHash.startsWith('0x') || txHash.length < 10) {
       throw new Error('Invalid transaction hash format');
     }
 
-    const verification = await suiService.verifyTransaction(txHash);
-
-    return verification;
+    return platformGameScoreClient.verifyByTxHash(txHash);
   }
 );
+
 

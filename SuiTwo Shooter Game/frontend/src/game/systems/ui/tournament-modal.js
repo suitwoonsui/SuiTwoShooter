@@ -125,43 +125,60 @@ async function showTournaments() {
       <button class="tournament-tab" onclick="switchTournamentTab('past')" id="tournamentTabPast">Past</button>
     </div>
     
-    <!-- Active Tournaments Tab Content -->
-    <div class="tournament-tab-content active" id="tournamentTabContentActive">
-      <div class="tournament-loading" id="tournamentLoadingActive">
-        <p>Loading tournaments...</p>
+    <div class="tournament-main-split">
+      <div class="tournament-main-column">
+        <!-- Active Tournaments Tab Content -->
+        <div class="tournament-tab-content active" id="tournamentTabContentActive">
+          <div class="tournament-active-filter" id="tournamentActiveFilter">
+            <button type="button" class="tournament-filter-btn active" data-status="all" aria-pressed="true">All</button>
+            <button type="button" class="tournament-filter-btn" data-status="upcoming" aria-pressed="false">Upcoming</button>
+            <button type="button" class="tournament-filter-btn" data-status="active" aria-pressed="false">Active</button>
+          </div>
+          <div class="tournament-loading" id="tournamentLoadingActive">
+            <p>Loading tournaments...</p>
+          </div>
+          <div class="tournament-list" id="tournamentListActive" style="display: none;">
+            <!-- Tournament cards will be added here -->
+          </div>
+          <div class="tournament-empty" id="tournamentEmptyActive" style="display: none;">
+            <p>No active tournaments at the moment.</p>
+          </div>
+        </div>
+        
+        <!-- My Tournaments Tab Content -->
+        <div class="tournament-tab-content" id="tournamentTabContentMy" style="display: none;">
+          <div class="tournament-loading" id="tournamentLoadingMy">
+            <p>Loading your tournaments...</p>
+          </div>
+          <div class="tournament-list" id="tournamentListMy" style="display: none;">
+            <!-- Tournament cards will be added here -->
+          </div>
+          <div class="tournament-empty" id="tournamentEmptyMy" style="display: none;">
+            <p>You haven't entered any tournaments yet.</p>
+          </div>
+        </div>
+        
+        <!-- Past Tournaments Tab Content -->
+        <div class="tournament-tab-content" id="tournamentTabContentPast" style="display: none;">
+          <div class="tournament-loading" id="tournamentLoadingPast">
+            <p>Loading past tournaments...</p>
+          </div>
+          <div class="tournament-list" id="tournamentListPast" style="display: none;">
+            <!-- Tournament cards will be added here -->
+          </div>
+          <div class="tournament-empty" id="tournamentEmptyPast" style="display: none;">
+            <p>No past tournaments available.</p>
+          </div>
+        </div>
       </div>
-      <div class="tournament-list" id="tournamentListActive" style="display: none;">
-        <!-- Tournament cards will be added here -->
-      </div>
-      <div class="tournament-empty" id="tournamentEmptyActive" style="display: none;">
-        <p>No active tournaments at the moment.</p>
-      </div>
-    </div>
-    
-    <!-- My Tournaments Tab Content -->
-    <div class="tournament-tab-content" id="tournamentTabContentMy" style="display: none;">
-      <div class="tournament-loading" id="tournamentLoadingMy">
-        <p>Loading your tournaments...</p>
-      </div>
-      <div class="tournament-list" id="tournamentListMy" style="display: none;">
-        <!-- Tournament cards will be added here -->
-      </div>
-      <div class="tournament-empty" id="tournamentEmptyMy" style="display: none;">
-        <p>You haven't entered any tournaments yet.</p>
-      </div>
-    </div>
-    
-    <!-- Past Tournaments Tab Content -->
-    <div class="tournament-tab-content" id="tournamentTabContentPast" style="display: none;">
-      <div class="tournament-loading" id="tournamentLoadingPast">
-        <p>Loading past tournaments...</p>
-      </div>
-      <div class="tournament-list" id="tournamentListPast" style="display: none;">
-        <!-- Tournament cards will be added here -->
-      </div>
-      <div class="tournament-empty" id="tournamentEmptyPast" style="display: none;">
-        <p>No past tournaments available.</p>
-      </div>
+      <aside class="tournament-details-aside" aria-label="Tournament details">
+        <div class="tournament-details-sticky">
+          <h3 class="tournament-details-heading">Details</h3>
+          <div id="tournamentDetailsPanel" class="tournament-details-panel-inner">
+            <p class="tournament-details-placeholder">Select a tournament to see details.</p>
+          </div>
+        </div>
+      </aside>
     </div>
     
     <!-- Actions -->
@@ -180,7 +197,23 @@ async function showTournaments() {
   
   tournamentModal.appendChild(tournamentContent);
   viewportContainer.appendChild(tournamentModal);
-  
+
+  // Filter buttons (All / Upcoming / Active) for the Active tab
+  const filterContainer = document.getElementById('tournamentActiveFilter');
+  if (filterContainer) {
+    filterContainer.addEventListener('click', function(e) {
+      const btn = e.target && e.target.closest('.tournament-filter-btn');
+      if (!btn) return;
+      filterContainer.querySelectorAll('.tournament-filter-btn').forEach(function(b) {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+      loadActiveTournaments();
+    });
+  }
+
   // Attach event listener to Create Tournament button as fallback
   const createBtn = document.getElementById('tournamentCreateBtn');
   if (createBtn) {
@@ -193,9 +226,26 @@ async function showTournaments() {
   
   // Update wallet connection UI
   updateTournamentWalletUI();
-  
-  // Load active tournaments
-  await loadActiveTournaments();
+
+  // Optional warm for My tab; merged list is ensured inside loadActiveTournaments (await + dedupe).
+  if (typeof window !== 'undefined' && typeof window.prefetchMyTournamentsIfStale === 'function') {
+    window.prefetchMyTournamentsIfStale();
+  }
+  if (typeof window !== 'undefined' && typeof window.prefetchBadgeIfStale === 'function') {
+    window.prefetchBadgeIfStale();
+  }
+
+  // Load active tournaments (shared menu-panel loading overlay)
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Loading tournaments... Please wait');
+  }
+  try {
+    await loadActiveTournaments();
+  } finally {
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
+    }
+  }
   
   // Restart menu music if background music is enabled (tournament menu should have menu music)
   if (typeof startMenuMusic === 'function' && typeof gameSettings !== 'undefined' && gameSettings.backgroundMusic) {
@@ -206,7 +256,15 @@ async function showTournaments() {
 // Assign to window immediately after function declaration to prevent race conditions
 if (typeof window !== 'undefined') {
   window.showTournaments = showTournaments;
-  
+
+  // Reload tournament lists (same as preload: invalidate cache then load active + my)
+  window.reloadTournamentLists = function reloadTournamentLists() {
+    window.__prefetchedTournaments = null;
+    window.__prefetchedMyTournaments = null;
+    loadActiveTournaments();
+    loadMyTournaments();
+  };
+
   // Handle Create Tournament button click
   window.handleCreateTournamentClick = function() {
     if (typeof showTournamentCreation === 'function') {
@@ -297,24 +355,8 @@ async function loadTournamentTicketCount(walletAddress) {
       }
     }
     
-    // Priority 3: Fallback to direct API call (only if cache is unavailable)
     if (ticketCount === null) {
-      log.debug('TOURNAMENT MODAL', 'Cache unavailable, making direct API call for ticket count');
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${API_BASE_URL}/game-pass/${walletAddress}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load game pass: ${response.status} ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.success && result.ticketCount !== undefined) {
-        ticketCount = result.ticketCount;
-        log.debug('TOURNAMENT MODAL', 'Got ticket count from direct API call', { ticketCount });
-      } else {
-        throw new Error(result.error || 'Failed to get ticket count from API');
-      }
+      throw new Error('Could not get ticket count. Please try again.');
     }
     
     // Update UI with ticket count
@@ -400,6 +442,8 @@ function switchTournamentTab(tabName) {
     }
   });
   
+  clearTournamentDetailsPanel();
+
   // Load data for selected tab
   if (tabName === 'active') {
     loadActiveTournaments();
@@ -422,64 +466,226 @@ function getWalletAddressForTournaments() {
   return null;
 }
 
+function getTournamentsPrefetchTtlMs() {
+  return (typeof window !== 'undefined' && window.TOURNAMENTS_PREFETCH_TTL_MS) ? window.TOURNAMENTS_PREFETCH_TTL_MS : (2 * 60 * 1000);
+}
+
+/**
+ * Use bootstrap/prefetch list only when TTL is valid and wallet matches cache semantics
+ * (anonymous list vs player-enriched list).
+ */
+function canUseTournamentListPrefetch(prefetched, walletAddress) {
+  if (!prefetched || prefetched.success === false || !Array.isArray(prefetched.tournaments)) return false;
+  if (!prefetched.at || (Date.now() - prefetched.at) >= getTournamentsPrefetchTtlMs()) return false;
+  var cur = walletAddress ? String(walletAddress) : '';
+  var prefAddr =
+    prefetched.playerAddress != null && prefetched.playerAddress !== ''
+      ? String(prefetched.playerAddress)
+      : '';
+  if (prefAddr && cur && cur !== prefAddr) return false;
+  if (prefAddr && !cur) return false;
+  // Allow anonymous bootstrap-prefetched lists (prefAddr empty) even when a wallet is connected.
+  // We'll render instantly from this list and then upgrade to player-enriched data in background.
+  return true;
+}
+
+function cloneTournamentsShallow(tournaments) {
+  return (tournaments || []).map(function (t) {
+    return t && typeof t === 'object' ? Object.assign({}, t) : t;
+  });
+}
+
+function getPrefetchedEnteredTournamentIdSet() {
+  try {
+    const pf = typeof window !== 'undefined' ? window.__prefetchedMyTournaments : null;
+    if (!pf || pf.success === false || !Array.isArray(pf.tournaments)) return null;
+    const s = new Set();
+    pf.tournaments.forEach(function (t) {
+      if (!t || typeof t !== 'object') return;
+      const id = t.objectId || t.id;
+      if (typeof id === 'string' && id) s.add(id);
+    });
+    return s;
+  } catch (_) {
+    return null;
+  }
+}
+
+function getCachedTicketCountForTournamentUI(walletAddress) {
+  try {
+    if (window.GamePassDisplay && typeof window.GamePassDisplay.getStatus === 'function') {
+      const st = window.GamePassDisplay.getStatus();
+      if (st && typeof st.tickets === 'number' && Number.isFinite(st.tickets)) return st.tickets;
+    }
+    const pf = window._preloadedGamePassStatus && walletAddress ? window._preloadedGamePassStatus[walletAddress] : null;
+    const t = pf && typeof pf.ticketCount === 'number' ? pf.ticketCount : null;
+    if (t != null && Number.isFinite(t)) return t;
+  } catch (_) {}
+  return null;
+}
+
+function applyTimeDerivedStatus(tournaments, now) {
+  (tournaments || []).forEach(function (t) {
+    if (t && typeof t.startTime === 'number' && typeof t.endTime === 'number') {
+      if (now < t.startTime) t.status = 'upcoming';
+      else if (now <= t.endTime) t.status = 'active';
+      else t.status = 'ended';
+    }
+  });
+}
+
+function filterActiveTabTournaments(tournaments, statusParam, now) {
+  applyTimeDerivedStatus(tournaments, now);
+  return (tournaments || []).filter(function (t) {
+    if (!t) return false;
+    if (t.status === 'ended') return false;
+    if (statusParam === 'upcoming') return t.status === 'upcoming';
+    if (statusParam === 'active') return t.status === 'active';
+    return t.status === 'upcoming' || t.status === 'active';
+  });
+}
+
 /**
  * Load active tournaments
  */
 async function loadActiveTournaments() {
   log.debug('TOURNAMENT MODAL', 'Loading active tournaments');
-  
+
   const loadingEl = document.getElementById('tournamentLoadingActive');
   const listEl = document.getElementById('tournamentListActive');
   const emptyEl = document.getElementById('tournamentEmptyActive');
-  
+
   if (!loadingEl || !listEl || !emptyEl) {
     log.error('TOURNAMENT MODAL', 'Tournament elements not found');
     return;
   }
-  
+
   loadingEl.style.display = 'block';
   listEl.style.display = 'none';
   emptyEl.style.display = 'none';
-  
-  try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-    
-    // Get wallet address if available
-    const walletAddress = getWalletAddressForTournaments();
-    const url = walletAddress 
-      ? `${API_BASE_URL}/tournaments?playerAddress=${encodeURIComponent(walletAddress)}`
-      : `${API_BASE_URL}/tournaments`;
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to load tournaments: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
+
+  var API_BASE_URL = getTournamentApiBaseUrl();
+
+  var filterEl = document.getElementById('tournamentActiveFilter');
+  var activeBtn = filterEl && filterEl.querySelector('.tournament-filter-btn.active');
+  var statusParam = (activeBtn && activeBtn.getAttribute('data-status')) || 'all';
+
+  // Render instantly from warm/bootstrap-prefetched list; upgrade in background.
+  if (typeof window !== 'undefined' && typeof window.prefetchTournamentsIfStale === 'function') {
+    try {
+      void window.prefetchTournamentsIfStale();
+    } catch (_) {}
+  }
+
+  var prefetched = typeof window !== 'undefined' ? window.__prefetchedTournaments : null;
+  var walletAddress = getWalletAddressForTournaments();
+
+  if (canUseTournamentListPrefetch(prefetched, walletAddress)) {
     loadingEl.style.display = 'none';
-    
-    if (!result.success || !result.tournaments || result.tournaments.length === 0) {
+    var ticketCount = (prefetched.playerTicketCount != null) ? prefetched.playerTicketCount : null;
+    if (ticketCount == null && walletAddress) ticketCount = getCachedTicketCountForTournamentUI(walletAddress);
+    if (ticketCount == null) ticketCount = 0;
+    var nowPrefetched = Date.now();
+    var visiblePrefetchedTournaments = filterActiveTabTournaments(cloneTournamentsShallow(prefetched.tournaments), statusParam, nowPrefetched);
+
+    if (!visiblePrefetchedTournaments.length) {
       emptyEl.style.display = 'block';
+      var emptyMsgPf = 'No active tournaments at the moment.';
+      if (statusParam === 'upcoming') emptyMsgPf = 'No upcoming tournaments.';
+      else if (statusParam === 'active') emptyMsgPf = 'No active tournaments right now.';
+      emptyEl.innerHTML = '<p>' + emptyMsgPf + '</p>';
       return;
     }
-    
     listEl.innerHTML = '';
-    result.tournaments.forEach(tournament => {
-      const card = createTournamentCard(tournament, result.playerTicketCount);
+    visiblePrefetchedTournaments.forEach(function (tournament) {
+      // If we have a wallet but only an anonymous tournaments list, synthesize minimal playerData from caches
+      // so the details panel can choose Purchase vs Enter immediately.
+      if (tournament && typeof tournament === 'object' && !tournament.playerData && walletAddress) {
+        const enteredSet = getPrefetchedEnteredTournamentIdSet();
+        const hasEntered = enteredSet ? enteredSet.has(tournament.objectId) : false;
+        const fee = Number(tournament.entryFeeTickets || 0);
+        const hasEnoughTickets = typeof ticketCount === 'number' ? ticketCount >= fee : false;
+        tournament.playerData = { hasEntered, hasEnoughTickets };
+      }
+      var card = createTournamentCard(tournament, ticketCount);
       listEl.appendChild(card);
     });
-    
     listEl.style.display = 'grid';
-    
-    // Update wallet UI after loading tournaments (in case ticket count changed)
+    updateTournamentWalletUI();
+    return;
+  }
+
+  try {
+    var params = new URLSearchParams();
+    if (walletAddress) params.set('playerAddress', walletAddress);
+    if (statusParam && statusParam !== 'all') params.set('status', statusParam);
+    var url = API_BASE_URL + '/tournaments' + (params.toString() ? '?' + params.toString() : '');
+
+    var response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error('Failed to load tournaments: ' + response.status);
+    }
+
+    var result = await response.json();
+
+    loadingEl.style.display = 'none';
+
+    if (!result.success || !result.tournaments || result.tournaments.length === 0) {
+      if (typeof window !== 'undefined' && result.success && (!statusParam || statusParam === 'all')) {
+        window.__prefetchedTournaments = {
+          success: true,
+          tournaments: [],
+          at: Date.now(),
+          playerAddress: walletAddress || null,
+          playerTicketCount: result.playerTicketCount,
+        };
+      }
+      emptyEl.style.display = 'block';
+      var emptyMsg = 'No active tournaments at the moment.';
+      if (statusParam === 'upcoming') emptyMsg = 'No upcoming tournaments.';
+      else if (statusParam === 'active') emptyMsg = 'No active tournaments right now.';
+      emptyEl.innerHTML = '<p>' + emptyMsg + '</p>';
+      return;
+    }
+
+    // Only cache merged list (no status= query); subset responses would break All / filter-from-cache.
+    if (typeof window !== 'undefined' && (!statusParam || statusParam === 'all')) {
+      window.__prefetchedTournaments = {
+        success: true,
+        tournaments: result.tournaments,
+        at: Date.now(),
+        playerAddress: walletAddress || null,
+        playerTicketCount: result.playerTicketCount,
+      };
+    }
+
+    var now = Date.now();
+    var visibleTournaments = filterActiveTabTournaments(cloneTournamentsShallow(result.tournaments), statusParam, now);
+
+    if (!visibleTournaments.length) {
+      emptyEl.style.display = 'block';
+      var emptyMsg2 = 'No active tournaments at the moment.';
+      if (statusParam === 'upcoming') emptyMsg2 = 'No upcoming tournaments.';
+      else if (statusParam === 'active') emptyMsg2 = 'No active tournaments right now.';
+      emptyEl.innerHTML = '<p>' + emptyMsg2 + '</p>';
+      return;
+    }
+
+    listEl.innerHTML = '';
+    visibleTournaments.forEach(function (tournament) {
+      var card = createTournamentCard(tournament, result.playerTicketCount);
+      listEl.appendChild(card);
+    });
+
+    listEl.style.display = 'grid';
+
     updateTournamentWalletUI();
   } catch (error) {
     log.error('TOURNAMENT MODAL', 'Error loading tournaments', error);
     loadingEl.style.display = 'none';
     emptyEl.style.display = 'block';
-    emptyEl.innerHTML = `<p>Error loading tournaments: ${error.message}</p>`;
+    emptyEl.innerHTML = '<p>Error loading tournaments: ' + error.message + '</p>';
   }
 }
 
@@ -488,62 +694,112 @@ async function loadActiveTournaments() {
  */
 async function loadMyTournaments() {
   log.debug('TOURNAMENT MODAL', 'Loading my tournaments');
-  
+
   const loadingEl = document.getElementById('tournamentLoadingMy');
   const listEl = document.getElementById('tournamentListMy');
   const emptyEl = document.getElementById('tournamentEmptyMy');
-  
+
   if (!loadingEl || !listEl || !emptyEl) {
     return;
   }
-  
+
   loadingEl.style.display = 'block';
   listEl.style.display = 'none';
   emptyEl.style.display = 'none';
-  
-  // Get wallet address
-  let walletAddress = null;
-  if (typeof getWalletAddress === 'function') {
-    walletAddress = getWalletAddress();
-  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
-    walletAddress = window.walletAPIInstance.getAddress();
-  }
-  
+
+  var walletAddress = (typeof getWalletAddress === 'function' && getWalletAddress()) ||
+    (window.walletAPIInstance && window.walletAPIInstance.isConnected() && window.walletAPIInstance.getAddress());
+
   if (!walletAddress) {
     loadingEl.style.display = 'none';
     emptyEl.style.display = 'block';
     emptyEl.innerHTML = '<p>Please connect your wallet to view your tournaments.</p>';
     return;
   }
-  
-  try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-    const url = `${API_BASE_URL}/tournaments/my-tournaments?playerAddress=${encodeURIComponent(walletAddress)}`;
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to load my tournaments: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
+
+  var API_BASE_URL = getTournamentApiBaseUrl();
+
+  if (typeof window !== 'undefined' && typeof window.prefetchMyTournamentsIfStale === 'function') {
+    try {
+      await window.prefetchMyTournamentsIfStale();
+    } catch (_) {}
+  }
+
+  var ttl = getTournamentsPrefetchTtlMs();
+  var prefetched = typeof window !== 'undefined' ? window.__prefetchedMyTournaments : null;
+  var usePrefetched =
+    prefetched &&
+    prefetched.success !== false &&
+    prefetched.address === walletAddress &&
+    prefetched.at &&
+    Date.now() - prefetched.at < ttl;
+
+  if (usePrefetched) {
     loadingEl.style.display = 'none';
-    
-    if (!result.success || !result.tournaments || result.tournaments.length === 0) {
+    var ticketCount = (prefetched.playerTicketCount != null) ? prefetched.playerTicketCount : 0;
+    if (!prefetched.tournaments || !prefetched.tournaments.length) {
       emptyEl.style.display = 'block';
+      emptyEl.innerHTML = '<p>You haven\'t entered any tournaments yet.</p>';
+      updateTournamentWalletUI();
       return;
     }
-    
     listEl.innerHTML = '';
-    result.tournaments.forEach(tournament => {
-      const card = createTournamentCard(tournament, result.playerTicketCount);
+    prefetched.tournaments.forEach(function (tournament) {
+      var card = createTournamentCard(tournament, ticketCount);
       listEl.appendChild(card);
     });
-    
     listEl.style.display = 'grid';
-    
-    // Update wallet UI after loading tournaments (in case ticket count changed)
+    updateTournamentWalletUI();
+    return;
+  }
+
+  try {
+    var url = API_BASE_URL + '/tournaments/my-tournaments?playerAddress=' + encodeURIComponent(walletAddress);
+
+    var response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error('Failed to load my tournaments: ' + response.status);
+    }
+
+    var result = await response.json();
+
+    loadingEl.style.display = 'none';
+
+    if (!result.success || !result.tournaments || result.tournaments.length === 0) {
+      if (typeof window !== 'undefined') {
+        window.__prefetchedMyTournaments = {
+          success: true,
+          tournaments: [],
+          address: walletAddress,
+          at: Date.now(),
+          playerTicketCount: result.playerTicketCount != null ? result.playerTicketCount : 0,
+        };
+      }
+      emptyEl.style.display = 'block';
+      emptyEl.innerHTML = '<p>You haven\'t entered any tournaments yet.</p>';
+      updateTournamentWalletUI();
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      window.__prefetchedMyTournaments = {
+        success: true,
+        tournaments: result.tournaments,
+        address: walletAddress,
+        at: Date.now(),
+        playerTicketCount: result.playerTicketCount,
+      };
+    }
+
+    listEl.innerHTML = '';
+    result.tournaments.forEach(function (tournament) {
+      var card = createTournamentCard(tournament, result.playerTicketCount);
+      listEl.appendChild(card);
+    });
+
+    listEl.style.display = 'grid';
+
     updateTournamentWalletUI();
   } catch (error) {
     log.error('TOURNAMENT MODAL', 'Error loading my tournaments', error);
@@ -572,32 +828,76 @@ async function loadPastTournaments() {
   emptyEl.style.display = 'none';
   
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
     
     // Get wallet address if available (optional for past tournaments)
     const walletAddress = getWalletAddressForTournaments();
-    const url = walletAddress 
+    const pastUrl = walletAddress 
       ? `${API_BASE_URL}/tournaments/past?playerAddress=${encodeURIComponent(walletAddress)}`
       : `${API_BASE_URL}/tournaments/past`;
     
-    const response = await fetch(url);
+    // Also fetch the unified tournaments list so we can treat
+    // time-ended tournaments as past even if Station hasn't moved them yet.
+    const activeUrl = `${API_BASE_URL}/tournaments`;
     
-    if (!response.ok) {
-      throw new Error(`Failed to load past tournaments: ${response.status}`);
+    const [pastResponse, activeResponse] = await Promise.all([
+      fetch(pastUrl),
+      fetch(activeUrl).catch(() => null),
+    ]);
+    
+    if (!pastResponse.ok) {
+      throw new Error(`Failed to load past tournaments: ${pastResponse.status}`);
     }
     
-    const result = await response.json();
+    const pastResult = await pastResponse.json();
+    const activeResult = activeResponse && activeResponse.ok ? await activeResponse.json() : null;
     
     loadingEl.style.display = 'none';
     
-    if (!result.success || !result.tournaments || result.tournaments.length === 0) {
+    const endedMap = new Map();
+    const now = Date.now();
+    
+    // 1) Tournaments explicitly returned by /tournaments/past (platform past table)
+    if (pastResult.success && Array.isArray(pastResult.tournaments)) {
+      pastResult.tournaments.forEach(function (t) {
+        if (t && t.objectId) {
+          // Ensure status is ended
+          t.status = 'ended';
+          endedMap.set(t.objectId, t);
+        }
+      });
+    }
+    
+    // 2) Tournaments from /tournaments whose time window has ended
+    if (activeResult && activeResult.success && Array.isArray(activeResult.tournaments)) {
+      activeResult.tournaments.forEach(function (t) {
+        if (!t || !t.objectId || typeof t.startTime !== 'number' || typeof t.endTime !== 'number') return;
+        var status;
+        if (now < t.startTime) status = 'upcoming';
+        else if (now <= t.endTime) status = 'active';
+        else status = 'ended';
+        if (status === 'ended' && !endedMap.has(t.objectId)) {
+          t.status = 'ended';
+          endedMap.set(t.objectId, t);
+        }
+      });
+    }
+    
+    const endedTournaments = Array.from(endedMap.values()).sort(function (a, b) {
+      return (b.endTime || 0) - (a.endTime || 0);
+    });
+    
+    if (!endedTournaments.length) {
       emptyEl.style.display = 'block';
+      if (walletAddress && window.PlayerInventoryCache?.refreshAfterRewardBackground) {
+        window.PlayerInventoryCache.refreshAfterRewardBackground(walletAddress);
+      }
       return;
     }
     
     listEl.innerHTML = '';
-    result.tournaments.forEach(tournament => {
-      const card = createTournamentCard(tournament, result.playerTicketCount);
+    endedTournaments.forEach(function (tournament) {
+      const card = createTournamentCard(tournament, pastResult.playerTicketCount);
       listEl.appendChild(card);
     });
     
@@ -606,6 +906,9 @@ async function loadPastTournaments() {
     // Update wallet UI after loading tournaments (in case ticket count changed)
     if (walletAddress) {
       updateTournamentWalletUI();
+      if (window.PlayerInventoryCache?.refreshAfterRewardBackground) {
+        window.PlayerInventoryCache.refreshAfterRewardBackground(walletAddress);
+      }
     }
   } catch (error) {
     log.error('TOURNAMENT MODAL', 'Error loading past tournaments', error);
@@ -673,90 +976,62 @@ function formatTimeRemaining(tournament) {
   }
 }
 
-/**
- * Create tournament card element
- */
-function createTournamentCard(tournament, playerTicketCount = null) {
-  const category = TOURNAMENT_CATEGORIES[tournament.category] || TOURNAMENT_CATEGORIES.highestScore;
-  const prizePoolUSD = (tournament.prizePoolUSDCents / 100).toFixed(2);
-  const timeInfo = formatTimeRemaining(tournament);
-  const playerData = tournament.playerData || null;
-  
-  // Map item IDs to user-friendly names
-  const itemNameMap = {
-    'orbLevel': 'Orb Level',
-    'forceField': 'Force Field',
-    'extraLives': 'Extra Lives',
-    'slowTime': 'Slow Time',
-    'coinTractorBeam': 'Coin Tractor',
-    'destroyAll': 'Destroy All',
-    'bossKillShot': 'Boss Kill Shot',
-    'random': 'Random L1 Item', // Resolved at distribution time
+var TOURNAMENT_ITEM_NAME_MAP = {
+  orb_level: 'Orb Level',
+  force_field: 'Force Field',
+  extra_lives: 'Extra Lives',
+  slow_time: 'Slow Time',
+  coin_tractor_beam: 'Coin Tractor',
+  destroy_all: 'Destroy All',
+  boss_kill_shot: 'Boss Kill Shot',
+  random: 'Random L1 Item',
+};
+
+function getDefaultRewardConfigForTournamentDisplay() {
+  const itemRewards = {
+    1: [
+      { itemId: 'destroy_all', level: 1, quantity: 1 },
+      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
+      { itemId: 'random', level: 1, quantity: 1 },
+    ],
+    2: [
+      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
+      { itemId: 'random', level: 1, quantity: 1 },
+    ],
+    3: [
+      { itemId: 'destroy_all', level: 1, quantity: 1 },
+      { itemId: 'random', level: 1, quantity: 1 },
+    ],
+    4: [{ itemId: 'random', level: 1, quantity: 1 }],
+    5: [{ itemId: 'random', level: 1, quantity: 1 }],
+    6: [{ itemId: 'random', level: 1, quantity: 1 }],
+    7: [{ itemId: 'random', level: 1, quantity: 1 }],
+    8: [{ itemId: 'random', level: 1, quantity: 1 }],
+    9: [{ itemId: 'random', level: 1, quantity: 1 }],
+    10: [{ itemId: 'random', level: 1, quantity: 1 }],
   };
-  
-  /**
-   * Get items that have 3 levels (exclude special items)
-   */
-  function getRandomizableItems() {
-    // Items with 3 levels: orbLevel, forceField, extraLives, slowTime, coinTractorBeam
-    return ['orbLevel', 'forceField', 'extraLives', 'slowTime', 'coinTractorBeam'];
+  return {
+    rewardDepth: 10,
+    poolDepth: 3,
+    poolDistribution: [50, 30, 20],
+    itemRewards,
+  };
+}
+
+function getItemDisplayNameForTournamentReward(itemId) {
+  return TOURNAMENT_ITEM_NAME_MAP[itemId] || itemId;
+}
+
+function renderTournamentRewardsSectionHTML(tournament) {
+  let rewardConfig = tournament.rewardConfig;
+  const isDefault = !rewardConfig || !rewardConfig.itemRewards || Object.keys(rewardConfig.itemRewards).length === 0;
+  if (isDefault) {
+    rewardConfig = getDefaultRewardConfigForTournamentDisplay();
   }
-
-  /**
-   * Generate default reward config for display purposes
-   * Based on the default reward system: ranks 1-10 get items, top 3 also get tokens
-   */
-  function getDefaultRewardConfig() {
-    // Use the documented default reward structure
-    // "random" is resolved at distribution time, not at display time
-    const itemRewards = {
-      1: [
-        { itemId: 'destroyAll', level: 1, quantity: 1 },
-        { itemId: 'bossKillShot', level: 1, quantity: 1 },
-        { itemId: 'random', level: 1, quantity: 1 },
-      ],
-      2: [
-        { itemId: 'bossKillShot', level: 1, quantity: 1 },
-        { itemId: 'random', level: 1, quantity: 1 },
-      ],
-      3: [
-        { itemId: 'destroyAll', level: 1, quantity: 1 },
-        { itemId: 'random', level: 1, quantity: 1 },
-      ],
-      4: [{ itemId: 'random', level: 1, quantity: 1 }],
-      5: [{ itemId: 'random', level: 1, quantity: 1 }],
-      6: [{ itemId: 'random', level: 1, quantity: 1 }],
-      7: [{ itemId: 'random', level: 1, quantity: 1 }],
-      8: [{ itemId: 'random', level: 1, quantity: 1 }],
-      9: [{ itemId: 'random', level: 1, quantity: 1 }],
-      10: [{ itemId: 'random', level: 1, quantity: 1 }],
-    };
-    
-    return {
-      rewardDepth: 10,
-      poolDepth: 3,
-      poolDistribution: [50, 30, 20],
-      itemRewards
-    };
+  if (!rewardConfig || !rewardConfig.itemRewards || Object.keys(rewardConfig.itemRewards).length === 0) {
+    return '';
   }
-
-  /**
-   * Render tournament rewards section (handles both default and custom rewards)
-   */
-  function renderTournamentRewards(tournament) {
-    // Get reward config (custom or default)
-    let rewardConfig = tournament.rewardConfig;
-    const isDefault = !rewardConfig || !rewardConfig.itemRewards || Object.keys(rewardConfig.itemRewards).length === 0;
-    
-    if (isDefault) {
-      rewardConfig = getDefaultRewardConfig();
-    }
-    
-    if (!rewardConfig || !rewardConfig.itemRewards || Object.keys(rewardConfig.itemRewards).length === 0) {
-      return '';
-    }
-
-    return `
+  return `
       <div class="tournament-rewards-section">
         <div class="tournament-rewards-header">
           <span class="tournament-rewards-label">🎁 Rewards</span>
@@ -769,9 +1044,9 @@ function createTournamentCard(tournament, playerTicketCount = null) {
               <div class="tournament-reward-row">
                 <span class="tournament-reward-rank-label">#${rank}</span>
                 <div class="tournament-reward-items">
-                  ${Array.isArray(items) ? items.map((item, idx) => `
-                    <span class="tournament-reward-item" title="${getItemDisplayName(item.itemId)} Level ${item.level} x${item.quantity}">
-                      <span class="tournament-reward-item-name">${getItemDisplayName(item.itemId)}</span>
+                  ${Array.isArray(items) ? items.map((item) => `
+                    <span class="tournament-reward-item" title="${getItemDisplayNameForTournamentReward(item.itemId)} Level ${item.level} x${item.quantity}">
+                      <span class="tournament-reward-item-name">${getItemDisplayNameForTournamentReward(item.itemId)}</span>
                       ${item.level ? `<span class="tournament-reward-item-level">Lv${item.level}</span>` : ''}
                       ${item.quantity > 1 ? `<span class="tournament-reward-item-quantity">×${item.quantity}</span>` : ''}
                     </span>
@@ -790,29 +1065,289 @@ function createTournamentCard(tournament, playerTicketCount = null) {
         ` : ''}
       </div>
     `;
+}
+
+function formatScoreForTournamentCategory(value, category) {
+  if (!value || value === 0) return '0';
+  switch (category) {
+    case 'totalCoins':
+    case 'highestScore':
+    case 'longestDistance':
+    case 'mostBosses':
+    case 'mostEnemies':
+      return value.toLocaleString();
+    case 'longestStreak':
+      return value.toString();
+    default:
+      return value.toLocaleString();
+  }
+}
+
+/**
+ * Markup for the details column (≈1/3) when a tournament card is selected.
+ */
+function buildTournamentDetailsPanelHTML(tournament, playerTicketCount = null) {
+  const category = TOURNAMENT_CATEGORIES[tournament.category] || TOURNAMENT_CATEGORIES.highestScore;
+  const prizePoolUSD = (tournament.prizePoolUSDCents / 100).toFixed(2);
+  const timeInfo = formatTimeRemaining(tournament);
+  const playerData = tournament.playerData || null;
+  const walletAddress = getWalletAddressForTournaments();
+  const enteredSet = walletAddress ? getPrefetchedEnteredTournamentIdSet() : null;
+  const hasEnteredDerived =
+    playerData && typeof playerData.hasEntered === 'boolean'
+      ? playerData.hasEntered
+      : (enteredSet ? enteredSet.has(tournament.objectId) : false);
+  const ticketCountForCalc =
+    typeof playerTicketCount === 'number' && Number.isFinite(playerTicketCount)
+      ? playerTicketCount
+      : (walletAddress ? getCachedTicketCountForTournamentUI(walletAddress) : null);
+  const hasEnoughTicketsDerived =
+    playerData && typeof playerData.hasEnoughTickets === 'boolean'
+      ? playerData.hasEnoughTickets
+      : (typeof ticketCountForCalc === 'number'
+          ? ticketCountForCalc >= Number(tournament.entryFeeTickets || 0)
+          : null);
+
+  return `
+    <div class="tournament-details-card">
+      <div class="tournament-card-header">
+        <div class="tournament-card-title">
+          <h3>${category.icon} ${tournament.name}</h3>
+          <span class="tournament-id">#${tournament.tournamentId}</span>
+        </div>
+        <span class="tournament-status tournament-status-${tournament.status}">${tournament.status.charAt(0).toUpperCase() + tournament.status.slice(1)}</span>
+      </div>
+      <div class="tournament-card-body">
+        <div class="tournament-info">
+          <div class="tournament-info-row">
+            <div class="tournament-info-item">
+              <span class="tournament-info-label">Category:</span>
+              <span class="tournament-info-value">${category.icon} ${category.name}</span>
+            </div>
+            <div class="tournament-info-item">
+              <span class="tournament-info-label">Entry Fee:</span>
+              <span class="tournament-info-value">${tournament.entryFeeTickets} ticket${tournament.entryFeeTickets !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+          <div class="tournament-info-row">
+            <div class="tournament-info-item">
+              <span class="tournament-info-label">Prize Pool:</span>
+              <span class="tournament-info-value prize-pool">$${prizePoolUSD}</span>
+            </div>
+            <div class="tournament-info-item">
+              <span class="tournament-info-label">Participants:</span>
+              <span class="tournament-info-value">${tournament.participants}</span>
+            </div>
+          </div>
+          ${playerData ? `
+            <div class="tournament-player-info">
+              <div class="tournament-player-header">
+                <span class="tournament-player-label">👤 Your Status</span>
+              </div>
+              <div class="tournament-player-row">
+                <div class="tournament-player-item">
+                  <span class="tournament-player-label-small">Tickets:</span>
+                  <span class="tournament-player-value ${playerData.hasEnoughTickets ? 'tournament-player-value-success' : 'tournament-player-value-warning'}">
+                    ${playerTicketCount !== null ? playerTicketCount : '?'} / ${tournament.entryFeeTickets}
+                  </span>
+                </div>
+                ${playerData.hasEntered ? `
+                  <div class="tournament-player-item">
+                    <span class="tournament-player-label-small">Rank:</span>
+                    <span class="tournament-player-value tournament-player-value-rank">
+                      ${playerData.rank ? `#${playerData.rank}` : 'Unranked'} / ${playerData.totalParticipants}
+                    </span>
+                  </div>
+                  <div class="tournament-player-item">
+                    <span class="tournament-player-label-small">Score:</span>
+                    <span class="tournament-player-value tournament-player-value-score">
+                      ${formatScoreForTournamentCategory(playerData.score, tournament.category)}
+                    </span>
+                  </div>
+                ` : `
+                  <div class="tournament-player-item">
+                    <span class="tournament-player-label-small">Status:</span>
+                    <span class="tournament-player-value tournament-player-value-not-entered">Not Entered</span>
+                  </div>
+                `}
+              </div>
+            </div>
+          ` : ''}
+          <div class="tournament-time-info">
+            <div class="tournament-time-item">
+              <span class="tournament-time-label">Starts:</span>
+              <span class="tournament-time-value">${formatDateTime(tournament.startTime)}</span>
+            </div>
+            <div class="tournament-time-item">
+              <span class="tournament-time-label">${tournament.status === 'upcoming' ? 'Ends:' : tournament.status === 'active' ? 'Ends:' : 'Ended:'}</span>
+              <span class="tournament-time-value">${formatDateTime(tournament.endTime)}</span>
+            </div>
+            ${timeInfo ? `
+              <div class="tournament-time-remaining">
+                <span class="tournament-time-remaining-label">${tournament.status === 'upcoming' ? '⏰' : tournament.status === 'active' ? '⏳' : ''}</span>
+                <span class="tournament-time-remaining-value">${timeInfo}</span>
+              </div>
+            ` : ''}
+          </div>
+          ${renderTournamentRewardsSectionHTML(tournament)}
+        </div>
+        <div class="tournament-actions-card">
+          <button type="button" class="menu-btn" onclick="viewTournamentLeaderboard('${tournament.objectId}')">
+            <span class="btn-icon">🏆</span> View Leaderboard
+          </button>
+          ${tournament.status === 'active' ? `
+            ${hasEnoughTicketsDerived === false ? `
+              <button type="button" class="menu-btn primary" onclick="openTicketShop()" title="Purchase tournament tickets">
+                <span class="btn-icon">🛒</span> Purchase Ticket
+              </button>
+            ` : `
+              <div class="tournament-action-buttons">
+                <button type="button" class="menu-btn primary"
+                        onclick="prepareTournamentThenOpenStore('${tournament.objectId}')"
+                        title="Opens the gold tournament loadout (inventory, items, bundles). Tap Start game there to play; or use main menu Start Game if you returned to the menu first.">
+                  <span class="btn-icon">🎫</span> ${hasEnteredDerived ? 'Play Again' : 'Enter Tournament'}
+                </button>
+                <button type="button" class="menu-btn secondary tournament-test-btn"
+                        onclick="startTournamentGameTest('${tournament.objectId}')"
+                        title="Start tournament game in test mode (bypasses balance requirement)">
+                  <span class="btn-icon">🧪</span> Test
+                </button>
+              </div>
+            `}
+          ` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function clearTournamentDetailsPanel() {
+  const panel = document.getElementById('tournamentDetailsPanel');
+  if (!panel) return;
+  panel.innerHTML = '<p class="tournament-details-placeholder">Select a tournament to see details.</p>';
+  document.querySelectorAll('.tournament-card.tournament-card-details-selected').forEach(function (c) {
+    c.classList.remove('tournament-card-details-selected');
+  });
+}
+
+function showTournamentDetailsInPanel(tournament, playerTicketCount, cardElement) {
+  const panel = document.getElementById('tournamentDetailsPanel');
+  if (!panel) return;
+  panel.innerHTML = buildTournamentDetailsPanelHTML(tournament, playerTicketCount);
+  try {
+    if (typeof window !== 'undefined') {
+      window.__selectedTournamentObjectId = tournament && tournament.objectId ? String(tournament.objectId) : null;
+    }
+  } catch (_) {}
+  document.querySelectorAll('.tournament-card.tournament-card-details-selected').forEach(function (c) {
+    c.classList.remove('tournament-card-details-selected');
+  });
+  if (cardElement) {
+    cardElement.classList.add('tournament-card-details-selected');
   }
 
-  function getItemDisplayName(itemId) {
-    return itemNameMap[itemId] || itemId;
-  }
-  
-  // Format score based on category
-  function formatScore(value, category) {
-    if (!value || value === 0) return '0';
-    switch (category) {
-      case 'totalCoins':
-      case 'highestScore':
-      case 'longestDistance':
-      case 'mostBosses':
-      case 'mostEnemies':
-        return value.toLocaleString();
-      case 'longestStreak':
-        return value.toString();
-      default:
-        return value.toLocaleString();
+  // Background refresh per-player entry state (short TTL + SWR) so button state stays correct after use.
+  try {
+    const walletAddress = getWalletAddressForTournaments();
+    if (walletAddress && tournament && tournament.objectId && window.apiRequestCache?.get) {
+      void refreshTournamentEntryStateSWR(String(tournament.objectId), String(walletAddress), playerTicketCount);
     }
-  }
-  
+  } catch (_) {}
+}
+
+function getTournamentApiBaseUrl() {
+  return window.GameApi ? window.GameApi.getBaseUrl() : ((window.GAME_CONFIG && (window.GAME_CONFIG.GAME_BACKEND_URL || window.GAME_CONFIG.API_BASE_URL)) || 'http://localhost:3001/api');
+}
+
+function tournamentEntryCacheKey(tournamentObjectId, playerAddress) {
+  return `tournamentEntry:${playerAddress}:${tournamentObjectId}`;
+}
+
+function applyEntryStateToTournament(tournament, entryState, playerTicketCountOverride) {
+  if (!tournament || typeof tournament !== 'object' || !entryState || typeof entryState !== 'object') return tournament;
+  const ticketCount =
+    typeof playerTicketCountOverride === 'number' && Number.isFinite(playerTicketCountOverride)
+      ? playerTicketCountOverride
+      : (typeof entryState.ticketCount === 'number' ? entryState.ticketCount : null);
+  const merged = Object.assign({}, tournament);
+  merged.playerData = Object.assign({}, merged.playerData || {}, {
+    hasEntered: !!entryState.hasEntered,
+    rank: entryState.rank ?? null,
+    score: entryState.score ?? 0,
+    totalParticipants: entryState.totalParticipants ?? merged.participants,
+    ticketCount: ticketCount != null ? ticketCount : (merged.playerData ? merged.playerData.ticketCount : undefined),
+    hasEnoughTickets: typeof entryState.hasEnoughTickets === 'boolean'
+      ? entryState.hasEnoughTickets
+      : (ticketCount != null ? ticketCount >= Number(merged.entryFeeTickets || 0) : (merged.playerData ? merged.playerData.hasEnoughTickets : false)),
+  });
+  return merged;
+}
+
+async function refreshTournamentEntryStateSWR(tournamentObjectId, playerAddress, playerTicketCountHint) {
+  const API_BASE_URL = getTournamentApiBaseUrl();
+  const key = tournamentEntryCacheKey(tournamentObjectId, playerAddress);
+
+  const fetcher = async () => {
+    const url = `${API_BASE_URL}/tournaments/entry-state?playerAddress=${encodeURIComponent(playerAddress)}&tournamentObjectId=${encodeURIComponent(tournamentObjectId)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to load tournament entry state: ${res.status}`);
+    const json = await res.json();
+    if (!json || json.success === false) throw new Error(json?.error || 'Failed to load tournament entry state');
+    return json;
+  };
+
+  const data = await window.apiRequestCache.get(key, fetcher, {
+    ttl: 15000,
+    walletAddress: playerAddress,
+    staleWhileRevalidate: true,
+  });
+
+  const entryState = data && data.entryState ? data.entryState : null;
+  if (!entryState) return;
+
+  // Patch prefetched list objects in-place so future renders pick up the corrected playerData.
+  try {
+    const pf = window.__prefetchedTournaments;
+    if (pf && Array.isArray(pf.tournaments)) {
+      pf.tournaments = pf.tournaments.map(function (t) {
+        if (!t || t.objectId !== tournamentObjectId) return t;
+        return applyEntryStateToTournament(t, entryState, playerTicketCountHint);
+      });
+    }
+    const my = window.__prefetchedMyTournaments;
+    if (my && Array.isArray(my.tournaments)) {
+      my.tournaments = my.tournaments.map(function (t) {
+        if (!t || t.objectId !== tournamentObjectId) return t;
+        return applyEntryStateToTournament(t, entryState, playerTicketCountHint);
+      });
+    }
+  } catch (_) {}
+
+  // If this tournament is currently selected in the details panel, re-render it.
+  try {
+    if (String(window.__selectedTournamentObjectId || '') === String(tournamentObjectId)) {
+      const panel = document.getElementById('tournamentDetailsPanel');
+      if (!panel) return;
+      // Find latest tournament object from prefetched cache (preferred), fallback to existing selected payload.
+      let latest = null;
+      const pf = window.__prefetchedTournaments;
+      if (pf && Array.isArray(pf.tournaments)) {
+        latest = pf.tournaments.find(function (t) { return t && t.objectId === tournamentObjectId; }) || null;
+      }
+      if (!latest) latest = { objectId: tournamentObjectId, playerData: entryState };
+      panel.innerHTML = buildTournamentDetailsPanelHTML(latest, playerTicketCountHint);
+    }
+  } catch (_) {}
+}
+
+/**
+ * Create tournament card element
+ */
+function createTournamentCard(tournament, playerTicketCount = null) {
+  const category = TOURNAMENT_CATEGORIES[tournament.category] || TOURNAMENT_CATEGORIES.highestScore;
+  const prizePoolUSD = (tournament.prizePoolUSDCents / 100).toFixed(2);
+  const playerData = tournament.playerData || null;
+
   const card = document.createElement('div');
   card.className = 'tournament-card tournament-card-condensed';
   card.setAttribute('data-tournament-id', tournament.objectId);
@@ -834,136 +1369,20 @@ function createTournamentCard(tournament, playerTicketCount = null) {
           ` : ''}
         </div>
       </div>
-      <div class="tournament-card-expand-hint">Click to expand</div>
-    </div>
-    <div class="tournament-card-expanded-view" style="display: none;">
-      <div class="tournament-card-expand-controls">
-        <button class="tournament-card-shrink-btn" onclick="shrinkTournamentCard('${tournament.objectId}')" title="Shrink card">
-          <span>−</span>
-        </button>
-      </div>
-      <div class="tournament-card-header">
-        <div class="tournament-card-title">
-          <h3>${category.icon} ${tournament.name}</h3>
-          <span class="tournament-id">#${tournament.tournamentId}</span>
-        </div>
-        <span class="tournament-status tournament-status-${tournament.status}">${tournament.status.charAt(0).toUpperCase() + tournament.status.slice(1)}</span>
-      </div>
-      <div class="tournament-card-body">
-      <div class="tournament-info">
-        <div class="tournament-info-row">
-          <div class="tournament-info-item">
-            <span class="tournament-info-label">Category:</span>
-            <span class="tournament-info-value">${category.icon} ${category.name}</span>
-          </div>
-          <div class="tournament-info-item">
-            <span class="tournament-info-label">Entry Fee:</span>
-            <span class="tournament-info-value">${tournament.entryFeeTickets} ticket${tournament.entryFeeTickets !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-        <div class="tournament-info-row">
-          <div class="tournament-info-item">
-            <span class="tournament-info-label">Prize Pool:</span>
-            <span class="tournament-info-value prize-pool">$${prizePoolUSD}</span>
-          </div>
-          <div class="tournament-info-item">
-            <span class="tournament-info-label">Participants:</span>
-            <span class="tournament-info-value">${tournament.participants}</span>
-          </div>
-        </div>
-        ${playerData ? `
-          <div class="tournament-player-info">
-            <div class="tournament-player-header">
-              <span class="tournament-player-label">👤 Your Status</span>
-            </div>
-            <div class="tournament-player-row">
-              <div class="tournament-player-item">
-                <span class="tournament-player-label-small">Tickets:</span>
-                <span class="tournament-player-value ${playerData.hasEnoughTickets ? 'tournament-player-value-success' : 'tournament-player-value-warning'}">
-                  ${playerTicketCount !== null ? playerTicketCount : '?'} / ${tournament.entryFeeTickets}
-                </span>
-              </div>
-              ${playerData.hasEntered ? `
-                <div class="tournament-player-item">
-                  <span class="tournament-player-label-small">Rank:</span>
-                  <span class="tournament-player-value tournament-player-value-rank">
-                    ${playerData.rank ? `#${playerData.rank}` : 'Unranked'} / ${playerData.totalParticipants}
-                  </span>
-                </div>
-                <div class="tournament-player-item">
-                  <span class="tournament-player-label-small">Score:</span>
-                  <span class="tournament-player-value tournament-player-value-score">
-                    ${formatScore(playerData.score, tournament.category)}
-                  </span>
-                </div>
-              ` : `
-                <div class="tournament-player-item">
-                  <span class="tournament-player-label-small">Status:</span>
-                  <span class="tournament-player-value tournament-player-value-not-entered">Not Entered</span>
-                </div>
-              `}
-            </div>
-          </div>
-        ` : ''}
-        <div class="tournament-time-info">
-          <div class="tournament-time-item">
-            <span class="tournament-time-label">${tournament.status === 'upcoming' ? 'Starts:' : tournament.status === 'active' ? 'Started:' : 'Started:'}</span>
-            <span class="tournament-time-value">${formatDateTime(tournament.startTime)}</span>
-          </div>
-          <div class="tournament-time-item">
-            <span class="tournament-time-label">${tournament.status === 'upcoming' ? 'Ends:' : tournament.status === 'active' ? 'Ends:' : 'Ended:'}</span>
-            <span class="tournament-time-value">${formatDateTime(tournament.endTime)}</span>
-          </div>
-          ${timeInfo ? `
-            <div class="tournament-time-remaining">
-              <span class="tournament-time-remaining-label">${tournament.status === 'upcoming' ? '⏰' : tournament.status === 'active' ? '⏳' : ''}</span>
-              <span class="tournament-time-remaining-value">${timeInfo}</span>
-            </div>
-          ` : ''}
-        </div>
-        ${renderTournamentRewards(tournament)}
-      </div>
-      <div class="tournament-actions-card">
-        <button class="menu-btn" onclick="viewTournamentLeaderboard('${tournament.objectId}')">
-          <span class="btn-icon">🏆</span> View Leaderboard
-        </button>
-        ${tournament.status === 'active' || tournament.status === 'upcoming' ? `
-          ${playerData && !playerData.hasEnoughTickets ? `
-            <button class="menu-btn primary" onclick="openTicketShop()" title="Purchase tournament tickets">
-              <span class="btn-icon">🛒</span> Purchase Ticket
-            </button>
-          ` : `
-            <div class="tournament-action-buttons">
-              <button class="menu-btn primary" 
-                      onclick="startTournamentGame('${tournament.objectId}')"
-                      title="${playerData && playerData.hasEntered ? 'Play another game for this tournament' : 'Enter and start playing'}">
-                <span class="btn-icon">🎫</span> ${playerData && playerData.hasEntered ? 'Play Again' : tournament.status === 'upcoming' ? 'Enter (Upcoming)' : 'Enter Tournament'}
-              </button>
-              <button class="menu-btn secondary tournament-test-btn" 
-                      onclick="startTournamentGameTest('${tournament.objectId}')"
-                      title="Start tournament game in test mode (bypasses balance requirement)">
-                <span class="btn-icon">🧪</span> Test
-              </button>
-            </div>
-          `}
-        ` : ''}
-      </div>
-      </div>
+      <div class="tournament-card-expand-hint">Click for details</div>
     </div>
   `;
-  
-  // Add click handler to expand card (only for condensed view)
+
   const condensedView = card.querySelector('.tournament-card-condensed-view');
   if (condensedView) {
-    condensedView.addEventListener('click', function(e) {
-      // Don't expand if clicking on buttons or links
+    condensedView.addEventListener('click', function (e) {
       if (e.target.closest('button') || e.target.closest('a')) {
         return;
       }
-      expandTournamentCard(tournament.objectId);
+      showTournamentDetailsInPanel(tournament, playerTicketCount, card);
     });
   }
-  
+
   return card;
 }
 
@@ -978,7 +1397,10 @@ async function viewTournamentLeaderboard(tournamentObjectId) {
   });
   
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    // Always go through the game backend proxy (it carries corridor identity to platform).
+    let API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : ((window.GAME_CONFIG && (window.GAME_CONFIG.GAME_BACKEND_URL || window.GAME_CONFIG.API_BASE_URL)) || 'http://localhost:3001/api');
+    API_BASE_URL = (API_BASE_URL || '').replace(/\/?$/, '');
+    if (API_BASE_URL && !/\/api$/.test(API_BASE_URL)) API_BASE_URL = API_BASE_URL + '/api';
     const url = `${API_BASE_URL}/tournaments/${tournamentObjectId}/leaderboard?limit=100`;
     console.log('🏆 [FRONTEND] Fetching leaderboard from URL', { url });
     
@@ -992,6 +1414,11 @@ async function viewTournamentLeaderboard(tournamentObjectId) {
         statusText: response.statusText,
         errorText,
       });
+      // Don't throw hard errors for expected empty-state / not-found behavior.
+      if (response.status === 404) {
+        alert('No leaderboard yet (tournament not found).');
+        return;
+      }
       throw new Error(`Failed to load leaderboard: ${response.status} ${response.statusText}`);
     }
     
@@ -1014,7 +1441,9 @@ async function viewTournamentLeaderboard(tournamentObjectId) {
     });
     
     if (!result.success) {
-      throw new Error(result.error || 'Failed to load leaderboard');
+      // Expected when no events/tournaments are set up yet.
+      alert(result.error || 'No leaderboard yet.');
+      return;
     }
     
     showTournamentLeaderboardModal(result.tournament, result.leaderboard || []);
@@ -1150,38 +1579,11 @@ function showTournamentLeaderboardModal(tournament, leaderboard) {
 }
 
 /**
- * Expand tournament card to show full details
+ * Legacy no-ops: details render in the right-hand panel (showTournamentDetailsInPanel).
  */
-function expandTournamentCard(tournamentObjectId) {
-  const card = document.querySelector(`[data-tournament-id="${tournamentObjectId}"]`);
-  if (!card) return;
-  
-  card.classList.remove('tournament-card-condensed');
-  card.classList.add('tournament-card-expanded');
-  
-  const condensedView = card.querySelector('.tournament-card-condensed-view');
-  const expandedView = card.querySelector('.tournament-card-expanded-view');
-  
-  if (condensedView) condensedView.style.display = 'none';
-  if (expandedView) expandedView.style.display = 'block';
-}
+function expandTournamentCard(_tournamentObjectId) {}
 
-/**
- * Shrink tournament card back to condensed view
- */
-function shrinkTournamentCard(tournamentObjectId) {
-  const card = document.querySelector(`[data-tournament-id="${tournamentObjectId}"]`);
-  if (!card) return;
-  
-  card.classList.remove('tournament-card-expanded');
-  card.classList.add('tournament-card-condensed');
-  
-  const condensedView = card.querySelector('.tournament-card-condensed-view');
-  const expandedView = card.querySelector('.tournament-card-expanded-view');
-  
-  if (condensedView) condensedView.style.display = 'block';
-  if (expandedView) expandedView.style.display = 'none';
-}
+function shrinkTournamentCard(_tournamentObjectId) {}
 
 /**
  * Close tournament leaderboard modal
@@ -1225,6 +1627,108 @@ function openTicketShop() {
 }
 
 /**
+ * Simplified tournament flow: verify ticket count, remember tournament, open tournament-entry loadout
+ * (Inventory + Items + Bundles + payment; no Game Pass or Tournament Tickets tabs).
+ * Ticket is consumed when the player taps Start game (same path as main-menu Start Game).
+ */
+async function prepareTournamentThenOpenStore(tournamentObjectId) {
+  log.debug('TOURNAMENT MODAL', 'prepareTournamentThenOpenStore', { tournamentObjectId });
+
+  let walletAddress = null;
+  if (typeof getWalletAddress === 'function') {
+    walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+
+  if (!walletAddress) {
+    alert('Please connect your wallet to enter tournaments.');
+    return;
+  }
+
+  if (!tournamentObjectId) {
+    alert('Select a tournament from the list first.');
+    return;
+  }
+
+  try {
+    const API_BASE_URL = window.GameApi
+      ? window.GameApi.getBaseUrl()
+      : window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api';
+
+    const tournamentResponse = await fetch(`${API_BASE_URL}/tournaments/${tournamentObjectId}`);
+    if (!tournamentResponse.ok) {
+      throw new Error('Failed to load tournament details');
+    }
+    const tournamentResult = await tournamentResponse.json();
+    if (!tournamentResult.success || !tournamentResult.tournament) {
+      throw new Error('Tournament not found');
+    }
+    const tournament = tournamentResult.tournament;
+
+    const now = Date.now();
+    const gracePeriodEnd = tournament.endTime + 60 * 60 * 1000;
+    if (now > gracePeriodEnd) {
+      alert('This tournament has ended. Score submission is no longer available.');
+      return;
+    }
+
+    const gamePassBase =
+      (window.GAME_CONFIG?.getBackendUrl && window.GAME_CONFIG.getBackendUrl('/api/game-pass/')) ||
+      (window.GameApi
+        ? window.GameApi.getBaseUrl()
+        : window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+    let hasTickets = false;
+    try {
+      const gamePassResponse = await fetch(`${gamePassBase}/game-pass/${walletAddress}?contract=new`);
+      if (gamePassResponse.ok) {
+        const gamePassResult = await gamePassResponse.json();
+        hasTickets =
+          gamePassResult.success && (gamePassResult.ticketCount ?? 0) >= (tournament.entryFeeTickets ?? 1);
+      }
+    } catch (e) {
+      log.error('TOURNAMENT MODAL', 'Ticket check failed', e);
+    }
+    if (!hasTickets) {
+      alert(
+        `You need at least ${tournament.entryFeeTickets ?? 1} tournament ticket${
+          (tournament.entryFeeTickets ?? 1) !== 1 ? 's' : ''
+        } to enter. Use Purchase Ticket or the Store Tickets tab, then try again.`
+      );
+      return;
+    }
+
+    if (window.TournamentContext && typeof window.TournamentContext.set === 'function') {
+      window.TournamentContext.set({
+        isTournamentMode: true,
+        awaitingStartGameFromMenu: true,
+        tournamentObjectId: tournament.objectId,
+        tournamentName: tournament.name,
+        tournamentCategory: tournament.category,
+        tournamentEntryFeeTickets: tournament.entryFeeTickets,
+        tournamentEndTime: tournament.endTime,
+        tournamentStatus: tournament.status,
+      });
+    }
+
+    hideTournaments();
+
+    if (typeof showStore === 'function') {
+      await showStore('tournament-entry');
+    } else if (typeof StoreService !== 'undefined' && StoreService.show) {
+      await StoreService.show('tournament-entry');
+    } else {
+      alert(
+        'Loadout screen could not be opened.\n\nUse the main menu Store to manage inventory, then try entering the tournament again.'
+      );
+    }
+  } catch (error) {
+    log.error('TOURNAMENT MODAL', 'prepareTournamentThenOpenStore failed', error);
+    alert(`Could not prepare tournament: ${error.message || 'Unknown error'}`);
+  }
+}
+
+/**
  * Start tournament game in test mode (bypasses balance check)
  * Checks for multiple active tournaments and shows selection if needed
  */
@@ -1245,7 +1749,7 @@ async function startTournamentGameTest(tournamentObjectId = null) {
   }
   
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
     
     // If tournamentObjectId not provided, check for multiple active tournaments
     if (!tournamentObjectId) {
@@ -1340,15 +1844,11 @@ async function startTournamentGameTest(tournamentObjectId = null) {
     if (typeof window.GameService.startTournamentGameTest === 'function') {
       await window.GameService.startTournamentGameTest(tournament);
     } else {
-      // Fallback: use regular startTournamentGame
       log.error('TOURNAMENT MODAL', 'GameService.startTournamentGameTest not available', {
         hasGameService: !!window.GameService,
         hasMethod: window.GameService ? typeof window.GameService.startTournamentGameTest : 'N/A',
-        gameServiceKeys: window.GameService ? Object.keys(window.GameService).slice(0, 20) : [],
-        hasStartTournamentGame: window.GameService ? typeof window.GameService.startTournamentGame : 'N/A',
       });
-      // Try regular startTournamentGame as fallback
-      await startTournamentGame(tournamentObjectId);
+      throw new Error('Tournament game start not available. Please refresh and try again.');
     }
   } catch (error) {
     log.error('TOURNAMENT MODAL', 'Error starting tournament game (test mode)', error);
@@ -1377,7 +1877,7 @@ async function startTournamentGame(tournamentObjectId = null) {
   }
   
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
     
     // If tournamentObjectId not provided, check for multiple active tournaments
     if (!tournamentObjectId) {
@@ -1474,15 +1974,11 @@ async function startTournamentGame(tournamentObjectId = null) {
     if (typeof window.GameService.startTournamentGame === 'function') {
       await window.GameService.startTournamentGame(tournament);
     } else {
-      // Fallback: use regular startGame with tournament context
       log.error('TOURNAMENT MODAL', 'GameService.startTournamentGame not available', {
         hasGameService: !!window.GameService,
         hasMethod: window.GameService ? typeof window.GameService.startTournamentGame : 'N/A',
-        gameServiceKeys: window.GameService ? Object.keys(window.GameService).slice(0, 20) : [],
-        hasStartGame: window.GameService ? typeof window.GameService.startGame : 'N/A',
       });
       alert('Tournament game start not available. Please refresh the page and try again.');
-      // Restore tournament modal visibility
       if (tournamentModal) {
         tournamentModal.classList.remove('tournament-modal-hidden');
         tournamentModal.classList.add('tournament-modal-visible');
@@ -1584,8 +2080,7 @@ function selectTournamentForGame(tournamentObjectId) {
     modal.remove();
   }
   
-  // Start game with selected tournament
-  startTournamentGame(tournamentObjectId);
+  void prepareTournamentThenOpenStore(tournamentObjectId);
 }
 
 /**
@@ -1605,20 +2100,15 @@ function cancelTournamentSelection() {
 }
 
 /**
- * Enter tournament (legacy function - kept for backward compatibility)
- * @deprecated Use startTournamentGame() instead
- */
-async function enterTournament(tournamentObjectId) {
-  log.warn('TOURNAMENT MODAL', 'enterTournament() is deprecated, use startTournamentGame() instead');
-  await startTournamentGame(tournamentObjectId);
-}
-
-/**
  * Refresh tournaments
  */
 async function refreshTournaments() {
   log.debug('TOURNAMENT MODAL', 'Refreshing tournaments');
-  
+  if (typeof window !== 'undefined') {
+    window.__prefetchedTournaments = null;
+    window.__prefetchedMyTournaments = null;
+  }
+
   const activeTab = document.querySelector('.tournament-tab.active');
   if (activeTab) {
     const tabName = activeTab.id.replace('tournamentTab', '').toLowerCase();
@@ -1668,13 +2158,61 @@ function hideTournaments(showMainMenuAfter = true) {
   
   // Show main menu only if requested
   if (showMainMenuAfter) {
+    // Get wallet address before showing menu (needed for badge refresh)
+    let walletAddress = null;
+    if (typeof window !== 'undefined') {
+      if (window.walletAPIInstance && window.walletAPIInstance.isConnected && window.walletAPIInstance.isConnected()) {
+        walletAddress = window.walletAPIInstance.getAddress();
+      } else if (typeof GameDataState !== 'undefined' && GameDataState.walletAddress) {
+        walletAddress = GameDataState.walletAddress;
+      }
+    }
+    
     if (typeof MenuService !== 'undefined' && MenuService.show) {
-      MenuService.show();
+      // MenuService.show() is async, so we need to wait for it to complete
+      MenuService.show({ fromMenuPanel: true }).then(() => {
+        // Refresh badge display to check for upgrades after menu is shown
+        // This ensures upgrade check happens after MenuService's onReturnToMenu() completes
+        if (walletAddress && typeof window.loadMenuBadgeDisplay === 'function') {
+          // Small delay to ensure menu is fully visible and MenuService's badge refresh completes
+          setTimeout(async () => {
+            try {
+              await window.loadMenuBadgeDisplay(walletAddress);
+            } catch (error) {
+              log.warn('TOURNAMENT MODAL', 'Error refreshing badge display after returning to menu', error);
+            }
+          }, 200);
+        }
+      }).catch(err => {
+        log.warn('TOURNAMENT MODAL', 'Error showing menu', err);
+        // Fallback: still try to refresh badge even if menu show failed
+        if (walletAddress && typeof window.loadMenuBadgeDisplay === 'function') {
+          setTimeout(async () => {
+            try {
+              await window.loadMenuBadgeDisplay(walletAddress);
+            } catch (error) {
+              log.warn('TOURNAMENT MODAL', 'Error refreshing badge display after returning to menu', error);
+            }
+          }, 200);
+        }
+      });
     } else {
       const mainMenu = document.getElementById('mainMenuOverlay');
       if (mainMenu) {
         mainMenu.classList.add('main-menu-overlay-visible');
         mainMenu.classList.remove('main-menu-overlay-hidden');
+      }
+      
+      // Refresh badge display if wallet is connected
+      if (walletAddress && typeof window.loadMenuBadgeDisplay === 'function') {
+        // Small delay to ensure menu is visible before refreshing badge
+        setTimeout(async () => {
+          try {
+            await window.loadMenuBadgeDisplay(walletAddress);
+          } catch (error) {
+            log.warn('TOURNAMENT MODAL', 'Error refreshing badge display after returning to menu', error);
+          }
+        }, 200);
       }
     }
   }
@@ -1688,9 +2226,9 @@ window.showTournaments = showTournaments;
 window.hideTournaments = hideTournaments;
 window.switchTournamentTab = switchTournamentTab;
 window.viewTournamentDetails = viewTournamentDetails;
-window.enterTournament = enterTournament; // Deprecated, but kept for backward compatibility
 window.startTournamentGame = startTournamentGame;
 window.startTournamentGameTest = startTournamentGameTest;
+window.prepareTournamentThenOpenStore = prepareTournamentThenOpenStore;
 window.openTicketShop = openTicketShop;
 window.selectTournamentForGame = selectTournamentForGame;
 window.cancelTournamentSelection = cancelTournamentSelection;
@@ -1709,15 +2247,16 @@ if (typeof window !== 'undefined') {
   
   // Wrap existing handlers to also update tournament UI
   window.onWalletConnected = function(address) {
-    if (originalOnWalletConnected) {
-      originalOnWalletConnected(address);
-    }
-    // Update tournament wallet UI if modal is open
-    const tournamentModal = document.getElementById('tournamentModal');
-    if (tournamentModal && tournamentModal.classList.contains('tournament-modal-visible')) {
-      updateTournamentWalletUI();
-      refreshTournaments();
-    }
+    const p = originalOnWalletConnected
+      ? Promise.resolve(originalOnWalletConnected(address))
+      : Promise.resolve();
+    return p.finally(() => {
+      const tournamentModal = document.getElementById('tournamentModal');
+      if (tournamentModal && tournamentModal.classList.contains('tournament-modal-visible')) {
+        updateTournamentWalletUI();
+        refreshTournaments();
+      }
+    });
   };
   
   window.onWalletDisconnected = function() {

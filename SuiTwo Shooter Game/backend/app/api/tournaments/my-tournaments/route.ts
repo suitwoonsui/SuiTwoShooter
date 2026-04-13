@@ -5,7 +5,8 @@
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler } from '@/lib/api/api-handler';
-import { getTournamentService } from '@/lib/sui/tournament-service';
+import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
+import { buildPlatformCallOptions } from '@/lib/services/platform/client/platform-client';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -28,35 +29,34 @@ export const GET = withApiHandler(
     }
 
     try {
+      const platformOptions = buildPlatformCallOptions(request);
       // Get tournament IDs the player has entered
-      const enteredTournamentsResult = await tournamentService.getPlayerEnteredTournaments(playerAddress);
+      const enteredTournamentsResult = await tournamentService.getPlayerEnteredTournaments(playerAddress, platformOptions);
       
-      if (!enteredTournamentsResult.success || !enteredTournamentsResult.tournamentIds) {
+      if (!enteredTournamentsResult.success) {
         return {
           success: true,
           tournaments: [],
         };
       }
 
-      const tournamentIds = enteredTournamentsResult.tournamentIds;
-      
-      if (tournamentIds.length === 0) {
+      const objectIds = enteredTournamentsResult.objectIds ?? [];
+
+      if (objectIds.length === 0) {
         return {
           success: true,
           tournaments: [],
         };
       }
 
-      // Get full tournament details for all entered tournaments (including past)
-      const tournaments = await tournamentService.getTournamentsByIds(tournamentIds);
+      const tournaments = await tournamentService.getTournamentsByObjectIds(objectIds);
 
-      // Get player's ticket count
-      const { getGamePassService } = await import('@/lib/sui/game-pass-service');
-      const gamePassService = getGamePassService();
+      // Get player's ticket count from platform backend
+      const { platformGamePassClient } = await import('@/lib/services/platform/client/platform-client');
       
       let ticketCount = 0;
       try {
-        const gamePassStatus = await gamePassService.getGamePassStatus(playerAddress);
+        const gamePassStatus = await platformGamePassClient.getGamePassStatus(playerAddress, platformOptions);
         ticketCount = gamePassStatus.success ? (gamePassStatus.ticketCount || 0) : 0;
       } catch (error) {
         console.warn('Failed to get game pass status for my tournaments:', error);
@@ -64,7 +64,7 @@ export const GET = withApiHandler(
 
       // Enrich tournaments with player data (rank, score, etc.)
       const enrichedTournaments = await Promise.allSettled(
-        tournaments.map(async (tournament: any) => {
+        tournaments.map(async (tournament) => {
           try {
             // Get player's rank and score in this tournament
             const playerRankResult = await tournamentService.getPlayerRank(
@@ -119,4 +119,5 @@ export const GET = withApiHandler(
     }
   }
 );
+
 

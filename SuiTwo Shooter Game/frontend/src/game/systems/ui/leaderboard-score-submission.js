@@ -20,6 +20,39 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
 
 log.info('LEADERBOARD SCORE SUBMISSION', 'Leaderboard score submission module loaded');
 
+/** After on-chain score write: bust stats + leaderboard caches so menu and board pick up changes immediately. */
+function afterScoreRecordedOnChain() {
+  try {
+    if (typeof window.invalidateMenuStatsCacheForConnectedWallet === 'function') {
+      window.invalidateMenuStatsCacheForConnectedWallet();
+    }
+    if (window.apiRequestCache?.invalidateByPattern) {
+      window.apiRequestCache.invalidateByPattern('leaderboard:');
+    }
+    // Tournament entry/rank/score are per-player mutable; refresh on score submission.
+    try {
+      const walletAddress = window.walletAPIInstance?.isConnected?.() ? window.walletAPIInstance.getAddress() : null;
+      const tid = window.gameState?.tournamentObjectId || window.game?.tournamentObjectId || null;
+      if (walletAddress && tid && window.apiRequestCache?.invalidateByPattern) {
+        window.apiRequestCache.invalidateByPattern(`tournamentEntry:${walletAddress}:`);
+      }
+      // Tournament lists are separately TTL cached in window.__prefetchedTournaments / __prefetchedMyTournaments.
+      // Bust them so the next render/refetch reflects updated hasEntered/rank/score.
+      if (typeof window !== 'undefined' && tid) {
+        window.__prefetchedTournaments = null;
+        window.__prefetchedMyTournaments = null;
+      }
+    } catch (_) {}
+    try {
+      delete window.__prefetchedLeaderboard;
+    } catch (_) {
+      /* ignore */
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 /**
  * Show name input modal (always shown after game over - all scores are tracked)
  * @param {number} score - Final game score
@@ -35,7 +68,7 @@ function showNameInput(score) {
   if (isDemoMode) {
     log.debug('LEADERBOARD SCORE', 'Name input modal blocked - game was in demo mode');
     // Skip showing the modal and go directly to appropriate screen
-    returnToAppropriateScreen();
+    void returnToAppropriateScreen();
     return;
   }
   
@@ -206,20 +239,24 @@ async function saveScore() {
     // Close name input modal (but keep loading modal visible)
     hideNameInput();
     
-    // Use currentGameStats if available, otherwise fallback to reading from window.game
-    const statsToSubmit = state.currentGameStats || {
-      score: score,
-      distance: window.game?.distance || 0,
-      coins: window.game?.coins || 0,
-      bossesDefeated: window.game?.bossesDefeated || 0,
-      enemiesDefeated: window.game?.enemiesDefeated || 0,
-      longestCoinStreak: window.game?.forceField?.maxStreak || 0,
-      sessionId: window.game?.sessionId || null
-    };
-    
-    // Submit to blockchain if wallet is connected and contract is deployed
-    // Now we wait for this to complete before hiding loading modal
-    if (typeof window.submitScoreToBlockchain === 'function' && 
+    // Use currentGameStats only (no fallback object). Only session ID fallback allowed.
+    const rawStats = state.currentGameStats;
+    const statsToSubmit = rawStats
+      ? {
+          ...rawStats,
+          sessionId: rawStats.sessionId ?? window.game?.sessionId ?? null,
+          anchorSessionId:
+            rawStats.anchorSessionId ??
+            window.game?.anchorSessionId ??
+            window.gameState?.anchorSessionId ??
+            window.__tournamentAnchorSessionId ??
+            null,
+        }
+      : null;
+
+    // Submit to blockchain if wallet is connected and we have stats (no fallback for missing stats)
+    if (statsToSubmit &&
+        typeof window.submitScoreToBlockchain === 'function' && 
         window.walletAPIInstance && 
         window.walletAPIInstance.isConnected()) {
       
@@ -254,6 +291,19 @@ async function saveScore() {
         
         if (result.success) {
           log.info('LEADERBOARD SCORE', 'Score submitted successfully!', result.digest);
+          // Milestones/eligibility only change after a game is recorded; invalidate and refresh in background.
+          try {
+            if (typeof window.invalidateMilestoneProgressCaches === 'function') {
+              window.invalidateMilestoneProgressCaches();
+            }
+            if (typeof window.prefetchMilestoneProgress === 'function') {
+              window.prefetchMilestoneProgress();
+            }
+            if (typeof window.updateClaimCountBadge === 'function') {
+              void window.updateClaimCountBadge(null, true);
+            }
+          } catch (_) {}
+          afterScoreRecordedOnChain();
           // Show success toast
           if (typeof window.showToast === 'function') {
             window.showToast('Score saved to blockchain!', 'success');
@@ -274,6 +324,7 @@ async function saveScore() {
       }
     } else {
       log.debug('LEADERBOARD SCORE', 'Skipping blockchain submission', {
+        hasStats: !!statsToSubmit,
         hasSubmitFunction: typeof window.submitScoreToBlockchain === 'function',
         hasWalletAPI: !!window.walletAPIInstance,
         isConnected: window.walletAPIInstance?.isConnected()
@@ -342,20 +393,19 @@ async function skipSave() {
   
   const state = window.LeaderboardService.getState();
   
-  // Submit to blockchain if wallet is connected (even when skipping name entry)
-  // Use currentGameStats if available, otherwise fallback to reading from window.game
-  const statsToSubmit = state.currentGameStats || {
-    score: state.currentGameScore || 0,
-    distance: window.game?.distance || 0,
-    coins: window.game?.coins || 0,
-    bossesDefeated: window.game?.bossesDefeated || 0,
-    enemiesDefeated: window.game?.enemiesDefeated || 0,
-    longestCoinStreak: window.game?.forceField?.maxStreak || 0,
-    sessionId: window.game?.sessionId || null
-  };
-  
+  // Use currentGameStats only (no fallback object). Only session ID fallback allowed.
+  const rawStats = state.currentGameStats;
+  const statsToSubmit = rawStats
+    ? {
+        ...rawStats,
+        sessionId: rawStats.sessionId ?? window.game?.sessionId ?? null,
+        anchorSessionId: rawStats.anchorSessionId ?? window.game?.anchorSessionId ?? window.gameState?.anchorSessionId ?? null,
+      }
+    : null;
+
   try {
-    if (typeof window.submitScoreToBlockchain === 'function' && 
+    if (statsToSubmit &&
+        typeof window.submitScoreToBlockchain === 'function' && 
         window.walletAPIInstance && 
         window.walletAPIInstance.isConnected()) {
       
@@ -388,6 +438,19 @@ async function skipSave() {
       
       if (result.success) {
         log.info('LEADERBOARD SCORE', 'Score submitted successfully!', result.digest);
+        // Milestones/eligibility only change after a game is recorded; invalidate and refresh in background.
+        try {
+          if (typeof window.invalidateMilestoneProgressCaches === 'function') {
+            window.invalidateMilestoneProgressCaches();
+          }
+          if (typeof window.prefetchMilestoneProgress === 'function') {
+            window.prefetchMilestoneProgress();
+          }
+          if (typeof window.updateClaimCountBadge === 'function') {
+            void window.updateClaimCountBadge(null, true);
+          }
+        } catch (_) {}
+        afterScoreRecordedOnChain();
         // Show success toast
         if (typeof window.showToast === 'function') {
           window.showToast('Score saved to blockchain!', 'success');
@@ -401,6 +464,7 @@ async function skipSave() {
       }
     } else {
       log.debug('LEADERBOARD SCORE', 'Skipping blockchain submission (skip)', {
+        hasStats: !!statsToSubmit,
         hasSubmitFunction: typeof window.submitScoreToBlockchain === 'function',
         hasWalletAPI: !!window.walletAPIInstance,
         isConnected: window.walletAPIInstance?.isConnected()
@@ -434,6 +498,12 @@ async function skipSave() {
  * Return to appropriate screen (tournament or main menu) based on game context
  */
 function returnToAppropriateScreen() {
+  // Game-over reconciliation: if gameplay consumed consumables, we mark a pending refetch.
+  // Refresh in the background on the game-over screen (do not block returning to menu).
+  if (typeof window !== 'undefined' && window.PlayerInventoryCache?.runPendingGameOverRefetchIfAny) {
+    void window.PlayerInventoryCache.runPendingGameOverRefetchIfAny();
+  }
+
   const game = typeof window !== 'undefined' && window.game ? window.game : null;
   const gameState = typeof window !== 'undefined' && window.gameState ? window.gameState : null;
   const uiGameState = typeof window !== 'undefined' && window.uiGameState ? window.uiGameState : null;
@@ -476,17 +546,28 @@ function returnToAppropriateScreen() {
     } else {
       log.warn('LEADERBOARD SCORE', 'showTournaments not available, falling back to main menu');
       if (typeof showMainMenu === 'function') {
-        showMainMenu();
+        showMainMenu({ afterGame: true });
       } else if (typeof MenuService !== 'undefined' && MenuService.show) {
-        MenuService.show();
+        MenuService.show({ afterGame: true });
       }
+    }
+
+    const tournamentWallet =
+      (typeof window.getWalletAddress === 'function' && window.getWalletAddress()) ||
+      (window.walletAPIInstance &&
+        window.walletAPIInstance.isConnected &&
+        window.walletAPIInstance.isConnected() &&
+        window.walletAPIInstance.getAddress?.()) ||
+      null;
+    if (tournamentWallet && window.PlayerInventoryCache?.refreshAfterRewardBackground) {
+      window.PlayerInventoryCache.refreshAfterRewardBackground(tournamentWallet);
     }
   } else {
     // Return to main menu
     if (typeof showMainMenu === 'function') {
-      showMainMenu();
+      showMainMenu({ afterGame: true });
     } else if (typeof MenuService !== 'undefined' && MenuService.show) {
-      MenuService.show();
+      MenuService.show({ afterGame: true });
     }
   }
 }
@@ -553,29 +634,22 @@ function onGameOver(gameStatsOrScore) {
     log.warn('LEADERBOARD SCORE', 'LeaderboardService not available');
     return;
   }
-  
-  // Handle both old format (just score) and new format (stats object)
-  let finalScore;
-  if (typeof gameStatsOrScore === 'object' && gameStatsOrScore !== null) {
-    // New format: stats object
-    window.LeaderboardService.setCurrentGameStats(gameStatsOrScore);
-    finalScore = gameStatsOrScore.score;
-    log.debug('LEADERBOARD SCORE', 'Game Over - Stats object received', gameStatsOrScore);
-  } else {
-    // Old format: just score (backward compatibility)
-    finalScore = gameStatsOrScore;
-    const stats = {
-      score: finalScore,
-      distance: window.game?.distance || 0,
-      coins: window.game?.coins || 0,
-      bossesDefeated: window.game?.bossesDefeated || 0,
-      enemiesDefeated: window.game?.enemiesDefeated || 0,
-      longestCoinStreak: window.game?.forceField?.maxStreak || 0,
-      sessionId: window.game?.sessionId || null
-    };
-    window.LeaderboardService.setCurrentGameStats(stats);
-    log.debug('LEADERBOARD SCORE', 'Game Over - Score only (legacy)', finalScore);
+
+  if (typeof window.invalidateMenuStatsCacheForConnectedWallet === 'function') {
+    window.invalidateMenuStatsCacheForConnectedWallet();
   }
+  
+  // Require the new format (stats object). The legacy score-only callback was removed.
+  if (typeof gameStatsOrScore !== 'object' || gameStatsOrScore === null) {
+    log.error('LEADERBOARD SCORE', 'Game Over - invalid stats payload (expected object)', {
+      receivedType: typeof gameStatsOrScore,
+    });
+    return;
+  }
+
+  window.LeaderboardService.setCurrentGameStats(gameStatsOrScore);
+  const finalScore = gameStatsOrScore.score;
+  log.debug('LEADERBOARD SCORE', 'Game Over - Stats object received', gameStatsOrScore);
   
   // Update game stats
   if (finalScore > gameStats.bestScore) {
@@ -638,7 +712,7 @@ function onGameOver(gameStatsOrScore) {
       if (isDemoMode) {
         log.debug('LEADERBOARD SCORE', 'Skipping name input modal - game was in demo mode');
         // Go directly to appropriate screen
-        returnToAppropriateScreen();
+        void returnToAppropriateScreen();
         return;
       }
       

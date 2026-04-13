@@ -5,62 +5,118 @@
 
 console.log('✅ [STORE ITEM SELECTION] Store item selection module loaded');
 
-/**
- * Get item selection key (itemId_level)
- */
-function getItemKey(itemId, level) {
-  return `${itemId}_${level}`;
+// Items that are non-leveled (single SKU, base key only).
+const NON_LEVELED_ITEM_IDS = new Set(['destroy_all', 'boss_kill_shot']);
+
+function toDynamicProvisionKey(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/[-\s]+/g, '_')
+    .replace(/([A-Z])/g, '_$1')
+    .replace(/^_+/, '')
+    .toLowerCase();
+}
+
+function getStoreOffersMap() {
+  if (typeof StoreService !== 'undefined' && StoreService._state && StoreService._state.storeOffers) {
+    return StoreService._state.storeOffers;
+  }
+  const state = typeof getStoreState === 'function' ? getStoreState() : null;
+  return state?.storeOffers || null;
+}
+
+function resolveOfferIdForItemLevel(itemId, level) {
+  const offers = getStoreOffersMap();
+  if (!offers || typeof offers !== 'object') return null;
+  const id = String(itemId || '').trim();
+  const lvl = Number(level || 1);
+
+  // Non-leveled items should resolve to the base offer id (no :l1 suffix).
+  // These SKUs are modeled as a single listing and should not create/require leveled offerIds.
+  if (NON_LEVELED_ITEM_IDS.has(toDynamicProvisionKey(id))) {
+    if (offers[id]) return id;
+    const dyn = toDynamicProvisionKey(id);
+    if (offers[dyn]) return dyn;
+    return null;
+  }
+
+  // Prefer canonical leveled offerIds for item listings.
+  // Some direct keys (e.g. "boss_kill_shot") may point to a non-item_listing offer shape that
+  // the paid checkout path can't fulfill (missing itemKey/level). The canonical leveled offerId
+  // is the most stable for single-item SKUs.
+  const canonical = `${toDynamicProvisionKey(id)}:l${lvl}`;
+  if (offers[canonical]) return canonical;
+  const rawLeveled = `${id}:l${lvl}`;
+  if (offers[rawLeveled]) return rawLeveled;
+
+  // Fallback: direct offer id (bundles / standalone SKUs like credits/tickets).
+  if (offers[id]) return id;
+  return null;
+}
+
+function getSelectedOffersState() {
+  if (typeof StoreService !== 'undefined' && StoreService._state && StoreService._state.selectedOffers) {
+    return StoreService._state.selectedOffers;
+  }
+  const state = typeof getStoreState === 'function' ? getStoreState() : null;
+  if (state && state.selectedOffers) return state.selectedOffers;
+  return null;
+}
+
+function getSelectedOfferQuantity(offerId) {
+  const sel = getSelectedOffersState();
+  if (!sel) return 0;
+  return sel[String(offerId || '').trim()] || 0;
+}
+
+async function addOfferToSelection(offerId) {
+  const sel = getSelectedOffersState();
+  if (!sel) return;
+  const id = String(offerId || '').trim();
+  if (!id) return;
+  sel[id] = (sel[id] || 0) + 1;
+  if (typeof updateStoreUI === 'function') {
+    await updateStoreUI();
+  }
+}
+
+async function removeOfferFromSelection(offerId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const sel = getSelectedOffersState();
+  if (!sel) return;
+  const id = String(offerId || '').trim();
+  const current = sel[id] || 0;
+  if (current > 1) sel[id] = current - 1;
+  else delete sel[id];
+  if (typeof updateStoreUI === 'function') {
+    await updateStoreUI();
+  }
+}
+
+function selectStoreOffer(offerId) {
+  console.log('🛒 [STORE ITEM SELECTION] Selecting offer:', offerId);
+  void addOfferToSelection(offerId);
 }
 
 /**
  * Get quantity for an item/level
  */
 function getItemQuantity(itemId, level) {
-  // Delegate to StoreService if available
-  if (typeof StoreService !== 'undefined' && StoreService.getItemQuantity) {
-    return StoreService.getItemQuantity(itemId, level);
-  }
-  
-  // Fallback: original implementation
-  if (typeof updateStoreStateReference === 'function') {
-    updateStoreStateReference();
-  }
-  const state = typeof getStoreState === 'function' ? getStoreState() : null;
-  if (!state) return 0;
-  
-  const key = getItemKey(itemId, level);
-  return state.selectedItems[key] || 0;
+  const offerId = resolveOfferIdForItemLevel(itemId, level);
+  if (!offerId) return 0;
+  return getSelectedOfferQuantity(offerId);
 }
 
 /**
  * Add item to selection (increment quantity)
  */
 async function addItemToSelection(itemId, level) {
-  // Delegate to StoreService if available
-  if (typeof StoreService !== 'undefined' && StoreService.addItemToSelection) {
-    await StoreService.addItemToSelection(itemId, level);
-    // Update local reference after service call
-    if (typeof updateStoreStateReference === 'function') {
-      updateStoreStateReference();
-    }
-    return;
-  }
-  
-  // Fallback: original implementation
-  if (typeof updateStoreStateReference === 'function') {
-    updateStoreStateReference();
-  }
-  const state = typeof getStoreState === 'function' ? getStoreState() : null;
-  if (!state) return;
-  
-  const key = getItemKey(itemId, level);
-  const currentQty = getItemQuantity(itemId, level);
-  state.selectedItems[key] = currentQty + 1;
-  console.log('➕ [STORE ITEM SELECTION] Added item:', key, 'quantity:', state.selectedItems[key]);
-  
-  if (typeof updateStoreUI === 'function') {
-    await updateStoreUI();
-  }
+  const offerId = resolveOfferIdForItemLevel(itemId, level);
+  if (!offerId) return;
+  await addOfferToSelection(offerId);
 }
 
 /**
@@ -75,68 +131,23 @@ async function removeItemFromSelection(itemId, level, event) {
     event.stopPropagation();
     event.preventDefault();
   }
-  
-  // Delegate to StoreService if available
-  if (typeof StoreService !== 'undefined' && StoreService.removeItemFromSelection) {
-    await StoreService.removeItemFromSelection(itemId, level);
-    // Update local reference after service call
-    if (typeof updateStoreStateReference === 'function') {
-      updateStoreStateReference();
-    }
-    return;
-  }
-  
-  // Fallback: original implementation
-  if (typeof updateStoreStateReference === 'function') {
-    updateStoreStateReference();
-  }
-  const state = typeof getStoreState === 'function' ? getStoreState() : null;
-  if (!state) return;
-  
-  const key = getItemKey(itemId, level);
-  const currentQty = getItemQuantity(itemId, level);
-  if (currentQty > 0) {
-    state.selectedItems[key] = currentQty - 1;
-    if (state.selectedItems[key] === 0) {
-      delete state.selectedItems[key];
-    }
-    console.log('➖ [STORE ITEM SELECTION] Removed item:', key, 'quantity:', state.selectedItems[key] || 0);
-    
-    if (typeof updateStoreUI === 'function') {
-      await updateStoreUI();
-    }
-  }
+
+  const offerId = resolveOfferIdForItemLevel(itemId, level);
+  if (!offerId) return;
+  await removeOfferFromSelection(offerId, event);
 }
 
 /**
  * Set item quantity directly
  */
 async function setItemQuantity(itemId, level, quantity) {
-  // Delegate to StoreService if available
-  if (typeof StoreService !== 'undefined' && StoreService.setItemQuantity) {
-    await StoreService.setItemQuantity(itemId, level, quantity);
-    // Update local reference after service call
-    if (typeof updateStoreStateReference === 'function') {
-      updateStoreStateReference();
-    }
-    return;
-  }
-  
-  // Fallback: original implementation
-  if (typeof updateStoreStateReference === 'function') {
-    updateStoreStateReference();
-  }
-  const state = typeof getStoreState === 'function' ? getStoreState() : null;
-  if (!state) return;
-  
-  const key = getItemKey(itemId, level);
-  if (quantity <= 0) {
-    delete state.selectedItems[key];
-  } else {
-    state.selectedItems[key] = quantity;
-  }
-  console.log('🔢 [STORE ITEM SELECTION] Set quantity:', key, '=', quantity);
-  
+  const offerId = resolveOfferIdForItemLevel(itemId, level);
+  if (!offerId) return;
+  const sel = getSelectedOffersState();
+  if (!sel) return;
+  const id = String(offerId).trim();
+  if (quantity <= 0) delete sel[id];
+  else sel[id] = quantity;
   if (typeof updateStoreUI === 'function') {
     await updateStoreUI();
   }
@@ -149,21 +160,19 @@ async function setItemQuantity(itemId, level, quantity) {
 function selectStoreItem(itemId, level) {
   console.log('🛒 [STORE ITEM SELECTION] Selecting item:', itemId, 'level:', level);
   
-  // Validate item type (order: coinTractorBeam before slowTime)
-  const validItemTypes = ['extraLives', 'forceField', 'orbLevel', 'coinTractorBeam', 'slowTime', 'destroyAll', 'bossKillShot'];
-  if (!validItemTypes.includes(itemId)) {
-    console.error('❌ [STORE ITEM SELECTION] Invalid item type:', itemId);
+  // Validate known core items OR dynamic catalog items (e.g. stockroom bundles).
+  const validItemTypes = ['extra_lives', 'force_field', 'orb_level', 'coin_tractor_beam', 'slow_time', 'destroy_all', 'boss_kill_shot'];
+  const itemExists = typeof getItemById === 'function' ? !!getItemById(itemId) : false;
+  if (!validItemTypes.includes(itemId) && !itemExists) {
+    console.error('❌ [STORE ITEM SELECTION] Unknown item type:', itemId);
     return;
   }
   
-  // Handle single-level items (level defaults to 1)
-  if (itemId === 'destroyAll' || itemId === 'bossKillShot') {
-    level = 1;
-  }
-  
+  // Data-driven level default:
+  // If caller didn't provide a level (or item has no levels), treat it as level 1.
   if (level === undefined || level === null) {
-    console.error('❌ [STORE ITEM SELECTION] Level required for item type:', itemId);
-    return;
+    const dyn = toDynamicProvisionKey(itemId);
+    level = NON_LEVELED_ITEM_IDS.has(dyn) ? null : 1;
   }
   
   // Add one to quantity
@@ -183,89 +192,59 @@ function clearLevelSelection(itemId, level, event) {
   }
   
   console.log('🗑️ [STORE ITEM SELECTION] Clearing selection for:', itemId, 'level:', level);
-  
-  // Delegate to StoreService if available
-  if (typeof StoreService !== 'undefined' && StoreService.clearLevelSelection) {
-    StoreService.clearLevelSelection(itemId, level, event);
-    // Update local reference after service call
-    if (typeof updateStoreStateReference === 'function') {
-      updateStoreStateReference();
+
+  const refreshSelectionUi = async () => {
+    if (typeof updateItemCardStates === 'function') {
+      updateItemCardStates();
     }
-    // Reload items to update UI
-    if (typeof loadStoreItems === 'function') {
-      loadStoreItems().then(async () => {
-        if (typeof updateStoreUI === 'function') {
-          await updateStoreUI();
-        }
-      });
+    if (typeof updateStoreUI === 'function') {
+      await updateStoreUI();
     }
+  };
+
+  const offerId = resolveOfferIdForItemLevel(itemId, level);
+  if (offerId) {
+    const sel = getSelectedOffersState();
+    if (sel) delete sel[String(offerId).trim()];
+    void refreshSelectionUi();
     return;
   }
   
-  // Fallback: original implementation
-  const state = typeof getStoreState === 'function' ? getStoreState() : null;
-  if (!state) return;
-  
-  const key = getItemKey(itemId, level);
-  delete state.selectedItems[key];
-  
-  // Reload items to update UI
-  if (typeof loadStoreItems === 'function') {
-    loadStoreItems().then(async () => {
-      if (typeof updateStoreUI === 'function') {
-        await updateStoreUI();
-      }
-    });
-  }
+  void refreshSelectionUi();
 }
 
 /**
  * Clear all selections
  */
 function clearStoreSelection() {
-  // Delegate to StoreService if available
-  if (typeof StoreService !== 'undefined' && StoreService.clearStoreSelection) {
-    StoreService.clearStoreSelection();
-    // Update local reference after service call
-    if (typeof updateStoreStateReference === 'function') {
-      updateStoreStateReference();
+  const refreshSelectionUi = async () => {
+    if (typeof updateItemCardStates === 'function') {
+      updateItemCardStates();
     }
-    // Reload items to update UI
-    if (typeof loadStoreItems === 'function') {
-      loadStoreItems().then(async () => {
-        if (typeof updateStoreUI === 'function') {
-          await updateStoreUI();
-        }
-      });
+    if (typeof updateStoreUI === 'function') {
+      await updateStoreUI();
     }
-    return;
-  }
-  
-  // Fallback: original implementation
+  };
+
   console.log('🗑️ [STORE ITEM SELECTION] Clearing all selections');
   const state = typeof getStoreState === 'function' ? getStoreState() : null;
   if (!state) return;
   
-  state.selectedItems = {};
-  
-  // Reload items to update UI
-  if (typeof loadStoreItems === 'function') {
-    loadStoreItems().then(async () => {
-      if (typeof updateStoreUI === 'function') {
-        await updateStoreUI();
-      }
-    });
-  }
+  state.selectedOffers = {};
+
+  void refreshSelectionUi();
 }
 
 // Expose globally
 if (typeof window !== 'undefined') {
-  window.getItemKey = getItemKey;
-  window.getItemQuantity = getItemQuantity;
+  window.getItemQuantity = getItemQuantity; // used by item cards (resolve to offerId under the hood)
   window.addItemToSelection = addItemToSelection;
   window.removeItemFromSelection = removeItemFromSelection;
   window.setItemQuantity = setItemQuantity;
   window.selectStoreItem = selectStoreItem;
+  window.selectStoreOffer = selectStoreOffer;
+  window.addOfferToSelection = addOfferToSelection;
+  window.removeOfferFromSelection = removeOfferFromSelection;
   window.clearLevelSelection = clearLevelSelection;
   window.clearStoreSelection = clearStoreSelection;
 }

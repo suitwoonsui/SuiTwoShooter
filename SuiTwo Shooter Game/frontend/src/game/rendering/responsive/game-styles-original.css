@@ -345,9 +345,6 @@ canvas:hover {
   padding: 5px 0;
 }
 
-.stat-item:last-child {
-  margin-bottom: 0;
-}
 
 .stat-label {
   color: #ccc;

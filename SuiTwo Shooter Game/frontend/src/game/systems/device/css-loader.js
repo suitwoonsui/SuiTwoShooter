@@ -95,6 +95,11 @@ const CSSLoader = {
     
     // Feature-specific modules (front-page already loaded above)
     await this.loadCSS('src/game/rendering/responsive/shared/shared-main-menu.css');
+    // Panels and modals (load panels first, then modals)
+    await this.loadCSS('src/game/rendering/responsive/shared/shared-panel-settings.css');
+    await this.loadCSS('src/game/rendering/responsive/shared/shared-panel-sound-test.css');
+    await this.loadCSS('src/game/rendering/responsive/shared/shared-panel-instructions.css');
+    await this.loadCSS('src/game/rendering/responsive/shared/shared-modal-leaderboard.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-panels.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-typography.css');
     await this.loadCSS('src/game/rendering/responsive/shared/shared-interactions.css');

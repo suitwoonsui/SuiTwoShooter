@@ -11,6 +11,10 @@ function showSoundTest() {
   if (typeof MenuService !== 'undefined' && MenuService.hide) {
     MenuService.hide();
   }
+
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Loading sound test... Please wait');
+  }
   
   // Remove any existing click-outside handlers from other panels
   // (This is a workaround since we can't access the menu-system handlers directly)
@@ -60,6 +64,10 @@ function showSoundTest() {
       stopBackgroundMusic();
     }
   }
+
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+    MenuPanelLoading.hide();
+  }
 }
 
 function hideSoundTest() {
@@ -70,7 +78,7 @@ function hideSoundTest() {
     
     // Show main menu again after closing sound test
     if (typeof MenuService !== 'undefined' && MenuService.show) {
-      MenuService.show();
+      MenuService.show({ fromMenuPanel: true });
     }
   }
 }

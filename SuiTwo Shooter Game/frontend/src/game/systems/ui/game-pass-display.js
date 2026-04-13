@@ -19,12 +19,10 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
     };
 
 const GamePassDisplay = {
-  // State
+  // State: game uses only credit count and ticket count
   _initialized: false,
   _currentCredits: 0,
   _currentTickets: 0,
-  _hasPass: false,
-  _isActive: false,
 
   /**
    * Initialize the display component
@@ -34,27 +32,27 @@ const GamePassDisplay = {
       log.warn('GAME PASS DISPLAY', 'Already initialized');
       return;
     }
-    
     this._currentCredits = 0;
     this._currentTickets = 0;
-    this._hasPass = false;
-    this._isActive = false;
     this._initialized = true;
+    // Show "--" when no wallet (consistent with best score / games played)
+    const creditsEl = document.getElementById('gamePassCreditsValue');
+    const ticketsEl = document.getElementById('gamePassTicketsValue');
+    if (creditsEl) creditsEl.textContent = '--';
+    if (ticketsEl) ticketsEl.textContent = '--';
     log.debug('GAME PASS DISPLAY', 'Initialized');
   },
 
   /**
    * Update credit and ticket display in main menu
-   * @param {number} credits - Number of credits remaining
-   * @param {number} tickets - Number of tickets remaining
-   * @param {boolean} hasPass - Whether player has an active pass
-   * @param {boolean} isActive - Whether pass is active
+   * @param {number} credits - Credit count
+   * @param {number} tickets - Ticket count
    */
-  updateMainMenuDisplay(credits, tickets, hasPass, isActive) {
-    this._currentCredits = credits || 0;
-    this._currentTickets = tickets || 0;
-    this._hasPass = hasPass || false;
-    this._isActive = isActive || false;
+  updateMainMenuDisplay(credits, tickets) {
+    const hasCredits = credits != null && credits !== '';
+    const hasTickets = tickets != null && tickets !== '';
+    this._currentCredits = hasCredits ? Number(credits) : 0;
+    this._currentTickets = hasTickets ? Number(tickets) : 0;
 
     const creditsDisplayElement = document.getElementById('gamePassCreditsDisplay');
     const creditsValueElement = document.getElementById('gamePassCreditsValue');
@@ -65,51 +63,19 @@ const GamePassDisplay = {
       log.debug('GAME PASS DISPLAY', 'Display elements not found (menu may not be loaded yet)');
       return;
     }
-
-    if (this._hasPass && this._isActive) {
-      // Show credits display if player has credits
-      if (this._currentCredits > 0) {
-        creditsDisplayElement.style.display = 'block';
-        creditsValueElement.textContent = this._currentCredits.toLocaleString();
-      } else {
-        creditsDisplayElement.style.display = 'none';
-      }
-      
-      // Show tickets display if player has tickets
-      // Note: We show tickets even if count is 0, so players can see their ticket status
-      if (this._hasPass && this._isActive) {
-        ticketsDisplayElement.style.display = 'block';
-        ticketsValueElement.textContent = this._currentTickets.toLocaleString();
-      } else {
-        ticketsDisplayElement.style.display = 'none';
-      }
-      
-      log.debug('GAME PASS DISPLAY', 'Updated main menu display', {
-        credits: this._currentCredits,
-        tickets: this._currentTickets,
-        hasPass: this._hasPass,
-        isActive: this._isActive,
-      });
-    } else {
-      // Hide both displays
-      creditsDisplayElement.style.display = 'none';
-      ticketsDisplayElement.style.display = 'none';
-      log.debug('GAME PASS DISPLAY', 'Hiding main menu display (no active pass)');
-    }
+    creditsValueElement.textContent = hasCredits ? this._currentCredits.toLocaleString() : '--';
+    ticketsValueElement.textContent = hasTickets ? this._currentTickets.toLocaleString() : '--';
+    log.debug('GAME PASS DISPLAY', 'Updated main menu display', { credits: this._currentCredits, tickets: this._currentTickets });
   },
 
   /**
    * Update credit and ticket display in store
-   * @param {number} credits - Number of credits remaining
-   * @param {number} tickets - Number of tickets remaining
-   * @param {boolean} hasPass - Whether player has an active pass
-   * @param {boolean} isActive - Whether pass is active
+   * @param {number} credits - Credit count
+   * @param {number} tickets - Ticket count
    */
-  updateStoreDisplay(credits, tickets, hasPass, isActive) {
-    this._currentCredits = credits || 0;
-    this._currentTickets = tickets || 0;
-    this._hasPass = hasPass || false;
-    this._isActive = isActive || false;
+  updateStoreDisplay(credits, tickets) {
+    this._currentCredits = credits ?? 0;
+    this._currentTickets = tickets ?? 0;
 
     const displayElement = document.getElementById('storeGamePassCreditsDisplay');
     const valueElement = document.getElementById('storeGamePassCreditsValue');
@@ -118,25 +84,9 @@ const GamePassDisplay = {
       log.debug('GAME PASS DISPLAY', 'Store display elements not found (store may not be loaded yet)');
       return;
     }
-
-    if (this._hasPass && this._isActive && this._currentCredits > 0) {
-      // Show display
-      displayElement.style.display = 'block';
-      valueElement.textContent = this._currentCredits.toLocaleString();
-      log.debug('GAME PASS DISPLAY', 'Updated store display', {
-        credits: this._currentCredits,
-        tickets: this._currentTickets,
-        hasPass: this._hasPass,
-        isActive: this._isActive,
-      });
-    } else {
-      // Hide display
-      displayElement.style.display = 'none';
-      log.debug('GAME PASS DISPLAY', 'Hiding store display (no active pass)');
-    }
-    
-    // Note: Tickets are displayed within the tab content itself, not in a separate header element
-    // The tab content will be refreshed when the tab is re-rendered
+    displayElement.style.display = 'block';
+    valueElement.textContent = this._currentCredits.toLocaleString();
+    log.debug('GAME PASS DISPLAY', 'Updated store display', { credits: this._currentCredits, tickets: this._currentTickets });
   },
 
   /**
@@ -144,8 +94,9 @@ const GamePassDisplay = {
    * @param {string} playerAddress - Player's wallet address
    * @param {boolean} updateMainMenu - Whether to update main menu display
    * @param {boolean} updateStore - Whether to update store display
+   * @param {boolean} useCache - If true, use 30s cache when available (faster when returning to menu)
    */
-  async refresh(playerAddress, updateMainMenu = true, updateStore = true) {
+  async refresh(playerAddress, updateMainMenu = true, updateStore = true, useCache = false) {
     if (!playerAddress) {
       log.warn('GAME PASS DISPLAY', 'No player address provided for refresh');
       return;
@@ -157,42 +108,22 @@ const GamePassDisplay = {
     }
 
     try {
-      const status = await window.GamePassService.getGamePassStatus(playerAddress, true); // Force refresh
+      const result = await window.GamePassService.getCreditsAndTickets(playerAddress, !useCache);
 
-      if (status.success) {
-        if (updateMainMenu) {
-          this.updateMainMenuDisplay(
-            status.gamesRemaining || 0,
-            status.ticketCount || 0,
-            status.hasPass || false,
-            status.isActive || false
-          );
-        }
-
-        if (updateStore) {
-          this.updateStoreDisplay(
-            status.gamesRemaining || 0,
-            status.ticketCount || 0,
-            status.hasPass || false,
-            status.isActive || false
-          );
-        }
-
-        log.debug('GAME PASS DISPLAY', 'Refreshed display', {
-          credits: status.gamesRemaining || 0,
-          hasPass: status.hasPass || false,
-          isActive: status.isActive || false,
-        });
-        
-        // Update start game button text based on credits
+      if (result.success) {
+        const credits = result.credits ?? 0;
+        const tickets = result.ticketCount ?? 0;
+        log.info('TICKET-FLOW', 'GamePassDisplay.refresh: updating UI', { credits, tickets, playerAddress: playerAddress?.slice(0, 10) + '...' });
+        if (updateMainMenu) this.updateMainMenuDisplay(credits, tickets);
+        if (updateStore) this.updateStoreDisplay(credits, tickets);
+        log.debug('GAME PASS DISPLAY', 'Refreshed display', { credits, tickets });
         if (updateMainMenu && typeof GameService !== 'undefined' && GameService.updateStartButtonText) {
-          const hasCredits = status.hasPass && status.isActive && (status.gamesRemaining || 0) > 0;
-          GameService.updateStartButtonText(hasCredits).catch(err => {
+          GameService.updateStartButtonText(credits > 0).catch(err => {
             log.warn('GAME PASS DISPLAY', 'Failed to update button text', err);
           });
         }
       } else {
-        log.warn('GAME PASS DISPLAY', 'Failed to refresh display', status.error);
+        log.warn('GAME PASS DISPLAY', 'Failed to refresh display', result.error);
         // Update button text to show "Start Demo" if refresh failed
         if (updateMainMenu && typeof GameService !== 'undefined' && GameService.updateStartButtonText) {
           GameService.updateStartButtonText(false).catch(err => {
@@ -219,15 +150,10 @@ const GamePassDisplay = {
   },
 
   /**
-   * Get current pass status (cached values)
+   * Get current credit and ticket counts (cached values)
    */
   getStatus() {
-    return {
-      credits: this._currentCredits,
-      tickets: this._currentTickets,
-      hasPass: this._hasPass,
-      isActive: this._isActive,
-    };
+    return { credits: this._currentCredits, tickets: this._currentTickets };
   },
 
   /**
@@ -236,26 +162,18 @@ const GamePassDisplay = {
   clear() {
     this._currentCredits = 0;
     this._currentTickets = 0;
-    this._hasPass = false;
-    this._isActive = false;
 
-    // Clear main menu display
+    // Clear main menu display (show "--" when no wallet, consistent with best score / games played)
     const creditsDisplayElement = document.getElementById('gamePassCreditsDisplay');
     const creditsValueElement = document.getElementById('gamePassCreditsValue');
     const ticketsDisplayElement = document.getElementById('gamePassTicketsDisplay');
     const ticketsValueElement = document.getElementById('gamePassTicketsValue');
 
-    if (creditsDisplayElement) {
-      creditsDisplayElement.style.display = 'none';
-    }
     if (creditsValueElement) {
-      creditsValueElement.textContent = '0';
-    }
-    if (ticketsDisplayElement) {
-      ticketsDisplayElement.style.display = 'none';
+      creditsValueElement.textContent = '--';
     }
     if (ticketsValueElement) {
-      ticketsValueElement.textContent = '0';
+      ticketsValueElement.textContent = '--';
     }
 
     // Update button text to show "Start Demo" when credits are cleared
@@ -273,7 +191,7 @@ const GamePassDisplay = {
       storeDisplayElement.style.display = 'none';
     }
     if (storeValueElement) {
-      storeValueElement.textContent = '0';
+      storeValueElement.textContent = '--';
     }
 
     log.debug('GAME PASS DISPLAY', 'Cleared all displays');

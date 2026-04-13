@@ -380,6 +380,7 @@ class GameLifecycle {
       enemiesDefeated: game.enemiesDefeated || 0,
       longestCoinStreak: game.forceField?.maxStreak || 0,
       sessionId: game.sessionId || null,
+      anchorSessionId: game.anchorSessionId != null ? game.anchorSessionId : 0, // For tournament submit (Anchor)
       bossTiers: game.bossTiers || [],
       enemyTypes: game.enemyTypes || [],
       bossHits: game.bossHits || 0
@@ -482,6 +483,8 @@ class GameLifecycle {
       game.checkedOutItems = null;
     }
     
+    let menuDataRefreshDelegatedToMenuService = false;
+
     if (shouldReturnToTournament) {
       log.debug('GAME LIFECYCLE', 'Returning to tournament screen instead of main menu');
       
@@ -506,7 +509,8 @@ class GameLifecycle {
         log.warn('GAME LIFECYCLE', 'showTournaments not available, falling back to main menu');
         // Fallback to main menu
         if (typeof MenuService !== 'undefined' && MenuService.show) {
-          MenuService.show();
+          MenuService.show({ afterGame: true });
+          menuDataRefreshDelegatedToMenuService = true;
         }
       }
     } else {
@@ -519,13 +523,20 @@ class GameLifecycle {
       
       // Use MenuService if available
       if (typeof MenuService !== 'undefined' && MenuService.show) {
-        MenuService.show();
+        MenuService.show({ afterGame: true });
+        menuDataRefreshDelegatedToMenuService = true;
       }
     }
-    
-    // Reload game data (badge, balance) when returning to menu
+
     if (typeof GameDataFlow !== 'undefined' && GameDataFlow.onReturnToMenu) {
-      GameDataFlow.onReturnToMenu();
+      if (menuDataRefreshDelegatedToMenuService) {
+        return;
+      }
+      if (shouldReturnToTournament) {
+        GameDataFlow.onReturnToMenu();
+      } else {
+        GameDataFlow.onReturnToMenu({ force: true, afterGame: true });
+      }
     }
   }
 }

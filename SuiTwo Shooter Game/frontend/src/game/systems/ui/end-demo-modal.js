@@ -91,11 +91,11 @@ const EndDemoModal = {
       
       if (playerAddress && window.GamePassService) {
         try {
-          const status = await window.GamePassService.getGamePassStatus(playerAddress, true); // Force refresh
+          const status = await window.GamePassService.getCreditsAndTickets(playerAddress, true);
           if (status.success) {
-            gamePassStatus = status;
-            hasActivePass = status.hasPass && status.isActive;
-            hasCredits = (status.gamesRemaining || 0) > 0;
+            gamePassStatus = { gamesRemaining: status.credits, ticketCount: status.ticketCount };
+            hasCredits = (status.credits || 0) > 0;
+            hasActivePass = hasCredits;
           }
         } catch (error) {
           log.warn('END DEMO MODAL', 'Failed to get game pass status', error);

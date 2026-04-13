@@ -1,16 +1,15 @@
 // ==========================================
 // Notify Tournament Created API
 // ==========================================
-// Called by frontend after successful tournament creation
-// to immediately schedule reward distribution
+// Called by frontend after successful tournament creation.
+// Distribution and move-to-past are scheduled on the platform (Tide); no game scheduler.
 
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { getTournamentService } from '@/lib/sui/tournament-service';
-import { TournamentScheduler } from '@/lib/services/tournament-scheduler';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
+import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -27,13 +26,13 @@ export const POST = withApiHandler(
     const { tournamentObjectId, transactionDigest } = body;
 
     if (!tournamentObjectId) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'tournamentObjectId is required'
       );
     }
 
-    BadgeLogger.info('🏆 [NOTIFY CREATED] Tournament creation notification received', {
+    PlatformLogger.info('🏆 [NOTIFY CREATED] Tournament creation notification received', {
       tournamentObjectId,
       transactionDigest,
     });
@@ -43,23 +42,15 @@ export const POST = withApiHandler(
     const result = await tournamentService.getTournament(tournamentObjectId);
 
     if (!result.success || !result.tournament) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         result.error || 'Tournament not found'
       );
     }
 
     const tournament = result.tournament;
 
-    // Schedule reward distribution
-    TournamentScheduler.scheduleDistribution(
-      tournament.tournamentId,
-      tournament.objectId,
-      tournament.endTime,
-      tournament.name
-    );
-
-    BadgeLogger.info('🏆 [NOTIFY CREATED] Tournament scheduled for reward distribution', {
+    PlatformLogger.info('🏆 [NOTIFY CREATED] Tournament creation acknowledged; platform Tide handles distribution', {
       tournamentId: tournament.tournamentId,
       name: tournament.name,
       endTime: new Date(tournament.endTime).toISOString(),
@@ -67,7 +58,7 @@ export const POST = withApiHandler(
 
     return {
       success: true,
-      message: 'Tournament scheduled for reward distribution',
+      message: 'Tournament created. Distribution is handled by the platform (Tide).',
       tournament: {
         tournamentId: tournament.tournamentId,
         name: tournament.name,
@@ -76,3 +67,4 @@ export const POST = withApiHandler(
     };
   }
 );
+

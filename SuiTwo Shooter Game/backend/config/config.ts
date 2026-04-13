@@ -30,10 +30,6 @@ interface TokenConfig {
 interface ContractsConfig {
   // Platform contract IDs are not in game config (strict split). Use platform API.
   platformPackageId?: string;
-  /** Optional: legacy game score contract type string `package::module::type`. */
-  gameScore?: string;
-  /** Optional: legacy tournament admin cap object id (used for distribution status updates). */
-  tournamentAdminCap?: string;
   /** @deprecated Use platform for score submission (Hydroscope). Game contract SessionRegistry not used when platform is configured. */
   sessionRegistry: string;  // Session registry object ID (from init function) — deprecated for score path
   /** Legacy: game package no longer has badge_system; badges are platform (Shipyard). Leave unset for new setups. */

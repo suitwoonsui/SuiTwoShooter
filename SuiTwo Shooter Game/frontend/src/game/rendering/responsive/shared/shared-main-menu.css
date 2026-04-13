@@ -55,7 +55,7 @@
   /* Fill available space from main-menu-overlay */
   width: 100%;
   /* Size based on content but constrained to overlay viewport */
-  max-width: 95vw; /* Prevent horizontal overflow */
+  max-width: 90vw; /* Prevent horizontal overflow */
   max-height: 100%; /* Constrain to parent overlay height - critical for Safari */
   min-height: 0; /* Allow flexbox shrinking - critical for Safari */
   /* Use percentage height to allow growth */
@@ -371,18 +371,73 @@
   -webkit-background-clip: border-box;
 }
 
-/* Fallback styles for custom badge display (if BadgeUI not available) */
+.menu-badge-image-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
 .menu-badge-info {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: min(0.5vh, 0.6vw);
   width: 100%;
   padding: min(0.8vh, 1vw);
+  padding-bottom: 0;
   background: rgba(77, 162, 255, 0.1);
   border: min(0.1vw, 0.15vh) solid rgba(77, 162, 255, 0.3);
   border-radius: min(1vh, 1.2vw);
+  overflow: hidden;
 }
+
+.menu-badge-info .badge-upgrade-footer {
+  text-align: center;
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.menu-badge-info .badge-upgrade-footer-text {
+  color: #39ff14 !important;
+  -webkit-text-fill-color: #39ff14 !important;
+  font-weight: 600;
+  font-size: clamp(min(0.8vh, 1vw), min(1.1vh, 1.3vw), min(1vh, 1.2vw));
+  text-transform: uppercase;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.menu-badge-display .badge-clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.menu-badge-display .badge-clickable:hover {
+  transform: scale(1.05);
+}
+
+.menu-badge-display .badge-clickable:hover .badge-upgrade-overlay {
+  background: rgba(77, 162, 255, 0.7);
+}
+
+.menu-badge-display.badge-has-upgrade .menu-badge-info {
+  border: 2px solid #4DA2FF;
+  box-shadow: 0 0 min(0.8vh, 1vw) rgba(77, 162, 255, 0.4);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 min(0.8vh, 1vw) rgba(77, 162, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.6);
+  }
+}
+
 
 .menu-badge-info h3 {
   font-size: clamp(min(1vh, 1.2vw), min(1.4vh, 1.7vw), min(1.3vh, 1.6vw));
@@ -435,6 +490,16 @@
   background: none;
   background-clip: border-box;
   -webkit-background-clip: border-box;
+}
+
+.menu-badge-mint-offer.menu-badge-info {
+  cursor: pointer;
+}
+
+.menu-badge-mint-hint {
+  color: rgba(57, 255, 20, 0.95) !important;
+  -webkit-text-fill-color: rgba(57, 255, 20, 0.95) !important;
+  font-size: 0.95em;
 }
 
 /* Minimum requirement notice - below balance */
@@ -739,10 +804,10 @@
 /* Icon size now governed by global `.btn-icon` */
 
 /* ========================================== */
-/* CLAIM BADGE - Notification count on buttons */
+/* Claim count badge - notification count on buttons (pending rewards to claim) */
 /* ========================================== */
 
-.claim-badge {
+.claim-count-badge {
   position: absolute;
   top: -8px;
   right: -8px;
@@ -779,7 +844,7 @@
 }
 
 /* Adjust badge positioning to work with overflow:hidden - position at top-right corner with small inset */
-#leaderboardMenuBtn .claim-badge {
+#leaderboardMenuBtn .claim-count-badge {
   top: 2px;
   right: 2px;
 }
@@ -795,24 +860,32 @@
 .game-stats {
   display: flex;
   justify-content: center;
+  align-items: stretch;
   gap: min(2vw, 3vh);
   flex-wrap: wrap;
 }
 
 .game-stats .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   background: rgba(77, 162, 255, 0.05);
   padding: min(1vw, 1.5vh) min(1.5vw, 2vh);
   border-radius: min(1vw, 1.5vh);
   border: 1px solid rgba(77, 162, 255, 0.2);
   min-width: auto;
+  align-self: stretch;
 }
 
 .game-stats .stat-label {
   display: block;
+  white-space: nowrap;
   color: #ccc;
   font-size: min(2.4vw, 3.6vh); /* Doubled from min(1.2vw, 1.8vh) */
   margin-bottom: min(0.5vw, 0.8vh);
+  line-height: 1.2;
 }
 
 .game-stats .stat-value {

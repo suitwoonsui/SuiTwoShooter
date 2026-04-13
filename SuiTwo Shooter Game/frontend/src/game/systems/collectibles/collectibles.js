@@ -29,6 +29,9 @@ function collectCoin(tile) {
   
   // Increment coin count
   game.coins++;
+  if (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.recordCoin === 'function') {
+    window.ReplayRecorder.recordCoin();
+  }
   
   // Increment coin streak
   game.forceField.coinStreak++;

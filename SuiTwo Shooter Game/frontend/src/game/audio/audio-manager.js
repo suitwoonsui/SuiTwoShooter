@@ -109,9 +109,8 @@ class AudioManager {
     }
   }
   
-  // Specialized sound effects with hybrid sample/buffer/oscillator support
-  async playExplosion(useSample = true) {
-    // Try sample first if available and requested
+  // Specialized sound effects. Game uses procedural/oscillator sounds (sound-effects.js); WAV sample path is legacy/unused.
+  async playExplosion(useSample = false) {
     if (useSample && this.sampleLoader && typeof getSampleConfig === 'function') {
       const config = getSampleConfig('explosion');
       if (config) {
@@ -148,8 +147,7 @@ class AudioManager {
     this.soundEffects.playBossSpawn(this.settings);
   }
   
-  async playBossDestroyed(useSample = true) {
-    // Try sample first if available and requested
+  async playBossDestroyed(useSample = false) {
     if (useSample && this.sampleLoader && typeof getSampleConfig === 'function') {
       const config = getSampleConfig('bossDestroyed');
       if (config) {
@@ -178,10 +176,8 @@ class AudioManager {
     this.soundEffects.playBossDestroyed(this.settings);
   }
   
-  async playGameOver(useSample = true) {
+  async playGameOver(useSample = false) {
     this.stopBackgroundMusic();
-    
-    // Try sample first if available and requested
     if (useSample && this.sampleLoader && typeof getSampleConfig === 'function') {
       const config = getSampleConfig('gameOver');
       if (config) {

@@ -1,13 +1,13 @@
 // ==========================================
 // Store Transaction Status API Route
-// Checks transaction status on blockchain
+// Proxies to platform backend (framework-level operation)
 // ==========================================
 
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
-import { storeService } from '@/lib/sui/store-service';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { withApiHandler, getDigestParam } from '@/lib/api/api-handler';
+import { platformStoreClient } from '@/lib/services/platform/client/platform-client';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -21,10 +21,10 @@ export const GET = withApiHandler(
   ) => {
     const digest = await getDigestParam(context.params);
 
-    BadgeLogger.info('Checking transaction status', { digest });
+    PlatformLogger.info('Checking transaction status (proxying to platform)', { digest });
 
-    // Verify transaction
-    const result = await storeService.verifyTransaction(digest);
+    // Proxy to platform backend
+    const result = await platformStoreClient.getTransactionStatus(digest);
 
     if (!result.success) {
       throw new Error(result.error || 'Failed to verify transaction');
@@ -32,7 +32,7 @@ export const GET = withApiHandler(
 
     return {
       success: true,
-      digest,
+      digest: result.digest,
       exists: result.exists,
       confirmed: result.confirmed,
     };

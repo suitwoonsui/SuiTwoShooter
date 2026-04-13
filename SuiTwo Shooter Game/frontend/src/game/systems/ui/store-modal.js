@@ -26,6 +26,55 @@ let _storeModalCache = {
   storeModal: null
 };
 
+/** Right column (≈1/3): cart panel on commerce tabs — duplicated markup, synced by updateStoreUI */
+const _STORE_COMMERCE_CART_ASIDE_HTML = `
+<aside class="store-commerce-cart" aria-label="Shopping cart">
+  <div class="store-cart-sticky">
+    <section class="store-selected-summary store-cart-panel" data-store-cart-panel>
+      <h3 class="store-cart-heading">Cart</h3>
+      <p class="store-cart-empty-hint" data-store-cart-empty>Your cart is empty. Add items or bundles from the list. Credit and ticket packs use Purchase on each card.</p>
+      <div class="store-selected-items-list" data-selected-items-list></div>
+      <div class="store-total store-cart-total" data-store-cart-total><span>Total: $0.00 (0 MEWS)</span></div>
+      <button type="button" class="menu-btn primary store-cart-purchase-btn" data-store-cart-purchase onclick="proceedToPurchase()" style="display: none;" disabled>
+        <span class="btn-icon">💳</span> Purchase
+      </button>
+    </section>
+  </div>
+</aside>`;
+
+/**
+ * Ordered phases for the full-store load (matches showStoreInternal sequence).
+ * @param {string} context - 'main-menu' | 'credits-only' | etc.
+ * @returns {Array<{ id: string, label: string }>}
+ */
+function buildStoreLoadSteps(context) {
+  const surf = getStoreSurfaceRulesResolved(context);
+  const steps = [];
+  if (typeof window !== 'undefined' && window.StoreDataSources && window.StoreDataSources.fetchStoreCatalogRaw) {
+    steps.push({ id: 'catalog', label: 'Syncing store catalog' });
+  }
+  if (context !== 'credits-only' && surf.loadItemsCatalog) {
+    steps.push({ id: 'items', label: 'Loading store items' });
+  }
+  if (context !== 'credits-only') {
+    steps.push({ id: 'inventory', label: 'Loading inventory' });
+  }
+  steps.push({ id: 'gamepass', label: 'Loading credits and tickets' });
+  if (surf.preloadTicketsTab) {
+    steps.push({ id: 'tickets', label: 'Loading tournament tickets' });
+  }
+  steps.push({ id: 'balance', label: 'Loading wallet balance' });
+  steps.push({ id: 'badge', label: 'Loading badge' });
+  if (surf.commerceFinalize) {
+    steps.push({ id: 'finalize', label: 'Finalizing store' });
+  }
+  return steps;
+}
+
+function storeLoadingGoToStep(stepId) {
+  // Store step-list/checklist loading UI removed for consistency with other loaders.
+}
+
 /**
  * Get cached main menu element
  * @private
@@ -67,6 +116,183 @@ function _invalidateStoreModalCache() {
   _storeModalCache.mainMenu = null;
   _storeModalCache.viewportContainer = null;
   _storeModalCache.storeModal = null;
+}
+
+/**
+ * @returns {string}
+ */
+function getStoreUiContext() {
+  let ctx = 'main-menu';
+  if (typeof getStoreState === 'function') {
+    const state = getStoreState();
+    ctx = state?.context || 'main-menu';
+  } else if (typeof StoreService !== 'undefined' && StoreService._state) {
+    ctx = StoreService._state.context || 'main-menu';
+  }
+  return ctx;
+}
+
+/** @param {string} ctx */
+function isPrepLoadoutContext(ctx) {
+  if (typeof window !== 'undefined' && typeof window.isPrepLoadoutStoreContext === 'function') {
+    return window.isPrepLoadoutStoreContext(ctx);
+  }
+  if (typeof window !== 'undefined' && window.StoreContextRules && typeof window.StoreContextRules.isPrepLoadoutContext === 'function') {
+    return window.StoreContextRules.isPrepLoadoutContext(ctx);
+  }
+  return ctx === 'tournament-entry' || ctx === 'regular-entry';
+}
+
+/** New prep loadout store open: reset embedded item-selection state on next inventory mount. */
+function bumpPrepLoadoutStoreSessionIfNeeded(context) {
+  if (typeof window === 'undefined' || !isPrepLoadoutContext(context)) return;
+  window.__prepLoadoutStoreOpenGeneration = (window.__prepLoadoutStoreOpenGeneration || 0) + 1;
+}
+
+/**
+ * Resolved surface rules (delegates to StoreContextRules, or mirrors it if that module is unavailable).
+ * @param {string} context
+ */
+function getStoreSurfaceRulesResolved(context) {
+  if (typeof window !== 'undefined' && window.StoreContextRules && typeof window.StoreContextRules.getStoreSurfaceRules === 'function') {
+    return window.StoreContextRules.getStoreSurfaceRules(context);
+  }
+  const prep = isPrepLoadoutContext(context);
+  return {
+    allowedTabKeys: prep ? ['inventory', 'items', 'bundles'] : null,
+    showPaymentSelector: true,
+    loadItemsCatalog: context !== 'credits-only',
+    preloadTicketsTab: context !== 'credits-only' && !prep,
+    commerceFinalize: context !== 'credits-only',
+    useTournamentChrome: context === 'tournament-entry',
+  };
+}
+
+/**
+ * Tab strip, payment row, header/back labels, and tournament gold chrome.
+ * Commerce tab visibility is driven by {@link StoreContextRules} (inventory / items / bundles vs full store).
+ * @param {string} context
+ */
+function applyStoreContextChrome(context) {
+  const storeModal = document.getElementById('storeModal');
+  if (!storeModal) return;
+
+  const surf = getStoreSurfaceRulesResolved(context);
+
+  if (surf.useTournamentChrome) {
+    storeModal.classList.add('store-modal--tournament-entry');
+  } else {
+    storeModal.classList.remove('store-modal--tournament-entry');
+  }
+
+  if (typeof window !== 'undefined' && window.StoreContextRules && window.StoreContextRules.applyCommerceTabStrip) {
+    window.StoreContextRules.applyCommerceTabStrip(context);
+  }
+
+  const pay = document.querySelector('.store-modal .store-payment-selector');
+  if (pay) pay.style.display = surf.showPaymentSelector ? '' : 'none';
+
+  const back = document.getElementById('backToMenuBtn');
+  const title = document.getElementById('storeTitle');
+
+  if (surf.useTournamentChrome) {
+    if (title) {
+      const first = title.querySelector('span:first-child');
+      if (first) first.textContent = '🏆 Tournament — loadout & purchases';
+    }
+    if (back) {
+      back.setAttribute('onclick', 'cancelTournamentEntryStore()');
+      back.innerHTML = '<span class="btn-icon">←</span> Back to Tournaments';
+    }
+  } else if (context === 'regular-entry') {
+    if (title) {
+      const first = title.querySelector('span:first-child');
+      if (first) first.textContent = '🎮 Get ready — loadout & purchases';
+    }
+    if (back) {
+      back.setAttribute('onclick', 'hideStore()');
+      back.innerHTML = '<span class="btn-icon">←</span> Back to Menu';
+    }
+  } else {
+    if (title) {
+      const first = title.querySelector('span:first-child');
+      if (first) first.textContent = '🛒 Store & Inventory';
+    }
+    if (back) {
+      back.setAttribute('onclick', 'hideStore()');
+      back.innerHTML = '<span class="btn-icon">←</span> Back to Menu';
+    }
+  }
+}
+
+function cancelTournamentEntryStore() {
+  if (window.TournamentContext && typeof window.TournamentContext.clear === 'function') {
+    window.TournamentContext.clear();
+  }
+  if (typeof hideStore === 'function') {
+    hideStore({ returnToTournaments: true });
+  }
+}
+
+async function startGameFromPrepLoadoutStore() {
+  const btn = document.getElementById('continueToGameBtn');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-icon">⏳</span> Starting...';
+  }
+  try {
+    if (typeof window.checkoutPrepLoadoutItemSelection !== 'function') {
+      alert('Item selection is not ready. Please refresh the page and try again.');
+      return;
+    }
+    const ctx = getStoreUiContext();
+    const isTournamentMode = ctx === 'tournament-entry';
+    const checkout = await window.checkoutPrepLoadoutItemSelection({ isTournamentMode });
+    if (!checkout || !checkout.ok) {
+      return;
+    }
+    if (window.GameService && typeof window.GameService.startGame === 'function') {
+      window.GameService._pendingPrepItemModalResult = {
+        confirmed: true,
+        items: checkout.items && typeof checkout.items === 'object' ? checkout.items : {},
+      };
+      if (typeof showLoadingModal === 'function') {
+        showLoadingModal('Starting game... Please wait', 'gameStartLoadingModal');
+      }
+      if (typeof hideStore === 'function') {
+        hideStore({ skipMainMenuReveal: true });
+      }
+      await window.GameService.startGame();
+    } else {
+      alert('Game could not be started. Please try Start Game from the main menu.');
+    }
+  } catch (e) {
+    log.error('STORE MODAL', 'startGameFromPrepLoadoutStore failed', e);
+    alert(e && e.message ? e.message : 'Could not start the game.');
+    if (typeof hideLoadingModal === 'function') {
+      hideLoadingModal('gameStartLoadingModal');
+    }
+    if (typeof MenuService !== 'undefined' && MenuService.show) {
+      MenuService.show({ fromMenuPanel: true });
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (originalHtml) btn.innerHTML = originalHtml;
+    }
+  }
+}
+
+function handleStoreContinueToGameClick() {
+  const ctx = getStoreUiContext();
+  if (isPrepLoadoutContext(ctx)) {
+    void startGameFromPrepLoadoutStore();
+    return;
+  }
+  if (typeof continueToGameAfterPurchase === 'function') {
+    void continueToGameAfterPurchase();
+  }
 }
 
 /**
@@ -119,22 +345,26 @@ async function showStoreInternal(context = 'main-menu') {
           state.context = context;
         }
       }
-      
+      bumpPrepLoadoutStoreSessionIfNeeded(context);
+
       // Handle special contexts
       if (context === 'gamePass' || context === 'credits-only') {
-        // Hide Items and Tickets tabs for credits-only mode
+        // Hide Items/Bundles/Tickets tabs for credits-only mode
         const itemsTab = document.getElementById('storeTabItems');
+        const bundlesTab = document.getElementById('storeTabBundles');
         const ticketsTab = document.getElementById('storeTabTickets');
         const storeTabsContainer = document.getElementById('storeTabs');
         
         if (context === 'credits-only') {
-          // Credits-only mode: hide Items and Tickets tabs
+          // Credits-only mode: hide Items, Bundles, and Tickets tabs
           if (itemsTab) itemsTab.style.display = 'none';
+          if (bundlesTab) bundlesTab.style.display = 'none';
           if (ticketsTab) ticketsTab.style.display = 'none';
           if (storeTabsContainer) storeTabsContainer.style.justifyContent = 'center'; // Center the single tab
         } else {
           // Ensure tabs are visible if not in credits-only mode
           if (itemsTab) itemsTab.style.display = '';
+          if (bundlesTab) bundlesTab.style.display = '';
           if (ticketsTab) ticketsTab.style.display = '';
           if (storeTabsContainer) storeTabsContainer.style.justifyContent = '';
         }
@@ -144,17 +374,8 @@ async function showStoreInternal(context = 'main-menu') {
           switchStoreTab('gamePass');
         }, 100);
       } else {
-        // Normal mode: ensure all tabs are visible
-        const itemsTab = document.getElementById('storeTabItems');
-        const ticketsTab = document.getElementById('storeTabTickets');
-        const storeTabsContainer = document.getElementById('storeTabs');
-        if (itemsTab) itemsTab.style.display = '';
-        if (ticketsTab) ticketsTab.style.display = '';
-        if (storeTabsContainer) storeTabsContainer.style.justifyContent = '';
-        // Update buttons for inventory tab (default)
+        applyStoreContextChrome(context);
         updateStoreButtons('inventory', context);
-        
-        // Switch to inventory tab
         if (typeof switchStoreTab === 'function') {
           await switchStoreTab('inventory');
         }
@@ -196,6 +417,10 @@ async function showStoreInternal(context = 'main-menu') {
           log.debug('STORE MODAL', 'Click outside ignored in credits-only mode - use buttons to navigate');
           return;
         }
+        if (isPrepLoadoutContext(currentContext)) {
+          log.debug('STORE MODAL', 'Click outside ignored in prep loadout — use Back or Start game');
+          return;
+        }
         
         log.debug('STORE MODAL', 'Click was outside store modal - closing');
         if (typeof hideStore === 'function') {
@@ -213,8 +438,8 @@ async function showStoreInternal(context = 'main-menu') {
     }, 0);
     
     // Show loading modal while refreshing
-    if (typeof showLoadingModal === 'function') {
-      showLoadingModal('Refreshing store... Please wait', 'storeLoadingModal');
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+      MenuPanelLoading.show('Refreshing store... Please wait');
     }
     // Wait for cards to exist, then load inventory and balance
     setTimeout(async () => {
@@ -230,8 +455,8 @@ async function showStoreInternal(context = 'main-menu') {
         }
       } finally {
         // Hide loading modal when refresh is complete
-        if (typeof hideLoadingModal === 'function') {
-          hideLoadingModal('storeLoadingModal');
+        if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+          MenuPanelLoading.hide();
         }
       }
     }, 100);
@@ -240,10 +465,12 @@ async function showStoreInternal(context = 'main-menu') {
   }
   
   // Show loading modal FIRST - before any loading starts
-  if (typeof showLoadingModal === 'function') {
-    showLoadingModal('Loading store... Please wait', 'storeLoadingModal');
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Loading store... Please wait');
   }
-  
+  const storeLoadSteps = buildStoreLoadSteps(context);
+  // Step-list/checklist loading UI removed for consistency with other loaders.
+
   // Get payment token from state (needed for modal HTML)
   let paymentToken = 'mews';
   if (typeof getStoreState === 'function') {
@@ -268,16 +495,23 @@ async function showStoreInternal(context = 'main-menu') {
   storeContent.innerHTML = `
     <!-- Store Header -->
     <div class="store-header">
-      <h2 id="storeTitle">
+      <div class="store-header-spacer" aria-hidden="true"></div>
+      <h2 id="storeTitle" class="store-header-title">
         <span>🛒 Store & Inventory</span>
         <span id="storeBadgeDisplay" class="store-badge-icon" style="display: none;"></span>
       </h2>
+      <div class="store-header-actions">
+        <button type="button" class="menu-btn store-header-back" onclick="hideStore()" id="backToMenuBtn">
+          <span class="btn-icon">←</span> Back to Menu
+        </button>
+      </div>
     </div>
     
     <!-- Store Tabs -->
     <div class="store-tabs" id="storeTabs">
       <button class="store-tab active" onclick="switchStoreTab('inventory')" id="storeTabInventory">Inventory</button>
       <button class="store-tab" onclick="switchStoreTab('items')" id="storeTabItems">Items</button>
+      <button class="store-tab" onclick="switchStoreTab('bundles')" id="storeTabBundles">Bundles</button>
       <button class="store-tab" onclick="switchStoreTab('gamePass')" id="storeTabGamePass">Game Pass</button>
       <button class="store-tab" onclick="switchStoreTab('tickets')" id="storeTabTickets">Tournament Tickets</button>
     </div>
@@ -289,9 +523,9 @@ async function showStoreInternal(context = 'main-menu') {
         <div class="payment-token-buttons">
           <button class="payment-token-btn ${(paymentToken === 'mews') ? 'active' : ''}" 
                   onclick="setPaymentToken('mews')" id="paymentTokenMews">
-            <img src="assets/SuiTwo_Profile.webp" alt="$MEWS" class="token-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+            <img src="assets/SuiTwo_Profile.webp" alt="MEWS" class="token-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
             <span class="token-fallback" style="display: none;">💰</span>
-            <span>$MEWS</span>
+            <span>MEWS</span>
           </button>
           <button class="payment-token-btn ${(paymentToken === 'sui') ? 'active' : ''}" 
                   onclick="setPaymentToken('sui')" id="paymentTokenSui">
@@ -318,48 +552,80 @@ async function showStoreInternal(context = 'main-menu') {
     <div class="store-tab-content-container">
       <!-- Inventory Tab Content -->
       <div class="store-tab-content active" id="storeTabContentInventory">
-        <div id="storeInventoryTabContent">
-          <div class="store-loading">
-            <span class="btn-icon">⏳</span> Loading Inventory...
+        <div class="store-commerce-layout">
+          <div class="store-commerce-products">
+            <div id="storeInventoryTabContent">
+              <div class="store-loading">
+                <span class="btn-icon">⏳</span> Loading Inventory...
+              </div>
+            </div>
           </div>
+          <aside class="store-commerce-cart inventory-merge-aside" aria-label="Item merge">
+            <div class="store-cart-sticky">
+              <section class="store-selected-summary store-cart-panel inventory-merge-panel" data-inventory-merge-panel>
+                <h3 class="store-cart-heading">Merge</h3>
+                <p class="store-cart-empty-hint" data-inventory-merge-hint>
+                  Select an item level on the left to see merge options.
+                </p>
+                <div class="store-selected-items-list" data-inventory-merge-body></div>
+              </section>
+            </div>
+          </aside>
         </div>
       </div>
       
       <!-- Items Tab Content -->
-      <div class="store-tab-content" id="storeTabContentItems">
-    <!-- Store Items Container -->
-    <div class="store-items-container" id="storeItemsContainer">
-      <div class="store-loading" id="storeLoading">
-        <span class="btn-icon">⏳</span> Loading store items...
+      <div class="store-tab-content store-tab-content-commerce" id="storeTabContentItems">
+        <div class="store-commerce-layout">
+          <div class="store-commerce-products">
+            <div class="store-items-container" id="storeItemsContainer">
+              <div class="store-loading" id="storeLoading">
+                <span class="btn-icon">⏳</span> Loading store items...
+              </div>
+            </div>
           </div>
+          ${_STORE_COMMERCE_CART_ASIDE_HTML}
+        </div>
+      </div>
+
+      <!-- Bundles Tab Content -->
+      <div class="store-tab-content store-tab-content-commerce" id="storeTabContentBundles">
+        <div class="store-commerce-layout">
+          <div class="store-commerce-products">
+            <div id="storeBundlesTabContent">
+              <div class="store-loading">
+                <span class="btn-icon">⏳</span> Loading Bundles...
+              </div>
+            </div>
+          </div>
+          ${_STORE_COMMERCE_CART_ASIDE_HTML}
         </div>
       </div>
       
       <!-- Game Pass Tab Content -->
-      <div class="store-tab-content" id="storeTabContentGamePass">
-        <div id="storeGamePassTabContent">
-          <div class="store-loading">
-            <span class="btn-icon">⏳</span> Loading Game Pass options...
+      <div class="store-tab-content store-tab-content-commerce" id="storeTabContentGamePass">
+        <div class="store-commerce-layout">
+          <div class="store-commerce-products">
+            <div id="storeGamePassTabContent">
+              <div class="store-loading">
+                <span class="btn-icon">⏳</span> Loading credits and options...
+              </div>
+            </div>
           </div>
         </div>
       </div>
       
       <!-- Tournament Tickets Tab Content -->
-      <div class="store-tab-content" id="storeTabContentTickets">
-        <div id="storeTournamentTicketsTabContent">
-          <div class="store-loading">
-            <span class="btn-icon">⏳</span> Loading Tournament Tickets...
+      <div class="store-tab-content store-tab-content-commerce" id="storeTabContentTickets">
+        <div class="store-commerce-layout">
+          <div class="store-commerce-products">
+            <div id="storeTournamentTicketsTabContent">
+              <div class="store-loading">
+                <span class="btn-icon">⏳</span> Loading Tournament Tickets...
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-    
-    <!-- Selected Items Summary -->
-    <div class="store-selected-summary" id="storeSelectedSummary" style="display: none;">
-      <h3>Selected Items</h3>
-      <div id="selectedItemsList"></div>
-      <div class="store-total" id="storeTotal">
-        <span>Total: $0.00 (0 $MEWS)</span>
       </div>
     </div>
     
@@ -368,13 +634,7 @@ async function showStoreInternal(context = 'main-menu') {
       <button class="menu-btn" onclick="clearStoreSelection()" id="clearSelectionBtn" style="display: none;">
         <span class="btn-icon">🗑️</span> Clear Selection
       </button>
-      <button class="menu-btn primary" onclick="proceedToPurchase()" id="proceedToPurchaseBtn" style="display: none;" disabled>
-        <span class="btn-icon">💳</span> Proceed to Purchase
-      </button>
-      <button class="menu-btn" onclick="hideStore()" id="backToMenuBtn">
-        <span class="btn-icon">←</span> Back to Menu
-      </button>
-      <button class="menu-btn primary" onclick="continueToGameAfterPurchase()" id="continueToGameBtn" style="display: none;">
+      <button class="menu-btn primary" onclick="handleStoreContinueToGameClick()" id="continueToGameBtn" style="display: none;">
         <span class="btn-icon">▶️</span> Continue to Game
       </button>
       <button class="menu-btn" onclick="backToPreviousModal()" id="backToPreviousModalBtn" style="display: none;">
@@ -422,6 +682,10 @@ async function showStoreInternal(context = 'main-menu') {
         log.debug('STORE MODAL', 'Click outside ignored in credits-only mode - use buttons to navigate');
         return;
       }
+      if (isPrepLoadoutContext(context)) {
+        log.debug('STORE MODAL', 'Click outside ignored in prep loadout — use Back or Start game');
+        return;
+      }
       
       console.log('🟠 [STORE MODAL] Click was outside store modal - closing');
       if (typeof hideStore === 'function') {
@@ -433,69 +697,152 @@ async function showStoreInternal(context = 'main-menu') {
   
   // Load all data BEFORE showing the modal
   try {
-    // Skip loading items and inventory for credits-only mode (faster loading)
-    if (context !== 'credits-only') {
-      // Update loading message
-      if (typeof updateLoadingModalMessage === 'function') {
-        updateLoadingModalMessage('Loading store items... Please wait', 'storeLoadingModal');
-      }
-      
-      // Step 1: Load store items (renders into hidden modal)
-      if (typeof loadStoreItems === 'function') {
-        await loadStoreItems();
-      }
-      
-      // Update loading message
-      if (typeof updateLoadingModalMessage === 'function') {
-        updateLoadingModalMessage('Loading inventory... Please wait', 'storeLoadingModal');
-      }
-      
-      // Step 2: Load and display inventory (after cards are created)
-      if (typeof loadInventoryDisplay === 'function') {
-        await loadInventoryDisplay();
+    // Warm catalog for store tabs. Use short-lived cache for fast modal open,
+    // and avoid forced refreshes during store open (cached store should open without network).
+    if (typeof window !== 'undefined' && window.StoreDataSources && window.StoreDataSources.fetchStoreCatalogRaw) {
+      try {
+        storeLoadingGoToStep('catalog');
+        // Uses STORE_CATALOG_CACHE_TTL_MS (15m); should be a cache hit after menu bootstrap prefetch.
+        const catalog = await window.StoreDataSources.fetchStoreCatalogRaw();
+        // If cache was missing or the cached call failed, do a single forced fetch (still awaited)
+        // so the store has usable catalog data.
+        if (!catalog || catalog.success !== true) {
+          await window.StoreDataSources.fetchStoreCatalogRaw({ forceFetch: true });
+        }
+      } catch (e) {
+        // Non-fatal: store can still open; tabs will fallback to empty states.
+        console.warn('[STORE MODAL] Failed to refresh store catalog', e);
       }
     }
-    
-    // Update loading message (context-aware)
-    if (typeof updateLoadingModalMessage === 'function') {
-      const loadingMessage = context === 'credits-only' 
-        ? 'Loading game pass credits... Please wait'
-        : 'Loading game pass credits... Please wait';
-      updateLoadingModalMessage(loadingMessage, 'storeLoadingModal');
-    }
-    
-    // Step 2.5: Load game pass status (credits and tickets)
-    // Get wallet address first
+
     let walletAddress = null;
     if (typeof getWalletAddress === 'function') {
       walletAddress = getWalletAddress();
     } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
       walletAddress = window.walletAPIInstance.getAddress();
     }
-    
-    if (walletAddress && typeof GamePassService !== 'undefined' && GamePassService.getGamePassStatus) {
+
+    /** When true, reservoir-bundle already applied credits/tickets + inventory for this open */
+    let storeBundleLoadedGamePass = false;
+
+    const surf = getStoreSurfaceRulesResolved(context);
+
+    if (context === 'credits-only') {
+      storeLoadingGoToStep('gamepass');
+    } else {
+      storeLoadingGoToStep('items');
+    }
+
+    if (surf.loadItemsCatalog) {
+      if (typeof loadStoreItems === 'function') {
+        await loadStoreItems();
+      }
+    }
+
+    if (context !== 'credits-only') {
+      storeLoadingGoToStep('inventory');
+      if (walletAddress) {
+        try {
+          // If we already have fresh inventory + cached credits/tickets, skip reservoir-bundle network call.
+          const cachedInv = window.PlayerInventoryCache?.getFreshOrNull?.(walletAddress) || null;
+          const cachedGp =
+            (window._preloadedGamePassStatus && window._preloadedGamePassStatus[walletAddress]) || null;
+
+          if (cachedInv && typeof loadInventoryDisplay === 'function') {
+            await loadInventoryDisplay(cachedInv);
+          }
+          if (cachedGp && cachedGp.success) {
+            const credits = cachedGp.gamesRemaining ?? cachedGp.credits ?? 0;
+            const tickets = cachedGp.ticketCount ?? 0;
+            if (window.GamePassDisplay) {
+              if (typeof window.GamePassDisplay.updateMainMenuDisplay === 'function') {
+                window.GamePassDisplay.updateMainMenuDisplay(credits, tickets);
+              }
+              if (typeof window.GamePassDisplay.updateStoreDisplay === 'function') {
+                window.GamePassDisplay.updateStoreDisplay(credits, tickets);
+              }
+            }
+            storeBundleLoadedGamePass = true;
+          }
+
+          if (!cachedInv || !storeBundleLoadedGamePass) {
+            const bundle =
+              window.PlayerInventoryCache?.fetchReservoirBundleAndCache
+                ? await window.PlayerInventoryCache.fetchReservoirBundleAndCache(walletAddress)
+                : await (async () => {
+                    const baseRaw = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+                    const base = String(baseRaw).replace(/\/?$/, '');
+                    const res = await fetch(`${base}/player/reservoir-bundle/${walletAddress}?contract=new`);
+                    return await res.json().catch(() => null);
+                  })();
+            if (bundle && bundle.success && bundle.gamePass) {
+              if (typeof loadInventoryDisplay === 'function') {
+                await loadInventoryDisplay(bundle.inventory || {});
+              }
+              const gp = bundle.gamePass;
+              const credits = gp.gamesRemaining ?? 0;
+              const tickets = gp.ticketCount ?? 0;
+              if (window.GamePassDisplay) {
+                if (typeof window.GamePassDisplay.updateMainMenuDisplay === 'function') {
+                  window.GamePassDisplay.updateMainMenuDisplay(credits, tickets);
+                }
+                if (typeof window.GamePassDisplay.updateStoreDisplay === 'function') {
+                  window.GamePassDisplay.updateStoreDisplay(credits, tickets);
+                }
+              }
+              if (!window._preloadedGamePassStatus) window._preloadedGamePassStatus = {};
+              window._preloadedGamePassStatus[walletAddress] = {
+                success: true,
+                gamesRemaining: credits,
+                ticketCount: tickets,
+                hasPass: gp.hasPass,
+                isActive: gp.isActive,
+                packType: gp.packType,
+              };
+              storeBundleLoadedGamePass = true;
+            } else if (typeof loadInventoryDisplay === 'function') {
+              await loadInventoryDisplay();
+            }
+          }
+        } catch (e) {
+          log.warn('STORE MODAL', 'Reservoir bundle failed; falling back to inventory + game-pass APIs', e);
+          if (typeof loadInventoryDisplay === 'function') {
+            await loadInventoryDisplay();
+          }
+        }
+      } else if (typeof loadInventoryDisplay === 'function') {
+        await loadInventoryDisplay();
+      }
+    }
+
+    storeLoadingGoToStep('gamepass');
+
+    if (walletAddress && typeof GamePassService !== 'undefined' && GamePassService.getGamePassStatus && !storeBundleLoadedGamePass) {
       try {
-        const gamePassStatus = await GamePassService.getGamePassStatus(walletAddress, true); // Force refresh
-        log.debug('STORE MODAL', 'Game pass status loaded', gamePassStatus);
+        // Balances are wallet-specific and should already be prefetched on wallet connect and on main menu load.
+        // Do not force-refresh here; it causes redundant backend calls when user goes menu -> store -> menu.
+        let gamePassStatus =
+          (window._preloadedGamePassStatus && window._preloadedGamePassStatus[walletAddress]) || null;
+        if (gamePassStatus) {
+          log.debug('STORE MODAL', 'Using cached game pass status', { success: gamePassStatus.success });
+        } else {
+          gamePassStatus = await GamePassService.getGamePassStatus(walletAddress, false);
+          log.debug('STORE MODAL', 'Game pass status fetched (no cache present)', gamePassStatus);
+        }
         
         // Store the status for use by Game Pass tab and display
         if (gamePassStatus.success) {
-          // Update display with loaded status (avoid another API call)
+          const credits = gamePassStatus.gamesRemaining || 0;
+          const tickets = gamePassStatus.ticketCount || 0;
           if (window.GamePassDisplay) {
+            if (typeof window.GamePassDisplay.updateMainMenuDisplay === 'function') {
+              window.GamePassDisplay.updateMainMenuDisplay(credits, tickets);
+            }
             if (typeof window.GamePassDisplay.updateStoreDisplay === 'function') {
-              window.GamePassDisplay.updateStoreDisplay(
-                gamePassStatus.gamesRemaining || 0,
-                gamePassStatus.ticketCount || 0,
-                gamePassStatus.hasPass || false,
-                gamePassStatus.isActive || false
-              );
+              window.GamePassDisplay.updateStoreDisplay(credits, tickets);
             }
           }
-          
-          // Store status globally for Game Pass tab to use
-          if (!window._preloadedGamePassStatus) {
-            window._preloadedGamePassStatus = {};
-          }
+          if (!window._preloadedGamePassStatus) window._preloadedGamePassStatus = {};
           window._preloadedGamePassStatus[walletAddress] = gamePassStatus;
         }
       } catch (error) {
@@ -504,54 +851,14 @@ async function showStoreInternal(context = 'main-menu') {
       }
     }
     
-    // Skip tournament tickets loading for credits-only mode
-    if (context !== 'credits-only') {
-      // Update loading message
-      if (typeof updateLoadingModalMessage === 'function') {
-        updateLoadingModalMessage('Loading tournament tickets... Please wait', 'storeLoadingModal');
-      }
-      
-      // Step 2.6: Load tournament tickets
+    // Tournament Tickets tab content — only when that tab exists in this surface (see StoreContextRules)
+    if (surf.preloadTicketsTab) {
+      storeLoadingGoToStep('tickets');
       // Note: Tournament tickets are stored in the GamePass object's tournament_tickets field
       // The backend's getGamePassStatus() currently doesn't extract tickets, but when it does,
       // they will be available in the gamePassStatus object above
       // For now, tickets are prepared to be loaded as part of game pass status
       // Future: Backend needs to extract tournament_tickets Table from GamePass object and return it
-    }
-    
-    // Update loading message
-    if (typeof updateLoadingModalMessage === 'function') {
-      updateLoadingModalMessage('Loading balance... Please wait', 'storeLoadingModal');
-    }
-    
-    // Step 3: Update balance display
-    if (typeof updateStoreBalance === 'function') {
-      await updateStoreBalance();
-    }
-    
-    // Update loading message
-    if (typeof updateLoadingModalMessage === 'function') {
-      updateLoadingModalMessage('Loading badge... Please wait', 'storeLoadingModal');
-    }
-    
-    // Step 4: Load and display badge (if player has one)
-    // Use 'gamePass' tab for credits-only mode, 'items' for normal mode
-    const defaultTabForBadge = context === 'credits-only' ? 'gamePass' : 'items';
-    if (typeof loadStoreBadgeDisplay === 'function') {
-      await loadStoreBadgeDisplay(defaultTabForBadge);
-    }
-    
-    // Skip UI updates for credits-only mode (no items to update prices for)
-    if (context !== 'credits-only') {
-      // Update loading message
-      if (typeof updateLoadingModalMessage === 'function') {
-        updateLoadingModalMessage('Finalizing store... Please wait', 'storeLoadingModal');
-      }
-      
-      // Step 5: Update UI (including prices with badge discount)
-      if (typeof updateStoreUI === 'function') {
-        await updateStoreUI();
-      }
     }
     
     // Store context in state for later use
@@ -564,10 +871,13 @@ async function showStoreInternal(context = 'main-menu') {
         state.context = context;
       }
     }
-    
+    bumpPrepLoadoutStoreSessionIfNeeded(context);
+
     // All data loaded - now show the modal
     storeModal.classList.remove('store-modal-hidden');
     storeModal.classList.add('store-modal-visible');
+    
+    applyStoreContextChrome(context);
     
     // Update buttons based on initial tab (inventory is default)
     updateStoreButtons('inventory', context);
@@ -576,18 +886,48 @@ async function showStoreInternal(context = 'main-menu') {
     if (typeof switchStoreTab === 'function') {
       await switchStoreTab('inventory');
     }
+
+    // Dismiss the full-store loading overlay as soon as the modal + default tab are usable.
+    // Balance and pending-upgrade badge checks are quick follow-ups (network); they should not block the overlay.
+    storeLoadingGoToStep('balance');
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
+    }
+    if (typeof updateStoreBalance === 'function') {
+      void updateStoreBalance().catch((e) =>
+        log.warn('STORE MODAL', 'Balance update after store open failed', e)
+      );
+    }
+
+    storeLoadingGoToStep('badge');
+    const defaultTabForBadge =
+      context === 'credits-only' ? 'gamePass' : isPrepLoadoutContext(context) ? 'inventory' : 'items';
+    if (typeof loadStoreBadgeDisplay === 'function') {
+      void loadStoreBadgeDisplay(defaultTabForBadge).catch((e) =>
+        log.warn('STORE MODAL', 'Badge display load failed', e)
+      );
+    }
+
+    if (surf.commerceFinalize) {
+      storeLoadingGoToStep('finalize');
+      if (typeof updateStoreUI === 'function') {
+        await updateStoreUI();
+      }
+    }
     
     // Handle special contexts (credits-only or gamePass)
     if (context === 'gamePass' || context === 'credits-only') {
-      // Hide Items and Tickets tabs for credits-only mode
+      // Hide Items/Bundles/Tickets tabs for credits-only mode
       const itemsTab = document.getElementById('storeTabItems');
+      const bundlesTab = document.getElementById('storeTabBundles');
       const ticketsTab = document.getElementById('storeTabTickets');
       const storeTabsContainer = document.getElementById('storeTabs');
       
       if (context === 'credits-only') {
-        // Credits-only mode: hide Items, Inventory, and Tickets tabs
+        // Credits-only mode: hide Items, Bundles, Inventory, and Tickets tabs
         const inventoryTab = document.getElementById('storeTabInventory');
         if (itemsTab) itemsTab.style.display = 'none';
+        if (bundlesTab) bundlesTab.style.display = 'none';
         if (inventoryTab) inventoryTab.style.display = 'none';
         if (ticketsTab) ticketsTab.style.display = 'none';
         if (storeTabsContainer) storeTabsContainer.style.justifyContent = 'center'; // Center the single tab
@@ -637,14 +977,16 @@ async function showStoreInternal(context = 'main-menu') {
       
       // Handle special contexts (credits-only or gamePass)
       if (context === 'gamePass' || context === 'credits-only') {
-        // Hide Items and Tickets tabs for credits-only mode
+        // Hide Items/Bundles/Tickets tabs for credits-only mode
         const itemsTab = document.getElementById('storeTabItems');
+        const bundlesTab = document.getElementById('storeTabBundles');
         const ticketsTab = document.getElementById('storeTabTickets');
         const storeTabsContainer = document.getElementById('storeTabs');
         
         if (context === 'credits-only') {
-          // Credits-only mode: hide Items and Tickets tabs
+          // Credits-only mode: hide Items, Bundles, and Tickets tabs
           if (itemsTab) itemsTab.style.display = 'none';
+          if (bundlesTab) bundlesTab.style.display = 'none';
           if (ticketsTab) ticketsTab.style.display = 'none';
           if (storeTabsContainer) storeTabsContainer.style.justifyContent = 'center'; // Center the single tab
         }
@@ -659,8 +1001,8 @@ async function showStoreInternal(context = 'main-menu') {
     }
   } finally {
     // Hide loading modal when store is fully loaded (or errored)
-    if (typeof hideLoadingModal === 'function') {
-      hideLoadingModal('storeLoadingModal');
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
     }
   }
 }
@@ -697,15 +1039,19 @@ async function loadStoreBadgeDisplay(activeTab = 'items') {
       
       if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
         const badge = badgeData.badge;
-        const tier = badge.tier || 1;
+        const tier =
+          typeof window.normalizeStoreBadgeTier === 'function'
+            ? (window.normalizeStoreBadgeTier(badge.tier) ?? 0)
+            : (Number.isFinite(Number(badge.tier)) ? Math.max(0, Math.floor(Number(badge.tier))) : 0);
         const badgeTitle = badge.name || `Tier ${tier} Badge`;
         
         // Get badge image URL - follow same pattern as badge-ui.js
         let imageSrc = null;
         const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
         const tierName = tierNames[tier] || 'Standard';
-        const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-        const baseUrl = apiBaseUrl.replace(/\/api$/, '');
+        // Badge images are served from the frontend origin (same app)
+        const badgeBase = window.GAME_CONFIG?.BADGE_IMAGE_BASE_URL || window.location?.origin || '';
+        const baseUrl = badgeBase.replace(/\/api\/?$/, '');
         
         // First, try to use imageUrl from badge
         if (badge.imageUrl && typeof badge.imageUrl === 'string' && (badge.imageUrl.startsWith('http://') || badge.imageUrl.startsWith('https://'))) {
@@ -713,7 +1059,7 @@ async function loadStoreBadgeDisplay(activeTab = 'items') {
           log.debug('STORE MODAL', 'Using badge imageUrl', imageSrc);
         } else {
           // Fallback: Construct URL from tier
-          const constructedUrl = `${baseUrl}/Badges/${tierName}.webp`;
+          const constructedUrl = baseUrl ? `${baseUrl}/Badges/${tierName}.webp` : '';
           imageSrc = constructedUrl;
           log.debug('STORE MODAL', 'Constructed image URL from tier', imageSrc);
           
@@ -746,39 +1092,181 @@ async function loadStoreBadgeDisplay(activeTab = 'items') {
           }
         }
         
-        // Get discount information for the active tab
-        // Game Pass and Tickets use gameplay discount, Items use store discount
-        const discounts = window.BadgeService ? window.BadgeService.getDiscountsForTier(tier) : { store: 0, gameplay: 0 };
-        const tabDiscount = (activeTab === 'gamePass' || activeTab === 'tickets') 
-          ? (discounts.gameplay || 0)
-          : (discounts.store || 0);
-        
-        // Construct fallback URL from tier in case image fails to load
-        const fallbackUrl = `${baseUrl}/Badges/${tierName}.webp`;
-        
-        // Display badge icon with tier name and discount - use wrapper structure
-        let imageHTML = '';
-        if (imageSrc) {
-          imageHTML = `<img src="${imageSrc}" alt="${badgeTitle}" class="store-badge-icon-image" 
-                 onerror="this.onerror=null; this.src='${fallbackUrl}';" />`;
-        } else {
-          // No image available, use emoji as text (not as image source)
-          imageHTML = `<span class="store-badge-icon-placeholder">🎖️</span>`;
+        const discounts = badge.discounts && typeof badge.discounts === 'object' ? badge.discounts : { store: 0, gameplay: 0 };
+        const tabDiscount =
+          activeTab === 'gamePass' || activeTab === 'tickets'
+            ? (typeof discounts.gameplay === 'number' ? discounts.gameplay : 0)
+            : typeof window.getStoreBadgeDiscountPercent === 'function'
+              ? window.getStoreBadgeDiscountPercent(badge)
+              : (typeof discounts.store === 'number' ? discounts.store : 0);
+
+        const fallbackUrl = baseUrl ? `${baseUrl}/Badges/${tierName}.webp` : '';
+
+        const emb =
+          badgeData.pendingUpgrade ||
+          (typeof GameDataState !== 'undefined' &&
+            GameDataState.walletAddress === walletAddress &&
+            GameDataState.badge &&
+            GameDataState.badge.pendingUpgrade) ||
+          null;
+        const hasEmbeddedPending = emb && typeof emb === 'object' && typeof emb.success === 'boolean';
+        let hasPendingUpgrade = false;
+        let upgradeData = null;
+        if (hasEmbeddedPending && emb.success && emb.hasPendingUpgrade && emb.badgeId && walletAddress) {
+          hasPendingUpgrade = true;
+          const oldTier = badge.tier;
+          const newTier = emb.newTier != null ? emb.newTier : oldTier + 1;
+          const newTierName = window.BadgeService ? window.BadgeService.getTierName(newTier) : 'Unknown';
+          upgradeData = {
+            oldTier,
+            newTier,
+            newTierName,
+            badgeId: emb.badgeId,
+            sessionId: `upgrade_${walletAddress}_${Date.now()}`,
+          };
         }
-        
-        // Build the badge display with wrapper, image, and text (tier + discount)
-        badgeDisplayContainer.innerHTML = `
-          <div class="store-badge-icon-wrapper">
+
+        const paintStoreBadgeHeader = (hasPH, upg) => {
+          let imageHTML = '';
+          if (imageSrc) {
+            const imgTag = `<img src="${imageSrc}" alt="${badgeTitle}" class="store-badge-icon-image" 
+                 onerror="this.onerror=null; this.src='${fallbackUrl}';" />`;
+            imageHTML = typeof window.wrapBadgeImageWithUpgrade === 'function'
+              ? window.wrapBadgeImageWithUpgrade(imgTag, hasPH, 'store-badge-image-container', 'store-badge-icon-image')
+              : `<div class="store-badge-image-container">${imgTag}</div>`;
+          } else {
+            imageHTML = `<span class="store-badge-icon-placeholder">🎖️</span>`;
+          }
+
+          badgeDisplayContainer.innerHTML = `
+          <div class="store-badge-icon-wrapper ${hasPH ? 'store-badge-has-upgrade store-badge-clickable' : ''}" ${hasPH && upg ? `title="Click to upgrade your badge to ${upg.newTierName}"` : ''}>
             ${imageHTML}
-            <div class="store-badge-text">
-              <div class="store-badge-tier">${tierName}</div>
-              ${tabDiscount > 0 ? `<div class="store-badge-discount">${tabDiscount}% off</div>` : ''}
+            <div class="store-badge-content">
+              <div class="store-badge-text">
+                <div class="store-badge-tier">${tierName}</div>
+                ${tabDiscount > 0 ? `<div class="store-badge-discount">${tabDiscount}% off</div>` : ''}
+              </div>
             </div>
           </div>
         `;
-        
-        badgeDisplayContainer.style.display = 'inline-block';
-        badgeDisplayContainer.title = badgeTitle;
+
+          badgeDisplayContainer.style.display = 'inline-block';
+          badgeDisplayContainer.title = badgeTitle;
+
+          if (hasPH && upg) {
+            const badgeWrapper = badgeDisplayContainer.querySelector('.store-badge-icon-wrapper');
+            if (badgeWrapper) {
+              badgeWrapper.style.cursor = 'pointer';
+              badgeWrapper.addEventListener('click', async () => {
+                log.debug('STORE MODAL', 'Store badge display clicked for upgrade', upg);
+
+                let storeContext = 'main-menu';
+                if (typeof StoreService !== 'undefined' && StoreService._state) {
+                  storeContext = StoreService._state.context || 'main-menu';
+                }
+
+                const storeModal = document.getElementById('storeModal');
+                if (storeModal) {
+                  if (typeof StoreService !== 'undefined') {
+                    if (StoreService._clickOutsideHandler) {
+                      document.removeEventListener('click', StoreService._clickOutsideHandler);
+                      StoreService._clickOutsideHandler = null;
+                      log.debug('STORE MODAL', 'Removed click-outside handler before showing badge upgrade modal');
+                    }
+                  }
+
+                  storeModal.classList.remove('store-modal-visible');
+                  storeModal.classList.add('store-modal-hidden');
+                  log.debug('STORE MODAL', 'Hiding store modal for badge upgrade');
+                }
+
+                if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
+                  window.BadgeUI.showTierUpgradeModal({
+                    oldTier: upg.oldTier,
+                    newTier: upg.newTier,
+                    newTierName: upg.newTierName,
+                    badgeId: upg.badgeId,
+                    sessionId: upg.sessionId,
+                    context: 'store',
+                    onUpgradeComplete: async (upgraded) => {
+                      log.debug('STORE MODAL', 'Badge upgrade modal closed, reopening store', { upgraded });
+
+                      if (upgraded) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        if (window.BadgeService && typeof window.BadgeService.clearBadgeCache === 'function') {
+                          window.BadgeService.clearBadgeCache();
+                        }
+                        if (typeof GameDataState !== 'undefined' && GameDataState.badge?.pendingUpgrade) {
+                          const { pendingUpgrade: _omit, ...rest } = GameDataState.badge;
+                          GameDataState.setBadge(rest);
+                        }
+                      }
+
+                      const mainMenu = document.getElementById('mainMenuOverlay');
+                      if (mainMenu) {
+                        mainMenu.classList.add('main-menu-overlay-hidden');
+                        mainMenu.classList.remove('main-menu-overlay-visible');
+                      }
+
+                      await new Promise(resolve => setTimeout(resolve, 100));
+
+                      let storeModalAfter = document.getElementById('storeModal');
+                      if (storeModalAfter) {
+                        log.debug('STORE MODAL', 'Store modal exists, showing and refreshing');
+                        storeModalAfter.classList.remove('store-modal-hidden');
+                        storeModalAfter.classList.add('store-modal-visible');
+
+                        setTimeout(() => {
+                          if (typeof StoreService !== 'undefined' && StoreService._setupClickOutsideHandler) {
+                            StoreService._setupClickOutsideHandler(storeModalAfter);
+                          }
+                        }, 50);
+
+                        if (typeof StoreService !== 'undefined') {
+                          if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+                            MenuPanelLoading.show('Refreshing store... Please wait');
+                          }
+                          try {
+                            if (StoreService._loadInventoryDisplay) {
+                              await StoreService._loadInventoryDisplay();
+                            }
+                            if (StoreService._updateBalance) {
+                              await StoreService._updateBalance();
+                            }
+                            if (StoreService._updateUI) {
+                              await StoreService._updateUI();
+                            }
+                          } finally {
+                            if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+                              MenuPanelLoading.hide();
+                            }
+                          }
+                        }
+                      } else {
+                        log.debug('STORE MODAL', 'Store modal not found, recreating');
+                        if (typeof StoreService !== 'undefined' && StoreService._showInternal) {
+                          await StoreService._showInternal(storeContext);
+                        } else if (typeof showStoreInternal === 'function') {
+                          await showStoreInternal(storeContext);
+                        } else if (typeof showStore === 'function') {
+                          await showStore(storeContext, true);
+                        }
+                      }
+
+                      await new Promise(resolve => setTimeout(resolve, 200));
+
+                      if (typeof loadStoreBadgeDisplay === 'function') {
+                        await loadStoreBadgeDisplay(activeTab);
+                      }
+                    },
+                  });
+                }
+              });
+            }
+          }
+        };
+
+        paintStoreBadgeHeader(hasPendingUpgrade, upgradeData);
       } else {
         // No badge, hide display
         badgeDisplayContainer.style.display = 'none';
@@ -807,25 +1295,12 @@ async function getTabDiscount(tabName, walletAddress) {
   try {
     const badge = await window.BadgeService.getBadge(walletAddress);
     if (badge && badge.success && badge.hasBadge && badge.badge) {
-      // Use getDiscountsForTier for consistency
-      if (typeof window.BadgeService.getDiscountsForTier === 'function') {
-        const discounts = window.BadgeService.getDiscountsForTier(badge.badge.tier);
-        // Game Pass and Tickets use gameplay discount, Items use store discount
-        if (tabName === 'gamePass' || tabName === 'tickets') {
-          return discounts.gameplay || 0;
-        } else {
-          // Items tab uses store discount
-          return discounts.store || 0;
-        }
-      } else if (typeof window.BadgeService.getDiscounts === 'function') {
-        // Fallback to getDiscounts if getDiscountsForTier not available
-        const discounts = window.BadgeService.getDiscounts(badge.badge.tier);
-        if (tabName === 'gamePass' || tabName === 'tickets') {
-          return discounts.gameplay || 0;
-        } else {
-          return discounts.store || 0;
-        }
+      const d = badge.badge.discounts && typeof badge.badge.discounts === 'object' ? badge.badge.discounts : null;
+      if (!d) return 0;
+      if (tabName === 'gamePass' || tabName === 'tickets') {
+        return typeof d.gameplay === 'number' && Number.isFinite(d.gameplay) ? Math.max(0, d.gameplay) : 0;
       }
+      return typeof d.store === 'number' && Number.isFinite(d.store) ? Math.max(0, d.store) : 0;
     }
   } catch (error) {
     log.warn('STORE MODAL', `Failed to get badge discount for ${tabName} tab`, error);
@@ -836,16 +1311,20 @@ async function getTabDiscount(tabName, walletAddress) {
 
 /**
  * Switch between store tabs
- * @param {string} tabName - Tab name ('items' or 'gamePass')
+ * @param {string} tabName - Tab name ('inventory', 'items', 'bundles', 'gamePass', 'tickets')
  */
 async function switchStoreTab(tabName) {
   console.log('🔄 [STORE MODAL] switchStoreTab called', tabName);
   
-  // Get current context
-  let context = 'main-menu';
-  if (typeof getStoreState === 'function') {
-    const state = getStoreState();
-    context = state.context || 'main-menu';
+  const context = getStoreUiContext();
+  if (
+    typeof window !== 'undefined' &&
+    window.StoreContextRules &&
+    typeof window.StoreContextRules.isTabAllowed === 'function' &&
+    !window.StoreContextRules.isTabAllowed(context, tabName)
+  ) {
+    log.debug('STORE MODAL', 'Tab not allowed for store context', { context, tabName });
+    return;
   }
   
   // Update buttons based on active tab
@@ -853,13 +1332,18 @@ async function switchStoreTab(tabName) {
   
   // For credits-only mode, ensure only Game Pass tab is accessible
   const itemsTab = document.getElementById('storeTabItems');
+  const bundlesTab = document.getElementById('storeTabBundles');
   const inventoryTab = document.getElementById('storeTabInventory');
   const ticketsTab = document.getElementById('storeTabTickets');
   const gamePassTab = document.getElementById('storeTabGamePass');
   
-  // If Items, Inventory, or Tickets tabs are hidden (credits-only mode), prevent switching to them
+  // If tabs are hidden (credits-only mode), prevent switching to them
   if (tabName === 'items' && itemsTab && itemsTab.style.display === 'none') {
     console.warn('🔄 [STORE MODAL] Items tab is hidden in credits-only mode');
+    return;
+  }
+  if (tabName === 'bundles' && bundlesTab && bundlesTab.style.display === 'none') {
+    console.warn('🔄 [STORE MODAL] Bundles tab is hidden in credits-only mode');
     return;
   }
   if (tabName === 'inventory' && inventoryTab && inventoryTab.style.display === 'none') {
@@ -899,6 +1383,33 @@ async function switchStoreTab(tabName) {
     // Update badge display to show store discount for Items tab
     if (typeof loadStoreBadgeDisplay === 'function') {
       await loadStoreBadgeDisplay('items');
+    }
+  } else if (tabName === 'bundles') {
+    const bundlesTab = document.getElementById('storeTabContentBundles');
+    const bundlesTabBtn = document.getElementById('storeTabBundles');
+    if (bundlesTab) bundlesTab.classList.add('active');
+    if (bundlesTabBtn) bundlesTabBtn.classList.add('active');
+
+    if (window.StoreBundlesTab) {
+      try {
+        await window.StoreBundlesTab.render();
+        if (typeof loadStoreBadgeDisplay === 'function') {
+          await loadStoreBadgeDisplay('bundles');
+        }
+      } catch (error) {
+        log.error('STORE MODAL', 'Error loading Bundles tab', error);
+        const container = document.getElementById('storeBundlesTabContent');
+        if (container) {
+          container.innerHTML = `
+            <div class="store-placeholder">
+              <p>❌ Error loading Bundles</p>
+              <p style="font-size: 0.9em; color: #888; margin-top: 10px;">
+                ${error.message || 'Unknown error'}
+              </p>
+            </div>
+          `;
+        }
+      }
     }
   } else if (tabName === 'inventory') {
     console.log('📦 [STORE MODAL] Switching to Inventory tab');
@@ -1039,7 +1550,7 @@ async function switchStoreTab(tabName) {
         if (container) {
           container.innerHTML = `
             <div class="store-placeholder">
-              <p>❌ Error loading Game Pass</p>
+              <p>❌ Error loading credits and tickets</p>
               <p style="font-size: 0.9em; color: #888; margin-top: 10px;">
                 ${error.message || 'Unknown error'}
               </p>
@@ -1171,35 +1682,49 @@ async function switchStoreTab(tabName) {
 
 /**
  * Update store action buttons based on active tab and context
- * @param {string} activeTab - Active tab name ('items', 'gamePass', 'tickets')
+ * @param {string} activeTab - Active tab name ('items', 'bundles', 'gamePass', 'tickets')
  * @param {string} context - Store context ('main-menu', 'credits-only', 'gamePass')
  */
 function updateStoreButtons(activeTab = 'items', context = 'main-menu') {
   const clearBtn = document.getElementById('clearSelectionBtn');
-  const proceedBtn = document.getElementById('proceedToPurchaseBtn');
   const backToMenuBtn = document.getElementById('backToMenuBtn');
   const continueToGameBtn = document.getElementById('continueToGameBtn');
   const backToPreviousModalBtn = document.getElementById('backToPreviousModalBtn');
-  
+  const cartPurchaseBtns = document.querySelectorAll('[data-store-cart-purchase]');
+
+  const setCartPurchaseVisible = (on) => {
+    cartPurchaseBtns.forEach((b) => {
+      b.style.display = on ? '' : 'none';
+    });
+  };
+
   // Hide all buttons first
   if (clearBtn) clearBtn.style.display = 'none';
-  if (proceedBtn) proceedBtn.style.display = 'none';
   if (backToMenuBtn) backToMenuBtn.style.display = 'none';
   if (continueToGameBtn) continueToGameBtn.style.display = 'none';
   if (backToPreviousModalBtn) backToPreviousModalBtn.style.display = 'none';
-  
+  setCartPurchaseVisible(false);
+
   // Show buttons based on active tab and context
-  if (activeTab === 'items') {
-    // Items tab: show Clear Selection, Proceed to Purchase, and Back to Menu
+  if (activeTab === 'items' || activeTab === 'bundles') {
     if (clearBtn) clearBtn.style.display = '';
-    if (proceedBtn) proceedBtn.style.display = '';
     if (backToMenuBtn) backToMenuBtn.style.display = '';
+    setCartPurchaseVisible(true);
+    if (isPrepLoadoutContext(context) && continueToGameBtn) {
+      continueToGameBtn.style.display = '';
+      continueToGameBtn.innerHTML = '<span class="btn-icon">▶️</span> Start game';
+    }
   } else if (activeTab === 'inventory') {
-    // Inventory tab: just show Back to Menu
-    if (backToMenuBtn) backToMenuBtn.style.display = '';
+    if (isPrepLoadoutContext(context)) {
+      if (backToMenuBtn) backToMenuBtn.style.display = '';
+      if (continueToGameBtn) {
+        continueToGameBtn.style.display = '';
+        continueToGameBtn.innerHTML = '<span class="btn-icon">▶️</span> Start game';
+      }
+    } else if (backToMenuBtn) {
+      backToMenuBtn.style.display = '';
+    }
   } else if (activeTab === 'gamePass' || activeTab === 'tickets') {
-    // Game Pass or Tickets tabs: direct purchases, no proceed button needed
-    
     // If in credits-only mode (from End Demo modal), check if we should show Continue/Back options
     if (context === 'credits-only' && window._endDemoPurchaseContext) {
       // Check if player now has credits (after purchase)
@@ -1219,7 +1744,6 @@ function updateStoreButtons(activeTab = 'items', context = 'main-menu') {
         if (backToPreviousModalBtn) backToPreviousModalBtn.style.display = '';
       }
     } else {
-      // Normal mode: just show Back to Menu
       if (backToMenuBtn) backToMenuBtn.style.display = '';
     }
   }
@@ -1265,8 +1789,8 @@ function backToPreviousModal() {
         // Re-check credits status
         let hasCredits = false;
         if (window.GamePassService) {
-          window.GamePassService.getGamePassStatus(walletAddress, true).then((status) => {
-            hasCredits = status.success && status.hasPass && status.isActive && (status.gamesRemaining || 0) > 0;
+          window.GamePassService.getCreditsAndTickets(walletAddress, true).then((status) => {
+            hasCredits = status.success && (status.credits || 0) > 0;
             
             // Get score using the same logic as the game UI overlay
             // Priority: _fallbackScore > secureGame.score > game.score getter
@@ -1382,5 +1906,11 @@ if (typeof window !== 'undefined') {
   window.updateStoreButtons = updateStoreButtons;
   window.continueToGameAfterPurchase = continueToGameAfterPurchase;
   window.backToPreviousModal = backToPreviousModal;
+  window.applyStoreContextChrome = applyStoreContextChrome;
+  window.getStoreUiContext = getStoreUiContext;
+  window.cancelTournamentEntryStore = cancelTournamentEntryStore;
+  window.startGameFromPrepLoadoutStore = startGameFromPrepLoadoutStore;
+  window.startGameFromTournamentEntryStore = startGameFromPrepLoadoutStore;
+  window.handleStoreContinueToGameClick = handleStoreContinueToGameClick;
 }
 

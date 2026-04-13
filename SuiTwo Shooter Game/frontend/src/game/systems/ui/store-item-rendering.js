@@ -5,6 +5,22 @@
 
 console.log('✅ [STORE ITEM RENDERING] Store item rendering module loaded');
 
+function getStoreOffersMap() {
+  const state = typeof getStoreState === 'function' ? getStoreState() : null;
+  return state?.storeOffers || null;
+}
+
+function toDynamicProvisionKey(raw) {
+  return (window.StoreOfferUtils && window.StoreOfferUtils.toDynamicProvisionKey)
+    ? window.StoreOfferUtils.toDynamicProvisionKey(raw)
+    : String(raw || '')
+        .trim()
+        .replace(/[-\s]+/g, '_')
+        .replace(/([A-Z])/g, '_$1')
+        .replace(/^_+/, '')
+        .toLowerCase();
+}
+
 /**
  * Create item card element
  */
@@ -22,27 +38,74 @@ async function createItemCard(item) {
     
     if (walletAddress && window.BadgeService && window.BadgeService.getBadge) {
       const badgeData = await window.BadgeService.getBadge(walletAddress);
-      if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
-        const discounts = window.BadgeService.getDiscountsForTier(badgeData.badge.tier);
-        badgeDiscount = discounts.store;
+      console.log('🔍 [STORE ITEM RENDERING] Badge check result:', {
+        success: badgeData?.success,
+        hasBadge: badgeData?.hasBadge,
+        badgeExists: !!badgeData?.badge,
+        tier: badgeData?.badge?.tier,
+        badgeId: badgeData?.badge?.badgeId,
+        fullResponse: badgeData
+      });
+      
+      if (
+        badgeData &&
+        badgeData.success === true &&
+        badgeData.hasBadge === true &&
+        badgeData.badge &&
+        typeof window.getStoreBadgeDiscountPercent === 'function'
+      ) {
+        badgeDiscount = window.getStoreBadgeDiscountPercent(badgeData.badge);
+        console.log('✅ [STORE ITEM RENDERING] Badge discount found:', badgeDiscount, '% (tier', badgeData.badge.tier, ')');
+      } else {
+        console.log('✅ [STORE ITEM RENDERING] No badge discount - hasBadge:', badgeData?.hasBadge, 'badge:', !!badgeData?.badge, 'tier:', badgeData?.badge?.tier);
       }
     }
   } catch (error) {
     console.warn('⚠️ [STORE ITEM RENDERING] Failed to get badge discount for item card:', error);
+    // Ensure discount is 0 on error
+    badgeDiscount = 0;
   }
   
-  // Check if item has multiple levels
-  const hasMultipleLevels = item.levels.length > 1;
+  const levels = Array.isArray(item?.levels) ? item.levels : [];
+  const hasLevels = levels.length > 0;
+  const hasMultipleLevels = levels.length > 1;
   
   // Build level buttons HTML
   let levelsHTML = '';
-  item.levels.forEach(levelData => {
+  const renderLevels = hasLevels ? levels : (function buildBaseLevel() {
+    // For no-level items, price may live only in the offers map (Stockroom item listing base offerId = "<itemId>").
+    const id = String(item?.id || '').trim();
+    const dyn = toDynamicProvisionKey(id);
+    const resolvedOfferId =
+      (window.StoreOfferUtils && window.StoreOfferUtils.resolveOfferIdForItemLevel)
+        ? window.StoreOfferUtils.resolveOfferIdForItemLevel(id, 1)
+        : null;
+    const offerUsd =
+      (window.StoreOfferUtils && window.StoreOfferUtils.resolveUsdUnitPrice)
+        ? window.StoreOfferUtils.resolveUsdUnitPrice({ itemId: id, level: 1 })
+        : null;
+    const directUsd =
+      (item?.usdPrice != null && Number(item.usdPrice) >= 0)
+        ? Number(item.usdPrice)
+        : ((item?.priceUsdCents != null && Number(item.priceUsdCents) >= 0)
+          ? Number(item.priceUsdCents) / 100
+          : null);
+    return [{
+    level: 1,
+    effect: item?.effect || item?.description || '',
+    usdPrice:
+      (directUsd != null ? directUsd : (offerUsd != null ? offerUsd : 0)),
+    prices: item?.prices,
+    }];
+  })();
+
+  renderLevels.forEach(levelData => {
     const level = levelData.level || 1;
     const quantity = typeof getItemQuantity === 'function' ? getItemQuantity(item.id, level) : 0;
     const hasQuantity = quantity > 0;
     
     // Apply badge discount to price
-    const originalPrice = levelData.usdPrice;
+    const originalPrice = Number(levelData.usdPrice || 0);
     const discountedPrice = badgeDiscount > 0 
       ? originalPrice * (1 - badgeDiscount / 100)
       : originalPrice;
@@ -70,17 +133,56 @@ async function createItemCard(item) {
       paymentToken = state.paymentToken || 'mews';
     }
     
-    // Use prices from backend API if available, otherwise calculate
+    // Always recalculate using fresh prices from state to ensure consistency with purchase API
+    // This ensures the displayed price matches what the wallet will show
     let tokenPriceDisplay = '';
-    const tokenSymbol = paymentToken === 'sui' ? 'SUI' : (paymentToken === 'usdc' ? 'USDC' : '$MEWS');
+    const tokenSymbol = paymentToken === 'sui' ? 'SUI' : (paymentToken === 'usdc' ? 'USDC' : 'MEWS');
     
-    if (levelData.prices && levelData.prices[paymentToken]) {
-      // Use backend-provided price
-      tokenPriceDisplay = levelData.prices[paymentToken].display || '';
+    // Get fresh prices from state (same ones used by purchase API)
+    let freshPrices = null;
+    if (typeof getStoreState === 'function') {
+      const state = getStoreState();
+      freshPrices = state?.tokenPrices;
+    } else if (typeof StoreService !== 'undefined' && StoreService.getState) {
+      const state = StoreService.getState();
+      freshPrices = state?.tokenPrices;
+    }
+    
+    if (freshPrices && typeof convertUsdToToken === 'function') {
+      // Always recalculate using fresh prices to match purchase API
+      const tokenConversion = convertUsdToToken(usdPrice, paymentToken, freshPrices);
+      tokenPriceDisplay = tokenConversion.formatted;
+      // Log full calculation details
+      const calculation = usdPrice / freshPrices[paymentToken];
+      console.log('💰 [STORE ITEM RENDERING] Price calculation for display', {
+        itemId: item.id,
+        level,
+        usdPrice,
+        paymentToken,
+        tokenPrice: freshPrices[paymentToken],
+        rawCalculation: calculation,
+        calculatedAmount: tokenConversion.amount,
+        displayAmount: tokenPriceDisplay,
+        formattedDetails: {
+          calculation: `${usdPrice} / ${freshPrices[paymentToken]} = ${calculation}`,
+          expectedResult: `${calculation} ${paymentToken.toUpperCase()}`,
+        },
+      });
+    } else if (levelData.prices && levelData.prices[paymentToken] && levelData.prices[paymentToken].display) {
+      // Fallback to backend-provided price if fresh prices not available
+      tokenPriceDisplay = levelData.prices[paymentToken].display;
+      console.warn('⚠️ [STORE ITEM RENDERING] Using backend-provided price (fresh prices not available)', {
+        itemId: item.id,
+        level,
+        paymentToken,
+        backendDisplay: tokenPriceDisplay,
+        backendAmount: levelData.prices[paymentToken].amount,
+        usdPrice,
+      });
     } else {
-      // Fallback to calculated price
+      // Last resort: calculate without prices
       if (typeof convertUsdToToken === 'function') {
-        const tokenConversion = convertUsdToToken(levelData.usdPrice, paymentToken);
+        const tokenConversion = convertUsdToToken(usdPrice, paymentToken);
         tokenPriceDisplay = tokenConversion.formatted;
       } else {
         tokenPriceDisplay = 'N/A';
@@ -90,21 +192,31 @@ async function createItemCard(item) {
     const levelClass = hasMultipleLevels ? 'item-level-btn' : 'item-single-btn';
     const selectedClass = hasQuantity ? 'selected' : '';
     
+    const offerId =
+      (window.StoreOfferUtils && window.StoreOfferUtils.resolveOfferIdForItemLevel)
+        ? window.StoreOfferUtils.resolveOfferIdForItemLevel(item.id, level)
+        : null;
+    const isLevelLessSingle = !hasLevels; // item has no levels array in Provisions
+    const onClick =
+      (isLevelLessSingle && offerId)
+        ? `selectStoreOffer('${offerId}')`
+        : `selectStoreItem('${item.id}', ${level})`;
+
     levelsHTML += `
       <div class="item-level-container ${selectedClass}" data-item-id="${item.id}" data-level="${level}">
         <div class="level-button-wrapper">
           <button class="${levelClass} ${selectedClass}" 
-                  onclick="selectStoreItem('${item.id}', ${level})"
+                  onclick="${onClick}"
                   data-item-id="${item.id}"
                   data-level="${level}">
             <div class="level-info">
               <div class="level-name">${hasMultipleLevels ? `Level ${level}` : item.name}</div>
-              <div class="level-effect">${levelData.effect}</div>
+              <div class="level-effect">${levelData.effect || ''}</div>
             </div>
             <div class="level-price">
               <div class="price-usd">${usdPriceHTML}</div>
               <div class="price-token">${tokenPriceDisplay} ${tokenSymbol}</div>
-              ${badgeDiscount > 0 ? `<div class="badge-discount-badge" style="font-size: 0.75rem; color: #39ff14; margin-top: 0.25rem;">🎖️ ${badgeDiscount}% off</div>` : ''}
+              ${badgeDiscount > 0 ? `<div class="badge-discount-badge" style="font-size: 0.75rem; color: #39ff14; margin-top: 0.25rem;">Badge: ${badgeDiscount}% off</div>` : ''}
             </div>
           </button>
           ${hasQuantity ? `

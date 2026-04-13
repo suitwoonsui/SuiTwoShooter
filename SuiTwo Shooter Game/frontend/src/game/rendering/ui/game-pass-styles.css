@@ -2,14 +2,18 @@
    GAME PASS STYLES
    ========================================== */
 
-/* Credit Display in Menu */
-#gamePassCreditsDisplay {
+/* Credit and Ticket displays in menu footer - match other stat-items (height/layout from .game-stats .stat-item) */
+#gamePassCreditsDisplay,
+#gamePassTicketsDisplay {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: min(1vh, 1.2vw);
+  justify-content: center;
+  gap: 0;
 }
 
-#gamePassCreditsValue {
+#gamePassCreditsValue,
+#gamePassTicketsValue {
   font-weight: bold;
   color: #FFD700;
 }
@@ -46,8 +50,7 @@
   border: min(0.2vw, 0.3vh) solid #FFD700;
   border-radius: min(2vh, 2.5vw);
   padding: min(3vh, 4vw);
-  max-width: min(50vh, 60vw);
-  width: min(90vw, 90vh);
+  width: 90vw;
   text-align: center;
   box-shadow: 0 min(1vh, 1.5vw) min(4vh, 5vw) rgba(0, 0, 0, 0.5);
 }
@@ -482,6 +485,13 @@
   background: rgba(77, 162, 255, 0.1);
   border-color: rgba(77, 162, 255, 0.4);
   transform: translateX(min(0.5vh, 0.6vw));
+}
+
+/* Merge selection only — not `.selected` (consumption UI uses `.selected` on different controls). */
+.inventory-item-level-card.inventory-merge-selected {
+  background: rgba(77, 162, 255, 0.18);
+  border-color: rgba(77, 162, 255, 0.75);
+  box-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.35);
 }
 
 .inventory-item-level-info {

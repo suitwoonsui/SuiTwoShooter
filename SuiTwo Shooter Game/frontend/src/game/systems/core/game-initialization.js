@@ -50,12 +50,30 @@ function initializeGameLogic(game, initSecurity, resetCoinStreak, player, clearG
     returnToTournament: game.returnToTournament,
   };
   
+  // Start replay recording for this run (server will compute score from replay)
+  if (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.startRun === 'function') {
+    window.ReplayRecorder.startRun();
+  }
+
   // Reset base game state using GameState.reset()
   if (game && typeof game.reset === 'function') {
     game.reset();
   } else {
     console.warn('⚠️ GameState.reset() not available, using fallback reset');
     // Fallback: manual reset if GameState not available
+    // Always set session ID for this run (same as GameState.reset(); ensures submit never fails for missing session)
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      game.sessionId = crypto.randomUUID();
+    } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const timestamp = Date.now();
+      const randomBytes = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      game.sessionId = `${timestamp}-${randomBytes}`;
+    } else {
+      const n = (typeof window !== 'undefined' && (window.__gameSessionIdCounter = (window.__gameSessionIdCounter || 0) + 1)) || 0;
+      game.sessionId = `session_${Date.now()}_${n}_${Math.random().toString(36).slice(2, 11)}`;
+    }
     game._fallbackScore = 0;
     game.scrollSpeed = game.baseScrollSpeed;
     game.enemySpeed = game.baseEnemySpeed;
@@ -128,8 +146,8 @@ function initializeGameLogic(game, initSecurity, resetCoinStreak, player, clearG
   
   // Initialize orb level with purchased orb level start
   game.startingOrbLevel = 1; // Default starting level
-  if (game.selectedItems && game.selectedItems.orbLevel) {
-    const orbLevelPurchase = game.selectedItems.orbLevel;
+  if (game.selectedItems && game.selectedItems.orb_level) {
+    const orbLevelPurchase = game.selectedItems.orb_level;
     // Level 1 purchase = start at 2, Level 2 = start at 3, Level 3 = start at 4
     game.startingOrbLevel = orbLevelPurchase + 1;
     game.projectileLevel = game.startingOrbLevel;
@@ -137,7 +155,7 @@ function initializeGameLogic(game, initSecurity, resetCoinStreak, player, clearG
     
     // Add to batch consumption list
     itemsToConsume.push({
-      itemId: 'orbLevel',
+      itemId: 'orb_level',
       level: orbLevelPurchase,
       quantity: 1,
     });
@@ -158,15 +176,15 @@ function initializeGameLogic(game, initSecurity, resetCoinStreak, player, clearG
   game.purchasedLives = 0; // Purchased extra lives
   
   // Check for extra lives in selected items
-  if (game.selectedItems && game.selectedItems.extraLives) {
-    const extraLivesLevel = game.selectedItems.extraLives;
+  if (game.selectedItems && game.selectedItems.extra_lives) {
+    const extraLivesLevel = game.selectedItems.extra_lives;
     // Level 1 = +1, Level 2 = +2, Level 3 = +3
     game.purchasedLives = extraLivesLevel;
     console.log(`❤️ [EXTRA LIVES] Starting with ${extraLivesLevel} extra lives (Level ${extraLivesLevel})`);
     
     // Add to batch consumption list
     itemsToConsume.push({
-      itemId: 'extraLives',
+      itemId: 'extra_lives',
       level: extraLivesLevel,
       quantity: 1,
     });
@@ -178,15 +196,15 @@ function initializeGameLogic(game, initSecurity, resetCoinStreak, player, clearG
   
   // Reset force field system
   // Check for purchased force field in selected items
-  if (game.selectedItems && game.selectedItems.forceField) {
-    const forceFieldLevel = game.selectedItems.forceField;
+  if (game.selectedItems && game.selectedItems.force_field) {
+    const forceFieldLevel = game.selectedItems.force_field;
     game.forceField.level = forceFieldLevel;
     game.forceField.active = true;
     console.log(`🛡️ [FORCE FIELD] Starting with Level ${forceFieldLevel} force field`);
     
     // Add to batch consumption list
     itemsToConsume.push({
-      itemId: 'forceField',
+      itemId: 'force_field',
       level: forceFieldLevel,
       quantity: 1,
     });
@@ -195,35 +213,10 @@ function initializeGameLogic(game, initSecurity, resetCoinStreak, player, clearG
     game.forceField.active = false;
   }
   
-  // Batch consume all start items in a single transaction
+  // Start items (orb_level, extra_lives, force_field) are already consumed in one atomic tx with the game credit
+  // via POST /api/game-pass/start-game (Channel batch: reservoir-consume-balance-and-items). Do not consume again here.
   if (itemsToConsume.length > 0) {
-    console.log(`🍽️ [CONSUMPTION] Batch consuming ${itemsToConsume.length} start items in single transaction:`, itemsToConsume);
-    
-    // Use batch consumption function if available
-    if (typeof consumeItemsFromBlockchain === 'function') {
-      consumeItemsFromBlockchain(itemsToConsume).catch(error => {
-        console.error('❌ [CONSUMPTION] Failed to batch consume start items from blockchain:', error);
-        // Continue game even if blockchain consumption fails
-      });
-      console.log(`✅ [CONSUMPTION] Batch consumed ${itemsToConsume.length} start items (blockchain)`);
-    } else if (typeof consumeItemFromBlockchain === 'function') {
-      // Fallback: consume items one by one if batch function not available
-      console.warn('⚠️ [CONSUMPTION] Batch function not available, consuming items individually');
-      for (const item of itemsToConsume) {
-        consumeItemFromBlockchain(item.itemId, item.level, item.quantity).catch(error => {
-          console.error(`❌ [CONSUMPTION] Failed to consume ${item.itemId} from blockchain:`, error);
-        });
-      }
-    } else {
-      // Fallback to localStorage if blockchain functions not available
-      if (typeof removeItemFromInventory === 'function') {
-        const walletAddress = typeof getWalletAddress === 'function' ? getWalletAddress() : null;
-        for (const item of itemsToConsume) {
-          removeItemFromInventory(item.itemId, item.level, item.quantity, walletAddress);
-          console.log(`✅ [CONSUMPTION] Consumed ${item.itemId} level ${item.level} at game start (localStorage fallback)`);
-        }
-      }
-    }
+    console.log(`🍽️ [CONSUMPTION] Start items (${itemsToConsume.length}) were already consumed with credit via channel batch at game start`);
   }
   
   // Reset coin streak and force field

@@ -21,6 +21,186 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
 log.info('LEADERBOARD MODAL', 'Leaderboard modal module loaded');
 
 /**
+ * Menu scripts load in parallel; this file may run before achievement-progress.js.
+ * Real logic is registered as __switchMilestoneTabImpl when that module finishes.
+ */
+(function initMilestoneTabForwarding() {
+  if (typeof window.switchMilestoneTab === 'function') return;
+
+  if (window.__milestoneTabForwarderInstalled) return;
+  window.__milestoneTabForwarderInstalled = true;
+
+  let pendingTab = null;
+  let pendingSubTab = null;
+
+  window.switchMilestoneTab = function switchMilestoneTabForward(tab) {
+    if (typeof window.__switchMilestoneTabImpl === 'function') {
+      return window.__switchMilestoneTabImpl(tab);
+    }
+    pendingTab = tab;
+  };
+
+  window.switchMilestoneSubTab = function switchMilestoneSubTabForward(subTab) {
+    if (typeof window.__switchMilestoneSubTabImpl === 'function') {
+      return window.__switchMilestoneSubTabImpl(subTab);
+    }
+    pendingSubTab = subTab;
+  };
+
+  window.__bindMilestoneTabImplementations = function __bindMilestoneTabImplementations() {
+    if (typeof window.__switchMilestoneTabImpl !== 'function') return;
+
+    if (pendingTab !== null) {
+      const t = pendingTab;
+      pendingTab = null;
+      pendingSubTab = null;
+      window.__switchMilestoneTabImpl(t);
+      return;
+    }
+
+    if (pendingSubTab !== null && typeof window.__switchMilestoneSubTabImpl === 'function') {
+      const s = pendingSubTab;
+      pendingSubTab = null;
+      window.__switchMilestoneSubTabImpl(s);
+    }
+  };
+})();
+
+/**
+ * Toggle Leaderboard vs Milestones panels in the DOM immediately so the UI updates even if
+ * achievement-progress handlers throw or load order left __switchMilestoneTabImpl unset briefly.
+ */
+function applyLeaderboardModalMainTabDOM(tab) {
+  const m = document.getElementById('leaderboardModal');
+  if (!m) return;
+  const lb = m.querySelector('.leaderboard');
+  if (!lb) return;
+  const isLeaderboard = tab === 'leaderboard';
+
+  lb.querySelectorAll('.leaderboard-split-tabs .milestone-tab').forEach((b) => {
+    const active =
+      (isLeaderboard && b.id === 'milestoneTabLeaderboard') ||
+      (!isLeaderboard && b.id === 'milestoneTabMilestones');
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  Array.from(lb.children).forEach((panel) => {
+    if (!panel.classList || !panel.classList.contains('milestone-tab-content')) return;
+    const active =
+      (isLeaderboard && panel.id === 'milestoneTabContentLeaderboard') ||
+      (!isLeaderboard && panel.id === 'milestoneTabContentMilestones');
+    panel.classList.toggle('active', active);
+  });
+
+  if (isLeaderboard && window.LeaderboardService && typeof window.LeaderboardService.getCurrentCategory === 'function') {
+    const titleEl = document.getElementById('leaderboardCategoryTitle');
+    if (titleEl) {
+      const cat = window.LeaderboardService.getCurrentCategory();
+      titleEl.textContent = `${cat.icon} ${cat.name}`;
+    }
+  }
+}
+
+/**
+ * Prefer achievement-progress impl for sub-tab + loadMilestoneProgress; DOM swap always runs first.
+ */
+function invokeSwitchMilestoneTab(tab) {
+  applyLeaderboardModalMainTabDOM(tab);
+
+  if (typeof window.__bindMilestoneTabImplementations === 'function') {
+    window.__bindMilestoneTabImplementations();
+  }
+
+  const run =
+    typeof window.__switchMilestoneTabImpl === 'function'
+      ? window.__switchMilestoneTabImpl
+      : typeof window.switchMilestoneTab === 'function'
+        ? window.switchMilestoneTab
+        : null;
+
+  if (run) {
+    try {
+      run(tab);
+    } catch (err) {
+      log.error('LEADERBOARD MODAL', 'switchMilestoneTab threw', err);
+      if (tab === 'milestones') {
+        fallbackLoadMilestonePanel();
+      }
+    }
+    return;
+  }
+
+  log.warn(
+    'LEADERBOARD MODAL',
+    'No switchMilestoneTab impl — using DOM + direct milestone load if available'
+  );
+  if (tab === 'milestones') {
+    fallbackLoadMilestonePanel();
+  }
+}
+
+function fallbackLoadMilestonePanel() {
+  const sub = window._currentMilestoneSubTab || 'per-game';
+  const runSub = window.__switchMilestoneSubTabImpl || window.switchMilestoneSubTab;
+  if (typeof runSub === 'function') {
+    try {
+      runSub(sub);
+    } catch (e) {
+      log.error('LEADERBOARD MODAL', 'switchMilestoneSubTab threw', e);
+      if (typeof window.loadMilestoneProgress === 'function') {
+        window.loadMilestoneProgress(sub);
+      }
+    }
+  } else if (typeof window.loadMilestoneProgress === 'function') {
+    window.loadMilestoneProgress(sub);
+  }
+}
+
+function invokeSwitchMilestoneSubTab(subTab) {
+  if (typeof window.__bindMilestoneTabImplementations === 'function') {
+    window.__bindMilestoneTabImplementations();
+  }
+  const run =
+    typeof window.__switchMilestoneSubTabImpl === 'function'
+      ? window.__switchMilestoneSubTabImpl
+      : typeof window.switchMilestoneSubTab === 'function'
+        ? window.switchMilestoneSubTab
+        : null;
+  if (run) run(subTab);
+}
+
+/**
+ * Delegated clicks on .leaderboard so taps on inner spans/icons still hit; avoids capture/stopPropagation issues.
+ */
+function wireLeaderboardModalTabControls(modalEl) {
+  const root = modalEl.querySelector('.leaderboard');
+  if (!root) {
+    log.warn('LEADERBOARD MODAL', 'No .leaderboard root for tab delegation');
+    return;
+  }
+  root.addEventListener('click', (e) => {
+    // Main Leaderboard | Milestones uses inline onclick (window.onLeaderboardModalMainTab) for reliability
+
+    const subBtn = e.target.closest('[data-lb-subtab]');
+    if (subBtn && modalEl.contains(subBtn)) {
+      const v = subBtn.getAttribute('data-lb-subtab');
+      if (v === 'per-game' || v === 'cumulative') {
+        e.preventDefault();
+        invokeSwitchMilestoneSubTab(v);
+      }
+      return;
+    }
+
+    const refreshBtn = e.target.closest('#milestoneRefreshBtn');
+    if (refreshBtn && modalEl.contains(refreshBtn) && typeof window.refreshMilestoneProgress === 'function') {
+      e.preventDefault();
+      window.refreshMilestoneProgress();
+    }
+  });
+}
+
+/**
  * Show leaderboard modal
  */
 async function showLeaderboard() {
@@ -61,63 +241,115 @@ async function showLeaderboard() {
   const currentCategory = window.LeaderboardService.getCurrentCategory();
   
   leaderboardContent.innerHTML = `
-    <!-- Main Header (shows "Leaderboard" or "Milestones") -->
-    <div class="leaderboard-header">
-      <h2 id="leaderboardMainTitle">🏆 Leaderboard</h2>
-    </div>
-    
-    <!-- Carousel Navigation -->
-    <div class="leaderboard-carousel">
-      <button class="carousel-arrow carousel-arrow-left" id="leaderboardPrevBtn" onclick="leaderboardPrevCategory()" aria-label="Previous category">
-        <span class="btn-icon">←</span>
-      </button>
-      
-      <!-- Leaderboard List Container -->
-      <div class="leaderboard-list-container">
-        <!-- Category Title (displayed above the list) -->
-        <div class="leaderboard-category-title" id="leaderboardCategoryTitle">
-          <h3>${currentCategory.icon} ${currentCategory.name}</h3>
+    <!-- Title row: Leaderboard | Milestones split (active = blue, inactive = black) -->
+    <div class="leaderboard-header leaderboard-title-split">
+      <div id="leaderboardMilestoneTabs" class="leaderboard-milestone-tabs leaderboard-milestone-tabs--split" role="tablist" aria-label="Leaderboard views">
+        <div class="leaderboard-split-tabs">
+          <button type="button" class="milestone-tab active" id="milestoneTabLeaderboard" role="tab" aria-selected="true" onclick="window.onLeaderboardModalMainTabClick&&window.onLeaderboardModalMainTabClick('leaderboard')">
+            <span class="tab-icon">🏆</span> Leaderboard
+          </button>
+          <button type="button" class="milestone-tab" id="milestoneTabMilestones" role="tab" aria-selected="false" onclick="window.onLeaderboardModalMainTabClick&&window.onLeaderboardModalMainTabClick('milestones')">
+            <span class="tab-icon">⭐</span> Milestones
+            <span class="milestone-tab-claim-count-badge" id="milestonesTabClaimCountBadge" style="display: none;">0</span>
+          </button>
         </div>
-        <ul class="leaderboard-list" id="modalLeaderboardList">
-          <!-- Entries will be added dynamically here -->
-        </ul>
       </div>
-      
-      <button class="carousel-arrow carousel-arrow-right" id="leaderboardNextBtn" onclick="leaderboardNextCategory()" aria-label="Next category">
-        <span class="btn-icon">→</span>
-      </button>
     </div>
-    
-    <!-- Load More Button -->
-    <div class="leaderboard-load-more-container" id="leaderboardLoadMoreContainer" style="display: none;">
-      <button class="menu-btn" id="leaderboardLoadMoreBtn" onclick="loadMoreLeaderboard()">
-        <span class="btn-icon">⬇️</span> Load More
-      </button>
+
+    <div id="milestoneTabContentLeaderboard" class="milestone-tab-content active">
+      <div class="leaderboard-carousel">
+        <button class="carousel-arrow carousel-arrow-left" id="leaderboardPrevBtn" onclick="leaderboardPrevCategory()" aria-label="Previous category">
+          <span class="btn-icon">←</span>
+        </button>
+        <div class="leaderboard-list-container">
+          <!-- Category sits in the center column only (above the list), not between arrows -->
+          <div class="leaderboard-category-row leaderboard-category-row--in-panel" id="leaderboardCategoryRow">
+            <div class="leaderboard-category-heading" id="leaderboardCategoryTitle" role="heading" aria-level="2">${currentCategory.icon} ${currentCategory.name}</div>
+          </div>
+          <ul class="leaderboard-list" id="modalLeaderboardList">
+          </ul>
+        </div>
+        <button class="carousel-arrow carousel-arrow-right" id="leaderboardNextBtn" onclick="leaderboardNextCategory()" aria-label="Next category">
+          <span class="btn-icon">→</span>
+        </button>
+      </div>
+      <div class="leaderboard-load-more-container" id="leaderboardLoadMoreContainer" style="display: none;">
+        <button class="menu-btn" id="leaderboardLoadMoreBtn" onclick="loadMoreLeaderboard()">
+          <span class="btn-icon">⬇️</span> Load More
+        </button>
+      </div>
+      <div class="leaderboard-actions">
+        <button class="menu-btn" id="leaderboardRefreshBtn" onclick="refreshLeaderboard()">
+          <span class="btn-icon">🔄</span> Refresh
+        </button>
+        <button class="menu-btn primary" onclick="hideLeaderboard()">
+          <span class="btn-icon">←</span> Back to Menu
+        </button>
+      </div>
     </div>
-    
-    <!-- Actions -->
-    <div class="leaderboard-actions">
-      <button class="menu-btn" id="leaderboardRefreshBtn" onclick="refreshLeaderboard()">
-        <span class="btn-icon">🔄</span> Refresh
-      </button>
-      <button class="menu-btn primary" onclick="hideLeaderboard()">
-        <span class="btn-icon">←</span> Back to Menu
-      </button>
+
+    <div id="milestoneTabContentMilestones" class="milestone-tab-content">
+      <div class="milestone-sub-tabs">
+        <button type="button" class="milestone-sub-tab active" id="milestoneSubTabPerGame" data-lb-subtab="per-game">
+          <span class="tab-icon">⭐</span> Per Game
+        </button>
+        <button type="button" class="milestone-sub-tab" id="milestoneSubTabCumulative" data-lb-subtab="cumulative">
+          <span class="tab-icon">📊</span> Cumulative
+        </button>
+      </div>
+      <div class="milestone-sub-tab-content active" id="milestoneSubTabContentPerGame">
+        <div class="milestone-progress-container">
+          <div class="milestone-loading" id="milestoneLoadingPerGame">
+            <p>Loading milestone progress...</p>
+          </div>
+          <div class="milestone-list" id="milestoneListPerGame" style="display: none;"></div>
+        </div>
+      </div>
+      <div class="milestone-sub-tab-content" id="milestoneSubTabContentCumulative">
+        <div class="milestone-progress-container">
+          <div class="milestone-loading" id="milestoneLoadingCumulative">
+            <p>Loading milestone progress...</p>
+          </div>
+          <div class="milestone-list" id="milestoneListCumulative" style="display: none;"></div>
+        </div>
+      </div>
+      <div class="leaderboard-actions">
+        <button type="button" class="menu-btn" id="milestoneRefreshBtn">
+          <span class="btn-icon">🔄</span> Refresh
+        </button>
+        <button class="menu-btn primary" onclick="hideLeaderboard()">
+          <span class="btn-icon">←</span> Back to Menu
+        </button>
+      </div>
     </div>
   `;
   
   leaderboardModal.appendChild(leaderboardContent);
   viewportContainer.appendChild(leaderboardModal);
-  
-  // Add milestone progress tabs to leaderboard
-  if (typeof addMilestoneProgressToLeaderboard === 'function') {
-    addMilestoneProgressToLeaderboard();
+
+  wireLeaderboardModalTabControls(leaderboardModal);
+  if (typeof window.__bindMilestoneTabImplementations === 'function') {
+    window.__bindMilestoneTabImplementations();
+  }
+
+  // Refresh claim-count badge on Milestones tab (DOM is prebuilt above; addMilestoneProgressToLeaderboard is a no-op for structure)
+  if (typeof window.addMilestoneProgressToLeaderboard === 'function') {
+    window.addMilestoneProgressToLeaderboard();
+  }
+
+  // Definitions normally come from menu bootstrap; network fallback only if cache missing/stale
+  const mdAt = typeof window.__prefetchedMilestoneDefinitionsTimestamp === 'number' ? window.__prefetchedMilestoneDefinitionsTimestamp : 0;
+  const mdDefs = window.__prefetchedMilestoneDefinitions;
+  const mdTtl = 24 * 60 * 60 * 1000;
+  const defsFresh = !!(mdDefs && mdAt && Date.now() - mdAt < mdTtl);
+  if (!defsFresh && typeof window.prefetchMilestoneDefinitions === 'function') {
+    window.prefetchMilestoneDefinitions();
   }
   
   // Update badge counts after modal is set up (force refresh to get latest count)
-  if (typeof updateLeaderboardClaimBadge === 'function') {
+  if (typeof updateClaimCountBadge === 'function') {
     setTimeout(async () => {
-      await updateLeaderboardClaimBadge(null, true);
+      await updateClaimCountBadge(null, true);
     }, 100);
   }
   
@@ -149,13 +381,18 @@ async function showLeaderboard() {
     document.addEventListener('click', handleClickOutside);
   }, 0);
   
-  // Show loading modal while fetching leaderboard
-  if (typeof showLoadingModal === 'function') {
-    showLoadingModal('Loading leaderboard... Please wait', 'leaderboardLoadingModal');
+  // Trigger leaderboard prefetch if stale (so next open or refresh has fresh data)
+  if (typeof window !== 'undefined' && typeof window.prefetchLeaderboardIfStale === 'function') {
+    window.prefetchLeaderboardIfStale();
   }
-  
+
+  // Show loading overlay while fetching leaderboard (shared menu-panel loader)
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Loading leaderboard... Please wait');
+  }
+
   try {
-    // Fetch leaderboard data from blockchain
+    // Fetch leaderboard data from blockchain (may use prefetched data for instant show)
     if (typeof window.fetchBlockchainLeaderboard === 'function') {
       await window.fetchBlockchainLeaderboard();
     }
@@ -165,15 +402,14 @@ async function showLeaderboard() {
       displayLeaderboardModal();
     }
   } finally {
-    // Hide loading modal when leaderboard is loaded
-    if (typeof hideLoadingModal === 'function') {
-      hideLoadingModal('leaderboardLoadingModal');
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
     }
     
     // Update badge counts after leaderboard is fully loaded (force refresh to get latest count)
-    if (typeof updateLeaderboardClaimBadge === 'function') {
+    if (typeof updateClaimCountBadge === 'function') {
       setTimeout(async () => {
-        await updateLeaderboardClaimBadge(null, true);
+        await updateClaimCountBadge(null, true);
       }, 200);
     }
   }
@@ -195,7 +431,7 @@ function hideLeaderboard() {
   
   // Show main menu again after closing leaderboard
   if (typeof MenuService !== 'undefined' && MenuService.show) {
-    MenuService.show();
+    MenuService.show({ fromMenuPanel: true });
   } else {
     // Fallback: manual show
     const mainMenu = document.getElementById('mainMenuOverlay');
@@ -210,15 +446,23 @@ function hideLeaderboard() {
  * Display leaderboard modal content
  */
 function displayLeaderboardModal() {
+  console.log('📋 [LEADERBOARD MODAL] displayLeaderboardModal() called');
+  
   if (!window.LeaderboardService) {
     log.warn('LEADERBOARD MODAL', 'LeaderboardService not available');
     return;
   }
   
   const list = document.getElementById('modalLeaderboardList');
-  if (!list) return;
+  if (!list) {
+    console.warn('📋 [LEADERBOARD MODAL] List element not found');
+    return;
+  }
   
   const state = window.LeaderboardService.getState();
+  console.log('📋 [LEADERBOARD MODAL] Current state:', state);
+  console.log('📋 [LEADERBOARD MODAL] Leaderboard data length:', state.currentLeaderboardData?.length || 0);
+  console.log('📋 [LEADERBOARD MODAL] First entry (if any):', state.currentLeaderboardData?.[0] || null);
   
   // Get current wallet address
   if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
@@ -230,22 +474,21 @@ function displayLeaderboardModal() {
   // Get current category
   const currentCategory = window.LeaderboardService.getCurrentCategory();
   const primaryField = currentCategory.primaryField;
+  console.log('📋 [LEADERBOARD MODAL] Current category:', currentCategory);
+  console.log('📋 [LEADERBOARD MODAL] Primary field:', primaryField);
   
-  // Update category title (above the list)
+  // Category label above carousel (inside leaderboard tab panel)
   const categoryTitleElement = document.getElementById('leaderboardCategoryTitle');
   if (categoryTitleElement) {
-    const h3 = categoryTitleElement.querySelector('h3');
-    if (h3) {
-      h3.textContent = `${currentCategory.icon} ${currentCategory.name}`;
-    } else {
-      categoryTitleElement.innerHTML = `<h3>${currentCategory.icon} ${currentCategory.name}</h3>`;
-    }
+    categoryTitleElement.textContent = `${currentCategory.icon} ${currentCategory.name}`;
   }
   
   // Use blockchain data
   const dataToDisplay = state.currentLeaderboardData;
+  console.log('📋 [LEADERBOARD MODAL] Data to display length:', dataToDisplay?.length || 0);
   
-  if (dataToDisplay.length === 0) {
+  if (!dataToDisplay || dataToDisplay.length === 0) {
+    console.warn('📋 [LEADERBOARD MODAL] ⚠️ No leaderboard data available!');
     list.innerHTML = '';
     const li = document.createElement('li');
     li.className = 'leaderboard-item';
@@ -440,5 +683,12 @@ if (typeof window !== 'undefined') {
   window.showLeaderboard = showLeaderboard;
   window.hideLeaderboard = hideLeaderboard;
   window.displayLeaderboardModal = displayLeaderboardModal;
+  /** Inline onclick on split tabs — always defined before modal innerHTML can reference it */
+  window.onLeaderboardModalMainTabClick = function onLeaderboardModalMainTabClick(tab) {
+    invokeSwitchMilestoneTab(tab);
+  };
+  window.onLeaderboardModalSubTabClick = function onLeaderboardModalSubTabClick(sub) {
+    invokeSwitchMilestoneSubTab(sub);
+  };
 }
 

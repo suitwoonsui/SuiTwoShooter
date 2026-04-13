@@ -215,8 +215,7 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   border-radius: min(3vh, 3.5vw);
   padding: min(3vh, 4vw);
-  width: min(90vw, 90vh);
-  max-width: min(60vh, 70vw);
+  width: 90vw;
   height: min(90vh, 90vw);
   max-height: min(90vh, 90vw);
   overflow-y: auto;
@@ -292,8 +291,7 @@
   border: min(0.3vw, 0.4vh) solid #4DA2FF;
   box-shadow: 0 0 min(6vh, 8vw) rgba(77, 162, 255, 0.5);
   text-align: center;
-  max-width: min(50vh, 60vw);
-  width: min(90vw, 90vh);
+  width: 90vw;
   position: relative;
   overflow: hidden;
 }

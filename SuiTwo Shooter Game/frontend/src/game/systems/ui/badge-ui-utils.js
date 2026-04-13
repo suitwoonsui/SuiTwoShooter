@@ -48,12 +48,11 @@ async function fetchRegistryGames(walletAddress) {
   }
   
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-    const response = await fetch(`${API_BASE_URL}/stats/${walletAddress}`, {
+    // Stats from game backend (proxies to platform using env keys, then blockchain)
+    const statsApiUrl = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+    const response = await fetch(`${statsApiUrl}/stats/${walletAddress}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
     });
 
     if (response.ok) {
@@ -77,9 +76,10 @@ async function fetchRegistryGames(walletAddress) {
 function constructBadgeImageUrl(tier) {
   const tierNames = ['Standard', 'Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
   const tierName = tierNames[tier] || 'Standard';
-  const apiBaseUrl = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-  const baseUrl = apiBaseUrl.replace(/\/api$/, '');
-  return `${baseUrl}/Badges/${tierName}.webp`;
+  // Badge images are served from the frontend origin (same app)
+  const badgeBase = window.GAME_CONFIG?.BADGE_IMAGE_BASE_URL || (typeof window !== 'undefined' && window.location?.origin) || '';
+  const baseUrl = badgeBase.replace(/\/api\/?$/, '');
+  return baseUrl ? `${baseUrl}/Badges/${tierName}.webp` : '';
 }
 
 /**
@@ -105,17 +105,47 @@ function getBadgeImageSource(badge) {
   return constructedUrl;
 }
 
+/**
+ * Wrap badge image with upgrade overlay if upgrade is available
+ * Universal function for all badge image displays
+ * @param {string} imageHTML - HTML for the badge image
+ * @param {boolean} hasUpgrade - Whether an upgrade is available
+ * @param {string} containerClass - CSS class for the image container (e.g., 'badge-image-wrapper', 'store-badge-image-container')
+ * @param {string} imageClass - CSS class for the image element (e.g., 'badge-display-image', 'store-badge-icon-image')
+ * @returns {string} HTML with image wrapped in container with upgrade overlay
+ */
+function wrapBadgeImageWithUpgrade(imageHTML, hasUpgrade, containerClass = 'badge-image-wrapper', imageClass = 'badge-display-image') {
+  if (!imageHTML) {
+    return imageHTML;
+  }
+  
+  // Create upgrade overlay HTML if upgrade is available
+  const upgradeOverlayHTML = hasUpgrade
+    ? `<div class="badge-upgrade-overlay">
+        <span class="badge-upgrade-overlay-text">Upgrade</span>
+      </div>`
+    : '';
+  
+  // Wrap image in container with upgrade overlay
+  return `<div class="${containerClass}">
+    ${imageHTML}
+    ${upgradeOverlayHTML}
+  </div>`;
+}
+
 // Expose globally
 if (typeof window !== 'undefined') {
   window.arrayBufferToBase64 = arrayBufferToBase64;
   window.fetchRegistryGames = fetchRegistryGames;
   window.constructBadgeImageUrl = constructBadgeImageUrl;
   window.getBadgeImageSource = getBadgeImageSource;
+  window.wrapBadgeImageWithUpgrade = wrapBadgeImageWithUpgrade;
   
   // Also expose via BadgeUI for backward compatibility
   if (!window.BadgeUI) {
     window.BadgeUI = {};
   }
   window.BadgeUI.arrayBufferToBase64 = arrayBufferToBase64;
+  window.BadgeUI.wrapBadgeImageWithUpgrade = wrapBadgeImageWithUpgrade;
 }
 

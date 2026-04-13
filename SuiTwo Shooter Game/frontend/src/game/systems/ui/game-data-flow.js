@@ -55,9 +55,9 @@ if (typeof window !== 'undefined') {
       }
     },
     
-    onReturnToMenu: () => {
+    onReturnToMenu: (options) => {
       if (typeof window.onReturnToMenu === 'function') {
-        return window.onReturnToMenu();
+        return window.onReturnToMenu(options);
       }
     },
     

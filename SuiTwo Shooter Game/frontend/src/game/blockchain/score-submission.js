@@ -83,6 +83,19 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
   let isTournamentMode = false;
   let tournamentObjectId = null;
   let tournamentCategory = null;
+
+  // Golden-path: TournamentContext is the single source of truth.
+  try {
+    const ctx =
+      (typeof window !== 'undefined' && window.TournamentContext && typeof window.TournamentContext.load === 'function')
+        ? window.TournamentContext.load()
+        : null;
+    if (ctx && ctx.isTournamentMode && typeof ctx.tournamentObjectId === 'string' && ctx.tournamentObjectId.startsWith('0x')) {
+      isTournamentMode = true;
+      tournamentObjectId = ctx.tournamentObjectId;
+      tournamentCategory = ctx.tournamentCategory || null;
+    }
+  } catch (_) {}
   
   // Priority 1: window.game (most direct access)
   if (game && game.isTournamentMode) {
@@ -124,13 +137,15 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
     windowGameStateTournamentObjectId: typeof window !== 'undefined' && window.gameState ? window.gameState.tournamentObjectId : 'N/A',
   });
 
-  // Validate stats before submission
-  const validation = validateGameStats(gameStats);
-  if (!validation.valid) {
-    console.error('❌ [BLOCKCHAIN] Stats validation failed:', validation.error);
+  // Replay is required; server computes score from it
+  const replay = (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.getReplay === 'function')
+    ? window.ReplayRecorder.getReplay()
+    : null;
+  if (!replay || !Array.isArray(replay.events) || replay.events.length === 0) {
+    console.error('❌ [BLOCKCHAIN] No replay available. Ensure ReplayRecorder ran for this run.');
     return {
       success: false,
-      error: validation.error || 'Invalid game stats'
+      error: 'No replay data. Score submission requires replay events from this run.'
     };
   }
 
@@ -151,10 +166,8 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
   }
 
   try {
-    // Get API base URL (from config or default)
-    // Note: process.env is not available in browser, use window config or default
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 
-                         'http://localhost:3000/api';
+    // Score submit and tournament submit are implemented on the game backend (proxies platform as needed).
+    const API_BASE_URL = (window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api')).replace(/\/?$/, '');
 
     // Route to tournament endpoint if tournament mode
     if (isTournamentMode && tournamentObjectId) {
@@ -171,39 +184,65 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
           tournamentCategory,
           playerAddress,
           playerName: playerName || '(not provided)',
-          scoreData: {
-            score: Math.round(gameStats.score || 0),
-            distance: Math.round(gameStats.distance || 0),
-            coins: Math.round(gameStats.coins || 0),
-            bossesDefeated: Math.round(gameStats.bossesDefeated || 0),
-            enemiesDefeated: Math.round(gameStats.enemiesDefeated || 0),
-            longestCoinStreak: Math.round(gameStats.longestCoinStreak || 0),
-          },
+          replayEventCount: replay.events.length,
           endpoint: `${API_BASE_URL}/tournaments/${tournamentObjectId}/submit-score`,
-          note: 'Score will be validated to ensure player entered THIS specific tournament',
+          note: 'Score computed from replay on server',
         });
+
+      // Tournament submit requires sessionId (Anchor session ID).
+      // Prefer the stats payload, but fall back to the tournament session persisted on window/game state.
+      const ctx = (typeof window !== 'undefined' && window.TournamentContext && typeof window.TournamentContext.load === 'function')
+        ? window.TournamentContext.load()
+        : null;
+      const sessionId =
+        (typeof gameStats.anchorSessionId === 'number' && gameStats.anchorSessionId >= 1)
+          ? gameStats.anchorSessionId
+          : (ctx && typeof ctx.anchorSessionId === 'number' && ctx.anchorSessionId >= 1)
+          ? ctx.anchorSessionId
+          : (typeof window !== 'undefined' && typeof window.__tournamentAnchorSessionId === 'number' && window.__tournamentAnchorSessionId >= 1)
+          ? window.__tournamentAnchorSessionId
+          : (typeof window !== 'undefined' && window.game && typeof window.game.anchorSessionId === 'number' && window.game.anchorSessionId >= 1)
+          ? window.game.anchorSessionId
+          : (typeof window !== 'undefined' && window.gameState && typeof window.gameState.anchorSessionId === 'number' && window.gameState.anchorSessionId >= 1)
+          ? window.gameState.anchorSessionId
+          : null;
+      if (sessionId == null) {
+        throw new Error(
+          'No tournament session. Start the tournament from the tournament menu so a session is created; if session creation failed, you cannot submit.'
+        );
+      }
+
+      const clientRequestId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `fe-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
       const response = await fetch(`${API_BASE_URL}/tournaments/${tournamentObjectId}/submit-score`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Request-Id': clientRequestId,
         },
         body: JSON.stringify({
           playerAddress,
-          playerName: playerName || '',  // Include player name for leaderboard display
-          scoreData: {
-            score: Math.round(gameStats.score || 0),
-            distance: Math.round(gameStats.distance || 0),
-            coins: Math.round(gameStats.coins || 0),
-            bossesDefeated: Math.round(gameStats.bossesDefeated || 0),
-            enemiesDefeated: Math.round(gameStats.enemiesDefeated || 0),
-            longestCoinStreak: Math.round(gameStats.longestCoinStreak || 0),
-          }
+          sessionId,
+          replay: { version: replay.version, events: replay.events },
+          playerName: playerName || '',
         }),
       });
 
+      const serverRequestId =
+        response.headers.get('x-request-id') || response.headers.get('X-Request-Id') || null;
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+        console.error('❌ [TOURNAMENT] submit-score HTTP error', {
+          clientRequestId,
+          serverRequestId,
+          sessionId,
+          tournamentObjectId,
+          status: response.status,
+        });
         throw new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
       }
 
@@ -211,6 +250,9 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
       
         if (result.success) {
           console.log('✅ [TOURNAMENT] Tournament score submitted successfully to CORRECT tournament!', {
+            clientRequestId,
+            serverRequestId: serverRequestId || clientRequestId,
+            sessionId,
             digest: result.digest,
             tournamentId: result.tournamentId,
             tournamentName: result.tournamentName,
@@ -234,7 +276,12 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
             categoryValue: result.categoryValue,
           };
         } else {
-          console.error('❌ [TOURNAMENT] Tournament score submission failed:', result.error);
+          console.error('❌ [TOURNAMENT] Tournament score submission failed:', result.error, {
+            clientRequestId,
+            serverRequestId,
+            sessionId,
+            tournamentObjectId,
+          });
           throw new Error(result.error || 'Tournament score submission failed');
         }
       }
@@ -247,30 +294,27 @@ async function submitScoreToBlockchain(gameStats, playerName = '') {
       });
     }
 
-    // Regular game score submission
-    console.log(`📤 [BLOCKCHAIN] Sending score data to backend: ${API_BASE_URL}/scores/submit`);
+    // Regular game score submission (server computes score from replay). Session ID must be set by the game.
+    if (gameStats.sessionId == null || String(gameStats.sessionId).trim() === '') {
+      console.error('❌ [BLOCKCHAIN] Missing game session ID');
+      return {
+        success: false,
+        error: 'Game session ID is required. Please start a new game and try again.'
+      };
+    }
+    const gameSessionId = String(gameStats.sessionId);
+    console.log(`📤 [BLOCKCHAIN] Sending replay to backend: ${API_BASE_URL}/scores/submit`, { eventCount: replay.events.length, sessionId: gameSessionId });
 
-    // Send score data to backend
     const response = await fetch(`${API_BASE_URL}/scores/submit`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        playerAddress,  // User's wallet address
-        playerName: playerName || '',  // Player name (empty if skipped)
-        sessionId: gameStats.sessionId || null,  // Session ID
-        scoreData: {
-          score: Math.round(gameStats.score || 0),
-          distance: Math.round(gameStats.distance || 0),  // Round to integer for Move contract
-          coins: Math.round(gameStats.coins || 0),
-          bossesDefeated: Math.round(gameStats.bossesDefeated || 0),
-          enemiesDefeated: Math.round(gameStats.enemiesDefeated || 0),
-          longestCoinStreak: Math.round(gameStats.longestCoinStreak || 0),
-          bossTiers: gameStats.bossTiers || [], // Array of boss tiers for exact score calculation
-          enemyTypes: gameStats.enemyTypes || [], // Array of enemy types for exact score calculation
-          bossHits: Math.round(gameStats.bossHits || 0) // Number of boss hits (50 points each)
-        }
+        playerAddress,
+        playerName: playerName || '',
+        sessionId: gameSessionId,
+        replay: { version: replay.version, events: replay.events },
       }),
     });
 
@@ -421,7 +465,9 @@ async function checkAchievementsAsync(playerAddress) {
     console.log('🏆 [ACHIEVEMENT] Checking for eligible achievements...');
     
     // Get API base URL from config
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = String(
+      window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api')
+    ).replace(/\/?$/, '');
     const response = await fetch(`${API_BASE_URL}/achievements/check?address=${playerAddress}`);
     if (!response.ok) {
       throw new Error(`Failed to check achievements: ${response.statusText}`);
@@ -435,24 +481,21 @@ async function checkAchievementsAsync(playerAddress) {
       console.log('🎁 [ACHIEVEMENT] Milestone rewards available!', { count: eligibleAchievements.length });
       
       // Update the badge on the Leaderboard button
-      if (typeof window.updateLeaderboardClaimBadge === 'function') {
-        window.updateLeaderboardClaimBadge(eligibleAchievements.length);
+      if (typeof window.updateClaimCountBadge === 'function') {
+        window.updateClaimCountBadge(eligibleAchievements.length);
       }
       
       // Show a notification that rewards are available to claim
       // This is a non-blocking notification, not the full popup
       if (typeof window.showMilestoneNotification === 'function') {
         window.showMilestoneNotification(eligibleAchievements.length);
-      } else {
-        // Fallback: Show a simple notification
-        console.log('💡 [ACHIEVEMENT] You have milestone rewards available! Check the Leaderboard → Milestones tab to claim them.');
       }
     } else {
       console.log('ℹ️ [ACHIEVEMENT] No new milestones reached');
       
       // Still update badge (may have unclaimed from previous sessions)
-      if (typeof window.updateLeaderboardClaimBadge === 'function') {
-        window.updateLeaderboardClaimBadge();
+      if (typeof window.updateClaimCountBadge === 'function') {
+        window.updateClaimCountBadge();
       }
     }
   } catch (error) {

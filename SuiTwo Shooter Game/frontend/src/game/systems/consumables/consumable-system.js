@@ -33,15 +33,17 @@ async function consumeItemsFromBlockchain(items) {
   console.log(`🍽️ [CONSUMPTION] Wallet address: ${walletAddress}`);
 
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL =
+      window.GAME_CONFIG?.getBackendUrl?.() ||
+      (window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api'));
     const requestBody = {
       playerAddress: walletAddress,
       items: items,
     };
     
-    console.log(`🍽️ [CONSUMPTION] Calling ${API_BASE_URL}/store/consume with:`, requestBody);
+    console.log(`🍽️ [CONSUMPTION] Calling ${API_BASE_URL}/inventory/consume with:`, requestBody);
     
-    const response = await fetch(`${API_BASE_URL}/store/consume`, {
+    const response = await fetch(`${API_BASE_URL}/inventory/consume`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -62,13 +64,12 @@ async function consumeItemsFromBlockchain(items) {
     if (data.success) {
       console.log(`✅ [CONSUMPTION] Consumed ${items.length} items from blockchain in single transaction`);
       console.log(`   Transaction: ${data.digest}`);
-      
-      // Invalidate API request cache for item consumption
-      if (window.apiRequestCache && walletAddress) {
-        window.apiRequestCache.recordTransaction(walletAddress, data.digest, 'item_consume');
-        console.log('✅ [CONSUMPTION] API cache invalidated for item consumption');
+
+      if (window.PlayerInventoryCache && walletAddress) {
+        window.PlayerInventoryCache.applyOptimisticConsume(walletAddress, items);
+        window.PlayerInventoryCache.markPendingRefetchOnGameOver(walletAddress);
       }
-      
+
       return { success: true, digest: data.digest };
     } else {
       console.error('❌ [CONSUMPTION] Consume API returned error:', data.error);
@@ -100,8 +101,8 @@ async function consumeItemFromBlockchain(itemId, level, quantity = 1) {
 const ConsumableSystem = {
   // Consumable item definitions
   items: {
-    coinTractorBeam: {
-      id: 'coinTractorBeam',
+    coin_tractor_beam: {
+      id: 'coin_tractor_beam',
       name: 'Coin Tractor Beam',
       icon: '🧲',
       keyboardKey: 'M', // M for Magnet
@@ -113,7 +114,7 @@ const ConsumableSystem = {
         if (typeof activateCoinTractorBeam === 'function') {
           activateCoinTractorBeam();
           // Consume item from inventory when activated
-          this.consumeItem('coinTractorBeam', game.coinTractorBeam.level);
+          this.consumeItem('coin_tractor_beam', game.coinTractorBeam.level);
         }
       },
       consumeItem: async function(itemId, level) {
@@ -125,8 +126,8 @@ const ConsumableSystem = {
         });
       }
     },
-    slowTime: {
-      id: 'slowTime',
+    slow_time: {
+      id: 'slow_time',
       name: 'Slow Time',
       icon: '⏱️',
       keyboardKey: 'S', // S for Slow
@@ -138,7 +139,7 @@ const ConsumableSystem = {
         if (typeof activateSlowTime === 'function') {
           activateSlowTime();
           // Consume item from inventory when activated
-          this.consumeItem('slowTime', game.slowTimePower.level);
+          this.consumeItem('slow_time', game.slowTimePower.level);
         }
       },
       consumeItem: async function(itemId, level) {
@@ -150,8 +151,8 @@ const ConsumableSystem = {
         });
       }
     },
-    destroyAll: {
-      id: 'destroyAll',
+    destroy_all: {
+      id: 'destroy_all',
       name: 'Destroy All Enemies',
       icon: '💥',
       keyboardKey: 'D', // D for Destroy
@@ -166,7 +167,7 @@ const ConsumableSystem = {
         if (typeof activateDestroyAll === 'function') {
           activateDestroyAll();
           // Consume item from inventory when activated (single level item)
-          this.consumeItem('destroyAll', 1);
+          this.consumeItem('destroy_all', 1);
         }
       },
       consumeItem: async function(itemId, level) {
@@ -178,8 +179,8 @@ const ConsumableSystem = {
         });
       }
     },
-    bossKillShot: {
-      id: 'bossKillShot',
+    boss_kill_shot: {
+      id: 'boss_kill_shot',
       name: 'Boss Kill Shot',
       icon: '🎯',
       keyboardKey: 'B', // B for Boss
@@ -195,7 +196,7 @@ const ConsumableSystem = {
         if (typeof activateBossKillShot === 'function') {
           activateBossKillShot();
           // Consume item from inventory when activated (single level item)
-          this.consumeItem('bossKillShot', 1);
+          this.consumeItem('boss_kill_shot', 1);
         }
       },
       consumeItem: async function(itemId, level) {
@@ -233,8 +234,8 @@ const ConsumableSystem = {
   // Initialize consumable items from game.selectedItems
   initializeConsumables() {
     // Coin Tractor Beam
-    if (game.selectedItems && game.selectedItems.coinTractorBeam) {
-      const level = game.selectedItems.coinTractorBeam;
+    if (game.selectedItems && game.selectedItems.coin_tractor_beam) {
+      const level = game.selectedItems.coin_tractor_beam;
       const durations = { 1: 4, 2: 6, 3: 8 };
       const ranges = { 1: 0.3, 2: 0.6, 3: 0.9 };
       
@@ -251,8 +252,8 @@ const ConsumableSystem = {
     }
 
     // Slow Time Power
-    if (game.selectedItems && game.selectedItems.slowTime) {
-      const level = game.selectedItems.slowTime;
+    if (game.selectedItems && game.selectedItems.slow_time) {
+      const level = game.selectedItems.slow_time;
       const durations = { 1: 4, 2: 6, 3: 8 };
       
       game.slowTimePower = {
@@ -266,7 +267,7 @@ const ConsumableSystem = {
     }
 
     // Destroy All Enemies
-    if (game.selectedItems && game.selectedItems.destroyAll) {
+    if (game.selectedItems && game.selectedItems.destroy_all) {
       game.destroyAllPower = {
         usesRemaining: 1,
         active: false
@@ -275,7 +276,7 @@ const ConsumableSystem = {
     }
 
     // Boss Kill Shot
-    if (game.selectedItems && game.selectedItems.bossKillShot) {
+    if (game.selectedItems && game.selectedItems.boss_kill_shot) {
       game.bossKillShot = {
         usesRemaining: 1,
         charging: false,
@@ -328,7 +329,7 @@ const ConsumableSystem = {
             this.updateButtonStates(); // Update UI immediately
           } else {
             console.log(`⌨️ [CONSUMABLES] ${item.name} not available - checkAvailable() returned false`);
-            if (item.id === 'coinTractorBeam') {
+            if (item.id === 'coin_tractor_beam') {
               console.log(`⌨️ [CONSUMABLES] Debug coinTractorBeam:`, {
                 exists: !!game.coinTractorBeam,
                 usesRemaining: game.coinTractorBeam?.usesRemaining,
@@ -336,7 +337,7 @@ const ConsumableSystem = {
                 level: game.coinTractorBeam?.level
               });
             }
-            if (item.id === 'bossKillShot') {
+            if (item.id === 'boss_kill_shot') {
               console.log(`⌨️ [CONSUMABLES] Debug bossKillShot:`, {
                 exists: !!game.bossKillShot,
                 usesRemaining: game.bossKillShot?.usesRemaining,

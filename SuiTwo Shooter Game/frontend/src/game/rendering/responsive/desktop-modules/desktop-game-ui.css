@@ -295,9 +295,6 @@ canvas.tournament-mode:hover {
   padding: 0.5vw 0; /* Pure viewport-based padding */
 }
 
-.stat-item:last-child {
-  margin-bottom: 0;
-}
 
 .stat-section-divider {
   height: 1px;
@@ -528,8 +525,7 @@ canvas.tournament-mode:hover {
   border: 3px solid #4DA2FF;
   box-shadow: 0 0 50px rgba(77, 162, 255, 0.5);
   text-align: center;
-  max-width: 500px;
-  width: 90%;
+  width: 90vw;
   position: relative;
   overflow: hidden;
 }

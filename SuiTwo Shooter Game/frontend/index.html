@@ -41,6 +41,7 @@
       }
     })();
   </script>
+
   <title>SuiTwo - Modular CSS Test</title>
   
   <!-- CRITICAL CSS: Inlined for instant start screen display -->
@@ -191,6 +192,43 @@
     .enter-game-btn:active {
       transform: translateY(0);
     }
+
+    .start-screen-progress {
+      width: min(520px, 80%);
+      margin: 0.35rem auto 0.8rem;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .start-screen-progress.start-screen-progress-visible {
+      display: block;
+      opacity: 1;
+    }
+
+    .start-screen-progress-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      overflow: hidden;
+      border: 1px solid rgba(0, 212, 255, 0.35);
+    }
+
+    .start-screen-progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #00d4ff, #39ff14, #00d4ff);
+      background-size: 180% 100%;
+      transition: width 0.55s cubic-bezier(0.25, 0.1, 0.25, 1);
+      animation: startScreenProgressShift 1.2s linear infinite;
+    }
+
+    @keyframes startScreenProgressShift {
+      0% { background-position: 180% 0; }
+      100% { background-position: 0 0; }
+    }
     
     .audio-note {
       color: #666;
@@ -274,6 +312,11 @@
         <button id="enterGameBtn" class="enter-game-btn">
           🎮 Enter Game
         </button>
+        <div id="startScreenProgress" class="start-screen-progress" aria-hidden="true">
+          <div class="start-screen-progress-track">
+            <div id="startScreenProgressFill" class="start-screen-progress-fill"></div>
+          </div>
+        </div>
         <div class="audio-note">
           <small>🔊 Audio will start after clicking Enter</small>
         </div>
@@ -382,7 +425,7 @@
             <!-- Minimum requirement notice -->
             <div class="wallet-minimum-notice" id="walletMinimumNotice">
               <span class="minimum-notice-icon">⚠️</span>
-              <span class="minimum-notice-text">Min: 500K Mews Required</span>
+              <span class="minimum-notice-text" id="minimumNoticeText">Loading minimum requirement...</span>
             </div>
             <!-- Legacy display elements (for backward compatibility) -->
             <div class="wallet-address-display" id="walletAddressDisplay" style="display: none;">
@@ -413,7 +456,7 @@
           <button class="menu-btn" id="leaderboardMenuBtn" onclick="showLeaderboard()" onmouseover="playMenuHoverSound()">
             <span class="btn-icon">🏆</span>
             Leaderboard
-            <span class="claim-badge" id="leaderboardClaimBadge" style="display: none;">0</span>
+            <span class="claim-count-badge" id="leaderboardClaimCountBadge" style="display: none;">0</span>
           </button>
           <button class="menu-btn" onclick="showTournaments()" onmouseover="playMenuHoverSound()">
             <span class="btn-icon">🎯</span>
@@ -433,19 +476,19 @@
           <div class="game-stats">
             <div class="stat-item">
               <span class="stat-label">Best Score:</span>
-              <span class="stat-value" id="bestScoreDisplay">0</span>
+              <span class="stat-value" id="bestScoreDisplay">--</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">Games Played:</span>
-              <span class="stat-value" id="gamesPlayedDisplay">0</span>
+              <span class="stat-value" id="gamesPlayedDisplay">--</span>
             </div>
-            <div class="stat-item" id="gamePassCreditsDisplay" style="display: none;">
-              <span class="stat-label">🎮 Credits:</span>
-              <span class="stat-value" id="gamePassCreditsValue">0</span>
+            <div class="stat-item" id="gamePassCreditsDisplay">
+              <span class="stat-label">Credits:</span>
+              <span class="stat-value" id="gamePassCreditsValue">--</span>
             </div>
-            <div class="stat-item" id="gamePassTicketsDisplay" style="display: none;">
-              <span class="stat-label">🎫 Tickets:</span>
-              <span class="stat-value" id="gamePassTicketsValue">0</span>
+            <div class="stat-item" id="gamePassTicketsDisplay">
+              <span class="stat-label">Tickets:</span>
+              <span class="stat-value" id="gamePassTicketsValue">--</span>
             </div>
           </div>
         </div>

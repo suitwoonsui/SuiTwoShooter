@@ -2,6 +2,35 @@
 // MAIN RENDERING COORDINATOR
 // ==========================================
 
+function renderDemoModeIndicator(ctx, gameState) {
+  const isDemoMode = !!(gameState && gameState.isDemoMode);
+  if (!isDemoMode) return;
+
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  // Smooth pulse between ~0.25 and ~1.0 alpha
+  const pulse = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(now / 220));
+
+  const text = 'DEMO';
+  const x = gameState.width / 2;
+  const y = Math.max(28, Math.floor(gameState.height * 0.06));
+
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Stroke + fill for legibility on any background
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.strokeText(text, x, y);
+
+  // Match UI accent ("market green") from shared theme
+  ctx.fillStyle = '#39ff14';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
 // Main drawing function - coordinates all rendering
 function draw() {
   // Get game state - use window.gameState or window.game (backward compatibility)
@@ -33,6 +62,7 @@ function draw() {
   if (uiState && uiState.isMenuVisible) {
     if (Math.random() < 0.01) console.log('⏸️ Drawing menu overlay'); // Throttled log
     renderMenuOverlay(ctx);
+    renderDemoModeIndicator(ctx, gameState);
     return;
   }
   
@@ -53,6 +83,7 @@ function draw() {
   if (gameState.gameOver) {
     if (Math.random() < 0.01) console.log('🎬 Drawing game over screen'); // Throttled log
     renderGameOverScreen(ctx);
+    renderDemoModeIndicator(ctx, gameState);
     return;
   }
 
@@ -60,6 +91,7 @@ function draw() {
   if (gameState.paused) {
     if (Math.random() < 0.01) console.log('⏸️ Drawing pause overlay'); // Throttled log
     renderPauseOverlay(ctx);
+    renderDemoModeIndicator(ctx, gameState);
     return;
   } else {
     // Hide mobile pause overlay when not paused
@@ -78,12 +110,14 @@ function draw() {
   // Boss warning
   if (gameState.bossWarning) {
     renderBossWarning(ctx);
+    renderDemoModeIndicator(ctx, gameState);
     return;
   }
 
   // Boss victory screen
   if (gameState.bossVictoryTimeout) {
     renderBossVictory(ctx);
+    renderDemoModeIndicator(ctx, gameState);
     return;
   }
 
@@ -107,10 +141,10 @@ function draw() {
       renderBossProjectiles(ctx);
       renderBoss(ctx);
   
-  // Render player effects
-  renderPlayerGlow(ctx);
-  renderForceField(ctx);
-  renderPlayer(ctx);
+  // Render player effects (use window refs so order-independent with player-rendering.js)
+  if (typeof window.renderPlayerGlow === 'function') window.renderPlayerGlow(ctx);
+  if (typeof window.renderForceField === 'function') window.renderForceField(ctx);
+  if (typeof window.renderPlayer === 'function') window.renderPlayer(ctx);
   
   // Render distance bar (boss progress bar) - only during regular gameplay
   if (!gameState.bossActive && !gameState.bossWarning && !gameState.bossVictoryTimeout) {
@@ -142,6 +176,9 @@ function draw() {
   if (typeof renderBossKillShotFlash === 'function') {
     renderBossKillShotFlash(ctx);
   }
+
+  // Render demo mode indicator last so it stays visible
+  renderDemoModeIndicator(ctx, gameState);
 }
 
 // Export draw function globally for GameLifecycle to use

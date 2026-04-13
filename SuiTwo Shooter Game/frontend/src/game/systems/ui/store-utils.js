@@ -29,35 +29,44 @@ function convertUsdToToken(usdPrice, tokenType, tokenPrices = null) {
     prices = state?.tokenPrices;
   }
   
-  // Use prices from backend API if available
-  if (prices) {
-    let rate;
-    
-    if (tokenType === 'sui') {
-      rate = prices.sui;
-    } else if (tokenType === 'mews') {
-      rate = prices.mews;
-    } else {
-      rate = prices.usdc || 1.0; // USDC is always $1.0
-    }
-    
-    // If rate is missing or invalid, return error
-    if (!rate || rate <= 0) {
-      console.warn(`⚠️ [STORE UTILS] Missing or invalid ${tokenType} price from backend`);
+    // Use prices from backend API if available
+    if (prices) {
+      let rate;
+      
+      if (tokenType === 'sui') {
+        rate = prices.sui;
+      } else if (tokenType === 'mews') {
+        rate = prices.mews;
+      } else {
+        rate = prices.usdc || 1.0; // USDC is always $1.0
+      }
+      
+      // If rate is missing or invalid, return error
+      if (!rate || rate <= 0) {
+        console.warn(`⚠️ [STORE UTILS] Missing or invalid ${tokenType} price from backend`);
+        return {
+          amount: 0,
+          formatted: 'N/A',
+          error: 'Price unavailable'
+        };
+      }
+      
+      const tokenAmount = usdPrice / rate;
+      
+      // Log the calculation for debugging
+      console.log('🔢 [STORE UTILS] convertUsdToToken calculation', {
+        usdPrice,
+        tokenType,
+        rate,
+        calculatedAmount: tokenAmount,
+        calculation: `${usdPrice} / ${rate} = ${tokenAmount}`,
+      });
+      
       return {
-        amount: 0,
-        formatted: 'N/A',
-        error: 'Price unavailable'
+        amount: tokenAmount,
+        formatted: formatTokenAmount(tokenAmount, tokenType)
       };
     }
-    
-    const tokenAmount = usdPrice / rate;
-    
-    return {
-      amount: tokenAmount,
-      formatted: formatTokenAmount(tokenAmount, tokenType)
-    };
-  }
   
   // Fallback: if no prices available, return error
   console.warn('⚠️ [STORE UTILS] No token prices available');
@@ -84,13 +93,15 @@ function formatTokenAmount(amount, tokenType) {
   if (tokenType === 'sui') {
     // SUI: Show up to 4 decimal places, use grouping
     return amount.toLocaleString('en-US', {
+      notation: 'standard',
       minimumFractionDigits: 0,
       maximumFractionDigits: 4,
       useGrouping: true
     });
   } else if (tokenType === 'mews') {
-    // MEWS: Show up to 2 decimal places, use grouping
+    // MEWS: Show up to 2 decimal places, use grouping (never compact "…B" billion suffix)
     return amount.toLocaleString('en-US', {
+      notation: 'standard',
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
       useGrouping: true
@@ -98,6 +109,7 @@ function formatTokenAmount(amount, tokenType) {
   } else {
     // USDC: Show 2 decimal places
     return amount.toLocaleString('en-US', {
+      notation: 'standard',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
       useGrouping: true
@@ -124,10 +136,40 @@ function formatUsdPrice(price) {
   });
 }
 
+/**
+ * Normalize badge tier from API (number or numeric string). Tier 0 is valid — never use `tier || 1`.
+ * @param {unknown} raw
+ * @returns {number|null}
+ */
+function normalizeStoreBadgeTier(raw) {
+  if (raw == null || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n)) return null;
+  const t = Math.floor(n);
+  if (t < 0 || t > 99) return null;
+  return t;
+}
+
+/**
+ * Store (SKU) discount % for a badge payload: prefers `badge.discounts.store` from GET /api/badges, else tier table.
+ * @param {{ tier?: unknown, discounts?: { store?: unknown } }|null|undefined} badge
+ * @returns {number}
+ */
+function getStoreBadgeDiscountPercent(badge) {
+  if (!badge) return 0;
+  const d = badge.discounts;
+  if (d && typeof d.store === 'number' && Number.isFinite(d.store)) {
+    return Math.max(0, d.store);
+  }
+  return 0;
+}
+
 // Expose globally
 if (typeof window !== 'undefined') {
   window.convertUsdToToken = convertUsdToToken;
   window.formatTokenAmount = formatTokenAmount;
   window.formatUsdPrice = formatUsdPrice;
+  window.normalizeStoreBadgeTier = normalizeStoreBadgeTier;
+  window.getStoreBadgeDiscountPercent = getStoreBadgeDiscountPercent;
 }
 

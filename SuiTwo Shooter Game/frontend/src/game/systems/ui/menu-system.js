@@ -205,8 +205,6 @@ function startGameTest() {
 // Track game readiness state
 const gameReadinessState = {
   dataLoaded: false,
-  migrationCheckComplete: false,
-  migrationModalClosed: true, // Start as true (no modal needed)
 };
 
 function isGameReady() {
@@ -217,7 +215,34 @@ function isGameReady() {
 
 function startGame() {
   log.debug('MENU SYSTEM', 'startGame() called');
-  GameService.startGame().catch(err => {
+  try {
+    const pending =
+      typeof window !== 'undefined' &&
+      window.TournamentContext &&
+      typeof window.TournamentContext.load === 'function'
+        ? window.TournamentContext.load()
+        : null;
+    if (
+      pending &&
+      pending.awaitingStartGameFromMenu === true &&
+      pending.isTournamentMode &&
+      pending.tournamentObjectId
+    ) {
+      GameService.startGame().catch((err) => {
+        log.error('MENU SYSTEM', 'Error starting game', err);
+      });
+      return;
+    }
+  } catch (e) {
+    log.warn('MENU SYSTEM', 'TournamentContext.load failed', e);
+  }
+  if (typeof window !== 'undefined' && typeof window.showStore === 'function') {
+    window.showStore('regular-entry').catch((err) => {
+      log.error('MENU SYSTEM', 'Error opening prep loadout', err);
+    });
+    return;
+  }
+  GameService.startGame().catch((err) => {
     log.error('MENU SYSTEM', 'Error starting game', err);
   });
 }
@@ -237,6 +262,10 @@ function showSettings() {
   
   // Hide main menu first
   MenuService.hide();
+
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Loading settings... Please wait');
+  }
   
   // Show settings panel directly
   const settingsPanel = document.getElementById('settingsPanel');
@@ -244,9 +273,18 @@ function showSettings() {
     settingsPanel.classList.remove('settings-panel-hidden');
     settingsPanel.classList.add('settings-panel-visible');
     _setupSettingsClickOutside(settingsPanel);
-    loadSettingsToUI();
+    try {
+      loadSettingsToUI();
+    } finally {
+      if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+        MenuPanelLoading.hide();
+      }
+    }
     log.debug('MENU SYSTEM', 'Settings panel shown');
   } else {
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
+    }
     log.warn('MENU SYSTEM', 'Settings panel element not found!');
   }
 }
@@ -316,7 +354,7 @@ function hideSettings() {
     settingsPanel.classList.remove('settings-panel-visible');
     
     // Show main menu again after closing settings
-    MenuService.show();
+    MenuService.show({ fromMenuPanel: true });
   } else {
     log.warn('MENU SYSTEM', 'Settings panel element not found!');
   }
@@ -327,6 +365,10 @@ function showInstructions() {
   
   // Hide main menu first
   MenuService.hide();
+
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Loading How to Play... Please wait');
+  }
   
   // Show instructions panel directly
   const instructionsPanel = document.getElementById('instructionsPanel');
@@ -338,27 +380,38 @@ function showInstructions() {
     // Initialize the enhanced modal if not already done
     // Defer initialization slightly to allow modal to become visible first (better UX)
     if (typeof initHowToPlayModal === 'function' && !instructionsPanel.dataset.initialized) {
-      // Use requestAnimationFrame to defer heavy operations until after modal is visible
       requestAnimationFrame(() => {
-        initHowToPlayModal();
-        instructionsPanel.dataset.initialized = 'true';
-        
-        // Reset to first tab after initialization
+        try {
+          initHowToPlayModal();
+          instructionsPanel.dataset.initialized = 'true';
+          if (window.howToPlayState) {
+            showHowToPlayTab(0);
+            showHowToPlayContent(0);
+          }
+        } finally {
+          if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+            MenuPanelLoading.hide();
+          }
+        }
+      });
+    } else {
+      try {
         if (window.howToPlayState) {
           showHowToPlayTab(0);
           showHowToPlayContent(0);
         }
-      });
-    } else {
-      // Already initialized, just reset to first tab
-      if (window.howToPlayState) {
-        showHowToPlayTab(0);
-        showHowToPlayContent(0);
+      } finally {
+        if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+          MenuPanelLoading.hide();
+        }
       }
     }
     
     log.debug('MENU SYSTEM', 'Instructions panel shown');
   } else {
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
+    }
     log.warn('MENU SYSTEM', 'Instructions panel element not found!');
   }
 }
@@ -405,7 +458,7 @@ function hideInstructions() {
     instructionsPanel.classList.remove('instructions-panel-visible');
     
     // Show main menu again after closing instructions
-    MenuService.show();
+    MenuService.show({ fromMenuPanel: true });
   }
 }
 
@@ -444,19 +497,19 @@ function onGameOverMenu(finalScore) {
         showTournaments();
       } else {
         log.warn('MENU SYSTEM', 'showTournaments not available, falling back to main menu');
-        showMainMenu();
+        showMainMenu({ afterGame: true });
       }
     } else {
-      showMainMenu();
+      showMainMenu({ afterGame: true });
     }
   }, 3000);
 }
 
-function showMainMenu() {
+function showMainMenu(options = {}) {
   log.debug('MENU SYSTEM', 'showMainMenu() called');
   // Check if MenuService is available (may not be loaded yet)
   if (typeof MenuService !== 'undefined' && MenuService.show) {
-  MenuService.show();
+  MenuService.show(options);
   } else {
     log.warn('MENU SYSTEM', 'MenuService not available, using fallback');
     // Fallback: manually show main menu

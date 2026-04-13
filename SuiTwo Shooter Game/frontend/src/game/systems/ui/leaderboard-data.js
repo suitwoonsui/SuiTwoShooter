@@ -25,36 +25,72 @@ log.info('LEADERBOARD DATA', 'Leaderboard data module loaded');
  * @param {number|null} limit - Maximum number of entries to fetch
  */
 async function fetchBlockchainLeaderboard(limit = null) {
+  console.log('📊 [LEADERBOARD DATA] fetchBlockchainLeaderboard() called', { limit });
+
   if (!window.LeaderboardService) {
+    console.error('📊 [LEADERBOARD DATA] ❌ LeaderboardService not available');
     log.warn('LEADERBOARD DATA', 'LeaderboardService not available');
     return;
   }
-  
+
   const state = window.LeaderboardService.getState();
-  
+
   // Use 200 for mock mode testing, 1000 for production
   if (limit === null) {
-    const useMock = window.GAME_CONFIG?.USE_MOCK_LEADERBOARD === true || 
+    const useMock = window.GAME_CONFIG?.USE_MOCK_LEADERBOARD === true ||
                     new URLSearchParams(window.location.search).get('mock') === 'true';
     limit = useMock ? 200 : 1000;
   }
-  
+
   if (state.isLoadingLeaderboard) {
+    console.log('📊 [LEADERBOARD DATA] Already loading, skipping duplicate request');
     log.debug('LEADERBOARD DATA', 'Already loading, skipping duplicate request');
     return;
   }
-  
+
+  var ttl = (typeof window !== 'undefined' && window.LEADERBOARD_PREFETCH_TTL_MS) ? window.LEADERBOARD_PREFETCH_TTL_MS : 30000;
+  var prefetched = typeof window !== 'undefined' ? window.__prefetchedLeaderboard : null;
+  var usePrefetched = prefetched && prefetched.leaderboard && prefetched.at && (Date.now() - prefetched.at) < ttl;
+
+  if (usePrefetched) {
+    window.LeaderboardService.setLeaderboardData(prefetched.leaderboard);
+    log.debug('LEADERBOARD DATA', 'Using prefetched leaderboard', prefetched.leaderboard.length, 'entries');
+    if (typeof window.displayLeaderboardModal === 'function') {
+      window.displayLeaderboardModal();
+    }
+    window.LeaderboardService.setLoading(false);
+    if ((prefetched.limit || 0) < limit) {
+      var API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+      var useMock = window.GAME_CONFIG?.USE_MOCK_LEADERBOARD === true || new URLSearchParams(window.location.search).get('mock') === 'true';
+      var mockParam = useMock ? '&mock=true' : '';
+      fetch(API_BASE_URL + '/leaderboard?limit=' + limit + mockParam)
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (data && data.success && Array.isArray(data.leaderboard) && window.LeaderboardService) {
+            window.LeaderboardService.setLeaderboardData(data.leaderboard);
+            if (typeof window.displayLeaderboardModal === 'function') window.displayLeaderboardModal();
+            if (typeof window.__prefetchedLeaderboard !== 'undefined') {
+              window.__prefetchedLeaderboard = { success: true, leaderboard: data.leaderboard, at: Date.now(), limit: data.limit };
+            }
+          }
+        })
+        .catch(function () {});
+    }
+    return;
+  }
+
   window.LeaderboardService.setLoading(true);
   const list = document.getElementById('modalLeaderboardList');
-  
+
   // Show loading state
   if (list) {
     list.innerHTML = '<li class="leaderboard-item" style="text-align: center; color: #888; padding: 20px;"><span class="btn-icon">⏳</span> Loading leaderboard...</li>';
   }
-  
+
   try {
-    // Get API base URL (from config or default)
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    // Use game backend for leaderboard API (game backend proxies platform as needed)
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+    console.log('📊 [LEADERBOARD DATA] Using API_BASE_URL:', API_BASE_URL);
     
     // Check for mock mode (for testing)
     const useMock = window.GAME_CONFIG?.USE_MOCK_LEADERBOARD === true || 
@@ -66,13 +102,14 @@ async function fetchBlockchainLeaderboard(limit = null) {
     let result = null;
     
     if (window.apiRequestCache) {
-      // Use cache with 60 second TTL
+      // Use cache with short TTL (see ttlByType.leaderboard / LEADERBOARD_PREFETCH_TTL_MS)
       result = await window.apiRequestCache.get(
         cacheKey,
         async () => {
-          log.debug('LEADERBOARD DATA', `Fetching leaderboard from: ${API_BASE_URL}/leaderboard?limit=${limit}${mockParam ? ' (MOCK MODE)' : ''}`);
+          const url = `${API_BASE_URL}/leaderboard?limit=${limit}${mockParam}`;
+          log.debug('LEADERBOARD DATA', `Fetching leaderboard from: ${url}${mockParam ? ' (MOCK MODE)' : ''}`);
           
-          const response = await fetch(`${API_BASE_URL}/leaderboard?limit=${limit}${mockParam}`, {
+          const response = await fetch(url, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -87,15 +124,16 @@ async function fetchBlockchainLeaderboard(limit = null) {
           return await response.json();
         },
         {
-          ttl: 60000, // 60 seconds
+          ttl: 30000, // 30 seconds
           staleWhileRevalidate: true // Use stale cache while refreshing in background
         }
       );
     } else {
       // Fallback to direct fetch if cache not available
-      log.debug('LEADERBOARD DATA', `Fetching leaderboard from: ${API_BASE_URL}/leaderboard?limit=${limit}${mockParam ? ' (MOCK MODE)' : ''}`);
+      const url = `${API_BASE_URL}/leaderboard?limit=${limit}${mockParam}`;
+      log.debug('LEADERBOARD DATA', `Fetching leaderboard from: ${url}${mockParam ? ' (MOCK MODE)' : ''}`);
       
-      const response = await fetch(`${API_BASE_URL}/leaderboard?limit=${limit}${mockParam}`, {
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -118,15 +156,33 @@ async function fetchBlockchainLeaderboard(limit = null) {
       }
     }
     
+    console.log('📊 [LEADERBOARD DATA] Full API response:', result);
+    console.log('📊 [LEADERBOARD DATA] Has leaderboard property:', 'leaderboard' in result);
+    console.log('📊 [LEADERBOARD DATA] Leaderboard value:', result.leaderboard);
+    console.log('📊 [LEADERBOARD DATA] Is array:', Array.isArray(result.leaderboard));
+    console.log('📊 [LEADERBOARD DATA] Leaderboard length:', result.leaderboard?.length || 0);
+    
     if (result.leaderboard && Array.isArray(result.leaderboard)) {
+      console.log('📊 [LEADERBOARD DATA] ✅ Setting leaderboard data:', result.leaderboard.length, 'entries');
       window.LeaderboardService.setLeaderboardData(result.leaderboard);
       log.debug('LEADERBOARD DATA', `Loaded ${result.leaderboard.length} entries from blockchain`);
+      
+      // Verify data was set
+      const verifyState = window.LeaderboardService.getState();
+      console.log('📊 [LEADERBOARD DATA] ✅ Verified data in service:', verifyState.currentLeaderboardData.length, 'entries');
       
       // Update display
       if (typeof window.displayLeaderboardModal === 'function') {
         window.displayLeaderboardModal();
       }
     } else {
+      console.error('📊 [LEADERBOARD DATA] ❌ Invalid response format!', {
+        hasLeaderboard: 'leaderboard' in result,
+        leaderboardType: typeof result.leaderboard,
+        isArray: Array.isArray(result.leaderboard),
+        resultKeys: Object.keys(result),
+        fullResult: result
+      });
       log.warn('LEADERBOARD DATA', 'Invalid response format', result);
       // Clear data and show empty state
       window.LeaderboardService.setLeaderboardData([]);
@@ -177,9 +233,8 @@ async function fetchBlockchainLeaderboard(limit = null) {
 async function refreshLeaderboard() {
   console.log('🔄 [LEADERBOARD DATA] Refreshing leaderboard...');
   
-  // Show loading modal while refreshing
-  if (typeof showLoadingModal === 'function') {
-    showLoadingModal('Refreshing leaderboard... Please wait', 'leaderboardLoadingModal');
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Refreshing leaderboard... Please wait');
   }
   
   const refreshBtn = document.getElementById('leaderboardRefreshBtn');
@@ -195,9 +250,8 @@ async function refreshLeaderboard() {
       refreshBtn.innerHTML = originalText;
       refreshBtn.disabled = false;
       
-      // Hide loading modal when refresh is complete
-      if (typeof hideLoadingModal === 'function') {
-        hideLoadingModal('leaderboardLoadingModal');
+      if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+        MenuPanelLoading.hide();
       }
     }
   } else {
@@ -205,9 +259,8 @@ async function refreshLeaderboard() {
     try {
       await fetchBlockchainLeaderboard();
     } finally {
-      // Hide loading modal when refresh is complete
-      if (typeof hideLoadingModal === 'function') {
-        hideLoadingModal('leaderboardLoadingModal');
+      if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+        MenuPanelLoading.hide();
       }
     }
   }

@@ -4,43 +4,53 @@
 
 // Render player glow and trail
 function renderPlayerGlow(ctx) {
-  let glowR=30;
-  if (game.chargeStart) {
-    const ratio=Math.min((performance.now()-game.chargeStart)/game.maxChargeTime,1);
-    glowR+=ratio*20;
+  const g = (typeof game !== 'undefined' ? game : (typeof window !== 'undefined' ? window.game : null));
+  const p = (typeof player !== 'undefined' ? player : (typeof window !== 'undefined' ? window.player : null));
+  if (!g || !p) return;
+  let glowR = 30;
+  if (g.chargeStart) {
+    const ratio = Math.min((performance.now() - g.chargeStart) / (g.maxChargeTime || 1000), 1);
+    glowR += ratio * 20;
   }
-  const pcx=player.x+player.width/2, pcy=player.y+player.height/2;
-  const grad=ctx.createRadialGradient(pcx,pcy,0,pcx,pcy,glowR);
-  grad.addColorStop(0,'rgba(57,255,20,0.9)');
-  grad.addColorStop(1,'rgba(57,255,20,0)');
-  ctx.fillStyle=grad;
-  ctx.beginPath(); 
-  ctx.arc(pcx,pcy,glowR,0,Math.PI*2); 
+  const pcx = p.x + p.width / 2, pcy = p.y + p.height / 2;
+  const grad = ctx.createRadialGradient(pcx, pcy, 0, pcx, pcy, glowR);
+  grad.addColorStop(0, 'rgba(57,255,20,0.9)');
+  grad.addColorStop(1, 'rgba(57,255,20,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(pcx, pcy, glowR, 0, Math.PI * 2);
   ctx.fill();
-  
-  // Trailing glow effect
-  if (player.trail.length > 1) {
-    player.trail.forEach((pt, i) => {
-      const trailProgress = i / (player.trail.length - 1);
-      const trailGlowR = glowR * (0.3 + trailProgress * 0.7); // Size from 30% to 100% of main glow
-      const trailAlpha = (0.1 + trailProgress * 0.4); // Alpha from 10% to 50%
-      
-      const trailGrad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, trailGlowR);
-      trailGrad.addColorStop(0, `rgba(57,255,20,${trailAlpha})`);
-      trailGrad.addColorStop(1, `rgba(57,255,20,0)`);
-      
-      ctx.fillStyle = trailGrad;
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, trailGlowR, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
+  if (!p.trail || p.trail.length <= 1) return;
+  p.trail.forEach((pt, i) => {
+    const trailProgress = i / (p.trail.length - 1);
+    const trailGlowR = glowR * (0.3 + trailProgress * 0.7);
+    const trailAlpha = (0.1 + trailProgress * 0.4);
+    const trailGrad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, trailGlowR);
+    trailGrad.addColorStop(0, `rgba(57,255,20,${trailAlpha})`);
+    trailGrad.addColorStop(1, 'rgba(57,255,20,0)');
+    ctx.fillStyle = trailGrad;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, trailGlowR, 0, Math.PI * 2);
+    ctx.fill();
+  });
 }
 
 // Render player character
 function renderPlayer(ctx) {
+  const g = (typeof game !== 'undefined' ? game : (typeof window !== 'undefined' ? window.game : null));
+  const p = (typeof player !== 'undefined' ? player : (typeof window !== 'undefined' ? window.player : null));
+  if (!g || !p) return;
+  // Use preloader image if available (it's loaded after registerGameImages/waitForGameImages),
+  // otherwise fall back to module-level characterImage (set when player-images.js ran)
+  const img = (typeof window.getGameImage === 'function' && window.getGameImage('player')) || (typeof characterImage !== 'undefined' ? characterImage : null);
+  if (!img || !img.complete || !img.naturalWidth) {
+    return; // Don't draw until image is ready
+  }
+  const getDims = typeof getPlayerDimensions === 'function' ? getPlayerDimensions : (typeof window.getPlayerDimensions === 'function' ? window.getPlayerDimensions : null);
+  if (!getDims) return;
+
   // Apply invulnerability effect
-  if (game.invulnerabilityTime > 0) {
+  if (g.invulnerabilityTime > 0) {
     // Flashing effect during invulnerability
     // Use performance.now() for better performance and precision
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -50,36 +60,32 @@ function renderPlayer(ctx) {
   }
   
   // Calculate dynamic player dimensions based on image aspect ratio
-  const playerDims = getPlayerDimensions(characterImage, player.width, player.height);
-  const playerX = player.x + playerDims.centerOffset;
+  const playerDims = getDims(img, p.width, p.height);
+  const playerX = p.x + playerDims.centerOffset;
   
-  ctx.drawImage(characterImage, playerX, player.y, playerDims.width, playerDims.height);
+  ctx.drawImage(img, playerX, p.y, playerDims.width, playerDims.height);
   
   // Restore alpha if invulnerability effect was applied
-  if (game.invulnerabilityTime > 0) {
+  if (g.invulnerabilityTime > 0) {
     ctx.restore();
   }
 }
 
-// Import the shared force field rendering function
-// This ensures we use the same rendering logic as previews
-// The function is loaded with menu scripts, so it's available early
-let renderForceFieldAt;
-if (typeof window !== 'undefined' && window.renderForceFieldAt) {
-  renderForceFieldAt = window.renderForceFieldAt;
-} else {
-  // Fallback: if not loaded yet, try to load it
-  // This shouldn't happen in normal flow since force-field-rendering.js loads with menu scripts
-  console.warn('[PLAYER RENDERING] renderForceFieldAt not available, force field may not render');
+// Render force field around player (in-game)
+// Resolve renderForceFieldAt from window each time so script is safe if loaded twice
+function renderForceField(ctx) {
+  const g = (typeof game !== 'undefined' ? game : (typeof window !== 'undefined' ? window.game : null));
+  const p = (typeof player !== 'undefined' ? player : (typeof window !== 'undefined' ? window.player : null));
+  if (!g || !p || !g.forceField || !g.forceField.active || g.forceField.level <= 0) return;
+  const renderForceFieldAt = (typeof window !== 'undefined' && window.renderForceFieldAt) ? window.renderForceFieldAt : null;
+  if (!renderForceFieldAt) return;
+  const pcx = p.x + p.width / 2, pcy = p.y + p.height / 2;
+  renderForceFieldAt(ctx, pcx, pcy, g.forceField.level);
 }
 
-// Render force field around player (in-game)
-function renderForceField(ctx) {
-  if (game.forceField.active && game.forceField.level > 0) {
-    const pcx = player.x + player.width/2;
-    const pcy = player.y + player.height/2;
-    if (renderForceFieldAt) {
-      renderForceFieldAt(ctx, pcx, pcy, game.forceField.level);
-    }
-  }
+// Expose on window so main-rendering.js can call them regardless of script load order
+if (typeof window !== 'undefined') {
+  window.renderPlayerGlow = renderPlayerGlow;
+  window.renderForceField = renderForceField;
+  window.renderPlayer = renderPlayer;
 }

@@ -44,13 +44,13 @@ if (typeof window !== 'undefined') {
 // Available items for rewards
 const AVAILABLE_ITEMS = [
   { id: 'random', name: 'Random L1 Item', levels: [1], special: false }, // Resolved at distribution time
-  { id: 'orbLevel', name: 'Orb Level', levels: [1, 2, 3] },
-  { id: 'forceField', name: 'Force Field', levels: [1, 2, 3] },
-  { id: 'extraLives', name: 'Extra Lives', levels: [1, 2, 3] },
-  { id: 'slowTime', name: 'Slow Time', levels: [1, 2, 3] },
-  { id: 'coinTractorBeam', name: 'Coin Tractor Beam', levels: [1, 2, 3] },
-  { id: 'destroyAll', name: 'Destroy All Enemies', levels: [1], special: true },
-  { id: 'bossKillShot', name: 'Boss Kill Shot', levels: [1], special: true },
+  { id: 'orb_level', name: 'Orb Level', levels: [1, 2, 3] },
+  { id: 'force_field', name: 'Force Field', levels: [1, 2, 3] },
+  { id: 'extra_lives', name: 'Extra Lives', levels: [1, 2, 3] },
+  { id: 'slow_time', name: 'Slow Time', levels: [1, 2, 3] },
+  { id: 'coin_tractor_beam', name: 'Coin Tractor Beam', levels: [1, 2, 3] },
+  { id: 'destroy_all', name: 'Destroy All Enemies', levels: [1], special: true },
+  { id: 'boss_kill_shot', name: 'Boss Kill Shot', levels: [1], special: true },
 ];
 
 // Wizard state
@@ -65,6 +65,7 @@ let wizardState = {
     entryFeeTickets: 1,
     rewardConfig: null, // null = default, or TournamentRewardConfig object
     startingAnteUSDCents: 0,
+    startingAnteToken: 'SUI', // User-selected token for ante input/quote display
     paymentToken: 'SUI',
   },
   rewardCost: null,
@@ -72,7 +73,18 @@ let wizardState = {
   randomItemLevel: 1, // Default level for randomized items (1, 2, or 3)
   loading: false,
   error: null,
+  /** Preloaded when modal opens so Rewards step shows immediately */
+  defaultRewardConfigForDisplay: null,
+  /** Token prices for ante/payment conversion (sui, mews, usdc in USD) */
+  prices: null,
+  decimals: null,
+  /** Ante input mode: 'usd' = enter dollars, 'token' = enter token amount */
+  anteInputMode: 'usd',
 };
+
+/** Last time we showed the "connect wallet" alert (ms). Used to show only one reminder even if button fires multiple times. */
+var _lastConnectWalletAlertAt = 0;
+var _CONNECT_WALLET_ALERT_THROTTLE_MS = 2000;
 
 /**
  * Show tournament creation modal
@@ -80,12 +92,13 @@ let wizardState = {
 async function showTournamentCreation() {
   log.info('TOURNAMENT CREATION', 'showTournamentCreation() called');
   
-  // Check wallet connection
+  // Check wallet connection — single reminder only (throttled so one alert even on double/triple click)
   const walletAddress = getWalletAddress();
   if (!walletAddress) {
-    alert('Please connect your wallet to create a tournament.');
-    if (typeof connectWalletForTournaments === 'function') {
-      connectWalletForTournaments();
+    const now = typeof Date.now === 'function' ? Date.now() : 0;
+    if (now - _lastConnectWalletAlertAt >= _CONNECT_WALLET_ALERT_THROTTLE_MS) {
+      _lastConnectWalletAlertAt = now;
+      alert('Please connect your wallet to create a tournament.');
     }
     return;
   }
@@ -102,6 +115,7 @@ async function showTournamentCreation() {
       entryFeeTickets: 1,
       rewardConfig: null,
       startingAnteUSDCents: 0,
+      startingAnteToken: 'SUI',
       paymentToken: 'SUI',
     },
     rewardCost: null,
@@ -109,10 +123,20 @@ async function showTournamentCreation() {
     randomItemLevel: 1, // Default level for randomized items
     loading: false,
     error: null,
+    defaultRewardConfigForDisplay: null,
+    prices: null,
+    decimals: null,
+    anteInputMode: 'usd',
   };
 
-  // Load badge discount
+  // Load badge discount and preload default rewards (so Rewards step is ready when user reaches it)
   await loadBadgeDiscount(walletAddress);
+  getDefaultRewardConfigForDisplay().then((config) => {
+    wizardState.defaultRewardConfigForDisplay = config;
+    log.info('TOURNAMENT CREATION', 'Default rewards preloaded');
+  }).catch((err) => {
+    log.warn('TOURNAMENT CREATION', 'Default rewards preload failed (will load on Rewards step)', err);
+  });
 
   // Create modal
   const viewportContainer = document.querySelector('.viewport-container');
@@ -454,7 +478,9 @@ function renderStep5Rewards() {
             These are the default rewards configured by administrators. You cannot edit them.
           </p>
           <div class="default-rewards-content" id="defaultRewardsContent">
-            <div style="color: #ccc; text-align: center; padding: 1rem;">Loading default rewards...</div>
+            ${wizardState.defaultRewardConfigForDisplay
+              ? renderItemRewardsByRank(wizardState.defaultRewardConfigForDisplay.itemRewards, wizardState.defaultRewardConfigForDisplay.rewardDepth, true)
+              : '<div style="color: #ccc; text-align: center; padding: 1rem;">Loading default rewards...</div>'}
           </div>
         </div>
       ` : `
@@ -481,9 +507,9 @@ function getRandomizableItems() {
  */
 async function getDefaultRewardConfigForDisplay() {
   try {
-    // Try to fetch admin-configured defaults
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000';
-    const response = await fetch(`${API_BASE_URL}/admin/tournaments/default-rewards`);
+    // Try to fetch admin-configured defaults (from game backend).
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl().replace(/\/api\/?$/, '') : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001');
+    const response = await fetch(`${API_BASE_URL}/admin/tournaments/default-sustain-config`);
     
     if (response.ok) {
       const data = await response.json();
@@ -500,16 +526,16 @@ async function getDefaultRewardConfigForDisplay() {
   // "random" is resolved at distribution time, not at display time
   const itemRewards = {
     1: [
-      { itemId: 'destroyAll', level: 1, quantity: 1 },
-      { itemId: 'bossKillShot', level: 1, quantity: 1 },
+      { itemId: 'destroy_all', level: 1, quantity: 1 },
+      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     2: [
-      { itemId: 'bossKillShot', level: 1, quantity: 1 },
+      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     3: [
-      { itemId: 'destroyAll', level: 1, quantity: 1 },
+      { itemId: 'destroy_all', level: 1, quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     4: [{ itemId: 'random', level: 1, quantity: 1 }],
@@ -645,7 +671,8 @@ function renderDefaultRewardsPreview() {
 }
 
 /**
- * Load and render default rewards preview (async)
+ * Load and render default rewards preview (async).
+ * Uses preloaded config from wizardState.defaultRewardConfigForDisplay when available.
  */
 async function loadAndRenderDefaultRewardsPreview() {
   const previewDiv = document.getElementById('defaultRewardsPreview');
@@ -654,8 +681,18 @@ async function loadAndRenderDefaultRewardsPreview() {
   const configDiv = previewDiv.querySelector('.default-rewards-content');
   if (!configDiv) return;
   
+  if (wizardState.defaultRewardConfigForDisplay) {
+    configDiv.innerHTML = renderItemRewardsByRank(
+      wizardState.defaultRewardConfigForDisplay.itemRewards,
+      wizardState.defaultRewardConfigForDisplay.rewardDepth,
+      true
+    );
+    return;
+  }
+  
   try {
     const defaultConfig = await getDefaultRewardConfigForDisplay();
+    wizardState.defaultRewardConfigForDisplay = defaultConfig;
     configDiv.innerHTML = renderItemRewardsByRank(defaultConfig.itemRewards, defaultConfig.rewardDepth, true);
   } catch (error) {
     log.error('TOURNAMENT CREATION', 'Failed to load default rewards preview', error);
@@ -702,28 +739,128 @@ function getItemDisplayName(itemId) {
 }
 
 /**
+ * Fetch token prices for ante/payment conversion
+ */
+async function fetchTournamentPrices() {
+  if (wizardState.prices && wizardState.decimals) return;
+  try {
+    // Always use the game backend as the API surface; it proxies platform calls as needed.
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+    const res = await fetch(`${API_BASE_URL}/tournaments/prices`);
+    const data = await res.json();
+    if (data.success && data.prices) {
+      wizardState.prices = data.prices;
+      wizardState.decimals = data.decimals || { SUI: 9, MEWS: 6, USDC: 6 };
+    }
+  } catch (e) {
+    log.warn('TOURNAMENT CREATION', 'Failed to fetch prices', e);
+  }
+}
+
+/**
+ * Convert USD cents to human token amount for display
+ */
+function usdCentsToTokenHuman(usdCents, token) {
+  if (!wizardState.prices || !wizardState.decimals) return null;
+  const price = token === 'SUI' ? wizardState.prices.sui : token === 'MEWS' ? wizardState.prices.mews : wizardState.prices.usdc;
+  const dec = wizardState.decimals[token] || 9;
+  if (!price || price <= 0) return null;
+  const human = (usdCents / 100) / price;
+  return human;
+}
+
+/**
+ * Convert human token amount to USD cents
+ */
+function tokenHumanToUsdCents(tokenHuman, token) {
+  if (!wizardState.prices || !wizardState.decimals) return 0;
+  const price = token === 'SUI' ? wizardState.prices.sui : token === 'MEWS' ? wizardState.prices.mews : wizardState.prices.usdc;
+  if (!price || price <= 0) return 0;
+  return Math.round(tokenHuman * price * 100);
+}
+
+/**
+ * Format token amount for display
+ */
+function formatTokenDisplay(human, token) {
+  if (human == null || human === 0) return '0';
+  const dec = token === 'SUI' ? 6 : token === 'USDC' ? 2 : 4;
+  return Number(human).toFixed(dec);
+}
+
+/**
  * Step 6: Starting Ante
  */
 function renderStep6Ante() {
-  const anteUSD = wizardState.tournamentData.startingAnteUSDCents / 100;
+  const anteCents = wizardState.tournamentData.startingAnteUSDCents || 0;
+  const anteUSD = anteCents / 100;
+  const anteToken = wizardState.tournamentData.startingAnteToken || 'SUI';
+  const mode = wizardState.anteInputMode || 'usd';
+  const tokenHuman = usdCentsToTokenHuman(anteCents, anteToken);
+  const tokenDisplay = tokenHuman != null ? formatTokenDisplay(tokenHuman, anteToken) : '—';
   return `
     <div class="tournament-creation-step">
       <h3>Starting Prize Pool Contribution</h3>
-      <p>Add to the prize pool (optional)</p>
-      <input 
-        type="number" 
-        id="tournamentAnteInput" 
-        class="tournament-creation-input" 
-        min="0"
-        step="0.01"
-        value="${anteUSD.toFixed(2)}"
-      />
+      <p>Add to the prize pool (optional). Enter amount in <strong>$ USD</strong> or <strong>token amount</strong>.</p>
+      <div class="tournament-creation-ante-row">
+        <div class="tournament-creation-ante-amount-field">
+          <label class="tournament-creation-ante-label">Enter amount in</label>
+          <div class="tournament-creation-ante-mode" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #ccc;">
+              <input type="radio" name="anteMode" value="usd" ${mode === 'usd' ? 'checked' : ''} />
+              <span>$ USD</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #ccc;">
+              <input type="radio" name="anteMode" value="token" ${mode === 'token' ? 'checked' : ''} />
+              <span>Token amount</span>
+            </label>
+          </div>
+          ${mode === 'usd' ? `
+            <input type="number" id="tournamentAnteInput" class="tournament-creation-input" min="0" step="0.01" placeholder="0.00" value="${anteUSD > 0 ? anteUSD.toFixed(2) : ''}" aria-label="Ante in US dollars" />
+            <p class="tournament-creation-hint" id="anteConversionLine">${anteCents > 0 && tokenDisplay !== '—' ? `≈ ${tokenDisplay} ${anteToken}` : ''}</p>
+          ` : `
+            <input type="number" id="tournamentAnteTokenInput" class="tournament-creation-input" min="0" step="0.000001" placeholder="0" value="${tokenHuman > 0 ? String(tokenHuman) : ''}" aria-label="Ante in token amount" />
+            <p class="tournament-creation-hint" id="anteConversionLine">${anteCents > 0 ? `≈ $${anteUSD.toFixed(2)} USD` : ''}</p>
+          `}
+        </div>
+        <div class="tournament-creation-ante-token-field">
+          <label for="tournamentAnteTokenSelect" class="tournament-creation-ante-label">Input token</label>
+          <select id="tournamentAnteTokenSelect" class="tournament-creation-input tournament-creation-ante-token-select" aria-label="Token used to quote ante value">
+            <option value="SUI" ${anteToken === 'SUI' ? 'selected' : ''}>SUI</option>
+            <option value="MEWS" ${anteToken === 'MEWS' ? 'selected' : ''}>MEWS</option>
+            <option value="USDC" ${anteToken === 'USDC' ? 'selected' : ''}>USDC</option>
+          </select>
+        </div>
+      </div>
       <p class="tournament-creation-hint">
-        This amount will be added to the prize pool before the tournament starts.
-        The creation fee ($5.00) goes to operations, NOT into the prize pool.
+        This ante is separate from the creation fee. Ante goes into the prize pool vault; creation fee ($5.00) goes to operations and does not enter the prize pool.
       </p>
+      ${anteCents > 0 ? `
+        <p class="tournament-creation-hint" style="margin-top: 0.5rem; font-style: italic;">
+          <strong>Important:</strong> Ante payment is converted to <strong>MEWS</strong> for pool vault deposit, regardless of payment token.
+        </p>
+      ` : ''}
     </div>
   `;
+}
+
+/**
+ * Format payment line with USD and token conversion for display
+ */
+function formatPaymentLineUsdAndToken(usdCents, token) {
+  const usd = (usdCents / 100).toFixed(2);
+  if (!wizardState.prices || !token) return `$${usd}`;
+  const human = usdCentsToTokenHuman(usdCents, token);
+  if (human == null) return `$${usd}`;
+  return `$${usd} (≈ ${formatTokenDisplay(human, token)} ${token})`;
+}
+
+/**
+ * Whether user selected custom rewards (reward cost applies). Default rewards have no cost.
+ */
+function isCustomRewards() {
+  const r = wizardState.tournamentData.rewardConfig;
+  return r != null && r._isDefault === false;
 }
 
 /**
@@ -732,6 +869,18 @@ function renderStep6Ante() {
 function renderStep7Review() {
   const totalPayment = calculateTotalPayment();
   const category = TOURNAMENT_CATEGORIES[wizardState.tournamentData.category];
+  const creationFeeCents = 500; // $5.00
+  const anteCents = wizardState.tournamentData.startingAnteUSDCents || 0;
+  const paymentToken = wizardState.tournamentData.paymentToken || 'SUI';
+  const anteToken = 'MEWS';
+  const creationFeeLine = formatPaymentLineUsdAndToken(creationFeeCents, paymentToken);
+  const anteLine = anteCents > 0 ? formatPaymentLineUsdAndToken(anteCents, anteToken) : '$0.00';
+  const customRewards = isCustomRewards();
+  const rewardCostCents = customRewards && wizardState.rewardCost ? Math.round(wizardState.rewardCost.totalCost * 100) : 0;
+  const rewardCostLine = rewardCostCents > 0 ? formatPaymentLineUsdAndToken(rewardCostCents, paymentToken) : null;
+  const paymentInTokenCents = creationFeeCents + rewardCostCents;
+  const paymentInTokenHuman = wizardState.prices && paymentInTokenCents > 0 ? usdCentsToTokenHuman(paymentInTokenCents, paymentToken) : null;
+  const paymentInTokenDisplay = paymentInTokenHuman != null ? formatTokenDisplay(paymentInTokenHuman, paymentToken) : null;
   
   return `
     <div class="tournament-creation-step">
@@ -744,24 +893,31 @@ function renderStep7Review() {
         <p><strong>Start:</strong> ${formatDateTime(wizardState.tournamentData.startTime)}</p>
         <p><strong>End:</strong> ${formatDateTime(wizardState.tournamentData.endTime)}</p>
         <p><strong>Entry Fee:</strong> ${wizardState.tournamentData.entryFeeTickets} ticket(s)</p>
-        <p><strong>Starting Ante:</strong> $${(wizardState.tournamentData.startingAnteUSDCents / 100).toFixed(2)}</p>
+        <p><strong>Starting Ante:</strong> ${anteCents > 0 ? formatPaymentLineUsdAndToken(anteCents, anteToken) : '$0.00'}</p>
       </div>
 
       <div class="review-section">
         <h4>Payment Summary</h4>
-        <p>Creation Fee: $5.00</p>
-        <p>Starting Ante: $${(wizardState.tournamentData.startingAnteUSDCents / 100).toFixed(2)}</p>
-        <p>Reward Cost: $${wizardState.rewardCost ? wizardState.rewardCost.totalCost.toFixed(2) : '0.00'}</p>
+        <p>Creation Fee: ${creationFeeLine} <span style="color: #888;">(pay in selected token below)</span></p>
+        <p>Starting Ante: ${anteLine} <span style="color: #888;">(deposited to vault as MEWS)</span></p>
+        ${rewardCostLine != null ? `<p>Reward Cost (custom): ${rewardCostLine}</p>` : '<p>Reward Cost: $0.00 <span style="color: #888;">(default rewards — no cost)</span></p>'}
         <p><strong>Total: $${totalPayment.toFixed(2)}</strong></p>
       </div>
 
       <div class="review-section">
-        <label>Payment Method</label>
+        <label>Creation fee &amp; rewards payment token</label>
         <select id="paymentTokenSelect" class="tournament-creation-input">
-          <option value="SUI" ${wizardState.tournamentData.paymentToken === 'SUI' ? 'selected' : ''}>SUI</option>
-          <option value="MEWS" ${wizardState.tournamentData.paymentToken === 'MEWS' ? 'selected' : ''}>MEWS</option>
-          <option value="USDC" ${wizardState.tournamentData.paymentToken === 'USDC' ? 'selected' : ''}>USDC</option>
+          <option value="SUI" ${paymentToken === 'SUI' ? 'selected' : ''}>SUI</option>
+          <option value="MEWS" ${paymentToken === 'MEWS' ? 'selected' : ''}>MEWS</option>
+          <option value="USDC" ${paymentToken === 'USDC' ? 'selected' : ''}>USDC</option>
         </select>
+        ${paymentInTokenDisplay != null ? `
+          <p class="tournament-creation-hint" style="margin-top: 0.5rem; color: #d4af37;">
+            You will pay: <strong>${paymentInTokenDisplay} ${paymentToken}</strong> ($${(paymentInTokenCents / 100).toFixed(2)} USD) for creation fee${rewardCostCents > 0 ? ' and custom rewards' : ''}.
+          </p>
+        ` : `
+          <p class="tournament-creation-hint" style="margin-top: 0.25rem;">Token used to pay the creation fee${customRewards && rewardCostCents > 0 ? ' and custom reward cost' : ''}. Ante is always funded to the vault in MEWS.</p>
+        `}
         <div id="paymentTokenBalance" class="payment-token-balance" style="margin-top: 0.5em; font-size: 0.9em; color: #d4af37;">
           <span class="balance-loading" style="display: none;">Loading balance...</span>
           <span class="balance-amount" style="display: none;"></span>
@@ -773,12 +929,12 @@ function renderStep7Review() {
 }
 
 /**
- * Calculate total payment
+ * Calculate total payment (creation fee + ante + custom reward cost only; default rewards = $0)
  */
 function calculateTotalPayment() {
   const creationFee = 5.00;
   const startingAnte = wizardState.tournamentData.startingAnteUSDCents / 100;
-  const rewardCost = wizardState.rewardCost ? wizardState.rewardCost.totalCost : 0;
+  const rewardCost = isCustomRewards() && wizardState.rewardCost ? wizardState.rewardCost.totalCost : 0;
   return creationFee + startingAnte + rewardCost;
 }
 
@@ -875,21 +1031,55 @@ function attachStepEventListeners(step) {
         });
       }
       break;
-    case 5:
-      // Step 5 is now Ante (was step 6 before swap)
-      const anteInput = document.getElementById('tournamentAnteInput');
-      if (anteInput) {
-        // Use both 'input' and 'change' events to catch all updates
-        const updateAnte = (e) => {
-          const value = parseFloat(e.target.value) || 0;
+    case 5: {
+      // Ante step: fetch prices only once; re-render only when prices first arrive (avoids infinite loop)
+      const hadPrices = !!(wizardState.prices && wizardState.decimals);
+      fetchTournamentPrices().then(() => {
+        if (wizardState.currentStep === 5 && !hadPrices) renderStep(5);
+      });
+      const anteModeRadios = document.querySelectorAll('input[name="anteMode"]');
+      anteModeRadios.forEach((radio) => {
+        radio.addEventListener('change', (e) => {
+          wizardState.anteInputMode = e.target.value;
+          renderStep(5);
+        });
+      });
+      const anteInputUsd = document.getElementById('tournamentAnteInput');
+      if (anteInputUsd) {
+        const updateFromUsd = () => {
+          const value = parseFloat(anteInputUsd.value) || 0;
           wizardState.tournamentData.startingAnteUSDCents = Math.round(value * 100);
+          renderStep(5);
         };
-        anteInput.addEventListener('input', updateAnte);
-        anteInput.addEventListener('change', updateAnte);
-        anteInput.addEventListener('blur', updateAnte);
+        anteInputUsd.addEventListener('input', updateFromUsd);
+        anteInputUsd.addEventListener('change', updateFromUsd);
+      }
+      const anteInputToken = document.getElementById('tournamentAnteTokenInput');
+      if (anteInputToken) {
+        const updateFromToken = () => {
+          const tokenSelect = document.getElementById('tournamentAnteTokenSelect');
+          const token = tokenSelect ? tokenSelect.value : wizardState.tournamentData.startingAnteToken || 'SUI';
+          const human = parseFloat(anteInputToken.value) || 0;
+          wizardState.tournamentData.startingAnteUSDCents = tokenHumanToUsdCents(human, token);
+          renderStep(5);
+        };
+        anteInputToken.addEventListener('input', updateFromToken);
+        anteInputToken.addEventListener('change', updateFromToken);
+      }
+      const anteTokenSelect = document.getElementById('tournamentAnteTokenSelect');
+      if (anteTokenSelect) {
+        anteTokenSelect.addEventListener('change', (e) => {
+          wizardState.tournamentData.startingAnteToken = e.target.value;
+          renderStep(5);
+        });
       }
       break;
-    case 7:
+    }
+    case 7: {
+      const hadPricesReview = !!(wizardState.prices && wizardState.decimals);
+      fetchTournamentPrices().then(() => {
+        if (wizardState.currentStep === 7 && !hadPricesReview) renderStep(7);
+      });
       const paymentTokenSelect = document.getElementById('paymentTokenSelect');
       if (paymentTokenSelect) {
         // Load balance for initially selected token
@@ -898,9 +1088,11 @@ function attachStepEventListeners(step) {
         paymentTokenSelect.addEventListener('change', (e) => {
           wizardState.tournamentData.paymentToken = e.target.value;
           updatePaymentTokenBalance(e.target.value);
+          renderStep(7);
         });
       }
       break;
+    }
   }
 }
 
@@ -999,7 +1191,7 @@ async function updatePaymentTokenBalance(paymentToken) {
  */
 async function loadBadgeDiscount(walletAddress) {
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
     const response = await fetch(`${API_BASE_URL}/badges/${walletAddress}`);
     if (response.ok) {
       const data = await response.json();
@@ -1033,7 +1225,7 @@ async function calculateRewardCost() {
   }
 
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
     const walletAddress = getWalletAddress();
     
     const response = await fetch(`${API_BASE_URL}/tournaments/calculate-reward-cost`, {
@@ -1098,15 +1290,26 @@ window.tournamentCreationNextStep = async function() {
  */
 function saveCurrentStepData() {
   switch (wizardState.currentStep) {
-    case 5:
-      // Save ante value (step 5 is now Ante after swap)
-      const anteInput = document.getElementById('tournamentAnteInput');
-      if (anteInput) {
-        const value = parseFloat(anteInput.value) || 0;
-        wizardState.tournamentData.startingAnteUSDCents = Math.round(value * 100);
-        log.debug('TOURNAMENT CREATION', 'Saved ante value', { value, cents: wizardState.tournamentData.startingAnteUSDCents });
+    case 5: {
+      const anteTokenSelect = document.getElementById('tournamentAnteTokenSelect');
+      if (anteTokenSelect) wizardState.tournamentData.startingAnteToken = anteTokenSelect.value || 'SUI';
+      const mode = wizardState.anteInputMode || 'usd';
+      const token = wizardState.tournamentData.startingAnteToken || 'SUI';
+      if (mode === 'usd') {
+        const anteInput = document.getElementById('tournamentAnteInput');
+        if (anteInput) {
+          const value = parseFloat(anteInput.value) || 0;
+          wizardState.tournamentData.startingAnteUSDCents = Math.round(value * 100);
+        }
+      } else {
+        const anteTokenInput = document.getElementById('tournamentAnteTokenInput');
+        if (anteTokenInput) {
+          const human = parseFloat(anteTokenInput.value) || 0;
+          wizardState.tournamentData.startingAnteUSDCents = tokenHumanToUsdCents(human, token);
+        }
       }
       break;
+    }
     // Add other steps as needed
   }
 }
@@ -1524,11 +1727,19 @@ async function handleCreateTournament() {
     return;
   }
 
+  const nextBtn = document.getElementById('tournamentCreationNextBtn');
+  const originalText = nextBtn ? nextBtn.textContent : 'Pay & Create Tournament';
+  if (nextBtn) {
+    nextBtn.textContent = 'Processing…';
+    nextBtn.classList.add('tournament-creation-btn-loading');
+    nextBtn.disabled = true;
+  }
+
   wizardState.loading = true;
   hideError();
 
   try {
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
     const walletAddress = getWalletAddress();
 
     if (!walletAddress) {
@@ -1553,6 +1764,7 @@ async function handleCreateTournament() {
       entryFeeTickets: wizardState.tournamentData.entryFeeTickets,
       rewardConfig: wizardState.tournamentData.rewardConfig,
       startingAnteUSDCents: wizardState.tournamentData.startingAnteUSDCents,
+      startingAnteToken: 'MEWS',
       paymentToken: wizardState.tournamentData.paymentToken,
       playerAddress: walletAddress,
       badgeDiscount: wizardState.badgeDiscount,
@@ -1560,7 +1772,47 @@ async function handleCreateTournament() {
 
     log.info('TOURNAMENT CREATION', 'Creating tournament', requestBody);
 
-    // Call backend to build transaction
+    // Step 1: Build player payment via backend (player approves creation + ante + custom rewards)
+    const buildPaymentBody = {
+      playerAddress: walletAddress,
+      paymentToken: wizardState.tournamentData.paymentToken,
+      startingAnteUSDCents: wizardState.tournamentData.startingAnteUSDCents || 0,
+      rewardConfig: wizardState.tournamentData.rewardConfig || null,
+      badgeDiscount: wizardState.badgeDiscount,
+    };
+
+    log.info('TOURNAMENT CREATION', 'Building payment', buildPaymentBody);
+
+    const buildPaymentResponse = await fetch(`${API_BASE_URL}/tournaments/build-payment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildPaymentBody),
+    });
+
+    if (!buildPaymentResponse.ok) {
+      const errorData = await buildPaymentResponse.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to build tournament payment: ${buildPaymentResponse.status}`);
+    }
+
+    const buildPaymentData = await buildPaymentResponse.json();
+    if (!buildPaymentData.success) {
+      throw new Error(buildPaymentData.error || 'Failed to build tournament payment');
+    }
+
+    // If payment is required, ask player to sign and execute the transaction
+    if (buildPaymentData.requiresPayment && buildPaymentData.transactionBytesBase64) {
+      log.info('TOURNAMENT CREATION', 'Signing payment transaction', {
+        paymentToken: buildPaymentData.paymentToken,
+        payment: buildPaymentData.payment,
+      });
+      await signAndExecuteTransaction(buildPaymentData.transactionBytesBase64);
+    } else {
+      log.info('TOURNAMENT CREATION', 'No payment required for tournament creation', {
+        payment: buildPaymentData.payment,
+      });
+    }
+
+    // Step 2: Call backend create route (admin signs via Channel; no further player signing)
     const response = await fetch(`${API_BASE_URL}/tournaments/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1574,110 +1826,22 @@ async function handleCreateTournament() {
 
     const data = await response.json();
 
-    if (!data.success || !data.transaction) {
-      throw new Error(data.error || 'Failed to build tournament creation transaction');
+    if (!data.success || !data.digest) {
+      throw new Error(data.error || 'Failed to create tournament');
     }
 
-    // Sign and execute transaction
-    const txResult = await signAndExecuteTransaction(data.transaction, data.gasEstimate);
-    
-    // Verify transaction succeeded
-    if (!txResult || !txResult.digest) {
-      throw new Error('Transaction execution failed or did not return a digest');
-    }
-    
-    // Check transaction effects to ensure it succeeded
-    if (txResult.effects && txResult.effects.status && txResult.effects.status.status !== 'success') {
-      const errorMsg = txResult.effects.status.error || 'Transaction execution failed';
-      throw new Error(`Transaction failed: ${errorMsg}`);
-    }
-    
-    log.info('TOURNAMENT CREATION', 'Transaction executed successfully', { 
-      digest: txResult.digest,
-      effects: txResult.effects,
-      events: txResult.events,
-    });
+    log.info('TOURNAMENT CREATION', 'Tournament created via channel', { digest: data.digest });
 
-    // Notify backend to schedule reward distribution for this tournament
-    // Extract tournament object ID from created objects or events
-    try {
-      let tournamentObjectId = null;
-      
-      // Try to get from objectChanges (created objects)
-      if (txResult.objectChanges) {
-        const tournamentObj = txResult.objectChanges.find(
-          (change) => change.type === 'created' && 
-                       change.objectType?.includes('Tournament') &&
-                       !change.objectType?.includes('Registry')
-        );
-        if (tournamentObj) {
-          tournamentObjectId = tournamentObj.objectId;
-        }
-      }
-      
-      // Fallback: try to get from events
-      if (!tournamentObjectId && txResult.events) {
-        const createdEvent = txResult.events.find(e => e.type?.includes('TournamentCreated'));
-        if (createdEvent?.parsedJson?.tournament_object_id) {
-          tournamentObjectId = createdEvent.parsedJson.tournament_object_id;
-        }
-      }
-      
-      if (tournamentObjectId) {
-        const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-        fetch(`${API_BASE_URL}/tournaments/notify-created`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tournamentObjectId,
-            transactionDigest: txResult.digest,
-          }),
-        }).then(response => {
-          if (response.ok) {
-            log.info('TOURNAMENT CREATION', 'Backend notified for reward scheduling', { tournamentObjectId });
-          }
-        }).catch(err => {
-          log.warn('TOURNAMENT CREATION', 'Failed to notify backend (non-critical)', err);
-        });
-      } else {
-        log.warn('TOURNAMENT CREATION', 'Could not extract tournament object ID for scheduling');
-      }
-    } catch (notifyErr) {
-      // Non-critical - don't fail the creation
-      log.warn('TOURNAMENT CREATION', 'Error notifying backend', notifyErr);
+    // Reload tournament list the same way as preload (invalidate cache + load)
+    if (typeof window !== 'undefined' && typeof window.reloadTournamentLists === 'function') {
+      window.__prefetchedTournaments = null;
+      window.__prefetchedMyTournaments = null;
+      setTimeout(() => {
+        window.reloadTournamentLists();
+      }, 1500);
     }
 
-    // Invalidate tournament cache by forcing refresh
-    // This ensures the new tournament appears immediately
-    // Wait a few seconds for event indexing, then refresh
-    setTimeout(async () => {
-      // Refresh tournaments if modal is open
-      if (typeof window !== 'undefined') {
-        // Try to call loadActiveTournaments if available
-        if (typeof window.loadActiveTournaments === 'function') {
-          // Force refresh by adding cache-busting parameter
-          const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-          const walletAddress = getWalletAddress();
-          const url = walletAddress 
-            ? `${API_BASE_URL}/tournaments?playerAddress=${encodeURIComponent(walletAddress)}&_refresh=${Date.now()}`
-            : `${API_BASE_URL}/tournaments?_refresh=${Date.now()}`;
-          
-          try {
-            const response = await fetch(url);
-            if (response.ok) {
-              window.loadActiveTournaments();
-            }
-          } catch (error) {
-            log.error('TOURNAMENT CREATION', 'Failed to refresh tournaments', error);
-          }
-        } else if (typeof window.showTournaments === 'function') {
-          // Fallback: reload the tournament modal
-          window.showTournaments();
-        }
-      }
-    }, 3000); // Wait 3 seconds for event indexing
-
-    // Show success message
+    wizardState.creationSuccess = true;
     showSuccessMessage(data);
 
   } catch (error) {
@@ -1685,6 +1849,11 @@ async function handleCreateTournament() {
     showError(error.message || 'Failed to create tournament');
   } finally {
     wizardState.loading = false;
+    if (nextBtn) {
+      nextBtn.textContent = originalText;
+      nextBtn.classList.remove('tournament-creation-btn-loading');
+      nextBtn.disabled = false;
+    }
   }
 }
 
@@ -1734,12 +1903,16 @@ async function signAndExecuteTransaction(transactionBytes, gasEstimate) {
 function showSuccessMessage(data) {
   const stepContent = document.getElementById('tournamentCreationStepContent');
   if (stepContent) {
+    const digestLine = data.digest
+      ? `<p><strong>Transaction:</strong> <code class="tournament-creation-digest">${data.digest.slice(0, 16)}...</code></p>`
+      : '';
     stepContent.innerHTML = `
       <div class="tournament-creation-success">
         <h3>✅ Tournament Created!</h3>
         <p>Your tournament has been created successfully!</p>
         <p><strong>Name:</strong> ${wizardState.tournamentData.name}</p>
         <p><strong>Total Paid:</strong> $${data.payment?.totalUSD?.toFixed(2) || '0.00'}</p>
+        ${digestLine}
         <div class="tournament-creation-success-actions">
           <button class="tournament-creation-btn primary" onclick="closeTournamentCreation()">Close</button>
         </div>
@@ -1758,6 +1931,12 @@ function showSuccessMessage(data) {
  * Close tournament creation modal
  */
 window.closeTournamentCreation = function() {
+  if (wizardState.creationSuccess && typeof window.reloadTournamentLists === 'function') {
+    window.__prefetchedTournaments = null;
+    window.__prefetchedMyTournaments = null;
+    window.reloadTournamentLists();
+    wizardState.creationSuccess = false;
+  }
   const modal = document.getElementById('tournamentCreationModal');
   if (modal) {
     modal.remove();

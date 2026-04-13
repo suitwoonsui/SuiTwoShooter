@@ -6,11 +6,40 @@
 
 console.log('✅ [TOKEN BALANCE UTILS] Token balance utilities module loaded');
 
+// Short-lived cache: balances can change, but for UX we mainly need to avoid re-checking
+// multiple times during menu → store → tab switches.
+const TOKEN_BALANCE_CACHE_TTL_MS = 2 * 60 * 1000;
+const _tokenBalanceCache = new Map(); // key -> { at, data }
+const _tokenBalanceInFlight = new Map(); // key -> Promise
+
+function prefetchTokenBalancesIfStale(walletAddress, network = 'testnet', tokens) {
+  const addr = String(walletAddress || '').trim();
+  if (!addr) return;
+  const wanted = Array.isArray(tokens) && tokens.length
+    ? tokens.map((t) => String(t || '').trim().toLowerCase()).filter(Boolean)
+    : ['sui', 'mews']; // default warm set for store
+  // Use fire-and-forget; fetchTokenBalance has cache + in-flight dedupe.
+  for (const t of wanted) {
+    void fetchTokenBalance(t, addr, network).catch(() => {});
+  }
+}
+
 /**
- * Get RPC URL for a given network
+ * Game backend Sui JSON-RPC proxy (same-origin + server failover). Falls back to public fullnode only if config missing.
  * @param {string} network - 'testnet' or 'mainnet'
- * @returns {string} RPC URL
+ * @returns {string|null} POST target URL or null
  */
+function getSuiJsonRpcProxyUrl(network) {
+  const gameApiBase = typeof window !== 'undefined' && window.GAME_CONFIG
+    ? window.GAME_CONFIG.GAME_BACKEND_URL || window.GAME_CONFIG.API_BASE_URL
+    : '';
+  const base = String(gameApiBase || '').replace(/\/api\/?$/, '');
+  if (!base) return null;
+  const net = network === 'mainnet' ? 'mainnet' : 'testnet';
+  return `${base}/api/sui-json-rpc?network=${net}`;
+}
+
+/** @deprecated Prefer getSuiJsonRpcProxyUrl; kept for emergency fallback only */
 function getRpcUrl(network) {
   return network === 'testnet'
     ? 'https://fullnode.testnet.sui.io:443'
@@ -62,8 +91,8 @@ async function fetchUsdcBalance(walletAddress, network = 'testnet') {
       };
     }
     
-    const rpcUrl = getRpcUrl(network);
-    
+    const rpcUrl = getSuiJsonRpcProxyUrl(network) || getRpcUrl(network);
+
     const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: {
@@ -99,6 +128,7 @@ async function fetchUsdcBalance(walletAddress, network = 'testnet') {
     const divisor = 1_000_000; // 10^6
     const balanceInUSDC = Number(totalBalance) / divisor;
     const formattedBalance = balanceInUSDC.toLocaleString('en-US', {
+      notation: 'standard',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
       useGrouping: true
@@ -151,19 +181,24 @@ async function fetchMewsBalance(walletAddress, network = 'testnet') {
       };
     }
     
-    // Parse formatted balance - handle commas and K/M suffixes
-    let balanceStr = balanceResult.formattedBalance.replace(/,/g, '');
-    
-    // Handle K (thousands) and M (millions) suffixes
+    // Parse formatted balance - handle commas and K/M/B/T compact suffixes (parseFloat stops at letters)
+    let balanceStr = String(balanceResult.formattedBalance || '').replace(/,/g, '').trim();
     let multiplier = 1;
-    if (balanceStr.endsWith('K')) {
-      multiplier = 1000;
-      balanceStr = balanceStr.replace('K', '');
+    const compact = /^([\d.+-eE]+)\s*([KMBT])$/i.exec(balanceStr.replace(/\s/g, ''));
+    if (compact) {
+      balanceStr = compact[1];
+      const suf = compact[2].toUpperCase();
+      if (suf === 'K') multiplier = 1e3;
+      else if (suf === 'M') multiplier = 1e6;
+      else if (suf === 'B') multiplier = 1e9;
+      else if (suf === 'T') multiplier = 1e12;
+    } else if (balanceStr.endsWith('K')) {
+      multiplier = 1e3;
+      balanceStr = balanceStr.slice(0, -1);
     } else if (balanceStr.endsWith('M')) {
-      multiplier = 1000000;
-      balanceStr = balanceStr.replace('M', '');
+      multiplier = 1e6;
+      balanceStr = balanceStr.slice(0, -1);
     }
-    
     const balance = parseFloat(balanceStr) * multiplier;
     
     return {
@@ -244,20 +279,62 @@ async function fetchSuiBalance(walletAddress, network = 'testnet') {
  */
 async function fetchTokenBalance(tokenType, walletAddress, network = 'testnet') {
   const normalizedType = tokenType.toLowerCase();
-  
-  if (normalizedType === 'sui') {
-    return await fetchSuiBalance(walletAddress, network);
-  } else if (normalizedType === 'mews') {
-    return await fetchMewsBalance(walletAddress, network);
-  } else if (normalizedType === 'usdc') {
-    return await fetchUsdcBalance(walletAddress, network);
-  } else {
-    return {
-      success: false,
-      balance: 0,
-      formattedBalance: '0',
-      error: `Unknown token type: ${tokenType}`
-    };
+
+  const addr = String(walletAddress || '').trim();
+  const net = String(network || 'testnet').trim().toLowerCase();
+  const cacheKey = `${normalizedType}:${net}:${addr.toLowerCase()}`;
+  const now = Date.now();
+
+  // Cache hit
+  const cached = _tokenBalanceCache.get(cacheKey);
+  if (cached && cached.at && (now - cached.at) < TOKEN_BALANCE_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  // In-flight dedupe
+  const inflight = _tokenBalanceInFlight.get(cacheKey);
+  if (inflight) return inflight;
+
+  const p = (async () => {
+    let result;
+    if (normalizedType === 'sui') {
+      result = await fetchSuiBalance(addr, net);
+    } else if (normalizedType === 'mews') {
+      result = await fetchMewsBalance(addr, net);
+    } else if (normalizedType === 'usdc') {
+      result = await fetchUsdcBalance(addr, net);
+    } else {
+      result = {
+        success: false,
+        balance: 0,
+        formattedBalance: '0',
+        error: `Unknown token type: ${tokenType}`
+      };
+    }
+    _tokenBalanceCache.set(cacheKey, { at: Date.now(), data: result });
+    return result;
+  })().finally(() => {
+    _tokenBalanceInFlight.delete(cacheKey);
+  });
+
+  _tokenBalanceInFlight.set(cacheKey, p);
+  return p;
+}
+
+/**
+ * Drop cached balances so the next fetch hits RPC (e.g. after a successful store purchase).
+ * @param {string} walletAddress
+ * @param {string} [network='testnet']
+ * @param {string[]} [tokenTypes=['sui','mews','usdc']]
+ */
+function invalidateTokenBalanceCache(walletAddress, network = 'testnet', tokenTypes = ['sui', 'mews', 'usdc']) {
+  const addr = String(walletAddress || '').trim().toLowerCase();
+  const net = String(network || 'testnet').trim().toLowerCase();
+  if (!addr) return;
+  const types = Array.isArray(tokenTypes) && tokenTypes.length ? tokenTypes : ['sui', 'mews', 'usdc'];
+  for (const t of types) {
+    const key = `${String(t).toLowerCase()}:${net}:${addr}`;
+    _tokenBalanceCache.delete(key);
   }
 }
 
@@ -268,6 +345,8 @@ if (typeof window !== 'undefined') {
     fetchMewsBalance,
     fetchUsdcBalance,
     fetchTokenBalance,
+    prefetchTokenBalancesIfStale,
+    invalidateTokenBalanceCache,
     getRpcUrl,
     getUsdcTokenTypeId
   };

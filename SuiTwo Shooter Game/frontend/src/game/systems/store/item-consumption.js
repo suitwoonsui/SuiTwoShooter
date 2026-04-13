@@ -23,14 +23,155 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
 // Game item selection state (for consumption, not purchase)
 // Format: { itemId: level } or { itemId: true } for single-level items
 let gameItemSelection = {
-  extraLives: null,        // null or level (1, 2, or 3)
-  forceField: null,        // null or level (1, 2, or 3)
-  orbLevel: null,          // null or level (1, 2, or 3)
-  slowTime: null,         // null or level (1, 2, or 3)
-  destroyAll: false,       // boolean (single level)
-  bossKillShot: false,     // boolean (single level)
-  coinTractorBeam: null    // null or level (1, 2, or 3)
+  extra_lives: null,        // null or level (1, 2, or 3)
+  force_field: null,        // null or level (1, 2, or 3)
+  orb_level: null,          // null or level (1, 2, or 3)
+  slow_time: null,         // null or level (1, 2, or 3)
+  destroy_all: false,       // boolean (single level)
+  boss_kill_shot: false,     // boolean (single level)
+  coin_tractor_beam: null    // null or level (1, 2, or 3)
 };
+
+let _lastPrepConsumptionMountGen = -1;
+
+/**
+ * DOM scope for consumption modal only (prep loadout uses inventory rows, not a second list).
+ * @returns {HTMLElement | null}
+ */
+function _getConsumptionDOMRoot() {
+  const modal = document.getElementById('itemConsumptionModal');
+  return modal || null;
+}
+
+/**
+ * New prep store open: reset run item selection. Caller should clear StoreInventoryTab._selected.
+ * @returns {boolean} True if this open was a new session (selection was reset).
+ */
+function prepLoadoutOnInventoryRenderMaybeResetSession() {
+  if (typeof window === 'undefined') return false;
+  const gen = window.__prepLoadoutStoreOpenGeneration || 0;
+  if (gen !== _lastPrepConsumptionMountGen) {
+    _lastPrepConsumptionMountGen = gen;
+    gameItemSelection = _defaultGameItemSelection();
+    return true;
+  }
+  return false;
+}
+
+/** Prep: one inventory row = run loadout for that stack (single type/level). */
+function setPrepLoadoutGameItemSelectionFromRow(itemType, levelNum) {
+  gameItemSelection = _defaultGameItemSelection();
+  if (itemType === 'destroy_all' || itemType === 'boss_kill_shot') {
+    gameItemSelection[itemType] = true;
+  } else {
+    gameItemSelection[itemType] = levelNum;
+  }
+}
+
+function clearPrepLoadoutGameItemSelection() {
+  gameItemSelection = _defaultGameItemSelection();
+}
+
+function _defaultGameItemSelection() {
+  return {
+    extra_lives: null,
+    force_field: null,
+    orb_level: null,
+    slow_time: null,
+    destroy_all: false,
+    boss_kill_shot: false,
+    coin_tractor_beam: null,
+  };
+}
+
+/**
+ * Refresh inventory from backend for validating checkout (same as confirm path).
+ * @param {string | null} walletAddress
+ * @returns {Promise<Record<string, number>>}
+ */
+async function fetchFreshBlockchainInventoryForConsumption(walletAddress) {
+  let blockchainInventory = {};
+  if (!walletAddress) return blockchainInventory;
+  try {
+    if (window.PlayerInventoryCache && typeof window.PlayerInventoryCache.fetchReservoirBundleAndCache === 'function') {
+      await window.PlayerInventoryCache.fetchReservoirBundleAndCache(walletAddress, { forceRefresh: true }).catch(() => null);
+      const inv = window.PlayerInventoryCache.getFreshOrNull ? window.PlayerInventoryCache.getFreshOrNull(walletAddress) : null;
+      blockchainInventory = inv || {};
+    } else {
+      const base = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+      const inventoryUrl = `${base}/inventory/${walletAddress}?contract=new`;
+      const response = await fetch(inventoryUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.inventory != null) blockchainInventory = data.inventory;
+      }
+    }
+  } catch (error) {
+    log.warn('CONSUMPTION', 'Error fetching inventory for validation', error);
+  }
+  return blockchainInventory;
+}
+
+/**
+ * Build items to consume from current gameItemSelection and validate against inventory.
+ * @param {string | null} walletAddress
+ * @returns {Promise<{ itemsToConsume: Record<string, number>; errors: string[] }>}
+ */
+async function validateGameItemSelectionAgainstInventory(walletAddress) {
+  const blockchainInventory = await fetchFreshBlockchainInventoryForConsumption(walletAddress);
+  const itemsToConsume = {};
+  const errors = [];
+
+  for (const [itemId, level] of Object.entries(gameItemSelection)) {
+    if (level !== null && level !== false) {
+      const actualLevel = level === true ? 1 : level;
+      const itemKey = `${itemId}_${actualLevel}`;
+
+      let count = blockchainInventory[itemKey] || 0;
+
+      if (count === 0 && typeof getItemCount === 'function') {
+        count = getItemCount(itemId, actualLevel, walletAddress);
+      }
+
+      if (count <= 0) {
+        const errorMsg = `${getItemName(itemId)} Level ${actualLevel} not in inventory`;
+        log.error('CONSUMPTION', errorMsg);
+        errors.push(errorMsg);
+        continue;
+      }
+
+      itemsToConsume[itemId] = actualLevel;
+    }
+  }
+
+  return { itemsToConsume, errors };
+}
+
+/**
+ * Prep loadout store: validate current embedded selections (no modal). Used before GameService.startGame.
+ * @returns {Promise<{ ok: boolean; items: Record<string, number> }>}
+ */
+async function checkoutPrepLoadoutItemSelection(options = {}) {
+  void options;
+  let walletAddress = null;
+  if (typeof getWalletAddress === 'function') {
+    walletAddress = getWalletAddress();
+  } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
+    walletAddress = window.walletAPIInstance.getAddress();
+  }
+
+  if (!walletAddress) {
+    return { ok: true, items: {} };
+  }
+
+  const { itemsToConsume, errors } = await validateGameItemSelectionAgainstInventory(walletAddress);
+  if (errors.length > 0) {
+    alert('Error: ' + errors.join('\n'));
+    return { ok: false, items: {} };
+  }
+
+  return { ok: true, items: itemsToConsume };
+}
 
 /**
  * Show item consumption/selection modal before game start
@@ -46,15 +187,7 @@ async function showItemConsumptionModal(options = {}) {
     
     // Reset item selection state for new game
     // This ensures selections from previous games don't carry over
-    gameItemSelection = {
-      extraLives: null,
-      forceField: null,
-      orbLevel: null,
-      slowTime: null,
-      destroyAll: false,
-      bossKillShot: false,
-      coinTractorBeam: null
-    };
+    gameItemSelection = _defaultGameItemSelection();
     
     // Also clear game.selectedItems if it exists (from previous game)
     if (typeof game !== 'undefined' && game.selectedItems) {
@@ -83,57 +216,36 @@ async function showItemConsumptionModal(options = {}) {
       updateLoadingModalMessage('Loading inventory... Please wait', 'gameStartLoadingModal');
     }
     
-    // Get inventory from blockchain API (not localStorage) - LOAD FIRST
-    // Use cache if available
+    // Ensure store catalog is in state so getAllItems() works (user may not have opened Store yet)
+    if (typeof ensureStoreCatalogLoaded === 'function') {
+      await ensureStoreCatalogLoaded();
+    }
+    
+    // Prefer reservoir-bundle cache from wallet/menu load (15m TTL). No refetch at game start when fresh.
     let inventory = {};
     try {
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      
-      if (window.apiRequestCache) {
-        // Use cache with 30 second TTL
-        inventory = await window.apiRequestCache.get(
-          `inventory:${walletAddress}`,
-          async () => {
-            const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
-            
-            if (!response.ok) {
-              throw new Error(`Failed to load inventory: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            if (!data.success || !data.inventory) {
-              throw new Error(data.error || 'Invalid response from server');
-            }
-            
-            return data.inventory || {};
-          },
-          {
-            ttl: 30000, // 30 seconds
-            walletAddress: walletAddress
-          }
-        );
-        log.debug('CONSUMPTION', 'Loaded inventory from blockchain (cached)', inventory);
+      const cached = window.PlayerInventoryCache?.getFreshOrNull?.(walletAddress);
+      if (cached) {
+        inventory = cached;
+        log.debug('CONSUMPTION', 'Using cached reservoir inventory (no start refetch)', Object.keys(inventory).length);
+      } else if (window.PlayerInventoryCache) {
+        await window.PlayerInventoryCache.fetchReservoirBundleAndCache(walletAddress);
+        const inv = window.PlayerInventoryCache.getFreshOrNull(walletAddress);
+        inventory = inv || {};
+        log.debug('CONSUMPTION', 'Loaded inventory via reservoir-bundle', Object.keys(inventory).length);
       } else {
-        // Fallback to direct fetch if cache not available
-        const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.inventory) {
-            inventory = data.inventory;
-            log.debug('CONSUMPTION', 'Loaded inventory from blockchain', inventory);
-          } else {
-            log.warn('CONSUMPTION', 'Failed to load inventory from blockchain', data.error);
-          }
-        } else {
-          log.warn('CONSUMPTION', 'Inventory API error', response.status);
-        }
+        const base = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+        const response = await fetch(`${base}/inventory/${walletAddress}?contract=new`);
+        if (!response.ok) throw new Error(`Failed to load inventory: ${response.status}`);
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Invalid response from server');
+        inventory = data.inventory != null ? data.inventory : {};
+        log.debug('CONSUMPTION', 'Loaded inventory from /inventory (no cache module)', Object.keys(inventory).length);
       }
     } catch (error) {
-      log.error('CONSUMPTION', 'Error loading inventory from blockchain', error);
-      // Fall back to localStorage if blockchain query fails
-      if (typeof getAllInventoryItems !== 'undefined') {
-        inventory = getAllInventoryItems(walletAddress);
+      log.error('CONSUMPTION', 'Error loading inventory', error);
+      if (typeof getAllInventoryItems === 'function') {
+        inventory = getAllInventoryItems(walletAddress) || {};
         log.warn('CONSUMPTION', 'Using localStorage inventory as fallback');
       }
     }
@@ -208,7 +320,7 @@ async function showItemConsumptionModal(options = {}) {
     
     // Append to DOM but keep hidden
     viewportContainer.appendChild(modal);
-    
+
     // Update UI
     updateConsumptionUI();
     
@@ -230,19 +342,25 @@ async function showItemConsumptionModal(options = {}) {
  * Build HTML for consumption items list
  */
 function buildConsumptionItemsHTML(inventory) {
-  if (typeof getAllItems === 'undefined' || typeof ITEM_CATALOG === 'undefined') {
+  if (typeof getAllItems === 'undefined') {
     return '<p>Item catalog not available</p>';
   }
   
   const items = getAllItems();
+  if (!items || items.length === 0) {
+    return '<p>No items available. Please load the store first.</p>';
+  }
   let html = '';
   
   items.forEach(item => {
-    // Check if player has any level of this item
-    const hasAnyLevel = item.levels.some(levelData => {
-      const key = `${item.id}_${levelData.level}`;
-      return inventory[key] > 0;
-    });
+    const levels = Array.isArray(item.levels) ? item.levels : [];
+    // Leveled items: check any level key. Non-leveled items: check base key (e.g. boss_kill_shot).
+    const hasAnyLevel = levels.length > 0
+      ? levels.some(levelData => {
+          const key = `${item.id}_${levelData.level}`;
+          return inventory[key] > 0;
+        })
+      : (inventory[item.id] > 0);
     
     if (!hasAnyLevel) {
       return; // Skip items not in inventory
@@ -250,22 +368,45 @@ function buildConsumptionItemsHTML(inventory) {
     
     // Build level buttons
     let levelsHTML = '';
-    item.levels.forEach(levelData => {
-      const level = levelData.level || 1;
-      const key = `${item.id}_${level}`;
-      const quantity = inventory[key] || 0;
-      
+    if (levels.length === 0) {
+      const quantity = inventory[item.id] || 0;
       if (quantity > 0) {
-        const isSelected = gameItemSelection[item.id] === level || 
-                          (item.id === 'destroyAll' && gameItemSelection[item.id] === true) ||
-                          (item.id === 'bossKillShot' && gameItemSelection[item.id] === true);
-        
+        const isSelected =
+          (item.id === 'destroy_all' && gameItemSelection[item.id] === true) ||
+          (item.id === 'boss_kill_shot' && gameItemSelection[item.id] === true);
         const selectedClass = isSelected ? 'selected' : '';
-        const levelName = item.levels.length > 1 ? `Level ${level}` : item.name;
-        
         levelsHTML += `
-          <button class="consumption-level-btn ${selectedClass}" 
-                  onclick="selectConsumptionItem('${item.id}', ${level})"
+          <button type="button" class="consumption-level-btn ${selectedClass}" 
+                  onclick="event.stopPropagation(); selectConsumptionItem('${item.id}', 1)"
+                  data-item-id="${item.id}"
+                  data-level="1">
+            <div class="consumption-level-info">
+              <div class="consumption-level-name">${item.name}</div>
+              <div class="consumption-level-effect">${item.description}</div>
+            </div>
+            <div class="consumption-level-badge">
+              <span class="consumption-quantity">Owned: ${quantity}</span>
+            </div>
+          </button>
+        `;
+      }
+    } else {
+      levels.forEach(levelData => {
+        const level = levelData.level || 1;
+        const key = `${item.id}_${level}`;
+        const quantity = inventory[key] || 0;
+      
+        if (quantity > 0) {
+          const isSelected = gameItemSelection[item.id] === level || 
+                            (item.id === 'destroy_all' && gameItemSelection[item.id] === true) ||
+                            (item.id === 'boss_kill_shot' && gameItemSelection[item.id] === true);
+        
+          const selectedClass = isSelected ? 'selected' : '';
+          const levelName = levels.length > 1 ? `Level ${level}` : item.name;
+        
+          levelsHTML += `
+          <button type="button" class="consumption-level-btn ${selectedClass}" 
+                  onclick="event.stopPropagation(); selectConsumptionItem('${item.id}', ${level})"
                   data-item-id="${item.id}"
                   data-level="${level}">
             <div class="consumption-level-info">
@@ -277,8 +418,9 @@ function buildConsumptionItemsHTML(inventory) {
             </div>
           </button>
         `;
-      }
-    });
+        }
+      });
+    }
     
     if (levelsHTML) {
       html += `
@@ -312,7 +454,7 @@ function selectConsumptionItem(itemId, level) {
   log.debug('CONSUMPTION', 'Selecting item', { itemId, level });
   
   // Handle single-level items
-  if (itemId === 'destroyAll' || itemId === 'bossKillShot') {
+  if (itemId === 'destroy_all' || itemId === 'boss_kill_shot') {
     level = 1;
     // Toggle selection
     if (gameItemSelection[itemId] === true) {
@@ -336,7 +478,9 @@ function selectConsumptionItem(itemId, level) {
  * Update consumption UI to reflect current selections
  */
 function updateConsumptionUI() {
-  const cards = document.querySelectorAll('.consumption-item-card');
+  const root = _getConsumptionDOMRoot();
+  if (!root) return;
+  const cards = root.querySelectorAll('.consumption-item-card');
   
   cards.forEach(card => {
     const itemId = card.getAttribute('data-item-id');
@@ -345,8 +489,8 @@ function updateConsumptionUI() {
     buttons.forEach(button => {
       const level = parseInt(button.getAttribute('data-level')) || 1;
       const isSelected = gameItemSelection[itemId] === level ||
-                        (itemId === 'destroyAll' && gameItemSelection[itemId] === true && level === 1) ||
-                        (itemId === 'bossKillShot' && gameItemSelection[itemId] === true && level === 1);
+                        (itemId === 'destroy_all' && gameItemSelection[itemId] === true && level === 1) ||
+                        (itemId === 'boss_kill_shot' && gameItemSelection[itemId] === true && level === 1);
       
       if (isSelected) {
         button.classList.add('selected');
@@ -362,86 +506,16 @@ function updateConsumptionUI() {
  */
 async function confirmItemConsumption() {
   log.debug('CONSUMPTION', 'Confirming item consumption', gameItemSelection);
-  
-  // Get wallet address
+
   let walletAddress = null;
   if (typeof getWalletAddress === 'function') {
     walletAddress = getWalletAddress();
   } else if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
     walletAddress = window.walletAPIInstance.getAddress();
   }
-  
-  // Fetch inventory from blockchain for validation
-  // Use cache if available
-  let blockchainInventory = {};
-  if (walletAddress) {
-    try {
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      
-      if (window.apiRequestCache) {
-        // Use cache with 30 second TTL
-        blockchainInventory = await window.apiRequestCache.get(
-          `inventory:${walletAddress}`,
-          async () => {
-            const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
-            if (!response.ok) {
-              throw new Error(`Failed to load inventory: ${response.status}`);
-            }
-            const data = await response.json();
-            if (!data.success || !data.inventory) {
-              throw new Error(data.error || 'Invalid response');
-            }
-            return data.inventory || {};
-          },
-          {
-            ttl: 30000,
-            walletAddress: walletAddress
-          }
-        );
-      } else {
-        // Fallback to direct fetch
-        const response = await fetch(`${API_BASE_URL}/store/inventory/${walletAddress}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.inventory) {
-            blockchainInventory = data.inventory;
-          }
-        }
-      }
-    } catch (error) {
-      log.warn('CONSUMPTION', 'Error fetching inventory for validation', error);
-    }
-  }
-  
-  // Validate and consume items
-  const itemsToConsume = {};
-  const errors = [];
-  
-  for (const [itemId, level] of Object.entries(gameItemSelection)) {
-    // Only validate items that are actually selected (not null, not false)
-    if (level !== null && level !== false) {
-      const actualLevel = level === true ? 1 : level;
-      const itemKey = `${itemId}_${actualLevel}`;
-      
-      // Check if item exists in blockchain inventory
-      let count = blockchainInventory[itemKey] || 0;
-      
-      // Fallback to localStorage if blockchain check failed
-      if (count === 0 && typeof getItemCount === 'function') {
-        count = getItemCount(itemId, actualLevel, walletAddress);
-      }
-      
-      if (count <= 0) {
-        const errorMsg = `${getItemName(itemId)} Level ${actualLevel} not in inventory`;
-        log.error('CONSUMPTION', errorMsg);
-        errors.push(errorMsg);
-        continue;
-      }
-      
-      itemsToConsume[itemId] = actualLevel;
-    }
-  }
-  
+
+  const { itemsToConsume, errors } = await validateGameItemSelectionAgainstInventory(walletAddress);
+
   if (errors.length > 0) {
     alert('Error: ' + errors.join('\n'));
     return;
@@ -449,8 +523,8 @@ async function confirmItemConsumption() {
   
   // DON'T consume items here - just "check out" items for use in this game
   // Items will be consumed when:
-  // - Start items (extraLives, forceField, orbLevel): Consumed at game start
-  // - Consumable items (coinTractorBeam, slowTime, destroyAll, bossKillShot): Consumed when activated during gameplay
+  // - Start items (extra_lives, force_field, orb_level): Consumed at game start
+  // - Consumable items (coin_tractor_beam, slow_time, destroy_all, boss_kill_shot): Consumed when activated during gameplay
   // This way, if game crashes or item is not used, it remains in inventory
   
   // Store selected items in game state (checked out, not consumed yet)
@@ -488,17 +562,8 @@ async function confirmItemConsumption() {
  */
 function cancelItemConsumption() {
   log.debug('CONSUMPTION', 'Cancelled item consumption');
-  
-  // Reset selection
-  gameItemSelection = {
-    extraLives: null,
-    forceField: null,
-    orbLevel: null,
-    slowTime: null,
-    destroyAll: false,
-    bossKillShot: false,
-    coinTractorBeam: null
-  };
+
+  gameItemSelection = _defaultGameItemSelection();
   
   // Hide modal
   hideItemConsumptionModal();
@@ -525,6 +590,7 @@ function hideItemConsumptionModal() {
     modal.classList.add('item-consumption-modal-hidden');
     setTimeout(() => {
       modal.remove();
+      updateConsumptionUI();
     }, 300);
   }
 }
@@ -547,5 +613,9 @@ if (typeof window !== 'undefined') {
   window.confirmItemConsumption = confirmItemConsumption;
   window.cancelItemConsumption = cancelItemConsumption;
   window.hideItemConsumptionModal = hideItemConsumptionModal;
+  window.checkoutPrepLoadoutItemSelection = checkoutPrepLoadoutItemSelection;
+  window.prepLoadoutOnInventoryRenderMaybeResetSession = prepLoadoutOnInventoryRenderMaybeResetSession;
+  window.setPrepLoadoutGameItemSelectionFromRow = setPrepLoadoutGameItemSelectionFromRow;
+  window.clearPrepLoadoutGameItemSelection = clearPrepLoadoutGameItemSelection;
 }
 

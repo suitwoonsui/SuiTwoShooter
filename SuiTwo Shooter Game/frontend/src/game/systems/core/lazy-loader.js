@@ -10,6 +10,13 @@
 const MENU_SCRIPTS = [
   // Frontend Logger (load first - needed by all modules)
   'src/game/systems/core/frontend-logger.js',
+
+  // Stats cache for menu + milestone prefetch (peekFresh); skipped if game scripts already loaded it
+  'src/game/systems/core/api-request-cache.js',
+  // Single API surface helper (frontend → game backend)
+  'src/game/systems/core/game-api.js',
+  // Tournament golden-path context
+  'src/game/systems/core/tournament-context.js',
   
   // Core state management (needed for menu stats)
   'src/game/systems/core/game-state-manager.js',
@@ -25,6 +32,9 @@ const MENU_SCRIPTS = [
   
   // Game Service (NEW - handles game lifecycle: start, stop, readiness)
   'src/game/systems/ui/game-service.js',
+
+  // Store surface rules — must load before store-service / store-wallet (prep-context checks)
+  'src/game/systems/ui/store-context-rules.js',
   
   // Store Service (NEW - handles store modal and purchase management)
   'src/game/systems/ui/store-service.js',
@@ -34,8 +44,11 @@ const MENU_SCRIPTS = [
   
   // Store Modules (NEW - extracted from store-ui.js)
   'src/game/systems/ui/store-utils.js',              // Price/formatting utilities
+  'src/game/systems/ui/store-offer-utils.js',        // Shared offerId + price resolution (cart + cards + tabs)
+  'src/game/systems/ui/store-data-sources.js',       // Game-config + token prices (single read path)
   'src/game/systems/ui/store-item-loader.js',        // Item loading from backend
   'src/game/systems/ui/store-item-rendering.js',     // Item card rendering
+  'src/game/systems/ui/player-inventory-cache.js',   // Reservoir inventory cache (15m TTL)
   'src/game/systems/ui/store-inventory.js',          // Inventory management
   'src/game/systems/ui/store-wallet-connection.js',  // Wallet connection modal
   'src/game/systems/ui/store-purchase-flow.js',      // Purchase transaction flow
@@ -49,6 +62,7 @@ const MENU_SCRIPTS = [
   'src/game/systems/ui/end-demo-modal.js',           // End Demo modal
   'src/game/systems/ui/store-game-pass-tab.js',      // Game Pass tab in store
   'src/game/systems/ui/store-tournament-tickets-tab.js', // Tournament Tickets tab in store
+  'src/game/systems/ui/store-bundles-tab.js',        // Bundles tab in store
   'src/game/systems/ui/store-inventory-tab.js',      // Inventory tab in store
   
   // Leaderboard Service (NEW - handles leaderboard state management)
@@ -61,12 +75,14 @@ const MENU_SCRIPTS = [
   'src/game/systems/ui/leaderboard-pagination.js',     // Pagination logic
   'src/game/systems/ui/leaderboard-data.js',           // Blockchain data fetching
   'src/game/systems/ui/leaderboard-score-submission.js', // Score submission flow
+
+  // Achievements BEFORE leaderboard-modal: modal calls addMilestoneProgressToLeaderboard on open;
+  // menu scripts load in parallel so execution order is not guaranteed unless this file lists deps first.
+  'src/game/systems/ui/achievement-popup.js',          // Achievement popup modal
+  'src/game/systems/ui/achievement-progress.js',     // Milestone tabs for leaderboard modal
+
   'src/game/systems/ui/leaderboard-modal.js',          // Modal creation and display
   'src/game/systems/ui/leaderboard-ui.js',             // Main coordination
-  
-  // Achievement System (NEW - milestone rewards)
-  'src/game/systems/ui/achievement-popup.js',          // Achievement popup modal
-  'src/game/systems/ui/achievement-progress.js',       // Milestone progress tabs
   
   // Tournament System (NEW - Weekly Tournament System)
   'src/game/systems/ui/tournament-modal.js',           // Tournament modal and UI
@@ -80,14 +96,13 @@ const MENU_SCRIPTS = [
   'src/game/systems/ui/menu-system.js',
   'src/game/systems/ui/settings-management.js',
   'src/game/systems/ui/sound-test-system.js',
-  'src/game/systems/ui/leaderboard-system.js',         // Legacy - delegates to new modules
   'src/game/systems/ui/store-ui.js',                   // Main store UI coordination
   'src/game/systems/ui/toast-notifications.js',
   'src/game/systems/ui/loading-modal.js',
+  'src/game/systems/ui/menu-panel-loading.js',
   
   // Store/inventory (needed for store menu)
   'src/game/systems/store/item-catalog.js',
-  'src/game/systems/store/inventory-manager.js',
   'src/game/systems/store/item-consumption.js',
   
   // Badge UI Service (NEW - handles badge UI state management)
@@ -99,27 +114,28 @@ const MENU_SCRIPTS = [
   'src/game/systems/ui/badge-ui-modals.js',         // Modal creation and display
   'src/game/systems/ui/badge-ui-mint.js',          // Badge minting flow
   'src/game/systems/ui/badge-ui-upgrade.js',       // Badge upgrade flow
-  'src/game/systems/ui/badge-ui-migration.js',     // Badge migration flow
+  // (removed) badge migration flow (upgradable contracts)
   
   // Blockchain/badges (needed for badge display and leaderboard)
   'src/game/blockchain/badge-service.js',
   'src/game/blockchain/score-submission.js',
-  'src/game/systems/ui/badge-ui.js',                // Legacy - delegates to new modules
   
   // Data flow management (needed for menu data loading)
   'src/game/systems/ui/game-data-state.js',
   'src/game/systems/ui/loading-manager.js',
   
+  // Game Data Flow loaders before service so window.warmPlayerSessionOnBackend exists before connect load runs
+  'src/game/systems/ui/game-data-flow-loaders.js',     // Data loading operations
+
   // Game Data Flow Service (NEW - handles state management and main coordination)
   'src/game/systems/ui/game-data-flow-service.js',
-  
+
   // Game Data Flow Modules (NEW - extracted from game-data-flow.js)
-  'src/game/systems/ui/game-data-flow-loaders.js',     // Data loading operations
   'src/game/systems/ui/game-data-flow-badge.js',      // Badge handling and display
   'src/game/systems/ui/game-data-flow-ui.js',         // UI updates
   'src/game/systems/ui/game-data-flow-modals.js',      // Modal management
   'src/game/systems/ui/game-data-flow-wallet.js',     // Wallet event handling
-  'src/game/systems/ui/game-data-flow.js',            // Legacy - delegates to new modules
+  // (removed) legacy delegation modules (leaderboard-system.js, badge-ui.js, game-data-flow.js)
   
   // Audio system (needed for menu sounds and background music)
   'src/game/audio/core/audio-context.js',
@@ -142,6 +158,8 @@ const MENU_SCRIPTS = [
 const GAME_SCRIPTS = [
   // Security system
   'game-security.js',
+  // Replay recorder (for score verification - must load before game init/update)
+  'src/game/blockchain/replay-recorder.js',
   
   // Game State and Core
   'src/game/systems/core/game-state.js',
@@ -422,18 +440,21 @@ function loadScripts(scripts, type = 'scripts') {
     // Load wallet module separately (only for menu scripts)
     // Note: WalletService.initialize() will be called after all menu scripts load
     if (type === 'menu') {
-      const walletModuleUrl = window.GAME_CONFIG?.WALLET_MODULE_URL || '../../../base/wallet-module/dist/wallet-api.umd.cjs';
+      const walletModuleUrl = window.GAME_CONFIG?.WALLET_MODULE_URL || 'http://localhost:3000/wallet-api.umd.cjs'; // Platform only
       console.log('📦 Loading wallet module from:', walletModuleUrl);
       
       const walletScript = document.createElement('script');
       walletScript.src = walletModuleUrl;
       walletScript.onload = function() {
         console.log('✅ Wallet bundle loaded');
+        if (typeof window.WalletAPI === 'undefined') {
+          console.error('❌ WalletAPI global missing after loading wallet module', { walletModuleUrl });
+        }
         // Don't initialize here - let WalletService.initialize() handle it after all scripts load
         // This ensures all dependencies are available
       };
       walletScript.onerror = () => {
-        console.error('❌ Failed to load wallet module');
+        console.error('❌ Failed to load wallet module', { walletModuleUrl });
       };
       document.head.appendChild(walletScript);
     }

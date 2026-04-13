@@ -32,10 +32,14 @@ const getConfig = () => {
     
     // 1. If localhost, ALWAYS use local services (ignore meta tags)
     if (isLocalhost) {
-      config.backendUrl = 'http://localhost:3000/api';
-      // Path from apps/shooter-game/frontend/ to base/wallet-module/dist/
-      // ../../ goes to apps/, ../ goes to root, then base/wallet-module/dist/
-      config.walletModuleUrl = '../../../base/wallet-module/dist/wallet-api.umd.cjs';
+      // Game backend runs on port 3001, base backend on 3000
+      // Note: Different routes go to different backends
+      config.gameBackendUrl = 'http://localhost:3001/api';
+      config.baseBackendUrl = 'http://localhost:3000/api';
+      config.backendUrl = config.gameBackendUrl; // Default to game backend for backward compatibility
+      // Wallet module served from base backend (port 3000)
+      // If base backend has built wallet module, use it; otherwise fallback to local file
+      config.walletModuleUrl = 'http://localhost:3000/wallet-api.umd.cjs';
     } else {
       // 2. For production, try meta tags first (for static HTML configuration)
       // Use a more robust method to read meta tags (in case script runs before DOM is fully parsed)
@@ -74,27 +78,74 @@ const getConfig = () => {
       }
       
       if (!config.walletModuleUrl) {
-        // Default production wallet module URL
-        config.walletModuleUrl = 'https://sui-two-shooter-wallet-module-test.vercel.app/wallet-api.umd.cjs';
+        // Default production wallet module URL (served from base backend)
+        // Update this to your base backend URL after deployment
+        config.walletModuleUrl = 'https://your-base-backend.vercel.app/wallet-api.umd.cjs';
       }
     }
   } else {
     // Fallback for non-browser environments
     config.backendUrl = 'http://localhost:3000/api';
-    config.walletModuleUrl = '../../../base/wallet-module/dist/wallet-api.umd.cjs';
+    config.walletModuleUrl = 'http://localhost:3000/wallet-api.umd.cjs'; // Platform only
   }
   
   return config;
 };
+
+// Read app/ecosystem from meta or default (for platform SaaS isolation)
+function getAppAndEcosystem() {
+  let appId = 'default';
+  let ecosystemId = 'suitwo';
+  if (typeof document !== 'undefined') {
+    const appMeta = document.querySelector('meta[name="app-id"]');
+    const ecoMeta = document.querySelector('meta[name="ecosystem-id"]');
+    if (appMeta && appMeta.getAttribute('content')) appId = appMeta.getAttribute('content').trim().toLowerCase();
+    if (ecoMeta && ecoMeta.getAttribute('content')) ecosystemId = ecoMeta.getAttribute('content').trim().toLowerCase();
+  }
+  return { appId, ecosystemId };
+}
 
 // Initialize global config immediately when script loads
 (function() {
   if (typeof window === 'undefined') return;
   
   const config = getConfig();
+  const { appId, ecosystemId } = getAppAndEcosystem();
   window.GAME_CONFIG = window.GAME_CONFIG || {};
   window.GAME_CONFIG.API_BASE_URL = config.backendUrl;
+  window.GAME_CONFIG.GAME_BACKEND_URL = config.gameBackendUrl || config.backendUrl;
+  window.GAME_CONFIG.BASE_BACKEND_URL = config.baseBackendUrl || config.backendUrl;
   window.GAME_CONFIG.WALLET_MODULE_URL = config.walletModuleUrl;
+  window.GAME_CONFIG.APP_ID = appId;
+  window.GAME_CONFIG.ECOSYSTEM_ID = ecosystemId;
+  // Headers for platform API calls (stats, milestones) so app data does not cross (SaaS isolation)
+  window.GAME_CONFIG.PLATFORM_HEADERS = {
+    'X-App-Id': appId,
+    'X-Ecosystem-Id': ecosystemId
+  };
+
+  // Wallet / dapp-kit SuiClient: avoid browser → fullnode (CORS + flaky official testnet). Proxy via game backend with failover.
+  const gameApiBase = window.GAME_CONFIG.GAME_BACKEND_URL || window.GAME_CONFIG.API_BASE_URL || '';
+  const gameOrigin = String(gameApiBase).replace(/\/api\/?$/, '');
+  if (gameOrigin) {
+    window.WALLET_RPC_PROXY_URL_TESTNET = `${gameOrigin}/api/sui-json-rpc?network=testnet`;
+    window.WALLET_RPC_PROXY_URL_MAINNET = `${gameOrigin}/api/sui-json-rpc?network=mainnet`;
+  }
+  // Badge images are served from the frontend origin (same app) after architecture split
+  window.GAME_CONFIG.BADGE_IMAGE_BASE_URL = (typeof window !== 'undefined' && window.location && window.location.origin)
+    ? window.location.origin
+    : (config.baseBackendUrl || '').replace(/\/api\/?$/, '');
+  
+  // Helper function to get the correct backend URL for a given endpoint
+  // Architecture: Frontend calls game backend (port 3001) for ALL routes
+  // Game backend internally proxies to platform backend (port 3000) for shared services
+  window.GAME_CONFIG.getBackendUrl = function(endpoint) {
+    // ALL routes go to game backend - it will proxy to platform backend internally when needed
+    // Game backend handles:
+    // - Game-specific routes directly (badges, stats, store, tournaments, etc.)
+    // - Platform routes by proxying to platform backend (game-pass, tokens, config, etc.)
+    return window.GAME_CONFIG.GAME_BACKEND_URL;
+  };
   
   // Log configuration for debugging
   const isProd = window.location.hostname.includes('vercel.app') || 

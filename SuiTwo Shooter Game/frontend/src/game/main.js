@@ -276,10 +276,11 @@ let tiles = [];
 // Separate enemies array (used after tier 4 boss is defeated)
 let enemies = [];
 
-// Expose globally for use by tiles.js and other modules
+// Expose globally for use by tiles.js, player-rendering.js, and other modules
 if (typeof window !== 'undefined') {
   window.tiles = tiles;
   window.enemies = enemies;
+  window.player = player;
 }
 
 // Helper function to clear game arrays (for use by game-initialization.js)

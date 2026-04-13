@@ -92,8 +92,15 @@ const MenuService = {
   
   /**
    * Show the main menu
+   * @param {{ fromMenuPanel?: boolean, afterGame?: boolean }} [options] - fromMenuPanel: Back from a menu modal
+   *   (shows MenuPanelLoading, cache-friendly data refresh). afterGame: returning from a run (forces stats/credits
+   *   refresh + GameDataFlow.load with force).
    */
-  async show() {
+  async show(options = {}) {
+    const fromMenuPanel = Boolean(options && options.fromMenuPanel);
+    const afterGame = Boolean(options && options.afterGame);
+    let menuReturnLoaderShown = false;
+
     // Prevent infinite recursion: if we're already showing, don't call closeGame again
     if (this._isShowing) {
       log.debug('MENU SERVICE', 'Already showing menu, skipping to prevent recursion');
@@ -103,7 +110,12 @@ const MenuService = {
     this._isShowing = true;
     
     try {
-    log.debug('MENU SERVICE', 'Showing main menu via MenuService.show()');
+    if (fromMenuPanel && typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+      MenuPanelLoading.show('Returning to menu... Please wait');
+      menuReturnLoaderShown = true;
+    }
+
+    log.debug('MENU SERVICE', 'Showing main menu via MenuService.show()', { fromMenuPanel, afterGame });
     
     // Update dependencies if they weren't available during init
     if (!this._gameDataFlow && typeof GameDataFlow !== 'undefined') {
@@ -168,13 +180,6 @@ const MenuService = {
       isGameOver: false
     });
     
-    // Update stats (delegate to game-state-manager)
-    if (typeof updateMenuStats === 'function') {
-      updateMenuStats().catch(err => {
-        log.warn('MENU SERVICE', 'Failed to update menu stats', err);
-      });
-    }
-    
     // Close game (delegate to game system)
       // Only call closeGame if we're not already being called from closeGame
       // This prevents infinite recursion: MenuService.show() -> closeGame() -> GameService.closeGame() -> MenuService.show()
@@ -197,43 +202,48 @@ const MenuService = {
     if (typeof startMenuMusic === 'function' && typeof gameSettings !== 'undefined' && gameSettings.backgroundMusic) {
       startMenuMusic();
     }
-    
+
     // Handle wallet state (delegate to GameDataFlow)
     if (this._gameDataFlow) {
       if (window.walletAPIInstance?.isConnected()) {
         const address = window.walletAPIInstance.getAddress();
         this._updateWalletUI(address);
+        // Stats + credits: cache until stale unless returning from a game session
+        const statsP = typeof updateMenuStats === 'function'
+          ? updateMenuStats({ forceRefresh: afterGame })
+          : Promise.resolve();
+        const creditsP = (window.GamePassDisplay && typeof window.GamePassDisplay.refresh === 'function')
+          ? window.GamePassDisplay.refresh(address, true, false, !afterGame)
+          : Promise.resolve();
+        await Promise.allSettled([statsP, creditsP]);
         if (this._gameDataFlow.onReturnToMenu) {
-          this._gameDataFlow.onReturnToMenu();
+          this._gameDataFlow.onReturnToMenu({ force: afterGame, afterGame });
         }
-        
-        // Refresh credit display when menu is shown
-        if (window.GamePassDisplay) {
-          window.GamePassDisplay.refresh(address, true, false).catch(err => {
-            log.warn('MENU SERVICE', 'Failed to refresh credit display', err);
-          });
+        if (typeof window !== 'undefined' && typeof window.prefetchTournamentsIfStale === 'function') {
+          window.prefetchTournamentsIfStale();
         }
-        
-        // Update leaderboard claim badge when menu is shown (force refresh to get latest count)
-        if (typeof window.updateLeaderboardClaimBadge === 'function') {
-          // Use forceRefresh=true to bypass cache and get fresh data
-          window.updateLeaderboardClaimBadge(null, true).catch(err => {
-            log.warn('MENU SERVICE', 'Failed to update leaderboard claim badge', err);
-          });
+        if (typeof window !== 'undefined' && typeof window.prefetchMyTournamentsIfStale === 'function') {
+          window.prefetchMyTournamentsIfStale();
         }
-        
-        // Reset start game buttons (including test button) when returning to menu
-        // Use updateGameReadiness() to properly set button states based on game readiness
+        if (typeof window !== 'undefined' && typeof window.prefetchBadgeIfStale === 'function') {
+          window.prefetchBadgeIfStale();
+        }
+        if (typeof window !== 'undefined' && typeof window.prefetchLeaderboardIfStale === 'function') {
+          window.prefetchLeaderboardIfStale();
+        }
         if (typeof updateGameReadiness === 'function') {
           updateGameReadiness();
         } else if (typeof GameService !== 'undefined' && GameService.updateGameReadiness) {
           GameService.updateGameReadiness();
         } else if (typeof GameService !== 'undefined' && GameService.enableStartGameButton) {
-          // Fallback: just enable the button
           GameService.enableStartGameButton();
         }
       } else {
         this._updateWalletUI(null);
+        // No wallet: set best score and games played to "--" (consistent with credits/tickets)
+        if (typeof updateMenuStats === 'function') {
+          updateMenuStats().catch(() => {});
+        }
         // Hide badge display when wallet disconnected
         const badgeDisplay = document.getElementById('menuBadgeDisplay');
         if (badgeDisplay) {
@@ -248,33 +258,38 @@ const MenuService = {
       if (window.walletAPIInstance?.isConnected()) {
         const address = window.walletAPIInstance.getAddress();
         this._updateWalletUI(address);
-        
-        // Refresh credit display when menu is shown
-        if (window.GamePassDisplay) {
-          window.GamePassDisplay.refresh(address, true, false).catch(err => {
-            log.warn('MENU SERVICE', 'Failed to refresh credit display', err);
-          });
+        const statsP = typeof updateMenuStats === 'function'
+          ? updateMenuStats({ forceRefresh: afterGame })
+          : Promise.resolve();
+        const creditsP = (window.GamePassDisplay && typeof window.GamePassDisplay.refresh === 'function')
+          ? window.GamePassDisplay.refresh(address, true, false, !afterGame)
+          : Promise.resolve();
+        await Promise.allSettled([statsP, creditsP]);
+        if (typeof window !== 'undefined' && typeof window.prefetchTournamentsIfStale === 'function') {
+          window.prefetchTournamentsIfStale();
         }
-        
-        // Update leaderboard claim badge when menu is shown (force refresh)
-        if (typeof window.updateLeaderboardClaimBadge === 'function') {
-          window.updateLeaderboardClaimBadge(null, true).catch(err => {
-            log.warn('MENU SERVICE', 'Failed to update leaderboard claim badge', err);
-          });
+        if (typeof window !== 'undefined' && typeof window.prefetchMyTournamentsIfStale === 'function') {
+          window.prefetchMyTournamentsIfStale();
         }
-        
-        // Reset start game buttons (including test button) when returning to menu
-        // Use updateGameReadiness() to properly set button states based on game readiness
+        if (typeof window !== 'undefined' && typeof window.prefetchBadgeIfStale === 'function') {
+          window.prefetchBadgeIfStale();
+        }
+        if (typeof window !== 'undefined' && typeof window.prefetchLeaderboardIfStale === 'function') {
+          window.prefetchLeaderboardIfStale();
+        }
         if (typeof updateGameReadiness === 'function') {
           updateGameReadiness();
         } else if (typeof GameService !== 'undefined' && GameService.updateGameReadiness) {
           GameService.updateGameReadiness();
         } else if (typeof GameService !== 'undefined' && GameService.enableStartGameButton) {
-          // Fallback: just enable the button
           GameService.enableStartGameButton();
         }
       } else {
         this._updateWalletUI(null);
+        // No wallet: set best score and games played to "--" (consistent with credits/tickets)
+        if (typeof updateMenuStats === 'function') {
+          updateMenuStats().catch(() => {});
+        }
         // Hide badge display when wallet disconnected
         const badgeDisplay = document.getElementById('menuBadgeDisplay');
         if (badgeDisplay) {
@@ -282,11 +297,11 @@ const MenuService = {
         }
         
         // Hide leaderboard claim badge when wallet disconnected
-        const claimBadge = document.getElementById('leaderboardClaimBadge');
-        if (claimBadge) {
-          claimBadge.style.display = 'none';
+        const claimCountBadge = document.getElementById('leaderboardClaimCountBadge');
+        if (claimCountBadge) {
+          claimCountBadge.style.display = 'none';
         }
-        const tabBadge = document.getElementById('milestonesTabBadge');
+        const tabBadge = document.getElementById('milestonesTabClaimCountBadge');
         if (tabBadge) {
           tabBadge.style.display = 'none';
         }
@@ -299,6 +314,10 @@ const MenuService = {
       log.error('MENU SERVICE', 'Error showing main menu', error);
       this._isShowing = false;
       this._isVisible = false;
+    } finally {
+      if (menuReturnLoaderShown && typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+        MenuPanelLoading.hide();
+      }
     }
   },
   

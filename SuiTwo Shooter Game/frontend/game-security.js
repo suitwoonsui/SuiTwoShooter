@@ -120,6 +120,44 @@ class GameSecurity {
     }
     return hash.toString(16);
   }
+
+  /**
+   * Initialize secure game state for score tracking (expected by game-lifecycle.js and main.js).
+   * Returns { secureGame, onEnemyDestroyed, onSecureGameOver }.
+   */
+  static initializeSecureGame() {
+    const secureGame = {
+      score: 0,
+      _score: 0,
+      _actionsCount: 0,
+      startTime: Date.now(),
+      actionLog: [],
+      reset() {
+        this.score = 0;
+        this._score = 0;
+        this._actionsCount = 0;
+        this.startTime = Date.now();
+        this.actionLog = [];
+      },
+      incrementScore(points) {
+        this._score = (this._score || 0) + points;
+        this.score = this._score;
+        this._actionsCount = (this._actionsCount || 0) + 1;
+      }
+    };
+    const onEnemyDestroyed = function() {
+      // Optional: log enemy destroy events for anti-cheat
+    };
+    const onSecureGameOver = function() {
+      return { success: true, score: secureGame._score != null ? secureGame._score : secureGame.score };
+    };
+    return {
+      secureGame,
+      onEnemyDestroyed,
+      onGameOver: onSecureGameOver,
+      onSecureGameOver
+    };
+  }
 }
 
 // 2. ANTI-TAMPERING MEASURES

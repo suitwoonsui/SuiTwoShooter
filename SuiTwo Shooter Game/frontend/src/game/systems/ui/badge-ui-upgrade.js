@@ -267,7 +267,6 @@ async function handleBadgeUpgrade(upgradeData, onComplete = null) {
       if (playerAddress && window.apiRequestCache) {
         // Invalidate cache again to ensure fresh data
         window.apiRequestCache.invalidate(`badge:${playerAddress}`);
-        window.apiRequestCache.invalidate(`stats:${playerAddress}`);
       }
       
       if (playerAddress && typeof loadMenuBadgeDisplay === 'function') {

@@ -5,7 +5,7 @@
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler } from '@/lib/api/api-handler';
-import { getTournamentService } from '@/lib/sui/tournament-service';
+import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -44,13 +44,12 @@ export const GET = withApiHandler(
 
     // If player address is provided, enrich tournaments with player-specific data
     if (playerAddress && tournaments.length > 0) {
-      const { getGamePassService } = await import('@/lib/sui/game-pass-service');
-      const gamePassService = getGamePassService();
+      const { platformGamePassClient, buildPlatformCallOptions } = await import('@/lib/services/platform/client/platform-client');
       
-      // Get player's ticket count
+      // Get player's ticket count from platform backend
       let ticketCount = 0;
       try {
-        const gamePassStatus = await gamePassService.getGamePassStatus(playerAddress);
+        const gamePassStatus = await platformGamePassClient.getGamePassStatus(playerAddress, buildPlatformCallOptions(request));
         ticketCount = gamePassStatus.success ? (gamePassStatus.ticketCount || 0) : 0;
       } catch (error) {
         console.warn('Failed to get game pass status for past tournaments:', error);
@@ -59,7 +58,7 @@ export const GET = withApiHandler(
       // Enrich tournaments with player data
       const tournamentService = getTournamentService();
       const enrichedTournaments = await Promise.allSettled(
-        tournaments.map(async (tournament: any) => {
+        tournaments.map(async (tournament) => {
           try {
             // Get player's rank and score in this tournament
             const playerRankResult = await tournamentService.getPlayerRank(
@@ -113,4 +112,5 @@ export const GET = withApiHandler(
     };
   }
 );
+
 

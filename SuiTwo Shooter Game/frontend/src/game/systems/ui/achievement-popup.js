@@ -232,13 +232,13 @@ function formatThreshold(category, threshold) {
  */
 function getItemName(itemId) {
   const names = {
-    extraLives: 'Extra Lives',
-    forceField: 'Force Field',
-    orbLevel: 'Orb Level',
-    slowTime: 'Slow Time',
-    coinTractorBeam: 'Coin Tractor Beam',
-    destroyAll: 'Destroy All',
-    bossKillShot: 'Boss Kill Shot',
+    extra_lives: 'Extra Lives',
+    force_field: 'Force Field',
+    orb_level: 'Orb Level',
+    slow_time: 'Slow Time',
+    coin_tractor_beam: 'Coin Tractor Beam',
+    destroy_all: 'Destroy All',
+    boss_kill_shot: 'Boss Kill Shot',
   };
   return names[itemId] || itemId;
 }

@@ -31,8 +31,7 @@
   border: min(0.2vw, 0.3vh) solid #4DA2FF;
   border-radius: min(2vh, 2.5vw);
   padding: min(3vh, 4vw);
-  width: min(90vw, 90vh);
-  max-width: min(60vh, 70vw);
+  width: 90vw;
   height: min(90vh, 90vw);
   max-height: min(90vh, 90vw);
   overflow-y: auto;
@@ -132,6 +131,33 @@
   border-bottom: none;
 }
 
+.badge-perk-highlight {
+  background: linear-gradient(135deg, rgba(77, 162, 255, 0.2), rgba(57, 255, 20, 0.15));
+  border-left: min(0.3vw, 0.4vh) solid #39ff14;
+  padding-left: min(1.5vw, 2vh);
+  font-weight: 600;
+  transform: scale(1.02);
+  transition: transform 0.2s ease;
+}
+
+.badge-upgrade-intro {
+  background: linear-gradient(135deg, rgba(77, 162, 255, 0.15), rgba(57, 255, 20, 0.1));
+  border: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.4);
+  border-radius: min(1vh, 1.2vw);
+  padding: min(1.5vh, 2vw);
+  margin-bottom: min(2vh, 2.5vw);
+  font-size: clamp(min(1.2vh, 1.5vw), min(1.6vh, 2vw), min(1.8vh, 2.2vw));
+  line-height: 1.5;
+}
+
+.badge-cost-highlight {
+  color: #39ff14 !important;
+  -webkit-text-fill-color: #39ff14 !important;
+  font-size: clamp(min(1vh, 1.2vw), min(1.3vh, 1.6vw), min(1.4vh, 1.7vw));
+  margin-top: min(1vh, 1.2vw);
+  font-style: italic;
+}
+
 .badge-soulbound-notice {
   background: rgba(77, 162, 255, 0.1);
   border: min(0.15vw, 0.2vh) solid #4DA2FF;
@@ -213,6 +239,7 @@
   border-radius: min(1.5vh, 2vw);
   padding: min(2vh, 2.5vw);
   margin: min(2vh, 2.5vw) 0;
+  overflow: hidden;
 }
 
 .badge-display-header h3 {
@@ -225,8 +252,14 @@
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: min(2vh, 2.5vw);
+  position: relative;
+  padding-bottom: 0;
+}
+
+.badge-has-upgrade .badge-display-content {
+  padding-bottom: 0;
 }
 
 .badge-display-image {
@@ -252,13 +285,19 @@
   flex: 1;
   min-width: min(20vh, 25vw);
   color: #ffffff;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .badge-display-tier {
-  font-size: min(2.2vw, 2.8vh);
+  font-size: clamp(min(1vw, 1.2vh), min(1.8vw, 2.2vh), min(2.2vw, 2.8vh));
   font-weight: bold;
   color: #4DA2FF;
   margin: 0 0 min(1vh, 1.2vw) 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .badge-display-games {
@@ -272,6 +311,47 @@
   color: #39ff14;
   font-weight: bold;
   font-size: min(1.6vw, 2vh);
+}
+
+.badge-image-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.badge-upgrade-footer {
+  text-align: center;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.badge-upgrade-footer-text {
+  color: #39ff14 !important;
+  -webkit-text-fill-color: #39ff14 !important;
+  font-weight: bold;
+  font-size: min(1.6vw, 2vh);
+  text-transform: uppercase;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.badge-clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.badge-clickable:hover {
+  transform: scale(1.05);
+}
+
+.badge-clickable:hover .badge-upgrade-overlay {
+  background: rgba(77, 162, 255, 0.7);
+}
+
+.badge-has-upgrade .badge-display-container {
+  border: 2px solid #4DA2FF;
+  box-shadow: 0 0 min(1vh, 1.2vw) rgba(77, 162, 255, 0.4);
 }
 
 /* Store Badge Display */
@@ -294,6 +374,16 @@
   display: flex;
   align-items: center;
   gap: min(1vw, 1.5vh);
+  position: relative;
+  border-radius: min(1vh, 1.2vw);
+  padding: min(0.4vh, 0.5vw);
+  transition: all 0.2s ease;
+}
+
+.store-badge-image-container {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .store-badge-icon-image {
@@ -303,7 +393,6 @@
   border: min(0.2vw, 0.3vh) solid #4DA2FF;
   object-fit: cover;
   box-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.5);
-  flex-shrink: 0;
   display: block;
 }
 
@@ -322,22 +411,40 @@
   flex-shrink: 0;
 }
 
+.store-badge-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: min(0.2vh, 0.3vw);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  max-width: 100%;
+}
+
 .store-badge-text {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   gap: min(0.2vh, 0.3vw);
+  overflow: hidden;
+  max-width: 100%;
+  width: 100%;
 }
 
 .store-badge-tier {
-  font-size: clamp(min(1.2vh, 1.5vw), min(1.8vh, 2.2vw), min(1.6vh, 2vw));
+  font-size: clamp(min(1vw, 1.2vh), min(1.6vh, 2vw), min(1.8vh, 2.2vw));
   font-weight: 600;
   color: #4DA2FF !important;
   -webkit-text-fill-color: #4DA2FF !important;
   text-transform: capitalize;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
   margin: 0;
   padding: 0;
 }
@@ -367,6 +474,47 @@
   margin: min(0.5vh, 0.6vw) 0;
   color: #39ff14;
   font-size: min(1.6vw, 2vh);
+}
+
+/* Universal Badge Upgrade Overlay - Works with all badge image containers */
+.badge-upgrade-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.badge-upgrade-overlay-text {
+  color: #39ff14 !important;
+  -webkit-text-fill-color: #39ff14 !important;
+  font-weight: 600;
+  font-size: clamp(min(0.8vh, 1vw), min(1.1vh, 1.3vw), min(1vh, 1.2vw));
+  text-transform: uppercase;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 min(0.1vh, 0.15vw) min(0.2vh, 0.3vw) rgba(0, 0, 0, 0.9),
+               0 0 min(0.5vh, 0.6vw) rgba(57, 255, 20, 0.6);
+}
+
+/* Store Badge Specific Styles */
+.store-badge-icon-wrapper.store-badge-has-upgrade {
+  border: 2px solid #4DA2FF;
+  box-shadow: 0 0 min(0.8vh, 1vw) rgba(77, 162, 255, 0.4);
+}
+
+.store-badge-clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.store-badge-clickable:hover {
+  transform: scale(1.05);
 }
 
 /* Badge Upgrade Info */

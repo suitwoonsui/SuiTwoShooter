@@ -1,12 +1,13 @@
-// ==========================================
+﻿// ==========================================
 // Clear Price Cache API Endpoint
 // Forces fresh price fetch on next request
 // ==========================================
 
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
-import { priceConverter } from '@/lib/services/price-converter';
+import { priceConverter } from '@/lib/services/payments/converter/price-converter';
 import { withApiHandler } from '@/lib/api/api-handler';
+import { invalidateStoreCatalogPublicCache } from '@/lib/cache/public-nonuser-data-cache';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -16,11 +17,13 @@ export async function OPTIONS(request: NextRequest) {
 export const POST = withApiHandler(
   async (request: NextRequest) => {
     priceConverter.clearCache();
-    
+    invalidateStoreCatalogPublicCache();
+
     return {
       success: true,
-      message: 'Price cache cleared. Next request will fetch fresh prices.',
+      message: 'Price cache and store catalog public cache cleared. Next request will fetch fresh prices and catalog.',
     };
   }
 );
+
 

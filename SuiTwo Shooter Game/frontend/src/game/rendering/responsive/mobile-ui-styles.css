@@ -1001,7 +1001,7 @@
   
   /* Mobile menu adjustments */
   .main-menu-content {
-    width: min(95vw, 95vh) !important;
+    width: min(90vw, 90vh) !important;
     max-width: min(90vw, 90vh) !important;
   }
   

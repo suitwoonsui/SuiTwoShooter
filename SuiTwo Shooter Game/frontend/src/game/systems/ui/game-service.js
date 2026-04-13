@@ -20,12 +20,33 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
       error: (cat, msg, data) => console.error(`[${cat}] ${msg}`, data || ''),
     };
 
+/** game-config / Helm minTokenBalance uses 6-decimal raw; gatekeeping MEWS check uses mainnet. */
+const _MEWS_GATE_DECIMALS = 6;
+
+function _formatMewsFromRawForAlert(rawStr) {
+  if (rawStr == null || rawStr === '') return null;
+  try {
+    const n = Number(BigInt(String(rawStr))) / Math.pow(10, _MEWS_GATE_DECIMALS);
+    if (!Number.isFinite(n)) return null;
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  } catch (_) {
+    return null;
+  }
+}
+
 const GameService = {
   // State
   _initialized: false,
   _isGameRunning: false,
   _isGamePaused: false,
   _isGameOver: false,
+  // Tournament Anchor session id for score submission.
+  // Stored here because tournament session creation can happen before game scripts define window.gameState/window.game.
+  _anchorSessionId: null,
+  /** @type {{ confirmed: boolean; items: Record<string, number> } | null} Prep store embed: skip modal, use this at item-selection phase. Cleared in startGame finally if unused. */
+  _pendingPrepItemModalResult: null,
   
   // DOM element cache
   _gameContainerCache: null,
@@ -105,7 +126,293 @@ const GameService = {
     this._startGameBtnCache = null;
     this._startGameTestBtnCache = null;
   },
-  
+
+  /**
+   * After tournament enter succeeds, the next main-menu Start Game should not reuse "prep" routing.
+   * @private
+   */
+  _clearTournamentMainMenuPrepFlag() {
+    try {
+      if (typeof window !== 'undefined' && window.TournamentContext && typeof window.TournamentContext.set === 'function') {
+        window.TournamentContext.set({ awaitingStartGameFromMenu: false });
+      }
+    } catch (_) {}
+  },
+
+  /**
+   * Start items (orb_level, extra_lives, force_field) from item modal result — same shape for tournament and credit runs.
+   * @param {{ items?: Record<string, unknown> } | null | undefined} result
+   * @returns {Array<{ itemId: string; level: number; quantity: number }>}
+   */
+  _normalizeStartItemsFromModalResult(result) {
+    if (!result?.items || typeof result.items !== 'object') return [];
+    return Object.entries(result.items)
+      .filter(([key]) => ['orb_level', 'extra_lives', 'force_field'].includes(key))
+      .map(([itemId, level]) => ({
+        itemId,
+        level: typeof level === 'number' ? level : level ? 1 : 0,
+        quantity: 1,
+      }))
+      .filter((item) => item.level > 0);
+  },
+
+  /** Anchor session id for tournament enter + score submit (shared resolution). */
+  _resolveTournamentAnchorSessionId() {
+    if (this._gameState && typeof this._gameState.anchorSessionId === 'number' && this._gameState.anchorSessionId >= 1) {
+      return this._gameState.anchorSessionId;
+    }
+    if (typeof window !== 'undefined' && window.gameState && typeof window.gameState.anchorSessionId === 'number' && window.gameState.anchorSessionId >= 1) {
+      return window.gameState.anchorSessionId;
+    }
+    if (typeof window !== 'undefined' && typeof window.__tournamentAnchorSessionId === 'number' && window.__tournamentAnchorSessionId >= 1) {
+      return window.__tournamentAnchorSessionId;
+    }
+    if (typeof this._anchorSessionId === 'number' && this._anchorSessionId >= 1) {
+      return this._anchorSessionId;
+    }
+    const ctx =
+      typeof window !== 'undefined' && window.TournamentContext && typeof window.TournamentContext.load === 'function'
+        ? window.TournamentContext.load()
+        : null;
+    if (ctx && typeof ctx.anchorSessionId === 'number' && ctx.anchorSessionId >= 1) {
+      return ctx.anchorSessionId;
+    }
+    return null;
+  },
+
+  _tournamentEnterApiBaseUrl() {
+    const raw = window.GameApi
+      ? window.GameApi.getBaseUrl()
+      : window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api';
+    return String(raw).replace(/\/?$/, '');
+  },
+
+  _onTournamentEnterSuccessSideEffects(tournamentContext, walletAddress) {
+    this._clearTournamentMainMenuPrepFlag();
+    if (window.GamePassService?.invalidateCache) {
+      window.GamePassService.invalidateCache();
+    }
+    try {
+      const tid = String(tournamentContext?.tournamentObjectId || '');
+      if (tid && window.apiRequestCache?.invalidateByPattern && walletAddress) {
+        window.apiRequestCache.invalidateByPattern(`tournamentEntry:${walletAddress}:`);
+      }
+      if (typeof window !== 'undefined') {
+        window.__prefetchedTournaments = null;
+        window.__prefetchedMyTournaments = null;
+      }
+      if (typeof window.refreshTournaments === 'function') {
+        void window.refreshTournaments();
+      }
+    } catch (_) {}
+  },
+
+  /**
+   * Tournament: POST /tournaments/enter — consume ticket + selected start items + Station participant (single backend tx).
+   * @returns {Promise<boolean>} true if entered (or alreadyEntered success)
+   */
+  async _postTournamentEnterWithSideEffects({ walletAddress, tournamentContext, startItems, requireAnchorSession }) {
+    const anchorSessionId = this._resolveTournamentAnchorSessionId();
+    if (requireAnchorSession && (anchorSessionId == null || anchorSessionId < 1)) {
+      log.error('GAME SERVICE', 'Cannot enter tournament without valid Anchor session');
+      this.enableStartGameButton();
+      alert('Session expired or missing. Please start the tournament again from the tournament menu.');
+      return false;
+    }
+
+    const entryUrl = `${this._tournamentEnterApiBaseUrl()}/tournaments/enter`;
+    const entryPayload = {
+      playerAddress: walletAddress,
+      tournamentObjectId: tournamentContext.tournamentObjectId,
+      items: Array.isArray(startItems) ? startItems : [],
+    };
+    if (typeof anchorSessionId === 'number' && anchorSessionId >= 1) {
+      entryPayload.anchorSessionId = anchorSessionId;
+    }
+
+    const clientRequestId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `fe-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    try {
+      const enterResponse = await fetch(entryUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Request-Id': clientRequestId,
+        },
+        body: JSON.stringify(entryPayload),
+      });
+
+      const serverRequestId =
+        enterResponse.headers.get('x-request-id') || enterResponse.headers.get('X-Request-Id') || null;
+
+      if (!enterResponse.ok) {
+        let errorData = {};
+        try {
+          errorData = await enterResponse.json();
+        } catch (e) {
+          log.error('GAME SERVICE', 'Failed to parse tournament enter error', e);
+          errorData = { error: `HTTP ${enterResponse.status}: ${enterResponse.statusText}` };
+        }
+        const errorMsg = errorData.error || errorData.message || `HTTP ${enterResponse.status}: ${enterResponse.statusText}`;
+        log.error('GAME SERVICE', 'Tournament enter HTTP error', {
+          error: errorMsg,
+          clientRequestId,
+          serverRequestId,
+          anchorSessionId,
+          startItemsCount: Array.isArray(startItems) ? startItems.length : 0,
+          playerAddress: walletAddress,
+          tournamentObjectId: tournamentContext.tournamentObjectId,
+        });
+        this.enableStartGameButton();
+        alert(
+          `Failed to enter tournament: ${errorMsg}\n\nPlease check:\n- You have enough tournament tickets\n- The tournament is still active\n- Your network connection\n\nGame cancelled.`
+        );
+        return false;
+      }
+
+      const enterResult = await enterResponse.json();
+      if (!enterResult.success) {
+        const errorMsg = enterResult.error || enterResult.message || 'Failed to enter tournament';
+        log.error('GAME SERVICE', 'Tournament enter API error', {
+          error: errorMsg,
+          clientRequestId,
+          serverRequestId,
+          anchorSessionId,
+          startItemsCount: Array.isArray(startItems) ? startItems.length : 0,
+          playerAddress: walletAddress,
+          tournamentObjectId: tournamentContext.tournamentObjectId,
+        });
+        this.enableStartGameButton();
+        alert(
+          `Failed to enter tournament: ${errorMsg}\n\nPlease check:\n- You have enough tournament tickets\n- The tournament is still active\n- Your network connection\n\nGame cancelled.`
+        );
+        return false;
+      }
+
+      log.info('GAME SERVICE', 'Tournament enter OK (ticket + items + participant)', {
+        clientRequestId,
+        serverRequestId: serverRequestId || clientRequestId,
+        anchorSessionId,
+        startItemsCount: Array.isArray(startItems) ? startItems.length : 0,
+        transactionDigest: enterResult.transactionDigest,
+        tournamentObjectId: tournamentContext.tournamentObjectId,
+        alreadyEntered: enterResult.alreadyEntered,
+      });
+      this._onTournamentEnterSuccessSideEffects(tournamentContext, walletAddress);
+      return true;
+    } catch (error) {
+      log.error('GAME SERVICE', 'Tournament enter exception', {
+        error: error instanceof Error ? error.message : String(error),
+        clientRequestId,
+        anchorSessionId,
+        playerAddress: walletAddress,
+      });
+      this.enableStartGameButton();
+      alert(
+        `Error entering tournament: ${error instanceof Error ? error.message : 'Unknown error'}\n\nThis might be a network issue. Please try again.\n\nGame cancelled.`
+      );
+      return false;
+    }
+  },
+
+  /**
+   * Regular game: consume 1 credit + same start items shape as tournament (Channel batch).
+   * @returns {Promise<boolean>}
+   */
+  async _postCreditStartGameWithSideEffects(walletAddress, startItems) {
+    if (!walletAddress || !window.GamePassService) return false;
+    try {
+      if (typeof updateLoadingModalMessage === 'function') {
+        updateLoadingModalMessage('Starting game (credit + items)... Please wait', 'gameStartLoadingModal');
+      }
+      const consumeResult = await window.GamePassService.startGame(walletAddress, Array.isArray(startItems) ? startItems : []);
+      if (!consumeResult.success) {
+        const errorMsg = consumeResult.error || 'Unknown error';
+        log.error('GAME SERVICE', 'Credit start-game failed after item selection', {
+          error: errorMsg,
+          playerAddress: walletAddress,
+        });
+        this.enableStartGameButton();
+        if (errorMsg.includes('not have an active game pass') || errorMsg.includes('credits remaining')) {
+          alert(`No credits available.\n\n${errorMsg}\n\nGame cancelled. Your credit was not consumed.`);
+        } else if (errorMsg.includes('network') || errorMsg.includes('timeout') || errorMsg.includes('connection')) {
+          alert(`Network error.\n\n${errorMsg}\n\nPlease check your connection and try again. Your credit was not consumed.`);
+        } else {
+          alert(`Failed to start game.\n\n${errorMsg}\n\nGame cancelled. Your credit and items were not consumed.`);
+        }
+        return false;
+      }
+      log.info('GAME SERVICE', 'Credit + items consumed via start-game batch', { digest: consumeResult.digest });
+      if (window.GamePassDisplay) {
+        try {
+          await window.GamePassDisplay.refresh(walletAddress, true, false);
+        } catch (refreshError) {
+          log.warn('GAME SERVICE', 'Failed to refresh credit display', refreshError);
+        }
+      }
+      return true;
+    } catch (error) {
+      log.error('GAME SERVICE', 'Error in credit start-game after items', error);
+      this.enableStartGameButton();
+      alert(`Error starting game: ${error instanceof Error ? error.message : 'Unknown error'}\n\nGame cancelled. Your credit and items were not consumed.`);
+      return false;
+    }
+  },
+
+  /**
+   * After item selection (or empty selection): one path for tournament ticket+items+participant vs credit+items vs demo.
+   * Mirrors regular `GamePassService.startGame` + tournament `POST /tournaments/enter` payloads.
+   */
+  async _applyConsumptionsAfterItemSelection({
+    isTournamentMode,
+    tournamentContext,
+    walletAddress,
+    hasCredits,
+    itemModalResult,
+    requireAnchorSession,
+  }) {
+    const startItems = this._normalizeStartItemsFromModalResult(itemModalResult);
+
+    if (isTournamentMode && tournamentContext && walletAddress) {
+      if (typeof updateLoadingModalMessage === 'function') {
+        updateLoadingModalMessage('Consuming ticket, items, and registering entry... Please wait', 'gameStartLoadingModal');
+      }
+      if (typeof showLoadingModal === 'function') {
+        showLoadingModal('Consuming ticket, items, and registering entry... Please wait', 'gameStartLoadingModal');
+      }
+      const ok = await this._postTournamentEnterWithSideEffects({
+        walletAddress,
+        tournamentContext,
+        startItems,
+        requireAnchorSession,
+      });
+      return { ok, isDemoMode: !ok };
+    }
+
+    if (isTournamentMode) {
+      log.error('GAME SERVICE', 'Tournament mode but missing context or wallet', {
+        hasTournamentContext: !!tournamentContext,
+        hasWalletAddress: !!walletAddress,
+      });
+      this.enableStartGameButton();
+      alert(
+        `Error: Cannot enter tournament. Missing required data.\n\nisTournamentMode: ${isTournamentMode}\nhasTournamentContext: ${!!tournamentContext}\nhasWalletAddress: ${!!walletAddress}\n\nPlease refresh the page and try again.`
+      );
+      return { ok: false, isDemoMode: true };
+    }
+
+    if (hasCredits && walletAddress && window.GamePassService) {
+      const ok = await this._postCreditStartGameWithSideEffects(walletAddress, startItems);
+      return { ok, isDemoMode: !ok };
+    }
+
+    log.info('GAME SERVICE', 'No credits — demo mode after item selection');
+    return { ok: true, isDemoMode: true };
+  },
+
   /**
    * Initialize the GameService
    */
@@ -150,9 +457,8 @@ const GameService = {
   isGameReady() {
     // Use gameReadinessState from menu-system.js
     if (typeof gameReadinessState !== 'undefined') {
-      return gameReadinessState.dataLoaded && 
-             gameReadinessState.migrationCheckComplete &&
-             gameReadinessState.migrationModalClosed;
+      // Badge migration has been removed (upgradable contracts), so readiness only depends on dataLoaded.
+      return gameReadinessState.dataLoaded;
     }
     return false;
   },
@@ -185,13 +491,93 @@ const GameService = {
         return;
       }
       
-      // Balance check (still required for gas)
+      // MEWS gate from game-config minTokenBalance only (wallet module); refresh before read
+      if (typeof window.walletAPIInstance.checkMEWSBalance === 'function') {
+        // Gatekeeping uses MAINNET MEWS (separate from testnet purchase testing).
+        await window.walletAPIInstance.checkMEWSBalance(walletAddress, 'mainnet');
+      }
       const balanceStatus = window.walletAPIInstance.getBalanceStatus();
       if (!balanceStatus.hasMinimumBalance) {
-        const balanceDisplay = balanceStatus.balance 
-          ? (Number(balanceStatus.balance) / 1_000_000_000).toLocaleString() 
-          : '0';
-        alert(`Insufficient $MEWS balance. You need at least 500,000 $MEWS for gas fees.\n\nCurrent balance: ${balanceDisplay} $MEWS`);
+        const balanceDisplay =
+          _formatMewsFromRawForAlert(balanceStatus.balance) || '0';
+        const minRequired =
+          window.WalletService?._minTokenBalanceFormatted ||
+          _formatMewsFromRawForAlert(balanceStatus.minimumRequired) ||
+          '0';
+        alert(`Insufficient MEWS balance. You need at least ${minRequired} MEWS for gas fees.\n\nCurrent balance: ${balanceDisplay} MEWS`);
+        return;
+      }
+
+      // Tournament prep flow: user chose "Enter Tournament" (ticket check + gold loadout), then Start game from loadout or main menu.
+      // Regular runs use the same loadout tabs via regular-entry (blue store) from menu Start Game.
+      const pendingTournament =
+        typeof window !== 'undefined' && window.TournamentContext && typeof window.TournamentContext.load === 'function'
+          ? window.TournamentContext.load()
+          : null;
+      if (
+        pendingTournament &&
+        pendingTournament.awaitingStartGameFromMenu === true &&
+        pendingTournament.isTournamentMode &&
+        pendingTournament.tournamentObjectId
+      ) {
+        if (!this.isGameReady()) {
+          alert('Please wait for game data to finish loading before starting.');
+          this.enableStartGameButton();
+          if (startGameBtn && originalBtnText) startGameBtn.innerHTML = originalBtnText;
+          return;
+        }
+        const tournament = {
+          objectId: pendingTournament.tournamentObjectId,
+          name: pendingTournament.tournamentName || 'Tournament',
+          category: pendingTournament.tournamentCategory || 'highestScore',
+          entryFeeTickets: pendingTournament.tournamentEntryFeeTickets ?? 1,
+          endTime: typeof pendingTournament.tournamentEndTime === 'number' ? pendingTournament.tournamentEndTime : 0,
+          status: pendingTournament.tournamentStatus || 'active',
+        };
+        const now = Date.now();
+        const gracePeriodEnd = tournament.endTime + 60 * 60 * 1000;
+        if (!tournament.endTime || now > gracePeriodEnd) {
+          alert(
+            `This tournament is no longer available for play.\n\nTournament: ${tournament.name}\n\nUse the tournament menu to pick an active event.`
+          );
+          this.enableStartGameButton();
+          if (startGameBtn && originalBtnText) startGameBtn.innerHTML = originalBtnText;
+          return;
+        }
+        const gamePassBase =
+          (window.GAME_CONFIG?.getBackendUrl && window.GAME_CONFIG.getBackendUrl('/api/game-pass/')) ||
+          (window.GameApi
+            ? window.GameApi.getBaseUrl()
+            : window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+        let hasTickets = false;
+        try {
+          const gamePassResponse = await fetch(`${gamePassBase}/game-pass/${walletAddress}?contract=new`);
+          if (gamePassResponse.ok) {
+            const gamePassResult = await gamePassResponse.json();
+            hasTickets =
+              gamePassResult.success && (gamePassResult.ticketCount ?? 0) >= tournament.entryFeeTickets;
+          }
+        } catch (error) {
+          log.error('GAME SERVICE', 'Error checking tournament tickets (prep → start)', error);
+        }
+        if (!hasTickets) {
+          alert(
+            `You need ${tournament.entryFeeTickets} tournament ticket${tournament.entryFeeTickets !== 1 ? 's' : ''} to start.\n\nOpen the Store to buy tickets, then Enter Tournament again from the tournament menu.`
+          );
+          this.enableStartGameButton();
+          if (startGameBtn && originalBtnText) startGameBtn.innerHTML = originalBtnText;
+          return;
+        }
+        if (startGameBtn) {
+          startGameBtn.innerHTML = '<span class="btn-icon">⏳</span> Loading game...';
+        }
+        await this._startGameInternal(false, false, walletAddress, {
+          isTournamentMode: true,
+          tournamentObjectId: tournament.objectId,
+          tournamentCategory: tournament.category,
+          tournamentName: tournament.name,
+          tournamentEntryFeeTickets: tournament.entryFeeTickets,
+        });
         return;
       }
       
@@ -200,8 +586,8 @@ const GameService = {
       let hasCredits = false;
       if (window.GamePassService) {
         try {
-          const status = await window.GamePassService.getGamePassStatus(walletAddress);
-          hasCredits = status.success && status.hasPass && status.isActive && (status.gamesRemaining || 0) > 0;
+          const status = await window.GamePassService.getCreditsAndTickets(walletAddress);
+          hasCredits = status.success && (status.credits || 0) > 0;
           if (!hasCredits) {
             log.info('GAME SERVICE', 'Player has no active game pass, will start in demo mode');
           }
@@ -226,6 +612,10 @@ const GameService = {
       this.enableStartGameButton();
       if (startGameBtn && originalBtnText) {
         startGameBtn.innerHTML = originalBtnText;
+      }
+    } finally {
+      if (this._pendingPrepItemModalResult != null) {
+        this._pendingPrepItemModalResult = null;
       }
     }
     // Note: Button will be re-enabled by _startGameInternal or error handler
@@ -283,12 +673,15 @@ const GameService = {
       // Check if player has tournament tickets (don't consume yet)
       // Ticket will be consumed after item selection
       let hasTickets = false;
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+      // Game-pass is proxied by game backend (3001), not platform (3000)
+      const gamePassBase =
+        (window.GAME_CONFIG?.getBackendUrl && window.GAME_CONFIG.getBackendUrl('/api/game-pass/')) ||
+        (window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api'));
       try {
-        const gamePassResponse = await fetch(`${API_BASE_URL}/game-pass/${walletAddress}`);
+        const gamePassResponse = await fetch(`${gamePassBase}/game-pass/${walletAddress}?contract=new`);
         if (gamePassResponse.ok) {
           const gamePassResult = await gamePassResponse.json();
-          hasTickets = gamePassResult.success && (gamePassResult.ticketCount || 0) >= tournament.entryFeeTickets;
+          hasTickets = gamePassResult.success && (gamePassResult.ticketCount ?? 0) >= tournament.entryFeeTickets;
           if (!hasTickets) {
             log.info('GAME SERVICE', 'Player has no tournament tickets (test mode), will start anyway');
             // In test mode, allow starting even without tickets (for testing)
@@ -366,13 +759,23 @@ const GameService = {
         }
       }
       
-      // Balance check (still required for gas)
+      if (typeof window.walletAPIInstance.checkMEWSBalance === 'function') {
+        // Use the explicitly configured network; do not hardcode mainnet.
+        const network =
+          window.WalletService?.network ||
+          window.GAME_CONFIG?.NETWORK ||
+          'testnet';
+        await window.walletAPIInstance.checkMEWSBalance(walletAddress, network);
+      }
       const balanceStatus = window.walletAPIInstance.getBalanceStatus();
       if (!balanceStatus.hasMinimumBalance) {
-        const balanceDisplay = balanceStatus.balance 
-          ? (Number(balanceStatus.balance) / 1_000_000_000).toLocaleString() 
-          : '0';
-        alert(`Insufficient $MEWS balance. You need at least 500,000 $MEWS for gas fees.\n\nCurrent balance: ${balanceDisplay} $MEWS`);
+        const balanceDisplay =
+          _formatMewsFromRawForAlert(balanceStatus.balance) || '0';
+        const minRequired =
+          window.WalletService?._minTokenBalanceFormatted ||
+          _formatMewsFromRawForAlert(balanceStatus.minimumRequired) ||
+          '0';
+        alert(`Insufficient MEWS balance. You need at least ${minRequired} MEWS for gas fees.\n\nCurrent balance: ${balanceDisplay} MEWS`);
         this.enableStartGameButton();
         // Restore tournament modal visibility if it was hidden
         const tournamentModal = document.getElementById('tournamentModal');
@@ -386,12 +789,15 @@ const GameService = {
       // Check if player has tournament tickets (don't consume yet)
       // Ticket will be consumed after item selection
       let hasTickets = false;
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+      // Game-pass is proxied by game backend (3001), not platform (3000)
+      const gamePassBase =
+        (window.GAME_CONFIG?.getBackendUrl && window.GAME_CONFIG.getBackendUrl('/api/game-pass/')) ||
+        (window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api'));
       try {
-        const gamePassResponse = await fetch(`${API_BASE_URL}/game-pass/${walletAddress}`);
+        const gamePassResponse = await fetch(`${gamePassBase}/game-pass/${walletAddress}?contract=new`);
         if (gamePassResponse.ok) {
           const gamePassResult = await gamePassResponse.json();
-          hasTickets = gamePassResult.success && (gamePassResult.ticketCount || 0) >= tournament.entryFeeTickets;
+          hasTickets = gamePassResult.success && (gamePassResult.ticketCount ?? 0) >= tournament.entryFeeTickets;
           if (!hasTickets) {
             alert(`You need ${tournament.entryFeeTickets} tournament ticket${tournament.entryFeeTickets !== 1 ? 's' : ''} to enter this tournament. Purchase tickets from the Store.`);
             this.enableStartGameButton();
@@ -477,8 +883,8 @@ const GameService = {
       let hasCredits = false;
       if (window.GamePassService) {
         try {
-          const status = await window.GamePassService.getGamePassStatus(walletAddress);
-          hasCredits = status.success && status.hasPass && status.isActive && (status.gamesRemaining || 0) > 0;
+          const status = await window.GamePassService.getCreditsAndTickets(walletAddress);
+          hasCredits = status.success && (status.credits || 0) > 0;
           if (!hasCredits) {
             log.info('GAME SERVICE', 'Player has no active game pass (test mode), will start in demo mode');
           }
@@ -548,6 +954,21 @@ const GameService = {
     if (isTournamentMode) {
       // Store that we should return to tournament screen after game ends
       const returnToTournament = true;
+
+      // Golden-path: persist tournament identity immediately (before Anchor session creation).
+      // This prevents later stages (enter/submit-score) from "forgetting" the tournament even if scripts load out of order.
+      if (typeof window !== 'undefined' && window.TournamentContext && typeof window.TournamentContext.set === 'function') {
+        try {
+          window.TournamentContext.set({
+            isTournamentMode: true,
+            tournamentObjectId: tournamentContext.tournamentObjectId,
+            tournamentCategory: tournamentContext.tournamentCategory,
+            tournamentName: tournamentContext.tournamentName,
+            // Anchor session will be filled in after create-anchor-session returns.
+            anchorSessionId: (typeof window.__tournamentAnchorSessionId === 'number' ? window.__tournamentAnchorSessionId : null),
+          });
+        } catch (_) {}
+      }
       
       if (this._gameState) {
         this._gameState.isTournamentMode = true;
@@ -594,6 +1015,89 @@ const GameService = {
         windowGameStateIsTournamentMode: typeof window !== 'undefined' && window.gameState ? window.gameState.isTournamentMode : 'N/A',
         windowGameIsTournamentMode: typeof window !== 'undefined' && window.game ? window.game.isTournamentMode : 'N/A',
       });
+
+      // Create Anchor session for tournament score submission.
+      // If the platform isn't initialized with an Anchor registry yet, don't block gameplay/ticket consumption;
+      // score submission can surface a clearer error (or be fixed by initializing Anchor) later.
+      if (walletAddress && typeof walletAddress === 'string' && walletAddress.startsWith('0x')) {
+        const API_BASE = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || (typeof window !== 'undefined' && window.location.origin ? new URL(window.location.origin).origin + '/api' : ''));
+        const createSessionUrl = API_BASE ? `${API_BASE.replace(/\/api\/?$/, '')}/api/tournaments/create-anchor-session` : '';
+        if (!createSessionUrl) {
+          this.enableStartGameButton();
+          const tournamentModal = document.getElementById('tournamentModal');
+          if (tournamentModal) { tournamentModal.classList.remove('tournament-modal-hidden'); tournamentModal.classList.add('tournament-modal-visible'); }
+          throw new Error('Cannot create tournament session: API URL not configured.');
+        }
+        let sessionData;
+        try {
+          const res = await fetch(createSessionUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playerAddress: walletAddress,
+              tournamentObjectId: tournamentContext.tournamentObjectId || null,
+            }),
+          });
+          sessionData = await res.json().catch(() => ({}));
+        } catch (err) {
+          log.error('GAME SERVICE', 'Create Anchor session request failed', err);
+          this.enableStartGameButton();
+          const tournamentModal = document.getElementById('tournamentModal');
+          if (tournamentModal) { tournamentModal.classList.remove('tournament-modal-hidden'); tournamentModal.classList.add('tournament-modal-visible'); }
+          throw new Error('Failed to create tournament session. Please try again.');
+        }
+        // Anchor session IDs are u64 counters and can legitimately start at 0.
+        if (!sessionData.success || typeof sessionData.sessionId !== 'number' || sessionData.sessionId < 0) {
+          const msg = sessionData.error || sessionData.message || 'Session creation failed or returned invalid session ID.';
+          log.warn('GAME SERVICE', 'Create Anchor session failed or invalid response', { response: sessionData });
+          const msgLower = String(msg || '').toLowerCase();
+          const isAnchorRegistryMissing =
+            msgLower.includes('anchor registry not found');
+          if (!isAnchorRegistryMissing) {
+            this.enableStartGameButton();
+            const tournamentModal = document.getElementById('tournamentModal');
+            if (tournamentModal) { tournamentModal.classList.remove('tournament-modal-hidden'); tournamentModal.classList.add('tournament-modal-visible'); }
+            throw new Error(msg);
+          }
+          // Continue without an anchorSessionId.
+          this._anchorSessionId = null;
+          if (this._gameState) this._gameState.anchorSessionId = null;
+          if (typeof window !== 'undefined' && window.gameState) window.gameState.anchorSessionId = null;
+          if (typeof window !== 'undefined' && window.game) window.game.anchorSessionId = null;
+          if (typeof window !== 'undefined') {
+            window.__tournamentAnchorSessionId = null;
+            if (window.TournamentContext && typeof window.TournamentContext.set === 'function') {
+              window.TournamentContext.set({
+                isTournamentMode: true,
+                tournamentObjectId: tournamentContext.tournamentObjectId,
+                tournamentCategory: tournamentContext.tournamentCategory,
+                tournamentName: tournamentContext.tournamentName,
+                anchorSessionId: null,
+              });
+            }
+          }
+          log.warn('GAME SERVICE', 'Continuing without Anchor session (registry missing for app)', { message: msg });
+        } else {
+          const sid = sessionData.sessionId;
+          this._anchorSessionId = sid;
+          if (this._gameState) this._gameState.anchorSessionId = sid;
+          if (typeof window !== 'undefined' && window.gameState) window.gameState.anchorSessionId = sid;
+          if (typeof window !== 'undefined' && window.game) window.game.anchorSessionId = sid;
+          if (typeof window !== 'undefined') {
+            window.__tournamentAnchorSessionId = sid;
+            if (window.TournamentContext && typeof window.TournamentContext.set === 'function') {
+              window.TournamentContext.set({
+                isTournamentMode: true,
+                tournamentObjectId: tournamentContext.tournamentObjectId,
+                tournamentCategory: tournamentContext.tournamentCategory,
+                tournamentName: tournamentContext.tournamentName,
+                anchorSessionId: sid,
+              });
+            }
+          }
+          log.info('GAME SERVICE', 'Anchor session created for tournament', { sessionId: sid });
+        }
+      }
     } else {
       // Clear tournament mode state for regular games
       if (this._gameState) {
@@ -601,24 +1105,35 @@ const GameService = {
         this._gameState.tournamentObjectId = null;
         this._gameState.tournamentCategory = null;
         this._gameState.tournamentName = null;
+        this._gameState.anchorSessionId = null;
       }
+      this._anchorSessionId = null;
       if (this._uiGameState) {
         this._uiGameState.isTournamentMode = false;
         this._uiGameState.tournamentObjectId = null;
         this._uiGameState.tournamentCategory = null;
         this._uiGameState.tournamentName = null;
+        this._uiGameState.anchorSessionId = null;
       }
       if (typeof gameState !== 'undefined') {
         gameState.isTournamentMode = false;
         gameState.tournamentObjectId = null;
         gameState.tournamentCategory = null;
         gameState.tournamentName = null;
+        gameState.anchorSessionId = null;
       }
       if (typeof window !== 'undefined' && window.game) {
         window.game.isTournamentMode = false;
         window.game.tournamentObjectId = null;
         window.game.tournamentCategory = null;
         window.game.tournamentName = null;
+        window.game.anchorSessionId = null;
+      }
+      if (typeof window !== 'undefined') {
+        window.__tournamentAnchorSessionId = null;
+        if (window.TournamentContext && typeof window.TournamentContext.clear === 'function') {
+          window.TournamentContext.clear();
+        }
       }
     }
     
@@ -742,363 +1257,121 @@ const GameService = {
         walletAddress: walletAddress,
         timestamp: new Date().toISOString(),
       });
-      // Update loading message - keep loading screen visible while inventory loads
-      if (typeof updateLoadingModalMessage === 'function') {
-        updateLoadingModalMessage('Loading inventory... Please wait', 'gameStartLoadingModal');
+      const prepItemResult =
+        this._pendingPrepItemModalResult != null && typeof this._pendingPrepItemModalResult === 'object'
+          ? this._pendingPrepItemModalResult
+          : null;
+
+      if (!prepItemResult) {
+        // Update loading message - keep loading screen visible while inventory loads
+        if (typeof updateLoadingModalMessage === 'function') {
+          updateLoadingModalMessage('Loading inventory... Please wait', 'gameStartLoadingModal');
+        }
+
+        // Ensure loading modal is still visible (in case it was hidden)
+        if (typeof showLoadingModal === 'function') {
+          showLoadingModal('Loading inventory... Please wait', 'gameStartLoadingModal');
+        }
       }
-      
-      // Ensure loading modal is still visible (in case it was hidden)
-      if (typeof showLoadingModal === 'function') {
-        showLoadingModal('Loading inventory... Please wait', 'gameStartLoadingModal');
-      }
-      
-      // Show item consumption modal if available (it will load inventory internally)
-      // Keep loading modal visible until inventory is loaded and modal is ready
-      // The loading modal will be hidden by showItemConsumptionModal() when the modal is ready to show
+
       log.info('GAME SERVICE', 'Checking for item consumption modal', {
         hasShowItemConsumptionModal: typeof showItemConsumptionModal === 'function',
         isTournamentMode: isTournamentMode,
         hasTournamentContext: !!tournamentContext,
+        hasPrepEmbeddedSelection: !!prepItemResult,
       });
-      
-      if (typeof showItemConsumptionModal === 'function') {
+
+      /** @type {{ confirmed: boolean; items?: Record<string, number> } | null} */
+      let itemSelectionResult = null;
+
+      if (prepItemResult) {
+        this._pendingPrepItemModalResult = null;
+        itemSelectionResult = prepItemResult;
+        log.info('GAME SERVICE', 'Using embedded prep loadout item selection (no consumption modal)');
+        if (typeof hideLoadingModal === 'function') {
+          hideLoadingModal('gameStartLoadingModal');
+        }
+        if (itemSelectionResult.confirmed && typeof game !== 'undefined' && game) {
+          const items = itemSelectionResult.items && typeof itemSelectionResult.items === 'object' ? itemSelectionResult.items : {};
+          game.selectedItems = items;
+          game.checkedOutItems = items;
+          if (typeof ConsumableSystem !== 'undefined' && ConsumableSystem.initializeConsumables) {
+            ConsumableSystem.initializeConsumables();
+          }
+        }
+      } else if (typeof showItemConsumptionModal === 'function') {
         console.log('📦 [ITEM SELECTION] Item consumption modal available - Showing modal', {
           timestamp: new Date().toISOString(),
         });
         log.info('GAME SERVICE', '✅ Item consumption modal available - Showing modal (loading screen will stay visible during inventory load)');
 
         const modalStartTime = performance.now();
-        // Pass tournament mode to modal for gold styling
-        const result = await showItemConsumptionModal({ isTournamentMode });
+        itemSelectionResult = await showItemConsumptionModal({ isTournamentMode });
         const modalTime = performance.now() - modalStartTime;
-        
+
         console.log('📦 [ITEM SELECTION] Modal returned', {
-          hasResult: !!result,
-          confirmed: result?.confirmed,
-          hasItems: !!result?.items,
-          items: result?.items,
+          hasResult: !!itemSelectionResult,
+          confirmed: itemSelectionResult?.confirmed,
+          hasItems: !!itemSelectionResult?.items,
+          items: itemSelectionResult?.items,
           modalTime: `${modalTime.toFixed(2)}ms`,
           timestamp: new Date().toISOString(),
         });
         log.info('GAME SERVICE', 'Item consumption modal returned', {
-          hasResult: !!result,
-          confirmed: result?.confirmed,
-          hasItems: !!result?.items,
+          hasResult: !!itemSelectionResult,
+          confirmed: itemSelectionResult?.confirmed,
+          hasItems: !!itemSelectionResult?.items,
           modalTime: `${modalTime.toFixed(2)}ms`,
         });
-        
-        if (!result.confirmed) {
+      }
+
+      if (itemSelectionResult) {
+        if (!itemSelectionResult.confirmed) {
           console.log('❌ [ITEM SELECTION] User cancelled item selection', {
             timestamp: new Date().toISOString(),
             isTournamentMode: isTournamentMode,
           });
           log.debug('GAME SERVICE', 'Item consumption cancelled');
-          // Loading modal already hidden, don't need to hide again
-          
-          // If this was a tournament game, return to tournament menu
           if (isTournamentMode) {
             log.info('GAME SERVICE', 'Returning to tournament menu after cancel');
-            // Re-enable start button
             this.enableStartGameButton();
-            // Show tournament modal
             if (typeof showTournaments === 'function') {
               showTournaments();
             } else if (typeof window.showTournaments === 'function') {
               window.showTournaments();
             }
           } else {
-            // Regular game - re-enable start button
             this.enableStartGameButton();
           }
-          return; // User cancelled
+          return;
         }
-        
+
         console.log('✅ [ITEM SELECTION] Item selection confirmed', {
-          items: result.items,
+          items: itemSelectionResult.items,
           timestamp: new Date().toISOString(),
         });
-        log.debug('GAME SERVICE', 'Item consumption confirmed', result.items);
-        
-        // ==========================================
-        // TOURNAMENT ENTRY (AFTER ITEM SELECTION)
-        // ==========================================
-        // Tournament entry happens AFTER item selection is confirmed
-        // This consumes the ticket, adds funds to pool, increments participant count, and marks player as entered
-        let isDemoMode = true;
-        
-        // DEBUG: Log tournament entry check conditions
-        console.log('🔍 [TOURNAMENT ENTRY CHECK] After item selection', {
-          isTournamentMode: isTournamentMode,
-          hasTournamentContext: !!tournamentContext,
-          hasWalletAddress: !!walletAddress,
-          walletAddress: walletAddress,
-          tournamentContext: tournamentContext,
-          tournamentObjectId: tournamentContext?.tournamentObjectId,
-          tournamentName: tournamentContext?.tournamentName,
-          entryFeeTickets: tournamentContext?.tournamentEntryFeeTickets,
-          allConditionsMet: isTournamentMode && tournamentContext && walletAddress,
-          timestamp: new Date().toISOString(),
+        log.debug('GAME SERVICE', 'Item consumption confirmed', itemSelectionResult.items);
+
+        const applied = await this._applyConsumptionsAfterItemSelection({
+          isTournamentMode,
+          tournamentContext,
+          walletAddress,
+          hasCredits,
+          itemModalResult: itemSelectionResult,
+          requireAnchorSession: false,
         });
-        log.info('GAME SERVICE', '🔍 Tournament entry check after item selection', {
-          isTournamentMode: isTournamentMode,
-          hasTournamentContext: !!tournamentContext,
-          hasWalletAddress: !!walletAddress,
-          tournamentObjectId: tournamentContext?.tournamentObjectId,
-          allConditionsMet: isTournamentMode && tournamentContext && walletAddress,
-        });
-        
-        if (isTournamentMode && tournamentContext && walletAddress) {
-          try {
-            console.log('✅ [TOURNAMENT ENTRY] Conditions met - Starting tournament entry', {
-              walletAddress: walletAddress,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-              entryFeeTickets: tournamentContext.tournamentEntryFeeTickets,
-              tournamentName: tournamentContext.tournamentName,
-              tournamentCategory: tournamentContext.tournamentCategory,
-              timestamp: new Date().toISOString(),
-            });
-            log.info('GAME SERVICE', '🏆 TOURNAMENT ENTRY - Entering tournament AFTER item selection confirmed', {
-              walletAddress: walletAddress,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-              entryFeeTickets: tournamentContext.tournamentEntryFeeTickets,
-              tournamentName: tournamentContext.tournamentName,
-            });
-            
-            // Update loading message to show ticket consumption
-            if (typeof updateLoadingModalMessage === 'function') {
-              updateLoadingModalMessage('Entering tournament and consuming ticket... Please wait', 'gameStartLoadingModal');
+        if (!applied.ok) {
+          if (isTournamentMode) {
+            if (typeof showTournaments === 'function') {
+              showTournaments();
+            } else if (typeof window.showTournaments === 'function') {
+              window.showTournaments();
             }
-            
-            // Show loading modal if hidden
-            if (typeof showLoadingModal === 'function') {
-              showLoadingModal('Entering tournament and consuming ticket... Please wait', 'gameStartLoadingModal');
-            }
-            
-            const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-            const entryUrl = `${API_BASE_URL}/tournaments/enter`;
-            const entryPayload = {
-              playerAddress: walletAddress,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-              // ticketId is optional - backend will find a valid ticket if not provided
-            };
-            
-            console.log('📡 [TOURNAMENT ENTRY] Calling API', {
-              url: entryUrl,
-              method: 'POST',
-              payload: entryPayload,
-              timestamp: new Date().toISOString(),
-            });
-            log.debug('GAME SERVICE', 'Calling tournament entry API', {
-              url: entryUrl,
-              playerAddress: walletAddress,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-            });
-            
-            const entryStartTime = performance.now();
-            
-            // Enter tournament (consumes ticket, admin wallet executes transaction)
-            const enterResponse = await fetch(entryUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(entryPayload),
-            });
-            
-            const entryResponseTime = performance.now() - entryStartTime;
-            
-            console.log('📥 [TOURNAMENT ENTRY] API Response received', {
-              ok: enterResponse.ok,
-              status: enterResponse.status,
-              statusText: enterResponse.statusText,
-              responseTime: `${entryResponseTime.toFixed(2)}ms`,
-              headers: Object.fromEntries(enterResponse.headers.entries()),
-              timestamp: new Date().toISOString(),
-            });
-            log.debug('GAME SERVICE', 'Tournament entry API response', {
-              ok: enterResponse.ok,
-              status: enterResponse.status,
-              statusText: enterResponse.statusText,
-              responseTime: `${entryResponseTime.toFixed(2)}ms`,
-            });
-            
-            if (!enterResponse.ok) {
-              let errorData = {};
-              try {
-                errorData = await enterResponse.json();
-              } catch (e) {
-                log.error('GAME SERVICE', 'Failed to parse error response', e);
-                errorData = { error: `HTTP ${enterResponse.status}: ${enterResponse.statusText}` };
-              }
-              const errorMsg = errorData.error || errorData.message || `HTTP ${enterResponse.status}: ${enterResponse.statusText}`;
-              console.error('❌ [TOURNAMENT ENTRY] HTTP Error', {
-                error: errorMsg,
-                status: enterResponse.status,
-                errorData: errorData,
-                timestamp: new Date().toISOString(),
-              });
-              log.error('GAME SERVICE', '❌ Failed to enter tournament - HTTP error', {
-                error: errorMsg,
-                status: enterResponse.status,
-                playerAddress: walletAddress,
-                tournamentObjectId: tournamentContext.tournamentObjectId,
-                errorData: errorData,
-              });
-              alert(`Failed to enter tournament: ${errorMsg}\n\nPlease check:\n- You have enough tournament tickets\n- The tournament is still active\n- Your network connection\n\nGame cancelled.`);
-              return; // Cancel game start
-            }
-            
-            const enterResult = await enterResponse.json();
-            
-            console.log('📋 [TOURNAMENT ENTRY] API Result parsed', {
-              success: enterResult.success,
-              transactionDigest: enterResult.transactionDigest,
-              error: enterResult.error,
-              message: enterResult.message,
-              fullResult: enterResult,
-              timestamp: new Date().toISOString(),
-            });
-            log.info('GAME SERVICE', 'Tournament entry API response received', {
-              success: enterResult.success,
-              transactionDigest: enterResult.transactionDigest,
-              error: enterResult.error,
-            });
-            
-            if (!enterResult.success) {
-              console.error('❌ [TOURNAMENT ENTRY] API returned error', {
-                error: enterResult.error,
-                message: enterResult.message,
-                fullResult: enterResult,
-                timestamp: new Date().toISOString(),
-              });
-              const errorMsg = enterResult.error || enterResult.message || 'Failed to enter tournament';
-              log.error('GAME SERVICE', '❌ Failed to enter tournament - API returned error', {
-                error: errorMsg,
-                playerAddress: walletAddress,
-                tournamentObjectId: tournamentContext.tournamentObjectId,
-                result: enterResult,
-              });
-              alert(`Failed to enter tournament: ${errorMsg}\n\nPlease check:\n- You have enough tournament tickets\n- The tournament is still active\n- Your network connection\n\nGame cancelled.`);
-              return; // Cancel game start
-            }
-            
-            // Tournament ticket consumed successfully - player is now entered
-            isDemoMode = false; // Tournament games are never in demo mode
-            console.log('✅ [TOURNAMENT ENTRY] SUCCESS - Player entered tournament', {
-              transactionDigest: enterResult.transactionDigest,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-              tournamentName: tournamentContext.tournamentName,
-              tournamentCategory: tournamentContext.tournamentCategory,
-              walletAddress: walletAddress,
-              timestamp: new Date().toISOString(),
-            });
-            log.info('GAME SERVICE', '✅ Tournament entry completed successfully - ticket consumed, player entered', {
-              transactionDigest: enterResult.transactionDigest,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-              tournamentName: tournamentContext.tournamentName,
-            });
-          } catch (error) {
-            console.error('❌ [TOURNAMENT ENTRY] Exception caught', {
-              error: error.message,
-              stack: error.stack,
-              name: error.name,
-              playerAddress: walletAddress,
-              tournamentObjectId: tournamentContext?.tournamentObjectId,
-              timestamp: new Date().toISOString(),
-            });
-            log.error('GAME SERVICE', '❌ Exception during tournament entry', {
-              error: error.message,
-              stack: error.stack,
-              playerAddress: walletAddress,
-              tournamentObjectId: tournamentContext?.tournamentObjectId,
-            });
-            alert(`Error entering tournament: ${error.message || 'Unknown error'}\n\nThis might be a network issue. Please try again.\n\nGame cancelled.`);
-            return; // Cancel game start
           }
-        } else if (isTournamentMode) {
-          // Tournament game but entry failed - CANCEL GAME
-          console.error('❌ [TOURNAMENT ENTRY] SKIPPED - Missing required data', {
-            isTournamentMode: isTournamentMode,
-            hasTournamentContext: !!tournamentContext,
-            hasWalletAddress: !!walletAddress,
-            tournamentContext: tournamentContext,
-            walletAddress: walletAddress,
-            tournamentObjectId: tournamentContext?.tournamentObjectId,
-            tournamentName: tournamentContext?.tournamentName,
-            timestamp: new Date().toISOString(),
-          });
-          log.error('GAME SERVICE', '❌ Tournament entry SKIPPED - missing required data', {
-            isTournamentMode: isTournamentMode,
-            hasTournamentContext: !!tournamentContext,
-            hasWalletAddress: !!walletAddress,
-            tournamentContext: tournamentContext,
-            walletAddress: walletAddress,
-          });
-          alert(`Error: Cannot enter tournament. Missing required data.\n\nisTournamentMode: ${isTournamentMode}\nhasTournamentContext: ${!!tournamentContext}\nhasWalletAddress: ${!!walletAddress}\n\nPlease refresh the page and try again.`);
-          return; // Cancel game start
-        } else if (hasCredits && walletAddress && window.GamePassService) {
-          // Regular credit consumption for non-tournament games
-          log.debug('GAME SERVICE', 'Consuming credit for regular game', {
-            hasTournamentContext: !!tournamentContext,
-            hasWalletAddress: !!walletAddress,
-          });
-          try {
-            log.info('GAME SERVICE', 'Consuming credit after item selection', {
-              walletAddress: walletAddress,
-            });
-            
-            // Update loading message to show credit consumption
-            if (typeof updateLoadingModalMessage === 'function') {
-              updateLoadingModalMessage('Consuming credit... Please wait', 'gameStartLoadingModal');
-            }
-            
-            const consumeResult = await window.GamePassService.consumeGameCredit(walletAddress);
-            if (!consumeResult.success) {
-              // Improved error handling
-              const errorMsg = consumeResult.error || 'Unknown error';
-              log.error('GAME SERVICE', 'Failed to consume game credit after item selection', {
-                error: errorMsg,
-                playerAddress: walletAddress,
-              });
-              
-              // Show user-friendly error message
-              if (errorMsg.includes('not have an active game pass') || errorMsg.includes('credits remaining')) {
-                alert(`No credits available.\n\n${errorMsg}\n\nYou can still play in demo mode.`);
-              } else if (errorMsg.includes('network') || errorMsg.includes('timeout') || errorMsg.includes('connection')) {
-                alert(`Network error while consuming credit.\n\n${errorMsg}\n\nPlease check your connection and try again. You can still play in demo mode.`);
-              } else {
-                alert(`Failed to consume game credit.\n\n${errorMsg}\n\nYou can still play in demo mode.`);
-              }
-              // Continue in demo mode
-            } else {
-              // Credit consumed successfully - start full game
-              isDemoMode = false;
-              log.info('GAME SERVICE', 'Credit consumed successfully after item selection', {
-                digest: consumeResult.digest,
-                gamesRemaining: consumeResult.gamesRemaining,
-              });
-              
-              // Refresh credit display (with error handling)
-              if (window.GamePassDisplay) {
-                try {
-                  await window.GamePassDisplay.refresh(walletAddress, true, false);
-                  log.debug('GAME SERVICE', 'Credit display refreshed after consumption');
-                } catch (refreshError) {
-                  log.warn('GAME SERVICE', 'Failed to refresh credit display', refreshError);
-                  // Don't block game start if display refresh fails
-                }
-              }
-            }
-          } catch (error) {
-            log.error('GAME SERVICE', 'Error consuming credit after item selection', error);
-            alert(`Error consuming credit: ${error.message || 'Unknown error'}\n\nYou can still play in demo mode.`);
-            // Continue in demo mode on error
-          }
-        } else {
-          log.info('GAME SERVICE', 'No credits available, starting in demo mode');
+          return;
         }
-        
-        // Store demo mode flag in game state
+        const isDemoMode = applied.isDemoMode;
+
         if (this._gameState) {
           this._gameState.isDemoMode = isDemoMode;
         }
@@ -1108,183 +1381,35 @@ const GameService = {
         if (typeof gameState !== 'undefined') {
           gameState.isDemoMode = isDemoMode;
         }
-        
-        // Loading modal will be shown again by confirmItemConsumption()
-        // Update loading message when it's shown
+
         if (typeof updateLoadingModalMessage === 'function') {
           updateLoadingModalMessage('Initializing game... Please wait', 'gameStartLoadingModal');
         }
-      } else {
-        // No item consumption modal - handle tournament entry or credit consumption
-        let isDemoMode = true;
-        
-        // ==========================================
-        // TOURNAMENT ENTRY (NO ITEM MODAL PATH)
-        // ==========================================
-        // Tournament entry happens AFTER item selection would have happened
-        // This consumes the ticket, adds funds to pool, increments participant count, and marks player as entered
-        
-        // DEBUG: Log tournament entry check conditions
-        console.log('🔍 [TOURNAMENT ENTRY CHECK] No item modal path', {
-          isTournamentMode: isTournamentMode,
-          hasTournamentContext: !!tournamentContext,
-          hasWalletAddress: !!walletAddress,
-          walletAddress: walletAddress,
-          tournamentContext: tournamentContext,
-          allConditionsMet: isTournamentMode && tournamentContext && walletAddress,
-        });
-        
-        if (isTournamentMode && tournamentContext && walletAddress) {
-          try {
-            log.info('GAME SERVICE', '🏆 TOURNAMENT ENTRY - Entering tournament (no item modal)', {
-              walletAddress: walletAddress,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-              entryFeeTickets: tournamentContext.tournamentEntryFeeTickets,
-              tournamentName: tournamentContext.tournamentName,
-            });
-            
-            // Update loading message to show ticket consumption
-            if (typeof updateLoadingModalMessage === 'function') {
-              updateLoadingModalMessage('Entering tournament and consuming ticket... Please wait', 'gameStartLoadingModal');
-            }
-            
-            // Show loading modal if hidden
-            if (typeof showLoadingModal === 'function') {
-              showLoadingModal('Entering tournament and consuming ticket... Please wait', 'gameStartLoadingModal');
-            }
-            
-            const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-            
-            log.debug('GAME SERVICE', 'Calling tournament entry API (no item modal)', {
-              url: `${API_BASE_URL}/tournaments/enter`,
-              playerAddress: walletAddress,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-            });
-            
-            // Enter tournament (consumes ticket, admin wallet executes transaction)
-            const enterResponse = await fetch(`${API_BASE_URL}/tournaments/enter`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                playerAddress: walletAddress,
-                tournamentObjectId: tournamentContext.tournamentObjectId,
-                // ticketId is optional - backend will find a valid ticket if not provided
-              }),
-            });
-            
-            log.debug('GAME SERVICE', 'Tournament entry API response (no item modal)', {
-              ok: enterResponse.ok,
-              status: enterResponse.status,
-              statusText: enterResponse.statusText,
-            });
-            
-            if (!enterResponse.ok) {
-              let errorData = {};
-              try {
-                errorData = await enterResponse.json();
-              } catch (e) {
-                log.error('GAME SERVICE', 'Failed to parse error response', e);
-                errorData = { error: `HTTP ${enterResponse.status}: ${enterResponse.statusText}` };
-              }
-              const errorMsg = errorData.error || errorData.message || `HTTP ${enterResponse.status}: ${enterResponse.statusText}`;
-              log.error('GAME SERVICE', '❌ Failed to enter tournament - HTTP error (no item modal)', {
-                error: errorMsg,
-                status: enterResponse.status,
-                playerAddress: walletAddress,
-                tournamentObjectId: tournamentContext.tournamentObjectId,
-                errorData: errorData,
-              });
-              alert(`Failed to enter tournament: ${errorMsg}\n\nPlease check:\n- You have enough tournament tickets\n- The tournament is still active\n- Your network connection\n\nGame cancelled.`);
-              return; // Cancel game start
-            }
-            
-            const enterResult = await enterResponse.json();
-            
-            log.info('GAME SERVICE', 'Tournament entry API response received (no item modal)', {
-              success: enterResult.success,
-              transactionDigest: enterResult.transactionDigest,
-              error: enterResult.error,
-            });
-            
-            if (!enterResult.success) {
-              const errorMsg = enterResult.error || enterResult.message || 'Failed to enter tournament';
-              log.error('GAME SERVICE', '❌ Failed to enter tournament - API returned error (no item modal)', {
-                error: errorMsg,
-                playerAddress: walletAddress,
-                tournamentObjectId: tournamentContext.tournamentObjectId,
-                result: enterResult,
-              });
-              alert(`Failed to enter tournament: ${errorMsg}\n\nPlease check:\n- You have enough tournament tickets\n- The tournament is still active\n- Your network connection\n\nGame cancelled.`);
-              return; // Cancel game start
-            }
-            
-            // Tournament ticket consumed successfully - player is now entered
-            isDemoMode = false; // Tournament games are never in demo mode
-            log.info('GAME SERVICE', '✅ Tournament entry completed successfully - ticket consumed, player entered (no item modal)', {
-              transactionDigest: enterResult.transactionDigest,
-              tournamentObjectId: tournamentContext.tournamentObjectId,
-              tournamentName: tournamentContext.tournamentName,
-            });
-          } catch (error) {
-            log.error('GAME SERVICE', '❌ Exception during tournament entry (no item modal)', {
-              error: error.message,
-              stack: error.stack,
-              playerAddress: walletAddress,
-              tournamentObjectId: tournamentContext?.tournamentObjectId,
-            });
-            alert(`Error entering tournament: ${error.message || 'Unknown error'}\n\nThis might be a network issue. Please try again.\n\nGame cancelled.`);
-            return; // Cancel game start
-          }
-        } else if (isTournamentMode) {
-          // Tournament game but entry failed - CANCEL GAME
-          log.error('GAME SERVICE', '❌ Tournament entry SKIPPED - missing required data (no item modal)', {
-            isTournamentMode: isTournamentMode,
-            hasTournamentContext: !!tournamentContext,
-            hasWalletAddress: !!walletAddress,
-            tournamentContext: tournamentContext,
-            walletAddress: walletAddress,
-          });
-          alert(`Error: Cannot enter tournament. Missing required data.\n\nisTournamentMode: ${isTournamentMode}\nhasTournamentContext: ${!!tournamentContext}\nhasWalletAddress: ${!!walletAddress}\n\nPlease refresh the page and try again.`);
-          return; // Cancel game start
-        } else if (hasCredits && walletAddress && window.GamePassService) {
-          // Regular credit consumption for non-tournament games
-          try {
-            log.info('GAME SERVICE', 'Consuming credit (no item selection)', {
-              walletAddress: walletAddress,
-            });
-            
-            const consumeResult = await window.GamePassService.consumeGameCredit(walletAddress);
-            if (!consumeResult.success) {
-              const errorMsg = consumeResult.error || 'Unknown error';
-              log.error('GAME SERVICE', 'Failed to consume game credit', {
-                error: errorMsg,
-                playerAddress: walletAddress,
-              });
-              // Continue in demo mode
-            } else {
-              isDemoMode = false;
-              log.info('GAME SERVICE', 'Credit consumed successfully', {
-                digest: consumeResult.digest,
-                gamesRemaining: consumeResult.gamesRemaining,
-              });
-              
-              if (window.GamePassDisplay) {
-                try {
-                  await window.GamePassDisplay.refresh(walletAddress, true, false);
-                } catch (refreshError) {
-                  log.warn('GAME SERVICE', 'Failed to refresh credit display', refreshError);
-                }
-              }
-            }
-          } catch (error) {
-            log.error('GAME SERVICE', 'Error consuming credit', error);
-            // Continue in demo mode
-          }
+        if (prepItemResult && typeof showLoadingModal === 'function') {
+          showLoadingModal('Initializing game... Please wait', 'gameStartLoadingModal');
         }
-        
-        // Store demo mode flag in game state
+      } else {
+        // No item modal: same consumption router (tournament requires Anchor session; credit uses empty item list).
+        const appliedNoModal = await this._applyConsumptionsAfterItemSelection({
+          isTournamentMode,
+          tournamentContext,
+          walletAddress,
+          hasCredits,
+          itemModalResult: null,
+          requireAnchorSession: true,
+        });
+        if (!appliedNoModal.ok) {
+          if (isTournamentMode) {
+            if (typeof showTournaments === 'function') {
+              showTournaments();
+            } else if (typeof window.showTournaments === 'function') {
+              window.showTournaments();
+            }
+          }
+          return;
+        }
+        const isDemoMode = appliedNoModal.isDemoMode;
+
         if (this._gameState) {
           this._gameState.isDemoMode = isDemoMode;
         }
@@ -1294,9 +1419,7 @@ const GameService = {
         if (typeof gameState !== 'undefined') {
           gameState.isDemoMode = isDemoMode;
         }
-        
-        // No item consumption modal, continue with initialization
-        // Show loading modal again
+
         if (typeof showLoadingModal === 'function') {
           showLoadingModal('Initializing game... Please wait', 'gameStartLoadingModal');
         }
@@ -1308,6 +1431,7 @@ const GameService = {
         window.initializeGame();
       } else {
         log.error('GAME SERVICE', 'initializeGame is not a function!');
+        throw new Error('Game could not start: game scripts may not have loaded. Please refresh the page and try again.');
       }
       
       // Update state after game scripts load (re-check in case gameState is now available)
@@ -1455,6 +1579,7 @@ const GameService = {
         
         if (!gameState) {
           log.error('GAME SERVICE', 'gameState not available! Make sure game-state.js is loaded.');
+          throw new Error('Game state not available. Please refresh the page and try again.');
         }
         
         // Update loading message before initialization
@@ -1634,6 +1759,8 @@ const GameService = {
       if (typeof hideLoadingModal === 'function') {
         hideLoadingModal('gameStartLoadingModal');
       }
+      // Re-enable start button so user can try again
+      this.enableStartGameButton();
     }
   },
   
@@ -1729,7 +1856,7 @@ const GameService = {
             // Set guard flag to prevent MenuService.show() from calling closeGame() again
             MenuService._calledFromCloseGame = true;
             try {
-              MenuService.show();
+              MenuService.show({ afterGame: true });
             } finally {
               MenuService._calledFromCloseGame = false;
             }
@@ -1741,12 +1868,12 @@ const GameService = {
           // Set guard flag to prevent MenuService.show() from calling closeGame() again
           MenuService._calledFromCloseGame = true;
           try {
-            MenuService.show();
+            MenuService.show({ afterGame: true });
           } finally {
             MenuService._calledFromCloseGame = false;
           }
         } else if (typeof showMainMenu === 'function') {
-          showMainMenu();
+          showMainMenu({ afterGame: true });
         }
       }
     }
@@ -1783,8 +1910,6 @@ const GameService = {
     if (!ready && typeof gameReadinessState !== 'undefined') {
       log.debug('GAME SERVICE', 'Game not fully ready, but buttons enabled for demo mode', {
         dataLoaded: gameReadinessState.dataLoaded,
-        migrationCheckComplete: gameReadinessState.migrationCheckComplete,
-        migrationModalClosed: gameReadinessState.migrationModalClosed,
       });
     }
   },
@@ -1803,8 +1928,8 @@ const GameService = {
         const walletAddress = window.walletAPIInstance.getAddress();
         if (walletAddress && window.GamePassService) {
           try {
-            const status = await window.GamePassService.getGamePassStatus(walletAddress);
-            hasCredits = status.success && status.hasPass && status.isActive && (status.gamesRemaining || 0) > 0;
+          const status = await window.GamePassService.getCreditsAndTickets(walletAddress);
+          hasCredits = status.success && (status.credits || 0) > 0;
           } catch (error) {
             log.warn('GAME SERVICE', 'Error checking credits for button text', error);
             hasCredits = false;

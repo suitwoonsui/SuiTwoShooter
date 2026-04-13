@@ -5,6 +5,33 @@
 
 console.log('✅ [STORE PURCHASE FLOW] Store purchase flow module loaded');
 
+const STORE_CART_PURCHASE_BTN_IDLE_HTML = '<span class="btn-icon">💳</span> Purchase';
+
+function formatStorePurchaseErrorForUser(err) {
+  const msg = err?.message || String(err);
+  if (/\b503\b|\b502\b|\b504\b|\b429\b|Unexpected status code|ECONNRESET|fetch failed|Service Unavailable/i.test(msg)) {
+    return 'Sui RPC returned a temporary error (for example HTTP 503). Wait a moment and try again. If it persists, check your wallet’s network / RPC settings.';
+  }
+  return msg;
+}
+
+function forEachStoreCartPurchaseButton(fn) {
+  document.querySelectorAll('[data-store-cart-purchase]').forEach(fn);
+}
+
+function setStoreCartPurchaseButtonsLoading(innerHTML) {
+  forEachStoreCartPurchaseButton((btn) => {
+    btn.disabled = true;
+    btn.innerHTML = innerHTML;
+  });
+}
+
+function restoreStoreCartPurchaseButtonsIdle() {
+  forEachStoreCartPurchaseButton((btn) => {
+    btn.innerHTML = STORE_CART_PURCHASE_BTN_IDLE_HTML;
+  });
+}
+
 /**
  * Proceed to purchase - Backend API + Blockchain Integration
  */
@@ -20,12 +47,10 @@ async function proceedToPurchase() {
     return;
   }
   
-  log.debug('STORE PURCHASE FLOW', 'Proceeding to purchase', state.selectedItems);
+  log.debug('STORE PURCHASE FLOW', 'Proceeding to purchase', state.selectedOffers);
   
   // Validate selections
-  const selectedCount = Object.keys(state.selectedItems).filter(
-    key => state.selectedItems[key] > 0
-  ).length;
+  const selectedCount = Object.entries(state.selectedOffers || {}).reduce((acc, [, qty]) => acc + (qty > 0 ? qty : 0), 0);
   
   if (selectedCount === 0) {
     if (typeof showToast === 'function') {
@@ -59,50 +84,58 @@ async function proceedToPurchase() {
   try {
     if (window.BadgeService && window.BadgeService.getBadge) {
       const badgeData = await window.BadgeService.getBadge(walletAddress);
-      if (badgeData.success && badgeData.hasBadge && badgeData.badge) {
-        const discounts = window.BadgeService.getDiscountsForTier(badgeData.badge.tier);
-        badgeDiscount = discounts.store; // Store discount percentage
-        log.debug('STORE PURCHASE FLOW', `Badge discount applied: ${badgeDiscount}%`);
+      log.debug('STORE PURCHASE FLOW', 'Badge check result:', {
+        success: badgeData?.success,
+        hasBadge: badgeData?.hasBadge,
+        badgeExists: !!badgeData?.badge,
+        tier: badgeData?.badge?.tier,
+        fullResponse: badgeData
+      });
+      
+      if (
+        badgeData &&
+        badgeData.success === true &&
+        badgeData.hasBadge === true &&
+        badgeData.badge &&
+        typeof window.getStoreBadgeDiscountPercent === 'function'
+      ) {
+        badgeDiscount = window.getStoreBadgeDiscountPercent(badgeData.badge);
+        log.debug('STORE PURCHASE FLOW', `Badge discount applied: ${badgeDiscount}% (tier ${badgeData.badge.tier})`);
+      } else {
+        log.debug('STORE PURCHASE FLOW', 'No badge discount - hasBadge:', badgeData?.hasBadge, 'badge:', !!badgeData?.badge, 'tier:', badgeData?.badge?.tier);
+        badgeDiscount = 0;
       }
     }
   } catch (error) {
     log.warn('STORE PURCHASE FLOW', 'Failed to get badge discount', error);
-    // Continue without discount if badge check fails
+    // Ensure discount is 0 on error
+    badgeDiscount = 0;
   }
 
   // Calculate total USD and token amount needed (with discount applied)
   let totalUsd = 0;
   let totalUsdBeforeDiscount = 0;
-  const items = [];
-  
-  for (const [key, quantity] of Object.entries(state.selectedItems)) {
-    if (quantity > 0) {
-      const [itemId, levelStr] = key.split('_');
-      const level = parseInt(levelStr) || 1;
-      
-      items.push({
-        itemId: itemId,
-        level: level,
-        quantity: quantity
-      });
-      
-      // Calculate total for display
-      // Try to get price from backend data, otherwise use fallback
-      const item = typeof getItemById === 'function' ? getItemById(itemId) : null;
-      if (item) {
-        const levelData = typeof getItemLevelData === 'function' ? getItemLevelData(itemId, level) : null;
-        if (levelData) {
-          const itemPrice = levelData.usdPrice;
-          totalUsdBeforeDiscount += itemPrice * quantity;
-          
-          // Apply badge discount
-          const discountedPrice = badgeDiscount > 0 
-            ? itemPrice * (1 - badgeDiscount / 100)
-            : itemPrice;
-          totalUsd += discountedPrice * quantity;
-        }
-      }
-    }
+  const lines = [];
+
+  const offers = state.storeOffers && typeof state.storeOffers === 'object' ? state.storeOffers : null;
+  const selectedOffers = state.selectedOffers && typeof state.selectedOffers === 'object' ? state.selectedOffers : null;
+
+  if (!offers || !selectedOffers) {
+    throw new Error('Store offers not loaded. Please reopen the store.');
+  }
+  for (const [offerId, quantity] of Object.entries(selectedOffers)) {
+    if (!(quantity > 0)) continue;
+    const offer = offers[offerId];
+    if (!offer) continue;
+    const rawCents = offer?.priceUsdCents ?? offer?.price_usd_cents;
+    const cents = Number(rawCents ?? 0);
+    const unitUsd = Number.isFinite(cents) ? Math.max(0, cents) / 100 : 0;
+
+    lines.push({ offerId, redeemCount: quantity });
+
+    totalUsdBeforeDiscount += unitUsd * quantity;
+    const discounted = badgeDiscount > 0 ? unitUsd * (1 - badgeDiscount / 100) : unitUsd;
+    totalUsd += discounted * quantity;
   }
   
   // Log discount info
@@ -112,19 +145,15 @@ async function proceedToPurchase() {
   }
   
   // Check balance before proceeding
-  const proceedBtn = document.getElementById('proceedToPurchaseBtn');
-  if (proceedBtn) {
-    proceedBtn.disabled = true;
-    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Checking balance...';
-  }
-  
+  setStoreCartPurchaseButtonsLoading('<span class="btn-icon">⏳</span> Checking balance...');
+
   try {
-    // Calculate required token amount
-    const tokenConversion = typeof convertUsdToToken === 'function' 
-      ? convertUsdToToken(totalUsd, state.paymentToken)
-      : { amount: 0, formatted: 'N/A' };
+    const tokenConversion =
+      typeof convertUsdToToken === 'function'
+        ? convertUsdToToken(totalUsd, state.paymentToken)
+        : { amount: 0, formatted: 'N/A' };
     const requiredTokenAmount = tokenConversion.amount;
-    const tokenSymbol = state.paymentToken === 'sui' ? 'SUI' : (state.paymentToken === 'usdc' ? 'USDC' : '$MEWS');
+    const tokenSymbol = state.paymentToken === 'sui' ? 'SUI' : (state.paymentToken === 'usdc' ? 'USDC' : 'MEWS');
     
     // Check user's balance using consolidated utility
     let userBalance = 0;
@@ -204,10 +233,10 @@ async function proceedToPurchase() {
           });
         }
         
-        if (proceedBtn) {
-          proceedBtn.disabled = false;
-          proceedBtn.innerHTML = '<span class="btn-icon">💳</span> Proceed to Purchase';
-        }
+        restoreStoreCartPurchaseButtonsIdle();
+        forEachStoreCartPurchaseButton((btn) => {
+          btn.disabled = false;
+        });
         return;
       }
     }
@@ -235,10 +264,10 @@ async function proceedToPurchase() {
         });
       }
       
-      if (proceedBtn) {
-        proceedBtn.disabled = false;
-        proceedBtn.innerHTML = '<span class="btn-icon">💳</span> Proceed to Purchase';
-      }
+      restoreStoreCartPurchaseButtonsIdle();
+      forEachStoreCartPurchaseButton((btn) => {
+        btn.disabled = false;
+      });
       return;
     }
     
@@ -260,35 +289,53 @@ async function proceedToPurchase() {
         required: '--',
         balance: '--',
         shortfall: '--',
-        tokenSymbol: state.paymentToken === 'sui' ? 'SUI' : (state.paymentToken === 'usdc' ? 'USDC' : '$MEWS'),
+        tokenSymbol: state.paymentToken === 'sui' ? 'SUI' : (state.paymentToken === 'usdc' ? 'USDC' : 'MEWS'),
         customMessage: errorMsg
       });
     }
     
-    if (proceedBtn) {
-      proceedBtn.disabled = false;
-      proceedBtn.innerHTML = '<span class="btn-icon">💳</span> Proceed to Purchase';
-    }
+    restoreStoreCartPurchaseButtonsIdle();
+    forEachStoreCartPurchaseButton((btn) => {
+      btn.disabled = false;
+    });
     return;
   }
   
   // Show loading state
   state.isLoading = true;
-  if (proceedBtn) {
-    proceedBtn.disabled = true;
-    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Building transaction...';
-  }
+  setStoreCartPurchaseButtonsLoading('<span class="btn-icon">⏳</span> Building transaction...');
   
   try {
-    // Get API base URL from config (set by api-config.js)
-    const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
+    // Frontend should always talk to the game backend (store is proxied by game backend).
+    const API_BASE_URL = window.GAME_CONFIG?.getBackendUrl
+      ? window.GAME_CONFIG.getBackendUrl('/api/store/').replace(/\/store\/?$/, '')
+      : (window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api'));
     log.debug('STORE PURCHASE FLOW', 'Purchase using API Base URL', API_BASE_URL);
     
     // Convert payment token to backend format (uppercase)
     const paymentToken = state.paymentToken.toUpperCase();
     
     // Step 1: Call backend to build transaction
-    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Building transaction...';
+    setStoreCartPurchaseButtonsLoading('<span class="btn-icon">⏳</span> Building transaction...');
+    
+    // Get prices that were used to display store items (for consistency)
+    let prices = null;
+    let pricesTimestamp = null;
+    if (typeof StoreService !== 'undefined' && StoreService.getState) {
+      const state = StoreService.getState();
+      prices = state.tokenPrices;
+      pricesTimestamp = state.tokenPricesTimestamp;
+    } else if (typeof getStoreState === 'function') {
+      const state = getStoreState();
+      prices = state?.tokenPrices;
+      pricesTimestamp = state?.tokenPricesTimestamp;
+    }
+    
+    log.debug('STORE PURCHASE FLOW', 'Sending prices to backend for consistency', {
+      prices,
+      pricesTimestamp,
+      priceAge: pricesTimestamp ? `${Math.round((Date.now() - pricesTimestamp) / 1000)}s` : 'N/A',
+    });
     
     const purchaseResponse = await fetch(`${API_BASE_URL}/store/purchase`, {
       method: 'POST',
@@ -297,9 +344,11 @@ async function proceedToPurchase() {
       },
       body: JSON.stringify({
         playerAddress: walletAddress,
-        items: items,
+        lines,
         paymentToken: paymentToken,
-        badgeDiscount: badgeDiscount  // Send badge discount to backend for validation
+        badgeDiscount: badgeDiscount,  // Send badge discount to backend for validation
+        prices: prices,  // Send prices used by frontend (for consistency)
+        pricesTimestamp: pricesTimestamp  // Send timestamp of prices (for validation)
       })
     });
     
@@ -317,40 +366,14 @@ async function proceedToPurchase() {
     log.debug('STORE PURCHASE FLOW', 'Transaction built', {
       totalUSD: purchaseData.totalUSD,
       totalToken: purchaseData.totalToken,
+      totalTokenDisplay: purchaseData.totalTokenDisplay,
       paymentToken: purchaseData.paymentToken,
       gasEstimate: purchaseData.gasEstimate
     });
-    
-    // Format the actual transaction amount for display
-    const tokenSymbol = purchaseData.paymentToken === 'SUI' ? 'SUI' : (purchaseData.paymentToken === 'USDC' ? 'USDC' : '$MEWS');
-    let formattedTokenAmount = '';
-    
-    if (purchaseData.paymentToken === 'SUI') {
-      const suiAmount = parseFloat(purchaseData.totalToken) / 1_000_000_000;
-      formattedTokenAmount = suiAmount.toFixed(6);
-    } else if (purchaseData.paymentToken === 'MEWS') {
-      // MEWS uses 9 decimals on testnet, 6 on mainnet
-      const mewsDecimals = 9; // Assuming testnet for now
-      const mewsAmount = parseFloat(purchaseData.totalToken) / Math.pow(10, mewsDecimals);
-      formattedTokenAmount = mewsAmount.toFixed(6);
-    } else if (purchaseData.paymentToken === 'USDC') {
-      const usdcAmount = parseFloat(purchaseData.totalToken) / 1_000_000;
-      formattedTokenAmount = usdcAmount.toFixed(2);
-    }
-    
-    // Show confirmation with actual transaction amount
-    const confirmMessage = `Confirm Purchase\n\n` +
-      `Total: $${purchaseData.totalUSD} USD\n` +
-      `Amount: ${formattedTokenAmount} ${tokenSymbol}\n\n` +
-      `This is the exact amount that will be charged.`;
-    
-    if (!confirm(confirmMessage)) {
-      log.debug('STORE PURCHASE FLOW', 'Purchase cancelled by user');
-      return;
-    }
-    
-    // Step 2: Sign and execute transaction
-    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Signing transaction...';
+
+    // Step 2: Sign and execute in the wallet. MEWS/USDC visibility improves when the PTB uses spendable
+    // coin object refs (platform store-cart planner paginates getCoins so v1 is chosen whenever possible).
+    setStoreCartPurchaseButtonsLoading('<span class="btn-icon">⏳</span> Signing transaction...');
     
     // Check if wallet API is available
     if (!window.walletAPIInstance || !window.walletAPIInstance.isConnected()) {
@@ -360,18 +383,58 @@ async function proceedToPurchase() {
     // Pass the base64 string directly to wallet API
     // dapp-kit accepts base64 strings directly (as seen in Insomnia's implementation)
     // The wallet API will handle conversion if needed
-    const signResult = await window.walletAPIInstance.signAndExecuteTransaction(purchaseData.transaction);
+    // Store checkout PTBs are always built for the game Sui network (testnet in prod-dev); force chain so
+    // sign+execute uses the same RPC/network as the unsigned bytes from /store/purchase.
+    const storeSuiNetwork =
+      (typeof window.GAME_CONFIG?.NETWORK === 'string' && window.GAME_CONFIG.NETWORK.trim()) ||
+      (typeof window.WalletService !== 'undefined' && window.WalletService._network) ||
+      'testnet';
+    const storeSuiNetId = storeSuiNetwork === 'mainnet' ? 'mainnet' : 'testnet';
+
+    const refreshStoreAndWalletBalances = async (reason) => {
+      if (!walletAddress) return;
+      try {
+        if (window.TokenBalanceUtils?.invalidateTokenBalanceCache) {
+          window.TokenBalanceUtils.invalidateTokenBalanceCache(walletAddress, storeSuiNetId, ['sui', 'mews', 'usdc']);
+        }
+        if (window.walletAPIInstance?.checkMEWSBalance) {
+          await window.walletAPIInstance.checkMEWSBalance(walletAddress, storeSuiNetId).catch(() => {});
+        }
+        if (window.walletAPIInstance?.checkSUIBalance) {
+          await window.walletAPIInstance.checkSUIBalance(walletAddress, storeSuiNetId).catch(() => {});
+        }
+        if (typeof updateStoreBalance === 'function') {
+          log.debug('STORE PURCHASE FLOW', 'Refreshing balances', { reason });
+          await updateStoreBalance();
+        }
+      } catch (e) {
+        log.warn('STORE PURCHASE FLOW', 'Post-purchase balance refresh failed', e);
+      }
+    };
+
+    const signResult = await window.walletAPIInstance.signAndExecuteTransaction(purchaseData.transaction, {
+      chain: storeSuiNetwork === 'mainnet' ? 'sui:mainnet' : 'sui:testnet',
+    });
     
     if (!signResult.success) {
       throw new Error(signResult.error || 'Transaction signing failed');
     }
+
+    // Tx may land quickly; bust token cache so MEWS/SUI header is not stuck for 2 minutes.
+    await new Promise((r) => setTimeout(r, 500));
+    await refreshStoreAndWalletBalances('after_sign');
+
+    log.debug('STORE PURCHASE FLOW', 'Payment transaction signed and submitted', {
+      digest: signResult.digest,
+      paymentToken,
+      playerAddress: walletAddress,
+      apiBaseUrl: API_BASE_URL,
+    });
     
-    log.debug('STORE PURCHASE FLOW', 'Transaction signed and submitted', signResult.digest);
+    // Step 3: Poll for payment confirmation
+    setStoreCartPurchaseButtonsLoading('<span class="btn-icon">⏳</span> Waiting for payment confirmation...');
     
-    // Step 3: Poll for confirmation
-    proceedBtn.innerHTML = '<span class="btn-icon">⏳</span> Waiting for confirmation...';
-    
-    const transactionDigest = signResult.digest;
+    const paymentDigest = signResult.digest;
     let confirmed = false;
     let attempts = 0;
     const maxAttempts = 30; // 30 seconds max
@@ -382,7 +445,7 @@ async function proceedToPurchase() {
       attempts++;
       
       try {
-        const statusResponse = await fetch(`${API_BASE_URL}/store/transaction/${transactionDigest}`);
+        const statusResponse = await fetch(`${API_BASE_URL}/store/transaction/${paymentDigest}`);
         if (statusResponse.ok) {
           const statusData = await statusResponse.json();
           if (statusData.confirmed) {
@@ -396,21 +459,84 @@ async function proceedToPurchase() {
     }
     
     if (!confirmed) {
-      log.warn('STORE PURCHASE FLOW', 'Transaction submitted but confirmation timeout. It may still be processing.');
+      log.warn('STORE PURCHASE FLOW', 'Payment submitted but confirmation timeout. It may still be processing.');
+    }
+
+    // Step 4: Fulfillment is included in the same cart PTB.
+    // No separate /store/fulfill call.
+    const fulfillmentResult = null;
+
+    // Step 4.5: Settlement (forward MEWS/USDC from platform wallet → game admin wallet).
+    // On-chain Reservoir routes paid fulfillment to ReservoirSystem.admin; platform settles to app admin via a second tx.
+    let settlementResult = null;
+    if (confirmed && paymentToken !== 'SUI') {
+      try {
+        setStoreCartPurchaseButtonsLoading('<span class="btn-icon">⏳</span> Settling payment...');
+        const settleUrl = `${API_BASE_URL}/store/settle/${paymentDigest}`;
+        log.debug('STORE PURCHASE FLOW', 'Calling settlement endpoint', { settleUrl, paymentDigest, paymentToken });
+        const settleRes = await fetch(settleUrl, { method: 'POST' });
+        if (settleRes.ok) {
+          settlementResult = await settleRes.json().catch(() => null);
+          if (settlementResult?.success && settlementResult?.settled && settlementResult?.settleDigest) {
+            log.debug('STORE PURCHASE FLOW', 'Settlement completed', settlementResult);
+            if (typeof showToast === 'function') {
+              showToast(`Payment settled! Tx: ${String(settlementResult.settleDigest).slice(0, 8)}...`, 'success');
+            }
+          } else {
+            log.warn('STORE PURCHASE FLOW', 'Settlement returned but did not settle', settlementResult);
+          }
+        } else {
+          const err = await settleRes.json().catch(() => ({}));
+          log.warn('STORE PURCHASE FLOW', 'Settlement failed', { status: settleRes.status, error: err?.error || err?.message || 'Unknown error' });
+        }
+      } catch (e) {
+        log.warn('STORE PURCHASE FLOW', 'Settlement request errored', e);
+      }
+    }
+
+    // Step 4.6: Platform terminal store fee (game admin pays platform, separate tx).
+    // Player should not pay platform fee in the player-signed purchase PTB.
+    let platformFeeResult = null;
+    if (confirmed) {
+      try {
+        setStoreCartPurchaseButtonsLoading('<span class="btn-icon">⏳</span> Paying platform fee...');
+        const feeUrl = `${API_BASE_URL}/store/fee/${paymentDigest}`;
+        log.debug('STORE PURCHASE FLOW', 'Calling platform fee endpoint', { feeUrl, paymentDigest, paymentToken });
+        const feeRes = await fetch(feeUrl, { method: 'POST' });
+        if (feeRes.ok) {
+          platformFeeResult = await feeRes.json().catch(() => null);
+          if (platformFeeResult?.success && platformFeeResult?.feePaid && platformFeeResult?.feeDigest) {
+            log.debug('STORE PURCHASE FLOW', 'Platform fee paid', platformFeeResult);
+            if (typeof showToast === 'function') {
+              showToast(`Platform fee paid! Tx: ${String(platformFeeResult.feeDigest).slice(0, 8)}...`, 'success');
+            }
+          } else {
+            log.warn('STORE PURCHASE FLOW', 'Platform fee endpoint returned without paying fee', platformFeeResult);
+          }
+        } else {
+          const err = await feeRes.json().catch(() => ({}));
+          log.warn('STORE PURCHASE FLOW', 'Platform fee payment failed', { status: feeRes.status, error: err?.error || err?.message || 'Unknown error' });
+        }
+      } catch (e) {
+        log.warn('STORE PURCHASE FLOW', 'Platform fee request errored', e);
+      }
     }
     
-    // Step 4: Clear selection and refresh inventory
-    state.selectedItems = {};
+    // Step 5: Clear selection and refresh inventory
+    state.selectedOffers = {};
     // Update StoreService state if available
     if (typeof StoreService !== 'undefined' && StoreService._state) {
-      StoreService._state.selectedItems = {};
+      StoreService._state.selectedOffers = {};
     }
     
     // Invalidate API request cache for purchase
     // Use the walletAddress already set at the top of the function
     if (window.apiRequestCache && walletAddress && confirmed) {
-      window.apiRequestCache.recordTransaction(walletAddress, transactionDigest, 'store_purchase');
+      window.apiRequestCache.recordTransaction(walletAddress, paymentDigest, 'store_cart_purchase');
       log.debug('STORE PURCHASE FLOW', 'API cache invalidated for purchase');
+    }
+    if (confirmed && window.GamePassService?.invalidateCache) {
+      window.GamePassService.invalidateCache();
     }
     
     // Small delay to ensure blockchain state is updated after transaction confirmation
@@ -419,59 +545,100 @@ async function proceedToPurchase() {
       await new Promise(resolve => setTimeout(resolve, 200));
     }
     
-    // Reload items and inventory (will fetch fresh data, bypassing cache if invalidated)
+    // Reload catalog; inventory refreshes from reservoir in background (purchase already invalidated API cache)
     if (typeof loadStoreItems === 'function') {
       await loadStoreItems();
     }
-    if (typeof loadInventoryDisplay === 'function') {
-      await loadInventoryDisplay();
+    // Refresh only what changed. Buying credits/tickets should not refetch inventory.
+    // Non-balance items (consumables/levels) should refresh inventory.
+    const offerIds = Array.isArray(lines) ? lines.map((l) => l?.offerId) : [];
+    const balanceOnly = offerIds.length > 0 && offerIds.every((id) => isBalanceOnlyOfferId(id));
+    if (walletAddress && window.PlayerInventoryCache?.refreshAfterRewardBackground) {
+      window.PlayerInventoryCache.refreshAfterRewardBackground(walletAddress, {
+        inventory: !balanceOnly,
+        gamePass: true,
+      });
+    } else {
+      if (walletAddress && window.PlayerInventoryCache) {
+        window.PlayerInventoryCache.invalidate(walletAddress);
+      }
+      if (walletAddress && typeof loadInventoryDisplay === 'function') {
+        void (async () => {
+          try {
+            if (window.PlayerInventoryCache) {
+              await window.PlayerInventoryCache.fetchReservoirBundleAndCache(walletAddress);
+              const inv = window.PlayerInventoryCache.getFreshOrNull(walletAddress);
+              if (inv) await loadInventoryDisplay(inv);
+            } else {
+              await loadInventoryDisplay();
+            }
+          } catch (e) {
+            log.warn('STORE PURCHASE FLOW', 'Background inventory refresh failed', e);
+          }
+        })();
+      }
     }
     
-    // Refresh balance display after transaction (important: balance changed after purchase)
-    // This ensures the displayed balance reflects the new balance after the purchase
-    if (typeof updateStoreBalance === 'function') {
-      log.debug('STORE PURCHASE FLOW', 'Refreshing balance after purchase');
-      await updateStoreBalance();
-    }
-    
+    // Second pass: confirmation + inventory delay — invalidate cache again and sync wallet header.
+    await refreshStoreAndWalletBalances('after_confirm');
+
     if (typeof updateStoreUI === 'function') {
       await updateStoreUI();
     }
     
     // Show success message
-    const successMsg = confirmed 
-      ? `Purchase confirmed! Transaction: ${transactionDigest.slice(0, 8)}...`
-      : `Purchase submitted! Transaction: ${transactionDigest.slice(0, 8)}... (confirming...)`;
+    const successMsg = confirmed
+      ? `Purchase confirmed! Tx: ${paymentDigest.slice(0, 8)}...`
+      : `Purchase submitted! Tx: ${paymentDigest.slice(0, 8)}... (confirming...)`;
     
     if (typeof showToast === 'function') {
       showToast(successMsg, 'success');
     } else {
-      alert(`Purchase Successful!\n\n${successMsg}\n\nTotal: ${purchaseData.totalUSD} ${purchaseData.paymentToken}`);
+      alert(
+        `Purchase Successful!\n\n${successMsg}\n\nTotal: $${purchaseData.totalUSD} USD` +
+          (purchaseData.totalTokenDisplay != null && purchaseData.paymentToken
+            ? ` (${purchaseData.totalTokenDisplay} ${purchaseData.paymentToken})`
+            : '')
+      );
     }
     
     log.debug('STORE PURCHASE FLOW', 'Purchase completed', {
-      digest: transactionDigest,
+      digest: paymentDigest,
       confirmed: confirmed,
-      items: items
+      lines,
+      settlementResult,
+      platformFeeResult,
     });
     
   } catch (error) {
     log.error('STORE PURCHASE FLOW', 'Purchase error', error);
     
-    const errorMsg = error.message || 'Unknown error occurred';
+    const errorMsg = formatStorePurchaseErrorForUser(error);
     if (typeof showToast === 'function') {
       showToast(`Purchase failed: ${errorMsg}`, 'error');
     } else {
       alert(`Purchase failed: ${errorMsg}`);
     }
   } finally {
-    // Reset loading state
     state.isLoading = false;
-    if (proceedBtn) {
-      proceedBtn.disabled = false;
-      proceedBtn.innerHTML = '<span class="btn-icon">💳</span> Proceed to Purchase';
+    restoreStoreCartPurchaseButtonsIdle();
+    if (typeof updateStoreUI === 'function') {
+      void updateStoreUI();
+    } else {
+      forEachStoreCartPurchaseButton((btn) => {
+        btn.disabled = false;
+      });
     }
   }
+}
+
+function isBalanceOnlyOfferId(offerId) {
+  const id = String(offerId || '').trim().toLowerCase();
+  if (!id) return false;
+  if (id === 'credits' || id === 'tickets') return true;
+  if (id.startsWith('credit_pack_') || id.startsWith('ticket_pack_')) return true;
+  if (id.startsWith('credit_bundle_') || id.startsWith('ticket_bundle_')) return true;
+  return false;
 }
 
 /**

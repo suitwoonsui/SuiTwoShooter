@@ -24,11 +24,12 @@ const GameDataState = {
   
   // Readiness flags (for backward compatibility with existing code)
   dataLoaded: false,
-  migrationCheckComplete: false,
-  migrationModalClosed: true,
   
   // Flag to skip upgrade check on next reload (after dismissing upgrade)
   skipUpgradeCheck: false,
+
+  /** After "Maybe Later" on mint modal — do not auto-open mint again on menu reload (e.g. onReturnToMenu → load). */
+  skipAutoMintModal: false,
   
   /**
    * Set flag to skip upgrade check on next reload
@@ -43,6 +44,14 @@ const GameDataState = {
    */
   shouldSkipUpgradeCheck() {
     return this.skipUpgradeCheck;
+  },
+
+  setSkipAutoMintModal(skip) {
+    this.skipAutoMintModal = Boolean(skip);
+  },
+
+  shouldSkipAutoMintModal() {
+    return this.skipAutoMintModal;
   },
   
   /**
@@ -92,9 +101,8 @@ const GameDataState = {
     this.badgeDisplayVisible = false;
     this.badgeModalVisible = false;
     this.dataLoaded = false;
-    this.migrationCheckComplete = false;
-    this.migrationModalClosed = true;
     this.skipUpgradeCheck = false;
+    this.skipAutoMintModal = false;
   },
   
   /**
@@ -177,8 +185,6 @@ const GameDataState = {
    */
   markDataLoaded() {
     this.dataLoaded = true;
-    this.migrationCheckComplete = true;
-    this.migrationModalClosed = true;
   },
   
   /**
@@ -187,9 +193,7 @@ const GameDataState = {
    */
   getReadinessState() {
     return {
-      dataLoaded: this.dataLoaded,
-      migrationCheckComplete: this.migrationCheckComplete,
-      migrationModalClosed: this.migrationModalClosed
+      dataLoaded: this.dataLoaded
     };
   }
 };

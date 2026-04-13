@@ -5,8 +5,10 @@
 
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
-import { priceConverter } from '@/lib/services/price-converter';
-import { getItemPrice, ITEM_CATALOG } from '@/lib/services/item-catalog';
+import { priceConverter } from '@/lib/services/payments/converter/price-converter';
+import { getProvisions } from '@/lib/services/store/catalog/provisions';
+import { callPlatformBackend } from '@/lib/services/platform/client/platform-client';
+import { getStockroomUsdPriceForLevel } from '@/lib/services/store/stockroom-pricing';
 import { withApiHandler } from '@/lib/api/api-handler';
 
 // Handle CORS preflight
@@ -80,28 +82,36 @@ export const GET = withApiHandler(
       })
     );
 
-    // Test item catalog conversions
+    const catalog = await getProvisions();
+    const stockRes = await callPlatformBackend<{
+      success: boolean;
+      offers?: Record<string, Record<string, unknown>>;
+    }>('api/stockroom/offers', { method: 'GET' });
+    const offers = stockRes.success && stockRes.offers ? stockRes.offers : {};
+
     const itemTests = await Promise.all(
-      Object.values(ITEM_CATALOG).slice(0, 3).map(async (item) => {
-        const level = (item.levels ?? [])[0]; // Test first level
+      Object.values(catalog).slice(0, 3).map(async (item) => {
+        const level = item.levels?.[0];
         if (!level) {
           return {
             itemId: item.id,
             itemName: item.name,
-            level: null,
-            usdPrice: null,
+            level: 0,
+            usdPrice: 0,
+            stockroomPriceMissing: true,
             conversion: null,
-            error: 'Item has no levels',
+            error: 'Catalog item has no levels',
           };
         }
+        const usdPrice = getStockroomUsdPriceForLevel(offers, item.id, level.level) ?? 0;
+        const conversionResult = await priceConverter.convertItemPriceToTokens(usdPrice);
 
-        const conversionResult = await priceConverter.convertItemPriceToTokens((level as any).usdPrice ?? 0);
-        
         return {
           itemId: item.id,
           itemName: item.name,
           level: level.level,
-          usdPrice: (level as any).usdPrice ?? null,
+          usdPrice,
+          stockroomPriceMissing: getStockroomUsdPriceForLevel(offers, item.id, level.level) == null,
           conversion: conversionResult.success ? conversionResult.prices : null,
           error: conversionResult.error,
         };
@@ -157,4 +167,5 @@ function getSourceDescription(source: string, token: string): string {
       return `Unknown source`;
   }
 }
+
 

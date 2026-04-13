@@ -17,10 +17,13 @@ function getStoreState() {
   // Fallback: create local state if StoreService not available
   if (!storeState) {
     storeState = {
-      selectedItems: {},
+      selectedOffers: {},
       paymentToken: 'mews',
       isLoading: false,
-      tokenPrices: null
+      tokenPrices: null,
+      tokenPricesTimestamp: null,
+      storeItems: null, // Items from backend (has correct USD prices)
+      storeOffers: null
     };
   }
   return storeState;
@@ -39,15 +42,20 @@ function updateStoreStateReference() {
  * Follows the leaderboard modal pattern
  * Now delegates to StoreService
  */
-async function showStore(context = 'main-menu') {
+async function showStore(context = 'main-menu', skipUpgradeCheck = false) {
   console.log('🛒 showStore() called', { context });
   
   // Update local state reference
   updateStoreStateReference();
   
+  // Show loading dialog immediately so the user gets instant feedback
+  if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.show) {
+    MenuPanelLoading.show('Loading store... Please wait');
+  }
+  
   // Delegate to StoreService if available
   if (typeof StoreService !== 'undefined' && StoreService.show) {
-    await StoreService.show(context);
+    await StoreService.show(context, skipUpgradeCheck);
     // Update local reference after service call
     updateStoreStateReference();
     return;
@@ -67,51 +75,12 @@ async function showStore(context = 'main-menu') {
   if (!walletAddress) {
     // Show wallet connection modal
     showStoreWalletConnectModal();
+    if (typeof MenuPanelLoading !== 'undefined' && MenuPanelLoading.hide) {
+      MenuPanelLoading.hide();
+    }
     return;
   }
   
-  // Check for pending badge upgrade BEFORE showing store
-  if (window.BadgeService && window.BadgeService.checkPendingUpgrade) {
-    const upgradeCheck = await window.BadgeService.checkPendingUpgrade(walletAddress);
-    if (upgradeCheck.success && upgradeCheck.hasPendingUpgrade && upgradeCheck.badgeId) {
-      console.log('🎖️ [STORE] Pending badge upgrade detected - showing upgrade modal first');
-      
-      // Get current badge to get old tier
-      const badgeData = await window.BadgeService.getBadge(walletAddress);
-      if (badgeData && badgeData.success && badgeData.hasBadge && badgeData.badge) {
-        const oldTier = badgeData.badge.tier;
-        const newTier = upgradeCheck.newTier || oldTier + 1;
-        const newTierName = window.BadgeService.getTierName(newTier);
-        
-        // Generate session ID for upgrade transaction
-        const sessionId = `upgrade_${walletAddress}_${Date.now()}`;
-        
-        // Show upgrade modal with callback to show store after upgrade
-        if (window.BadgeUI && window.BadgeUI.showTierUpgradeModal) {
-          window.BadgeUI.showTierUpgradeModal({
-            oldTier,
-            newTier,
-            newTierName,
-            badgeId: upgradeCheck.badgeId,
-            sessionId: sessionId,
-            onUpgradeComplete: async (upgraded) => {
-              // After upgrade modal closes (whether upgraded or declined), show store
-              if (upgraded) {
-                // Small delay to let badge cache clear
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
-              await showStoreInternal(context);
-            },
-          });
-          
-          // Return early - store will be shown via callback
-          return;
-        }
-      }
-    }
-  }
-  
-  // Wallet is connected, proceed to show store
   await showStoreInternal(context);
 }
 
@@ -137,11 +106,12 @@ async function showStore(context = 'main-menu') {
 
 /**
  * Hide store modal
+ * @param {{ returnToTournaments?: boolean; skipMainMenuReveal?: boolean }} [options]
  */
-function hideStore() {
+function hideStore(options = {}) {
   // Delegate to StoreService if available
   if (typeof StoreService !== 'undefined' && StoreService.hide) {
-    StoreService.hide();
+    StoreService.hide(options);
     // Update local reference after service call
     updateStoreStateReference();
     return;
@@ -158,30 +128,40 @@ function hideStore() {
     }, 300);
   }
   
-  // Check context - don't show main menu if in credits-only mode (from End Demo modal)
   let context = 'main-menu';
   if (typeof getStoreState === 'function') {
     const state = getStoreState();
     context = state.context || 'main-menu';
+    if (state) state.context = 'main-menu';
   } else if (typeof StoreService !== 'undefined' && StoreService._state) {
     context = StoreService._state.context || 'main-menu';
+    StoreService._state.context = 'main-menu';
   }
-  
+
+  if (options.returnToTournaments) {
+    if (typeof showTournaments === 'function') {
+      showTournaments();
+    } else if (typeof window.showTournaments === 'function') {
+      window.showTournaments();
+    }
+    return;
+  }
+
+  if (options.skipMainMenuReveal) {
+    return;
+  }
+
   if (context !== 'credits-only') {
-    // Show main menu again after closing store (only if not in credits-only mode)
-  if (typeof MenuService !== 'undefined' && MenuService.show) {
-    MenuService.show();
-  } else {
-    // Fallback: manual show
-    const mainMenu = document.getElementById('mainMenuOverlay');
-    if (mainMenu) {
-      mainMenu.classList.add('main-menu-overlay-visible');
-      mainMenu.classList.remove('main-menu-overlay-hidden');
-    }
+    if (typeof MenuService !== 'undefined' && MenuService.show) {
+      MenuService.show({ fromMenuPanel: true });
+    } else {
+      const mainMenu = document.getElementById('mainMenuOverlay');
+      if (mainMenu) {
+        mainMenu.classList.add('main-menu-overlay-visible');
+        mainMenu.classList.remove('main-menu-overlay-hidden');
+      }
     }
   } else {
-    // In credits-only mode, don't show main menu - stay in game
-    // The End Demo modal should handle showing itself again if needed
     console.log('🔄 [STORE UI] Store closed in credits-only mode - staying in game');
   }
 }
@@ -275,20 +255,23 @@ async function setPaymentToken(token) {
   
   // Re-render active tab if it's Game Pass or Tournament Tickets
   const itemsTab = document.getElementById('storeTabContentItems');
+  const bundlesTab = document.getElementById('storeTabContentBundles');
   const gamePassTab = document.getElementById('storeTabContentGamePass');
   const ticketsTab = document.getElementById('storeTabContentTickets');
   
   let activeTab = null;
   if (itemsTab && itemsTab.classList.contains('active')) {
     activeTab = 'items';
+  } else if (bundlesTab && bundlesTab.classList.contains('active')) {
+    activeTab = 'bundles';
   } else if (gamePassTab && gamePassTab.classList.contains('active')) {
     activeTab = 'gamePass';
   } else if (ticketsTab && ticketsTab.classList.contains('active')) {
     activeTab = 'tickets';
   }
   
-  // Only refresh Game Pass or Tournament Tickets tabs (Items tab updates via updateItemPrices)
-  if ((activeTab === 'gamePass' || activeTab === 'tickets') && typeof switchStoreTab === 'function') {
+  // Only refresh non-Items tabs (Items tab updates via updateItemPrices)
+  if ((activeTab === 'bundles' || activeTab === 'gamePass' || activeTab === 'tickets') && typeof switchStoreTab === 'function') {
     console.log(`💱 [STORE] Refreshing ${activeTab} tab after payment token change`);
     await switchStoreTab(activeTab);
   }
@@ -325,6 +308,7 @@ if (typeof window !== 'undefined') {
   // Note: Many functions are now exposed from their respective modules:
   // - proceedToPurchase, showInsufficientBalanceModal, closeInsufficientBalanceModal (store-purchase-flow.js)
   // - convertUsdToToken, formatTokenAmount, formatUsdPrice (store-utils.js)
+  // - StoreDataSources: /api/store/catalog, token prices (store-data-sources.js)
   // - loadStoreItems (store-item-loader.js)
   // - loadInventoryDisplay (store-inventory.js)
   // - handleStoreWalletConnect, cancelStoreWalletConnect (store-wallet-connection.js)

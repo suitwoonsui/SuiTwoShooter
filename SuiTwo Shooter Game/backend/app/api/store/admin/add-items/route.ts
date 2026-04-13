@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
-import { storeService } from '@/lib/sui/store-service';
+import { platformInventoryClient, getEcosystemIdFromRequest } from '@/lib/services/platform/client/platform-client';
 import { handleCorsPreflight } from '@/lib/cors';
 import { verifyApiKey, getAdminIdentifier } from '@/lib/auth';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { BadgeValidators } from '@/lib/sui/badge-validators';
+import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
+import { PlatformValidators } from '@/lib/services/platform/validators/platform-validators';
 
 /**
  * POST /api/store/admin/add-items
@@ -30,30 +30,32 @@ export const POST = withApiHandler(
   async (request: NextRequest) => {
     // Require admin authentication
     if (!verifyApiKey(request)) {
-      throw new BadgeError(
-        BadgeErrorCode.UNAUTHORIZED,
+      throw new PlatformError(
+        PlatformErrorCode.UNAUTHORIZED,
         'Unauthorized. Valid API key required.'
       );
     }
 
     const adminId = getAdminIdentifier(request);
-    BadgeLogger.info('Authenticated admin request', { adminId });
+    PlatformLogger.info('Authenticated admin request', { adminId });
 
     const body = await getRequestBody<{ 
       playerAddress: string; 
       items: Array<{ itemId: string; level: number; quantity: number }>;
+      ecosystemId?: string;
     }>(request);
     const { playerAddress, items } = body;
+    const ecosystemId = getEcosystemIdFromRequest(request, body);
 
     // Validate request
     if (!playerAddress || typeof playerAddress !== 'string') {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'Invalid playerAddress. Must be a valid Sui address.'
       );
     }
 
-    BadgeValidators.validateAddress(playerAddress);
+    PlatformValidators.validateAddress(playerAddress);
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw new Error('Invalid items. Must be a non-empty array.');
@@ -69,20 +71,23 @@ export const POST = withApiHandler(
       }
     }
 
-    BadgeLogger.info('Received request to add items', {
+    PlatformLogger.info('Received request to add items', {
       adminId,
       playerAddress,
       items,
     });
 
-    // Call store service
-    const result = await storeService.adminAddItems(playerAddress, items);
+    // Call platform inventory API (inventory separated from store; per-ecosystem)
+    const result = await platformInventoryClient.adminAddItems(
+      { playerAddress, items },
+      { ecosystemId: ecosystemId || undefined }
+    );
 
     if (!result.success) {
       throw new Error(result.error || 'Failed to add items');
     }
 
-    BadgeLogger.info('Items added successfully', {
+    PlatformLogger.info('Items added successfully', {
       adminId,
       playerAddress,
       itemCount: items.length,
@@ -96,4 +101,5 @@ export const POST = withApiHandler(
     };
   }
 );
+
 

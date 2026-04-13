@@ -52,10 +52,8 @@ function loadGameData() {
   if (savedStats) {
     gameStats = { ...gameStats, ...JSON.parse(savedStats) };
   }
-  
-  // updateMenuStats is now async, but we don't need to await it here
-  // It will update the UI when stats are fetched
-  updateMenuStats().catch(err => console.warn('Failed to update menu stats:', err));
+  // Do not load player stats on front page — no wallet is logged in yet.
+  // Stats are loaded when the user connects a wallet (GameDataFlow) and when the main menu is shown.
   applySettings();
 }
 
@@ -65,18 +63,104 @@ function saveGameData() {
   localStorage.setItem('gameStats', JSON.stringify(gameStats));
 }
 
-// Update menu statistics display
-async function updateMenuStats() {
+// After stats are updated, prefetch milestone progress once the session loader is not blocking
+function maybePrefetchMilestoneProgressAfterStats() {
+  if (typeof window.scheduleMilestoneProgressPrefetchAfterLoadingUi === 'function') {
+    window.scheduleMilestoneProgressPrefetchAfterLoadingUi();
+  } else if (
+    typeof window.LoadingManager !== 'undefined' &&
+    !window.LoadingManager.isVisible &&
+    typeof window.prefetchMilestoneProgress === 'function'
+  ) {
+    window.prefetchMilestoneProgress();
+  }
+}
+
+/**
+ * Load player stats JSON — single path for menu + milestones (apiRequestCache key stats:${address}, retries).
+ * @param {string} walletAddress
+ * @param {{ forceRefresh?: boolean }} [options]
+ * @returns {Promise<object|null>}
+ */
+async function loadStatsPayloadForWallet(walletAddress, options = {}) {
+  const forceRefresh = Boolean(options && options.forceRefresh);
+  if (!walletAddress) return null;
+
+  const statsBase = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+  const cacheKey = `stats:${walletAddress}`;
+  const maxRetries = 3;
+  const baseDelay = 1500;
+
+  const fetchStatsWithRetries = async () => {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          console.log(`📊 [MENU] Stats API failed, retry ${attempt + 1}/${maxRetries} in ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+
+        const response = await fetch(`${statsBase}/stats/${walletAddress}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+          if (attempt < maxRetries - 1) {
+            console.warn(`⚠️ [MENU] Stats API failed (attempt ${attempt + 1}), will retry...`);
+            continue;
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.success) {
+          if (attempt < maxRetries - 1) {
+            console.warn(`⚠️ [MENU] Stats API failed (attempt ${attempt + 1}), will retry...`);
+            continue;
+          }
+          throw new Error(data.error || 'Invalid response');
+        }
+        return data;
+      } catch (error) {
+        if (attempt < maxRetries - 1) {
+          console.warn(`⚠️ [MENU] Stats fetch error (attempt ${attempt + 1}), will retry:`, error);
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('Stats fetch exhausted retries');
+  };
+
+  try {
+    if (window.apiRequestCache) {
+      return await window.apiRequestCache.get(cacheKey, fetchStatsWithRetries, {
+        walletAddress,
+        bypassCache: forceRefresh,
+      });
+    }
+    return await fetchStatsWithRetries();
+  } catch (error) {
+    console.warn('⚠️ [MENU] Stats fetch failed after retries:', error);
+    return null;
+  }
+}
+
+/**
+ * Update best score / games played on the main menu (same cache key as fetchRegistryGames: stats:${address}).
+ * @param {{ forceRefresh?: boolean }} [options] - When true, bypass apiRequestCache (e.g. after a run or forced GameDataFlow load).
+ */
+async function updateMenuStats(options = {}) {
+  const forceRefresh = Boolean(options && options.forceRefresh);
   const bestScoreElement = document.getElementById('bestScoreDisplay');
   const gamesPlayedElement = document.getElementById('gamesPlayedDisplay');
-  
-  // Get wallet address if connected
+
   let walletAddress = null;
   if (window.walletAPIInstance && window.walletAPIInstance.isConnected()) {
     walletAddress = window.walletAPIInstance.getAddress();
   }
-  
-  // If no wallet is connected, show "--"
+
   if (!walletAddress) {
     if (bestScoreElement) {
       bestScoreElement.textContent = '--';
@@ -86,102 +170,52 @@ async function updateMenuStats() {
     }
     return;
   }
-  
-  // Wallet is connected, fetch stats from blockchain
-  // Add retry logic with exponential backoff for indexing delays
-  const maxRetries = 3;
-  const baseDelay = 2000; // Start with 2 seconds
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff: 2s, 4s, 8s
-        console.log(`📊 [MENU] Stats query attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms for indexing...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-      
-      const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${API_BASE_URL}/stats/${walletAddress}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`📊 [MENU] Stats API response (attempt ${attempt + 1}):`, data);
-        
-        if (data.success) {
-          // If stats found, update display and return
-          if (data.hasStats && data.totalGames > 0) {
-            if (bestScoreElement) {
-              bestScoreElement.textContent = (data.bestScore || 0).toLocaleString();
-            }
-            if (gamesPlayedElement) {
-              gamesPlayedElement.textContent = data.totalGames || 0;
-            }
-            console.log('✅ [MENU] Stats updated from blockchain:', { 
-              bestScore: data.bestScore, 
-              totalGames: data.totalGames,
-              hasStats: data.hasStats,
-              attempt: attempt + 1,
-              fullResponse: data
-            });
-            return;
-          }
-          
-          // If no stats found but this is not the last attempt, retry
-          if (attempt < maxRetries - 1) {
-            console.log(`📊 [MENU] No stats found yet (hasStats: ${data.hasStats}, totalGames: ${data.totalGames}), will retry...`);
-            continue;
-          }
-          
-          // Last attempt and still no stats, show 0
-          console.warn('⚠️ [MENU] No stats found after all retries (may be indexing delay)');
-          if (bestScoreElement) {
-            bestScoreElement.textContent = (data.bestScore || 0).toLocaleString();
-          }
-          if (gamesPlayedElement) {
-            gamesPlayedElement.textContent = data.totalGames || 0;
-          }
-          return;
-        }
-      }
-      
-      // API call failed, retry if attempts remaining
-      if (attempt < maxRetries - 1) {
-        console.warn(`⚠️ [MENU] Stats API call failed (attempt ${attempt + 1}), will retry...`);
-        continue;
-      }
-      
-      // All retries exhausted, show 0
-      console.warn('⚠️ [MENU] Failed to fetch stats from blockchain after all retries');
-      if (bestScoreElement) {
-        bestScoreElement.textContent = '0';
-      }
-      if (gamesPlayedElement) {
-        gamesPlayedElement.textContent = '0';
-      }
-      return;
-    } catch (error) {
-      // Error occurred, retry if attempts remaining
-      if (attempt < maxRetries - 1) {
-        console.warn(`⚠️ [MENU] Error fetching stats (attempt ${attempt + 1}), will retry:`, error);
-        continue;
-      }
-      
-      // All retries exhausted, show 0
-      console.warn('⚠️ [MENU] Error fetching stats from blockchain after all retries:', error);
-      if (bestScoreElement) {
-        bestScoreElement.textContent = '0';
-      }
-      if (gamesPlayedElement) {
-        gamesPlayedElement.textContent = '0';
-      }
+  const applySuccessToDom = (data) => {
+    if (!data || !data.success) {
+      return false;
+    }
+    const best = (data.bestScore ?? 0);
+    const total = (data.totalGames ?? 0);
+    if (bestScoreElement) bestScoreElement.textContent = best.toLocaleString();
+    if (gamesPlayedElement) gamesPlayedElement.textContent = String(total);
+    if (data.hasStats && total > 0) {
+      console.log('✅ [MENU] Stats updated', { bestScore: best, totalGames: total });
+    }
+    maybePrefetchMilestoneProgressAfterStats();
+    return true;
+  };
+
+  try {
+    const data = await loadStatsPayloadForWallet(walletAddress, { forceRefresh });
+    if (applySuccessToDom(data)) {
       return;
     }
+  } catch (error) {
+    console.warn('⚠️ [MENU] Stats update failed:', error);
   }
+
+  if (bestScoreElement) bestScoreElement.textContent = '0';
+  if (gamesPlayedElement) gamesPlayedElement.textContent = '0';
+  maybePrefetchMilestoneProgressAfterStats();
+}
+
+/** Drop cached GET /stats for the connected wallet (call after a finished run so the next read is fresh). */
+function invalidateMenuStatsCacheForConnectedWallet() {
+  try {
+    if (!window.walletAPIInstance?.isConnected?.()) return;
+    const addr = window.walletAPIInstance.getAddress();
+    if (addr && window.apiRequestCache?.invalidate) {
+      window.apiRequestCache.invalidate(`stats:${addr}`);
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.invalidateMenuStatsCacheForConnectedWallet = invalidateMenuStatsCacheForConnectedWallet;
+  window.loadStatsPayloadForWallet = loadStatsPayloadForWallet;
 }
 
 // Apply settings to the game

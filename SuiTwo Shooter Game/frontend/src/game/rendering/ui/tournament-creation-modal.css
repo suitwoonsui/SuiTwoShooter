@@ -26,8 +26,7 @@
   border: min(0.3vw, 0.4vh) solid #FFD700;
   border-radius: min(2vh, 2.5vw);
   padding: min(2.5vh, 3vw);
-  width: min(90vw, 90vh);
-  max-width: min(80vh, 90vw);
+  width: 90vw;
   height: min(90vh, 90vw);
   max-height: min(90vh, 90vw);
   overflow-y: auto;
@@ -205,6 +204,27 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Ante step: row with amount (USD) and token dropdown */
+.tournament-creation-ante-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: end;
+}
+.tournament-creation-ante-amount-field,
+.tournament-creation-ante-token-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.tournament-creation-ante-label {
+  display: block;
+  font-size: min(1.4vw, 1.75vh);
+  color: #cccccc;
+  font-weight: 500;
+}
+
 /* Select dropdown styling - ensure readability */
 select.tournament-creation-input,
 .tournament-creation-input[type="select"],
@@ -215,6 +235,17 @@ select.tournament-creation-input,
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+}
+
+/* Ante token select: visible dropdown arrow so it's clearly clickable */
+.tournament-creation-ante-token-select {
+  padding-right: 2.5em !important;
+  min-height: 2.5em;
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23FFD700' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75em center !important;
+  background-size: 1em !important;
 }
 
 /* Option elements - dark background with white text for contrast */
@@ -312,6 +343,12 @@ select.tournament-creation-input option:hover,
   margin-bottom: min(1vh, 1.2vw);
   font-weight: 500;
   font-size: min(1.4vw, 1.7vh);
+}
+
+/* Native date/time picker: dark color-scheme so calendar/clock icons are light on dark modal */
+.tournament-creation-schedule input[type="datetime-local"],
+.tournament-creation-input[type="datetime-local"] {
+  color-scheme: dark;
 }
 
 /* Reward Configuration */
@@ -585,6 +622,32 @@ select.tournament-creation-input option:hover,
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+.tournament-creation-btn-loading {
+  position: relative;
+  pointer-events: none;
+  padding-left: min(2.5vh, 3vw);
+}
+
+.tournament-creation-btn-loading::after {
+  content: '';
+  position: absolute;
+  width: min(1.2vh, 1.5vw);
+  height: min(1.2vh, 1.5vw);
+  top: 50%;
+  left: min(1vh, 1.2vw);
+  margin-top: min(-0.6vh, -0.75vw);
+  border: min(0.2vh, 0.25vw) solid rgba(255, 215, 0, 0.3);
+  border-top-color: #FFD700;
+  border-radius: 50%;
+  animation: tournament-creation-spin 0.7s linear infinite;
+}
+
+@keyframes tournament-creation-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Error Message */

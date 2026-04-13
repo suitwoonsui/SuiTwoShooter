@@ -1,12 +1,16 @@
-// Tournament Migration API endpoint
+// Tournament Migration API endpoint — migration is deprecated; requests are forwarded to the platform API.
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
-import { getAdminWalletService } from '@/lib/sui/admin-wallet-service';
-import { TournamentMigrationService } from '@/lib/sui/migration-service';
-import { BadgeLogger } from '@/lib/sui/badge-logger';
+import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { BadgeError, BadgeErrorCode } from '@/lib/sui/badge-errors';
-import { getConfig } from '@/config/config';
+import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
+import {
+  MigrationApiUnavailableError,
+  migrationApiMigrateTournament,
+  migrationApiGetTournamentIds,
+  migrationApiReadOldTournament,
+  migrationApiRestoreDataForMigratedTournament,
+} from '@/lib/services/migration/migration-api-client';
 
 // Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -15,28 +19,28 @@ export async function OPTIONS(request: NextRequest) {
 
 export const POST = withApiHandler(
   async (request: NextRequest) => {
-    BadgeLogger.info('Received POST request to /api/tournaments/migrate');
+    PlatformLogger.info('Received POST request to /api/tournaments/migrate');
     
     const body = await getRequestBody<{ 
       tournamentId: number; 
       oldTournamentRegistryId?: string; 
       oldTournamentAdminCapId?: string;
     }>(request);
-    BadgeLogger.debug('Request body', { body });
+    PlatformLogger.debug('Request body', { body });
     
     const { tournamentId, oldTournamentRegistryId, oldTournamentAdminCapId } = body;
 
     // Validate required fields
     if (tournamentId === undefined || tournamentId === null) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'tournamentId is required'
       );
     }
 
     if (typeof tournamentId !== 'number' || tournamentId < 0) {
-      throw new BadgeError(
-        BadgeErrorCode.INVALID_ADDRESS,
+      throw new PlatformError(
+        PlatformErrorCode.INVALID_ADDRESS,
         'tournamentId must be a valid non-negative number'
       );
     }
@@ -50,59 +54,56 @@ export const POST = withApiHandler(
       throw new Error('oldTournamentRegistryId is required. Provide it in the request body or set OLD_TOURNAMENT_REGISTRY_OBJECT_ID_TESTNET (or OLD_TOURNAMENT_REGISTRY_OBJECT_ID) environment variable.');
     }
 
-    // Get old package ID from environment variable or use current package ID as fallback
-    const config = getConfig();
-    const oldPackageId = process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || 
-                         process.env.OLD_GAME_SCORE_PACKAGE_ID || 
-                         process.env.OLD_GAME_SCORE_CONTRACT ||
-                         (config.contracts.gameScore?.includes('::')
-                           ? config.contracts.gameScore.split('::')[0]
-                           : config.contracts.gameScore || '');
+    const oldPackageId = process.env.OLD_GAME_SCORE_CONTRACT_TESTNET ||
+                         process.env.OLD_GAME_SCORE_PACKAGE_ID ||
+                         process.env.OLD_GAME_SCORE_CONTRACT || '';
 
     if (!oldPackageId) {
-      throw new Error('Old package ID not configured. Please set OLD_GAME_SCORE_CONTRACT_TESTNET (or OLD_GAME_SCORE_PACKAGE_ID) environment variable.');
+      throw new Error('Old package ID not configured. Set OLD_GAME_SCORE_CONTRACT_TESTNET or OLD_GAME_SCORE_PACKAGE_ID (migration will move to platform).');
     }
 
-    BadgeLogger.info('Migrating tournament', {
+    PlatformLogger.info('Migrating tournament via platform API', {
       tournamentId,
       oldTournamentRegistryId: finalOldTournamentRegistryId,
       oldTournamentAdminCapId: finalOldTournamentAdminCapId,
       oldPackageId,
-      registryIdSource: oldTournamentRegistryId ? 'request' : 'environment',
-      adminCapSource: oldTournamentAdminCapId ? 'request' : 'environment',
     });
 
-    // Create migration service and migrate
-    const migrationService = new TournamentMigrationService(getAdminWalletService());
-    const result = await migrationService.migrateTournament(
-      tournamentId,
-      oldPackageId,
-      finalOldTournamentRegistryId,
-      finalOldTournamentAdminCapId || ''
-    );
+    try {
+      const result = await migrationApiMigrateTournament({
+        tournamentId,
+        oldTournamentRegistryId: finalOldTournamentRegistryId,
+        oldTournamentAdminCapId: finalOldTournamentAdminCapId || undefined,
+      });
 
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to migrate tournament');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to migrate tournament');
+      }
+
+      PlatformLogger.info('Tournament migrated successfully', {
+        tournamentId,
+        digest: result.digest,
+      });
+
+      return {
+        success: true,
+        digest: result.digest,
+        tournamentId,
+        message: result.message || 'Tournament migrated successfully to new system',
+      };
+    } catch (err) {
+      if (err instanceof MigrationApiUnavailableError) {
+        throw new PlatformError(PlatformErrorCode.SERVICE_UNAVAILABLE, err.message);
+      }
+      throw err;
     }
-
-    BadgeLogger.info('Tournament migrated successfully', {
-      tournamentId,
-      digest: result.digest,
-    });
-
-    return {
-      success: true,
-      digest: result.digest,
-      tournamentId,
-      message: 'Tournament migrated successfully to new system',
-    };
   }
 );
 
 // GET endpoint to fetch all tournament IDs from old registry
 export const GET = withApiHandler(
   async (request: NextRequest) => {
-    BadgeLogger.info('Received GET request to /api/tournaments/migrate (list tournaments)');
+    PlatformLogger.info('Received GET request to /api/tournaments/migrate (list tournaments)');
     
     const { searchParams } = new URL(request.url);
     const oldTournamentRegistryId = searchParams.get('oldTournamentRegistryId');
@@ -133,27 +134,37 @@ export const GET = withApiHandler(
         throw new Error('Old package ID is required for read action (or specify oldPackageId/sourcePackageId query param)');
       }
 
-      BadgeLogger.info('Reading old tournament data', {
+      PlatformLogger.info('Reading old tournament data via platform API', {
         oldTournamentId: Number(oldTournamentId),
         sourcePackageId: oldPackageId,
         hasRegistryId: !!finalOldTournamentRegistryId,
       });
 
-      const migrationService = new TournamentMigrationService(getAdminWalletService());
-      const result = await migrationService.readOldTournament(
-        oldPackageId,
-        finalOldTournamentRegistryId || '', // Allow empty - will reconstruct from events
-        Number(oldTournamentId)
-      );
+      try {
+        const result = await migrationApiReadOldTournament({
+          tournamentId: Number(oldTournamentId),
+          oldPackageId,
+          oldTournamentRegistryId: finalOldTournamentRegistryId || undefined,
+        });
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to read old tournament data');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to read old tournament data');
+        }
+
+        return {
+          success: true,
+          tournament: result.tournament,
+        };
+      } catch (err) {
+        if (err instanceof MigrationApiUnavailableError) {
+          throw new PlatformError(
+            PlatformErrorCode.SERVICE_UNAVAILABLE,
+            err.message,
+            410
+          );
+        }
+        throw err;
       }
-
-      return {
-        success: true,
-        tournament: result.tournament,
-      };
     }
 
     // Handle restore action
@@ -181,31 +192,40 @@ export const GET = withApiHandler(
         throw new Error('Old package ID is required for restore action (or specify sourcePackageId)');
       }
 
-      BadgeLogger.info('Restoring data for migrated tournament', {
+      PlatformLogger.info('Restoring data for migrated tournament via platform API', {
         oldTournamentId: Number(oldTournamentId),
         newTournamentId: newTournamentId ? Number(newTournamentId) : null,
         sourcePackageId: oldPackageId,
-        sourceRegistryId: finalOldTournamentRegistryId || 'N/A (will use events only)',
       });
 
-      const migrationService = new TournamentMigrationService(getAdminWalletService());
-      const result = await migrationService.restoreDataForMigratedTournament(
-        Number(oldTournamentId),
-        newTournamentId ? Number(newTournamentId) : null,
-        oldPackageId,
-        finalOldTournamentRegistryId || '' // Allow empty registry - will reconstruct from events
-      );
+      try {
+        const result = await migrationApiRestoreDataForMigratedTournament({
+          oldTournamentId: Number(oldTournamentId),
+          newTournamentId: newTournamentId ? Number(newTournamentId) : null,
+          oldPackageId,
+          oldTournamentRegistryId: finalOldTournamentRegistryId || undefined,
+        });
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to restore tournament data');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to restore tournament data');
+        }
+
+        return {
+          success: true,
+          message: result.message || 'Tournament data restored successfully',
+          digests: result.digests || [],
+          newTournamentId: result.newTournamentId,
+        };
+      } catch (err) {
+        if (err instanceof MigrationApiUnavailableError) {
+          throw new PlatformError(
+            PlatformErrorCode.SERVICE_UNAVAILABLE,
+            err.message,
+            410
+          );
+        }
+        throw err;
       }
-
-      return {
-        success: true,
-        message: 'Tournament data restored successfully',
-        digests: result.digests || [],
-        newTournamentId: result.newTournamentId,
-      };
     }
 
     // Default: list tournaments
@@ -217,43 +237,46 @@ export const GET = withApiHandler(
       throw new Error('oldTournamentRegistryId is required. Provide it as a query parameter or set OLD_TOURNAMENT_REGISTRY_OBJECT_ID_TESTNET (or OLD_TOURNAMENT_REGISTRY_OBJECT_ID) environment variable.');
     }
 
-    // Get old package ID from environment variable or use current package ID as fallback
-    const config = getConfig();
-    const oldPackageId = process.env.OLD_GAME_SCORE_CONTRACT_TESTNET || 
-                         process.env.OLD_GAME_SCORE_PACKAGE_ID || 
-                         process.env.OLD_GAME_SCORE_CONTRACT ||
-                         (config.contracts.gameScore?.includes('::')
-                           ? config.contracts.gameScore.split('::')[0]
-                           : config.contracts.gameScore || '');
+    const oldPackageId = process.env.OLD_GAME_SCORE_CONTRACT_TESTNET ||
+                         process.env.OLD_GAME_SCORE_PACKAGE_ID ||
+                         process.env.OLD_GAME_SCORE_CONTRACT || '';
 
     if (!oldPackageId) {
-      throw new Error('Old package ID not configured. Please set OLD_GAME_SCORE_CONTRACT_TESTNET (or OLD_GAME_SCORE_PACKAGE_ID) environment variable.');
+      throw new Error('Old package ID not configured. Set OLD_GAME_SCORE_CONTRACT_TESTNET or OLD_GAME_SCORE_PACKAGE_ID (migration will move to platform).');
     }
 
-    BadgeLogger.info('Discovering tournaments', {
+    PlatformLogger.info('Discovering tournaments via platform API', {
       oldTournamentRegistryId: finalOldTournamentRegistryId,
       oldPackageId,
-      source: oldTournamentRegistryId ? 'query' : 'environment',
     });
 
-    // Create migration service and get tournament IDs
-    const migrationService = new TournamentMigrationService(getAdminWalletService());
-    const result = await migrationService.getAllTournamentIds(oldPackageId, finalOldTournamentRegistryId);
+    try {
+      const result = await migrationApiGetTournamentIds({
+        oldTournamentRegistryId: finalOldTournamentRegistryId,
+        oldPackageId,
+      });
 
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to discover tournaments');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to discover tournaments');
+      }
+
+      PlatformLogger.info('Found tournaments in old registry', {
+        count: result.tournamentIds?.length || 0,
+        oldTournamentRegistryId: finalOldTournamentRegistryId,
+      });
+
+      return {
+        success: true,
+        tournamentIds: result.tournamentIds || [],
+        count: result.tournamentIds?.length || 0,
+      };
+    } catch (err) {
+      if (err instanceof MigrationApiUnavailableError) {
+        throw new PlatformError(PlatformErrorCode.SERVICE_UNAVAILABLE, err.message);
+      }
+      throw err;
     }
-
-    BadgeLogger.info('Found tournaments in old registry', {
-      count: result.tournamentIds?.length || 0,
-      oldTournamentRegistryId: finalOldTournamentRegistryId,
-    });
-
-    return {
-      success: true,
-      tournamentIds: result.tournamentIds || [],
-      count: result.tournamentIds?.length || 0,
-    };
   }
 );
+
 

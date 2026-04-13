@@ -358,6 +358,9 @@ class GameUpdate {
     
     game.bossTiers.push(defeatedBossTier);
     game.bossesDefeated++;
+    if (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.recordBossKill === 'function') {
+      window.ReplayRecorder.recordBossKill(defeatedBossTier);
+    }
     game.currentTier = Math.min(4, Math.floor(game.bossesDefeated / 1) + 1); // New tier after each boss
     
     // Recalculate power-up cap based on current orb level at start of new tier
@@ -394,8 +397,8 @@ class GameUpdate {
         let hasCredits = false;
         if (window.GamePassService) {
           try {
-            const status = await window.GamePassService.getGamePassStatus(walletAddress, true);
-            hasCredits = status.success && status.hasPass && status.isActive && (status.gamesRemaining || 0) > 0;
+            const status = await window.GamePassService.getCreditsAndTickets(walletAddress, true);
+            hasCredits = status.success && (status.credits || 0) > 0;
           } catch (error) {
             console.warn('Error checking credits after boss defeat', error);
           }
@@ -496,8 +499,8 @@ class GameUpdate {
                   // Check if player now has credits after purchase
                   if (window.GamePassService) {
                     try {
-                      const status = await window.GamePassService.getGamePassStatus(walletAddress, true);
-                      if (status.success && status.hasPass && status.isActive && (status.gamesRemaining || 0) > 0) {
+                      const status = await window.GamePassService.getCreditsAndTickets(walletAddress, true);
+                      if (status.success && (status.credits || 0) > 0) {
                         // Player has credits now - show continue option
                         // Ensure game is still paused
                         game.paused = true;
@@ -550,9 +553,9 @@ class GameUpdate {
                               } else {
                                 // Final fallback if GameService not available
                               if (typeof MenuService !== 'undefined' && typeof MenuService.show === 'function') {
-                                MenuService.show();
+                                MenuService.show({ afterGame: true });
                               } else if (typeof showMainMenu === 'function') {
-                                showMainMenu();
+                                showMainMenu({ afterGame: true });
                                 }
                               }
                             }
@@ -591,9 +594,9 @@ class GameUpdate {
             } else {
               // Final fallback if GameService not available
             if (typeof MenuService !== 'undefined' && typeof MenuService.show === 'function') {
-              MenuService.show();
+              MenuService.show({ afterGame: true });
             } else if (typeof showMainMenu === 'function') {
-              showMainMenu();
+              showMainMenu({ afterGame: true });
               }
             }
           }
@@ -706,8 +709,12 @@ class GameUpdate {
       }
       
       // Update distance calculations (constant speed for consistent boss timing) - scale by delta
-      game.distance += game.distanceSpeed * deltaMultiplier;
-      game.distanceSinceBoss += game.distanceSpeed * deltaMultiplier;
+      const distanceDelta = game.distanceSpeed * deltaMultiplier;
+      game.distance += distanceDelta;
+      game.distanceSinceBoss += distanceDelta;
+      if (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.recordDistanceTick === 'function') {
+        window.ReplayRecorder.recordDistanceTick(distanceDelta);
+      }
       
       // Update visual scrolling (background) - use effective scroll speed (with slow time multiplier) - scale by delta
       const effectiveScrollSpeed = typeof getEffectiveScrollSpeed === 'function' ? getEffectiveScrollSpeed() : game.scrollSpeed;
@@ -921,6 +928,9 @@ class GameUpdate {
           // Track enemy type for accurate score calculation
           if (!game.enemyTypes) game.enemyTypes = [];
           game.enemyTypes.push(enemy.type);
+          if (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.recordEnemyKill === 'function') {
+            window.ReplayRecorder.recordEnemyKill(enemy.type);
+          }
           // Play enemy destroyed sound - DISABLED (keeping only enemy hit sound)
           // if (typeof playEnemyDestroyedSound === 'function') {
           //   playEnemyDestroyedSound();
@@ -1046,6 +1056,11 @@ class GameUpdate {
               updateScore(damageDealt); // Points equal to damage dealt (orb level)
             }
             game.bossHits += damageDealt; // Track total damage dealt for accurate score calculation
+            for (let i = 0; i < damageDealt; i++) {
+              if (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.recordBossHit === 'function') {
+                window.ReplayRecorder.recordBossHit();
+              }
+            }
           }
           
           // Check if boss was defeated immediately after HP decrement

@@ -37,8 +37,7 @@
   border: min(0.3vw, 0.4vh) solid #FFD700;
   border-radius: min(2vh, 2.5vw);
   padding: min(3vh, 4vw);
-  max-width: min(90vh, 95vw);
-  width: 90%;
+  width: 90vw;
   height: 90vh; /* Fixed height for consistency */
   max-height: 90vh; /* Ensure it doesn't exceed viewport */
   box-sizing: border-box;
@@ -179,6 +178,8 @@
 
 .leaderboard-milestone-tabs {
   margin: 0;
+  flex-shrink: 0;
+  width: 100%;
 }
 
 .milestone-tabs {
@@ -581,6 +582,14 @@
   animation: pulseGlow 2s ease-in-out infinite;
 }
 
+.milestone-target-none {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: min(2vw, 2.5vh);
+  font-weight: 500;
+  display: block;
+  letter-spacing: min(0.05vw, 0.08vh);
+}
+
 @keyframes pulseGlow {
   0%, 100% {
     opacity: 1;
@@ -649,6 +658,19 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+.milestone-claim-btn.milestone-claim-btn--pending {
+  background: linear-gradient(135deg, #4a4a4a 0%, #3a3a3a 50%, #2a2a2a 100%);
+  border-color: #555;
+  color: #aaa;
+  box-shadow: none;
+  opacity: 0.85;
+  cursor: wait;
+}
+
+.milestone-claim-btn.milestone-claim-btn--pending::before {
+  display: none;
 }
 
 .milestone-item {

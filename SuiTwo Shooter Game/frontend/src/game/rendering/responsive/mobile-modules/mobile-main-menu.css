@@ -19,9 +19,9 @@
 /* Mobile Main Menu Content - Optimized sizing */
 .main-menu-content {
   /* Mobile: More compact max-width to fit smaller screens */
-  max-width: 95vw;
+  max-width: 90vw;
   max-height: 95vh;
-  width: 95vw;
+  width: 90vw;
   /* Better scrolling on mobile */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */

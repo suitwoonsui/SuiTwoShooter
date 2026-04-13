@@ -99,6 +99,7 @@ class GameState {
     this.tournamentObjectId = null; // Tournament object ID on-chain
     this.tournamentCategory = null; // Tournament category: 'highestScore' | 'longestDistance' | 'totalCoins' | etc.
     this.tournamentName = null; // Tournament name for display
+    this.anchorSessionId = null; // Anchor session ID (number) for tournament score submit; set when starting tournament game
     
     // Level timing
     this.levelStartDelay = 0; // Milliseconds remaining in delay
@@ -205,18 +206,21 @@ class GameState {
       tournamentCategory: this.tournamentCategory,
       tournamentName: this.tournamentName,
       returnToTournament: this.returnToTournament,
+      anchorSessionId: this.anchorSessionId,
     };
     
-    // Generate unique session ID for this game session
+    // Always generate a unique session ID for this game session (so submit never fails for missing session)
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       this.sessionId = crypto.randomUUID();
-    } else {
-      // Fallback: timestamp + random bytes
+    } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
       const timestamp = Date.now();
       const randomBytes = Array.from(crypto.getRandomValues(new Uint8Array(8)))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
       this.sessionId = `${timestamp}-${randomBytes}`;
+    } else {
+      const n = (typeof window !== 'undefined' && (window.__gameSessionIdCounter = (window.__gameSessionIdCounter || 0) + 1)) || 0;
+      this.sessionId = `session_${Date.now()}_${n}_${Math.random().toString(36).slice(2, 11)}`;
     }
     
     // Reset fallback score
@@ -296,6 +300,7 @@ class GameState {
     this.tournamentCategory = preservedTournamentState.tournamentCategory;
     this.tournamentName = preservedTournamentState.tournamentName;
     this.returnToTournament = preservedTournamentState.returnToTournament;
+    this.anchorSessionId = preservedTournamentState.anchorSessionId ?? null;
   }
   
   /**

@@ -112,6 +112,9 @@ class DestroyAllMissile {
     if (game.enemyTypes) {
       game.enemyTypes.push(this.targetEnemy.type);
     }
+    if (typeof window !== 'undefined' && window.ReplayRecorder && typeof window.ReplayRecorder.recordEnemyKill === 'function') {
+      window.ReplayRecorder.recordEnemyKill(this.targetEnemy.type);
+    }
     
     // Play enemy destroyed sound (same as player projectiles) - DISABLED (keeping only enemy hit sound)
     // if (typeof playEnemyDestroyedSound === 'function') {

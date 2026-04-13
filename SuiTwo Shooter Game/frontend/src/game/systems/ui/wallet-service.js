@@ -1,8 +1,8 @@
 // ==========================================
 // WALLET SERVICE - Wallet Connection and UI Management
 // ==========================================
-// Handles wallet connection, disconnection, UI updates, and game readiness
-// Delegates data loading to GameDataFlow
+// Handles wallet connection, disconnection, UI updates, and game readiness.
+// Delegates data loading to the refactored GameDataFlowService + wallet flow handlers.
 
 // Use FrontendLogger if available, fallback to console
 // Use var to allow redeclaration when multiple scripts are loaded
@@ -23,8 +23,13 @@ var log = (typeof window !== 'undefined' && window.FrontendLogger)
 const WalletService = {
   // State
   _initialized: false,
+  _initializePromise: null,
   _isConnecting: false,
   _isDisconnecting: false,
+  _minTokenBalanceFormatted: null, // Cached formatted minimum balance for display
+  _configInFlight: null,
+  _minReqInFlight: null,
+  _pendingWalletFlowEvent: null,
   
   // Dependencies (accessed via window/global scope)
   _gameDataFlow: null,
@@ -40,11 +45,195 @@ const WalletService = {
     }
     
     // Set up dependencies (may not be available immediately)
-    this._gameDataFlow = typeof GameDataFlow !== 'undefined' ? GameDataFlow : null;
+    this._gameDataFlow = (typeof window !== 'undefined' && window.GameDataFlowService) ? window.GameDataFlowService : null;
     this._gameState = typeof uiGameState !== 'undefined' ? uiGameState : null;
     
     this._initialized = true;
     log.debug('WALLET SERVICE', 'Initialized');
+    
+    // Fetch and update minimum requirement text on initialization
+    this.updateMinimumRequirementText();
+  },
+
+  /**
+   * Best-effort: run the refactored wallet flow even if scripts load out of order.
+   * @param {{ type: 'connected' | 'disconnected', address?: string | null }} event
+   * @returns {Promise<void>}
+   */
+  async _runWalletFlow(event) {
+    const type = event?.type;
+    const address = typeof event?.address === 'string' ? event.address : null;
+
+    // Wait briefly for flow handlers to be registered by game-data-flow-wallet.js.
+    const start = Date.now();
+    const maxWaitMs = 5_000;
+    while (
+      (typeof window === 'undefined' ||
+        typeof window.onWalletConnected !== 'function' ||
+        typeof window.onWalletDisconnected !== 'function') &&
+      Date.now() - start < maxWaitMs
+    ) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+
+    const hasHandlers =
+      typeof window !== 'undefined' &&
+      typeof window.onWalletConnected === 'function' &&
+      typeof window.onWalletDisconnected === 'function';
+
+    if (hasHandlers) {
+      if (type === 'connected' && address) {
+        await window.onWalletConnected(address);
+      } else if (type === 'disconnected') {
+        window.onWalletDisconnected();
+      }
+      return;
+    }
+
+    // Fallback (should be rare): at least trigger the core load path so stats/gamepass/badge populate.
+    // This avoids a broken UX if wallet events fire before flow scripts are ready.
+    const flow = (typeof window !== 'undefined' && window.GameDataFlowService)
+      ? window.GameDataFlowService
+      : undefined;
+    if (type === 'connected' && address && flow && typeof flow.load === 'function') {
+      try {
+        await flow.load(address, { checkBadgeUpgrade: true });
+      } catch (e) {
+        log.error('WALLET SERVICE', 'Fallback load failed', e);
+      }
+    }
+  },
+  
+  /**
+   * Fetch minimum token balance from API and update the UI text
+   * @returns {Promise<void>}
+   */
+  async updateMinimumRequirementText() {
+    if (this._minReqInFlight) return this._minReqInFlight;
+    this._minReqInFlight = (async () => {
+    try {
+      const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+      
+      log.debug('WALLET SERVICE', 'Fetching min token balance from API', { API_BASE_URL });
+
+      const ttlMs =
+        (typeof window.GAME_CONFIG_BOOTSTRAP_TTL_MS === 'number' && window.GAME_CONFIG_BOOTSTRAP_TTL_MS > 0
+          ? window.GAME_CONFIG_BOOTSTRAP_TTL_MS
+          : 30 * 60 * 1000);
+      const pref = typeof window !== 'undefined' ? window.__prefetchedGameConfig : null;
+      let result = null;
+      if (
+        pref &&
+        pref.at &&
+        pref.response &&
+        pref.response.success === true &&
+        pref.response.config &&
+        Date.now() - pref.at < ttlMs
+      ) {
+        result = pref.response;
+        log.debug('WALLET SERVICE', 'Using menu bootstrap game-config prefetch for min balance');
+      }
+
+      // If bootstrap is in-flight, prefer it over a separate /game-config fetch.
+      if (!result && typeof window !== 'undefined' && window.__menuBootstrapPromise) {
+        try {
+          // Wait longer here to avoid a redundant /game-config call (bootstrap already fetches it).
+          const bootstrapState = await Promise.race([
+            window.__menuBootstrapPromise,
+            new Promise((resolve) => setTimeout(() => resolve(null), 10_000)),
+          ]);
+          const data = bootstrapState && bootstrapState.data ? bootstrapState.data : bootstrapState;
+          const gc = data && data.gameConfig && data.gameConfig.success === true ? data.gameConfig : null;
+          if (gc && gc.config) {
+            result = gc;
+            log.debug('WALLET SERVICE', 'Using in-flight menu bootstrap for min balance');
+          }
+        } catch (_) {
+          /* ignore */
+        }
+      }
+
+      if (!result) {
+        const response = await fetch(`${API_BASE_URL}/game-config?source=wallet_min_req`);
+        if (!response.ok) {
+          this._minTokenBalanceFormatted = null;
+          const minimumNoticeFetch = document.getElementById('minimumNoticeText');
+          if (minimumNoticeFetch) minimumNoticeFetch.textContent = '';
+          log.debug('WALLET SERVICE', 'game-config fetch failed — treat as no min threshold', {
+            status: response.status,
+          });
+          return;
+        }
+        result = await response.json();
+      }
+      log.debug('WALLET SERVICE', 'Game config API response', { 
+        success: result.success, 
+        hasMinTokenBalance: !!result.config?.minTokenBalance,
+        minTokenBalance: result.config?.minTokenBalance 
+      });
+      
+      if (result.success && result.config?.minTokenBalance != null && result.config.minTokenBalance !== '') {
+        const minBalanceRaw = BigInt(result.config.minTokenBalance);
+        if (minBalanceRaw <= BigInt(0)) {
+          this._minTokenBalanceFormatted = null;
+          const minimumNoticeTextZero = document.getElementById('minimumNoticeText');
+          if (minimumNoticeTextZero) minimumNoticeTextZero.textContent = '';
+          log.debug('WALLET SERVICE', 'minTokenBalance is zero — no minimum notice');
+          return;
+        }
+        
+        // The minTokenBalance is stored on-chain with 6 decimals (mainnet style)
+        // regardless of network, as per the admin panel which converts to raw with 6 decimals
+        // See: apps/shooter-game/backend/app/admin/tabs/GameConfigTab.tsx (mewsToRaw function)
+        const decimals = 6; // Always use 6 decimals for minTokenBalance (stored value format)
+        const divisor = Math.pow(10, decimals);
+        
+        // Format for display
+        const minBalanceInMEWS = Number(minBalanceRaw) / divisor;
+        let formatted;
+        if (minBalanceInMEWS >= 1000000) {
+          formatted = `${(minBalanceInMEWS / 1000000).toFixed(1)}M`;
+        } else if (minBalanceInMEWS >= 1000) {
+          formatted = `${(minBalanceInMEWS / 1000).toFixed(1)}K`;
+        } else {
+          formatted = minBalanceInMEWS.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+        
+        this._minTokenBalanceFormatted = formatted;
+        
+        // Update the UI text
+        const minimumNoticeText = document.getElementById('minimumNoticeText');
+        if (minimumNoticeText) {
+          minimumNoticeText.textContent = `Min: ${formatted} Mews Required`;
+        }
+        
+        log.debug('WALLET SERVICE', 'Updated minimum requirement text', { 
+          formatted, 
+          raw: minBalanceRaw.toString(), 
+          decimals,
+          minBalanceInMEWS,
+          calculation: `${minBalanceRaw.toString()} / ${divisor} = ${minBalanceInMEWS}`
+        });
+      } else {
+        this._minTokenBalanceFormatted = null;
+        const minimumNoticeTextNone = document.getElementById('minimumNoticeText');
+        if (minimumNoticeTextNone) minimumNoticeTextNone.textContent = '';
+        log.debug('WALLET SERVICE', 'No minTokenBalance in game-config — no minimum notice');
+      }
+    } catch (error) {
+      log.debug('WALLET SERVICE', 'game-config unavailable for min display — no minimum notice', {
+        message: error.message,
+      });
+      this._minTokenBalanceFormatted = null;
+      const minimumNoticeText = document.getElementById('minimumNoticeText');
+      if (minimumNoticeText) {
+        minimumNoticeText.textContent = '';
+      }
+    }
+    })().finally(() => {
+      this._minReqInFlight = null;
+    });
+    return this._minReqInFlight;
   },
   
   /**
@@ -53,13 +242,25 @@ const WalletService = {
    * @returns {Promise<void>}
    */
   async initialize() {
+    if (this._initializePromise) return this._initializePromise;
+    this._initializePromise = (async () => {
     log.debug('WALLET SERVICE', 'Initializing wallet integration');
     
     // Wait a bit for React and WalletAPI to load
     // Optimized: 500ms → 200ms (wallet connection is usually faster)
     await new Promise(resolve => setTimeout(resolve, 200));
-    
-    if (typeof WalletAPI === 'undefined') {
+
+    // The wallet module is loaded via a separate <script> tag.
+    // In dev, it may finish loading slightly after this initialize() runs.
+    if (typeof window.WalletAPI === 'undefined') {
+      const start = Date.now();
+      const maxWaitMs = 25_000;
+      while (typeof window.WalletAPI === 'undefined' && Date.now() - start < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    if (typeof window.WalletAPI === 'undefined') {
       log.warn('WALLET SERVICE', 'WalletAPI not loaded');
       const walletStatusText = document.getElementById('walletStatusText');
       if (walletStatusText) {
@@ -69,26 +270,42 @@ const WalletService = {
     }
     
     try {
-      // Get network from backend config (should match backend network)
-      // Default to testnet for development, but fetch from backend if available
-      let network = 'testnet'; // Default to testnet
+      // Get network from backend config (should match backend network).
+      // MUST be explicit; WalletAPI.initialize does not default.
+      let network = null;
       
       try {
         // Try to fetch network from backend API
-        const API_BASE_URL = window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3000/api';
-        const response = await fetch(`${API_BASE_URL}/config`);
-        if (response.ok) {
-          const config = await response.json();
-          if (config.network) {
-            network = config.network;
-            log.debug('WALLET SERVICE', `Using network from backend: ${network}`);
-          }
+        const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+        if (!this._configInFlight) {
+          this._configInFlight = fetch(`${API_BASE_URL}/config?source=wallet_init`)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)
+            .finally(() => {
+              this._configInFlight = null;
+            });
+        }
+        const config = await this._configInFlight;
+        if (config && config.network) {
+          network = config.network;
+          log.debug('WALLET SERVICE', `Using network from backend: ${network}`);
         }
       } catch (error) {
-        log.warn('WALLET SERVICE', 'Could not fetch network from backend, using default', network);
+        log.warn('WALLET SERVICE', 'Could not fetch network from backend', { error: error?.message || String(error) });
       }
       
-      const api = await WalletAPI.initialize({ network });
+      // If backend config fetch failed, fall back to explicit testnet for local dev.
+      if (network !== 'mainnet' && network !== 'testnet') {
+        network = 'testnet';
+        log.warn('WALLET SERVICE', `Falling back to explicit network: ${network}`);
+      }
+
+      // Store resolved network for the rest of the frontend (balance checks, store, etc.).
+      this._network = network;
+
+      // Do not set RPC overrides here. Prefer defaults / wallet module config.
+
+      const api = await window.WalletAPI.initialize({ network });
       
       // Store globally for easy access
       window.walletAPIInstance = api;
@@ -119,59 +336,51 @@ const WalletService = {
         lastWalletEventTime = now;
         log.debug('WALLET SERVICE', 'Processing wallet event', event);
         
-        // Use new flow controller for wallet events
-        if (typeof GameDataFlow !== 'undefined') {
-          log.debug('WALLET SERVICE', 'Using NEW REFACTORED SYSTEM (GameDataFlow) for wallet event');
-          if (event.type === 'connected' && event.address) {
-            GameDataFlow.onWalletConnected(event.address);
-            // Update menu stats from blockchain when wallet connects
-            if (typeof updateMenuStats === 'function') {
-              updateMenuStats().catch(err => log.warn('WALLET SERVICE', 'Failed to update menu stats', err));
-            }
-          } else if (event.type === 'disconnected') {
-            GameDataFlow.onWalletDisconnected();
-            if (typeof disableStartGameButton === 'function') {
-              disableStartGameButton();
-            }
-            this.updateBalanceUI(null, false);
-            this.updateWalletRequirementsUI(false, false);
-            const walletStatusText = document.getElementById('walletStatusText');
-            if (walletStatusText) {
-              walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect Sui wallet to play</span>';
-            }
-            if (typeof updateMenuStats === 'function') {
-              updateMenuStats().catch(err => log.warn('WALLET SERVICE', 'Failed to update menu stats', err));
-            }
-            // Clear game pass display (credits and tickets) when wallet disconnects
-            if (window.GamePassDisplay && typeof window.GamePassDisplay.clear === 'function') {
-              window.GamePassDisplay.clear();
-              log.debug('WALLET SERVICE', 'Cleared game pass display (event handler)');
-            }
-            const testBtn = document.getElementById('startGameTestBtn');
-            if (testBtn) {
-              testBtn.disabled = true;
-              testBtn.style.opacity = '0.5';
-              testBtn.style.cursor = 'not-allowed';
-            }
+        // Use refactored wallet flow handlers; if they aren't ready yet, wait briefly and fall back.
+        if (event.type === 'connected' && event.address) {
+          void this._runWalletFlow({ type: 'connected', address: event.address });
+        } else if (event.type === 'disconnected') {
+          void this._runWalletFlow({ type: 'disconnected', address: null });
+          if (typeof disableStartGameButton === 'function') {
+            disableStartGameButton();
           }
-        } else {
-          log.error('WALLET SERVICE', 'GameDataFlow not available - this should not happen');
+          this.updateBalanceUI(null, false);
+          this.updateWalletRequirementsUI(false, false);
+          const walletStatusText = document.getElementById('walletStatusText');
+          if (walletStatusText) {
+            walletStatusText.innerHTML = '<span class="wallet-icon">🔒</span><span>Connect Sui wallet to play</span>';
+          }
+          if (typeof updateMenuStats === 'function') {
+            updateMenuStats().catch(err => log.warn('WALLET SERVICE', 'Failed to update menu stats', err));
+          }
+          // Clear game pass display (credits and tickets) when wallet disconnects
+          if (window.GamePassDisplay && typeof window.GamePassDisplay.clear === 'function') {
+            window.GamePassDisplay.clear();
+            log.debug('WALLET SERVICE', 'Cleared game pass display (event handler)');
+          }
+          const testBtn = document.getElementById('startGameTestBtn');
+          if (testBtn) {
+            testBtn.disabled = true;
+            testBtn.style.opacity = '0.5';
+            testBtn.style.cursor = 'not-allowed';
+          }
         }
       });
       
-      // Check if wallet is already connected
-      if (api.isConnected()) {
-        const address = api.getAddress();
+      // Check if wallet is already connected (ignore zero address so we don't call APIs before real login)
+      const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000000000000000000000000000';
+      const isConnected = api.isConnected();
+      const address = isConnected ? api.getAddress() : null;
+      const hasRealAddress = address && address !== ZERO_ADDRESS && address.toLowerCase() !== ZERO_ADDRESS;
+      if (isConnected && hasRealAddress) {
         this.updateWalletUI(address);
-        // Check balance for already connected wallet (don't enable button until check completes)
-        await this.checkMEWSBalanceAndUpdateUI(address);
-        // Update menu stats from blockchain for already connected wallet
-        if (typeof updateMenuStats === 'function') {
-          updateMenuStats().catch(err => console.warn('⚠️ [WALLET SERVICE] Failed to update menu stats:', err));
-        }
+        // Single load path: onWalletConnected resets state, prefetches game pass, runs GameDataFlowService.load.
+        // Avoid checkMEWSBalanceAndUpdateUI here — it duplicated a full load (same as load) on every cold start.
+        await this._runWalletFlow({ type: 'connected', address });
         // Test button will be enabled by updateGameReadiness() after data loads
       } else {
-        // Show requirements when wallet not connected
+        // Show requirements when wallet not connected (or connected with zero address)
+        this.updateWalletUI(null);
         this.updateWalletRequirementsUI(false, false);
         if (typeof disableStartGameButton === 'function') {
           disableStartGameButton();
@@ -200,6 +409,10 @@ const WalletService = {
         walletStatusText.innerHTML = '<span class="wallet-icon">⚠️</span><span>Wallet initialization failed</span>';
       }
     }
+    })().finally(() => {
+      this._initializePromise = null;
+    });
+    return this._initializePromise;
   },
   
   /**
@@ -213,19 +426,30 @@ const WalletService = {
     }
     
     log.debug('WALLET SERVICE', 'Connecting wallet');
+
+    // Disable immediately to prevent rapid double-clicks while we wait for the wallet module.
+    this._isConnecting = true;
+    this._updateConnectButtonState('connecting');
     
-    // Validate WalletAPI available
-    if (typeof WalletAPI === 'undefined' || !window.walletAPIInstance) {
+    // Menu can render before the wallet module finishes loading + initializing.
+    // If user clicks quickly, wait briefly instead of failing immediately.
+    if (typeof window.WalletAPI === 'undefined' || !window.walletAPIInstance) {
+      const start = Date.now();
+      const maxWaitMs = 25_000;
+      while ((typeof window.WalletAPI === 'undefined' || !window.walletAPIInstance) && Date.now() - start < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    // Validate WalletAPI available after wait
+    if (typeof window.WalletAPI === 'undefined' || !window.walletAPIInstance) {
       const error = 'Wallet API not initialized. Please refresh the page.';
       log.error('WALLET SERVICE', 'Error', error);
       alert(error);
+      this._isConnecting = false;
+      this._updateConnectButtonState('idle');
       return { success: false, error };
     }
-    
-    this._isConnecting = true;
-    
-    // Update button state
-    this._updateConnectButtonState('connecting');
     
     try {
       const result = await window.walletAPIInstance.connect();
@@ -235,12 +459,15 @@ const WalletService = {
         
         // Update UI immediately (don't wait for event)
         this.updateWalletUI(result.address);
+
+        // Also trigger the load flow immediately as a backstop.
+        // Some wallets/events can be delayed or swallowed; we still want stats/gamepass/badge to load.
+        if (result.address) {
+          await this._runWalletFlow({ type: 'connected', address: result.address });
+        }
         
         // Note: Don't call checkMEWSBalanceAndUpdateUI here - the wallet event listener
         // will handle it when the 'connected' event fires. This prevents duplicate calls.
-        // The event listener will:
-        // 1. Call GameDataFlow.onWalletConnected(event.address)
-        // 2. Call updateMenuStats()
         // Test button will be enabled by updateGameReadiness() after data loads
         
         return { success: true, address: result.address };
@@ -277,7 +504,7 @@ const WalletService = {
     
     log.debug('WALLET SERVICE', 'Disconnecting wallet');
     
-    if (typeof WalletAPI === 'undefined' || !window.walletAPIInstance) {
+    if (typeof window.WalletAPI === 'undefined' || !window.walletAPIInstance) {
       return { success: false, error: 'Wallet API not initialized' };
     }
     
@@ -403,7 +630,7 @@ const WalletService = {
   /**
    * Update balance UI display
    * @param {number|null} balance - Balance amount or null
-   * @param {boolean} hasMinimum - Whether balance meets minimum requirement (500K MEWS)
+   * @param {boolean} hasMinimum - Whether balance meets minimum requirement
    */
   updateBalanceUI(balance, hasMinimum) {
     // Balance is not shown in compact wallet UI - only address is displayed
@@ -420,7 +647,7 @@ const WalletService = {
     if (balanceDisplay && balanceElement) {
       if (balance) {
         balanceDisplay.style.display = 'flex'; /* Use flex to align properly */
-        balanceElement.textContent = `${balance} $MEWS`;
+        balanceElement.textContent = `${balance} MEWS`;
         balanceElement.style.color = hasMinimum ? '#39ff14' : '#ff4444';
       } else {
         balanceDisplay.style.display = 'none';
@@ -452,8 +679,8 @@ const WalletService = {
   
   /**
    * Check MEWS balance and update UI
-   * NOTE: This function is now a wrapper around GameDataFlow.load() for backward compatibility
-   * All new code should use GameDataFlow.load() directly
+   * NOTE: This function is now a wrapper around the refactored data-flow load path.
+   * All new code should use `GameDataFlowService.load()` (via the wallet flow handlers) directly.
    * @param {string} address - Wallet address
    * @returns {Promise<void>}
    */
@@ -466,26 +693,28 @@ const WalletService = {
       return;
     }
     
-    // Use new flow controller - GameDataFlow is required
-    if (typeof GameDataFlow === 'undefined' || !GameDataFlow.load) {
-      console.error('❌ [WALLET SERVICE] GameDataFlow not available - this should not happen');
+    // Use the refactored flow controller. `GameDataFlow` used to be a legacy delegation shim;
+    // prefer `GameDataFlowService` directly so wallet init doesn't depend on legacy scripts.
+    const flow = (typeof window !== 'undefined' && window.GameDataFlowService)
+      ? window.GameDataFlowService
+      : (typeof window !== 'undefined' ? window.GameDataFlow : undefined);
+    if (!flow || typeof flow.load !== 'function') {
+      console.error('❌ [WALLET SERVICE] GameDataFlowService not available - wallet init cannot load data yet');
       if (typeof disableStartGameButton === 'function') {
         disableStartGameButton();
       }
       return;
     }
     
-    console.log('✅ [WALLET SERVICE] Using NEW REFACTORED SYSTEM (GameDataFlow) for balance check');
+    console.log('✅ [WALLET SERVICE] Using NEW REFACTORED SYSTEM (GameDataFlowService) for balance check');
     try {
-      await GameDataFlow.load(address);
+      await flow.load(address);
       
       // Update game readiness state from GameDataState
       if (typeof GameDataState !== 'undefined') {
         const readiness = GameDataState.getReadinessState();
         if (typeof gameReadinessState !== 'undefined') {
           gameReadinessState.dataLoaded = readiness.dataLoaded;
-          gameReadinessState.migrationCheckComplete = readiness.migrationCheckComplete;
-          gameReadinessState.migrationModalClosed = readiness.migrationModalClosed;
         }
       }
       
@@ -507,23 +736,24 @@ const WalletService = {
    * @returns {Promise<void>}
    */
   async loadMenuBadgeDisplay(walletAddress) {
-    // Use new flow controller - GameDataFlow is required
-    if (typeof GameDataFlow === 'undefined' || !GameDataFlow.load) {
-      console.error('❌ [WALLET SERVICE] GameDataFlow not available - this should not happen');
+    // Use the refactored flow controller. Avoid relying on legacy delegation shims.
+    const flow = (typeof window !== 'undefined' && window.GameDataFlowService)
+      ? window.GameDataFlowService
+      : (typeof window !== 'undefined' ? window.GameDataFlow : undefined);
+    if (!flow || typeof flow.load !== 'function') {
+      console.error('❌ [WALLET SERVICE] GameDataFlowService not available - cannot load badge yet');
       return;
     }
 
-    console.log('✅ [WALLET SERVICE] Using NEW REFACTORED SYSTEM (GameDataFlow) for badge load');
+    console.log('✅ [WALLET SERVICE] Using NEW REFACTORED SYSTEM (GameDataFlowService) for badge load');
     try {
-      await GameDataFlow.load(walletAddress, { skipBalance: true });
+      await flow.load(walletAddress, { skipBalance: true });
 
       // Update game readiness state from GameDataState
       if (typeof GameDataState !== 'undefined') {
         const readiness = GameDataState.getReadinessState();
         if (typeof gameReadinessState !== 'undefined') {
           gameReadinessState.dataLoaded = readiness.dataLoaded;
-          gameReadinessState.migrationCheckComplete = readiness.migrationCheckComplete;
-          gameReadinessState.migrationModalClosed = readiness.migrationModalClosed;
         }
       }
       
