@@ -1,0 +1,247 @@
+// ==========================================
+// BOSS MANAGEMENT - SPAWNING AND COMBAT
+// ==========================================
+
+// Boss image loading
+function loadBossImage(bossType) {
+  // Disable transparency processing to avoid CORS errors
+  // Use boss images directly
+  bossImage = bossImages[bossType];
+}
+
+// Boss spawn warning
+function spawnBoss() {
+  console.log('spawnBoss() called - currentTier:', game.currentTier, 'bossesDefeated:', game.bossesDefeated);
+  // Start with warning
+  game.bossWarning = true;
+  game.bossWarningTime = 2000; // 2 seconds warning
+  
+  // Reset distance for next boss cycle
+  game.distanceSinceBoss = 0;
+  
+  // Stop regular music when boss warning appears
+  if (typeof stopBackgroundMusic === 'function') {
+    stopBackgroundMusic();
+  }
+  
+  // Pre-load boss assets during warning transition (2 seconds available)
+  if (typeof window.handleBossWarningTransition === 'function') {
+    window.handleBossWarningTransition(game.currentTier);
+  }
+  
+  // Clear all existing content
+  // IMPORTANT: After tier 4, enemies are in a separate array, so we need to clear both
+  // Use window.tiles and window.enemies (exposed by main.js)
+  if (typeof window !== 'undefined') {
+    // Clear tiles (contains enemies before tier 4, collectibles after tier 4)
+    window.tiles = [];
+    // Clear separate enemies array (used after tier 4)
+    window.enemies = [];
+    
+    // Also clear the local variables directly to ensure rendering sees the cleared arrays
+    // The rendering functions use the global tiles/enemies variables, not window.tiles/enemies
+    if (typeof tiles !== 'undefined') {
+      tiles = [];
+    }
+    if (typeof enemies !== 'undefined') {
+      enemies = [];
+    }
+    
+    // Sync to ensure both references stay in sync
+    if (typeof window.syncGameArrays === 'function') {
+      window.syncGameArrays();
+    }
+    
+    // Debug log to verify clearing
+    const tilesAfterClear = (typeof window !== 'undefined' && window.tiles) ? window.tiles.length : 0;
+    const enemiesAfterClear = (typeof window !== 'undefined' && window.enemies) ? window.enemies.length : 0;
+    console.log('🧹 [BOSS SPAWN] Cleared arrays - tiles:', tilesAfterClear, 'enemies:', enemiesAfterClear, 'bossesDefeated:', game.bossesDefeated);
+  }
+  game.enemyProjectiles = [];
+  game.bossProjectiles = [];
+  game.projectiles = [];
+  game.particles = [];
+  
+  // Stop scrolling (visual only - distance continues at constant rate)
+  game.scrollSpeed = 0;
+  
+  // Cancel any charge in progress
+  game.chargeStart = null;
+}
+
+// Create boss instance
+function createBoss() {
+  const currentBossStats = bossStats[game.currentTier] || bossStats[4];
+  const size = 60 * 3;
+  
+  console.log('Creating boss for tier:', game.currentTier, 'bossesDefeated:', game.bossesDefeated);
+  
+  // Apply post-tier-4 speed multiplier to boss movement speed (same as projectile speeds)
+  const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
+  const scaledBossSpeed = currentBossStats.speed * speedMultiplier;
+  
+  // Load specific boss image - Boss_Scammer for tier 1, Boss_Market_Maker for tier 2, Boss_Bear for tier 3, Boss_Shadow_Figure for tier 4
+  let bossImageType;
+  if (game.currentTier === 1) {
+    bossImageType = 0; // Boss_Scammer for tier 1 (index 0)
+  } else if (game.currentTier === 2) {
+    bossImageType = 1; // Boss_Market_Maker for tier 2 (index 1)
+  } else if (game.currentTier === 3) {
+    bossImageType = 2; // Boss_Bear for tier 3 (index 2)
+  } else {
+    bossImageType = 3; // Boss_Shadow_Figure for tier 4+ (index 3)
+  }
+  console.log('Boss image type selected:', bossImageType, 'for tier:', game.currentTier);
+  loadBossImage(bossImageType);
+  
+  // Calculate effective fire rate with post-tier-4 scaling
+  const fireRateMultiplier = typeof getFireRateMultiplier === 'function' ? getFireRateMultiplier() : 1.0;
+  const baseFireRate = currentBossStats.fireRate;
+  const effectiveFireRate = Math.floor(baseFireRate / fireRateMultiplier); // Divide to make faster (lower ms = faster)
+  
+  // Ensure game dimensions are valid before calculating boss position
+  if (!game.width || !game.height || game.width <= 0 || game.height <= 0) {
+    console.error('❌ [BOSS] Invalid game dimensions:', { width: game.width, height: game.height });
+    return; // Don't create boss if dimensions are invalid
+  }
+  
+  // Calculate initial Y position (centered vertically)
+  const initialY = Math.max(0, Math.min((game.height - size) / 2, game.height - size));
+  
+  game.boss = {
+    type: bossImageType,
+    tier: game.currentTier,
+    hp: currentBossStats.hp,
+    maxHp: currentBossStats.hp,
+    x: game.width + size, // Start off-screen right
+    y: initialY, // Centered vertically (clamped to valid range)
+    targetX: game.width - size - 50, // Final position
+    width: size,
+    height: size,
+    lastShot: 0,
+    hitTime: 0,
+    moveSpeed: scaledBossSpeed, // Apply post-tier-4 speed scaling
+    vulnerable: false, // Boss invulnerable at start
+    entranceTime: 2000, // 2 seconds entrance
+    entranceStart: game.now(),
+    attackPattern: 0, // Current attack pattern
+    lastPatternChange: 0,
+    patternDuration: 3000, // Change pattern every 3 seconds
+    moveDirection: 1, // Vertical movement direction
+    baseY: initialY, // Base Y position (same as initial Y, clamped to valid range)
+    fireRate: effectiveFireRate, // Apply post-tier-4 fire rate scaling
+    maxPatterns: currentBossStats.patterns,
+    enrageTime: currentBossStats.enrageTime,
+    enrageStart: null, // When enrage timer starts
+    enraged: false, // Enrage state
+    baseFireRate: effectiveFireRate // Save effective fire rate (already scaled)
+  };
+  game.bossActive = true;
+  game.bossWarning = false;
+  
+  // Switch to boss music
+  if (typeof startBossMusic === 'function') {
+    startBossMusic();
+  }
+}
+
+// Boss fire with varied patterns
+function handleBossFire() {
+  // Don't fire if boss isn't in position yet
+  if (!game.bossActive || !game.boss || !game.boss.vulnerable || game.boss.x > game.boss.targetX) {
+    return;
+  }
+  
+  const now = game.now();
+  
+  // Change attack pattern periodically (faster for high tiers and when enraged)
+  const patternChangeSpeed = game.boss.enraged ? game.boss.patternDuration : Math.max(2000, 4000 - (game.boss.tier * 500));
+  if (now - game.boss.lastPatternChange > patternChangeSpeed) {
+    game.boss.attackPattern = (game.boss.attackPattern + 1) % game.boss.maxPatterns;
+    game.boss.lastPatternChange = now;
+    game.boss.lastShot = now; // Reset fire timer
+  }
+  
+  // Get effective fire rate (with slow time multiplier applied)
+  const slowTimeFireRateMultiplier = typeof getEffectiveFireRateMultiplier === 'function' ? getEffectiveFireRateMultiplier() : 1.0;
+  const effectiveBossFireRate = game.boss.fireRate * slowTimeFireRateMultiplier;
+  
+  if (now - game.boss.lastShot > effectiveBossFireRate) {
+    game.boss.lastShot = now;
+    const bx = game.boss.x;
+    const by = game.boss.y + game.boss.height/2;
+    const px = player.x + player.width/2;
+    const py = player.y + player.height/2;
+    const baseProjectileSpeed = (5 + game.boss.tier) * (game.boss.enraged ? 1.5 : 1); // Faster when enraged
+    // Apply post-tier-4 scaling multiplier (+5% per boss after tier 4)
+    const speedMultiplier = typeof getProjectileSpeedMultiplier === 'function' ? getProjectileSpeedMultiplier() : 1.0;
+    // Apply slow time multiplier to projectile speed
+    const slowTimeSpeedMultiplier = typeof getEffectiveProjectileSpeedMultiplier === 'function' ? getEffectiveProjectileSpeedMultiplier() : 1.0;
+    const projectileSpeed = baseProjectileSpeed * speedMultiplier * slowTimeSpeedMultiplier;
+    const enrageMultiplier = game.boss.enraged ? 2 : 1; // Double projectiles when enraged
+    
+    switch(game.boss.attackPattern) {
+      case 0: // Straight line shot (multiple based on tier)
+        const lineShots = Math.min(3, game.boss.tier) * enrageMultiplier;
+        for (let i = 0; i < lineShots; i++) {
+          createBossProjectile(bx, by + (i - Math.floor(lineShots/2)) * 20, -projectileSpeed, 0);
+        }
+        break;
+        
+      case 1: // Triple fan shot (wider based on tier)
+        const spreadCount = (3 + game.boss.tier) * enrageMultiplier;
+        for (let i = 0; i < spreadCount; i++) {
+          const angle = (i - Math.floor(spreadCount/2)) * 0.3;
+          createBossProjectile(bx, by, -projectileSpeed * Math.cos(angle), projectileSpeed * Math.sin(angle));
+        }
+        break;
+        
+      case 2: // Aimed shot at player (multiple based on tier)
+        const dx = px - bx;
+        const dy = py - by;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 5) {
+          const homingShots = game.boss.tier * enrageMultiplier;
+          for (let i = 0; i < homingShots; i++) {
+            const spread = (i - Math.floor(homingShots/2)) * 0.2;
+            createBossProjectile(bx, by, (dx/dist + spread) * projectileSpeed, (dy/dist + spread) * projectileSpeed);
+          }
+        }
+        break;
+        
+      case 3: // Intensified vertical barrage
+        if (game.boss.tier >= 2) {
+          // Reduce projectile count to ensure proper gaps
+          const barrageCount = Math.min(4, 2 + game.boss.tier) * enrageMultiplier; // Tier 2: 4, Tier 3: 5, Tier 4: 6
+          // Progressive gap sizes: higher tiers = smaller gaps (but still dodgable)
+          const minGapSize = Math.max(100, 160 - (game.boss.tier * 10)); // Tier 2: 140px, Tier 3: 130px, Tier 4: 120px
+          const startY = 60;
+          const endY = game.height - 60;
+          const totalSpace = endY - startY;
+          
+          // Calculate spacing to ensure minimum gap size
+          const totalGapSpace = (barrageCount - 1) * minGapSize;
+          const remainingSpace = totalSpace - totalGapSpace;
+          const projectileSpacing = remainingSpace / barrageCount;
+          
+          for (let i = 0; i < barrageCount; i++) {
+            const y = startY + i * (projectileSpacing + minGapSize);
+            createBossProjectile(bx, y, -projectileSpeed, 0);
+          }
+        }
+        break;
+        
+      case 4: // Multiple spiral shots
+        if (game.boss.tier >= 3) {
+          const spiralCount = game.boss.tier * enrageMultiplier;
+          for (let j = 0; j < spiralCount; j++) {
+            for (let i = 0; i < 4; i++) {
+              const angle = (now * 0.008 + i * Math.PI * 2 / 4 + j * Math.PI / spiralCount) % (Math.PI * 2);
+              createBossProjectile(bx, by, -3 + Math.cos(angle) * (2 + game.boss.tier), Math.sin(angle) * (2 + game.boss.tier));
+            }
+          }
+        }
+        break;
+    }
+  }
+}

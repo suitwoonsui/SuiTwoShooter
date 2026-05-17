@@ -1,0 +1,172 @@
+/* ========================================== */
+/* SOUND TEST PANEL STYLES */
+/* ========================================== */
+/* Extracted from shared-panels.css - Sound test panel only */
+
+.sound-test-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(26, 35, 50, 1) 0%, rgba(15, 20, 25, 1) 100%);
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(2.5vh, 3vw);
+  width: 90vw;
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
+  box-shadow: 0 min(2vh, 3vw) min(4vh, 5vw) rgba(0, 0, 0, 0.5);
+  z-index: 999999;
+  flex-direction: column;
+  transition: opacity 0.3s ease-out;
+}
+
+.sound-test-panel[class*="-visible"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.sound-test-panel[class*="-hidden"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sound-test-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(77, 162, 255, 0.1) 50%, transparent 70%);
+  border-radius: min(2.5vh, 3vw);
+  pointer-events: none;
+}
+
+.sound-test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: min(3vh, 3.5vw);
+  padding-bottom: min(2vh, 2.5vw);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}
+
+.sound-test-header h2 {
+  color: #4DA2FF;
+  font-size: min(4vw, 4.5vh);
+  font-weight: bold;
+  text-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.5);
+  margin: 0;
+}
+
+.sound-test-section {
+  margin-bottom: min(3vh, 3.5vw);
+}
+
+.sound-test-section h3 {
+  color: #39ff14;
+  font-size: min(3vw, 3.5vh);
+  font-weight: bold;
+  margin-bottom: min(1.5vh, 2vw);
+  text-shadow: 0 0 min(0.6vh, 0.8vw) rgba(57, 255, 20, 0.3);
+}
+
+.sound-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20vh, 25vw), 1fr));
+  gap: min(1vh, 1.2vw);
+  justify-items: stretch;
+  align-items: stretch;
+}
+
+.sound-test-section .asset-sfx-meta {
+  font-size: 0.88em;
+  color: #aaa;
+  margin: 0 0 min(0.8vh, 1vw) 0;
+}
+
+.sound-test-section .asset-sfx-filter {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: min(1vh, 1.2vw);
+  padding: min(0.8vh, 1vw) min(1.2vh, 1.5vw);
+  font-size: min(2vw, 2.4vh);
+  border-radius: min(0.8vh, 1vw);
+  border: 1px solid #4da2ff;
+  background: rgba(20, 30, 45, 0.92);
+  color: #e8f4ff;
+}
+
+.sound-test-section .asset-sfx-scroll {
+  max-height: min(38vh, 440px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: min(0.6vw, 0.8vh);
+  margin-top: min(0.4vh, 0.5vw);
+}
+
+.sound-test-content .sound-btn {
+  background: linear-gradient(135deg, #2a3a4a 0%, #1a2332 100%) !important;
+  border: min(0.2vw, 0.3vh) solid #4DA2FF !important;
+  border-radius: min(1vh, 1.2vw) !important;
+  color: white !important;
+  padding: min(1.5vh, 2vw) min(2vh, 2.5vw) !important;
+  font-size: min(1.8vw, 2.3vh) !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  text-align: center !important;
+  position: relative !important;
+  /* Long titles: wrap within the button; full text available via tooltip (title attr) */
+  white-space: normal !important;
+  word-break: break-word !important;
+  hyphens: auto !important;
+  line-height: 1.15 !important;
+  display: block !important;
+  width: 100% !important; /* Fill grid cell properly */
+  height: auto !important; /* Override mobile min-height */
+  text-overflow: unset !important; /* Override mobile text-overflow: ellipsis */
+  box-sizing: border-box !important; /* Include padding in width calculation */
+  z-index: 2; /* Ensure text appears above gradient effect */
+}
+
+.sound-test-content .sound-btn:hover {
+  background: linear-gradient(135deg, #4DA2FF 0%, #2a3a4a 100%) !important;
+  border-color: #39ff14 !important;
+  box-shadow: 0 min(1vh, 1.5vw) min(3vh, 4vw) rgba(77, 162, 255, 0.6), 0 0 min(2.5vh, 3vw) rgba(57, 255, 20, 0.4) !important; /* Enhanced glow instead of scaling */
+  filter: brightness(1.1) !important; /* Subtle brightness increase */
+}
+
+.sound-test-content .sound-btn:active {
+  box-shadow: 0 min(0.3vh, 0.4vw) min(0.8vh, 1vw) rgba(77, 162, 255, 0.2) !important;
+  filter: brightness(0.95) !important; /* Subtle dimming for click feedback */
+}
+
+.sound-test-content .sound-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none; /* Ensure it doesn't interfere with hover detection */
+}
+
+.sound-test-content .sound-btn:hover::before {
+  opacity: 1;
+}

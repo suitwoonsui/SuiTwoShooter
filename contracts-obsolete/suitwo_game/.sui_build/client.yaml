@@ -1,0 +1,4 @@
+active_address: ""
+environments:
+  testnet:
+    rpc: "https://fullnode.testnet.sui.io:443"

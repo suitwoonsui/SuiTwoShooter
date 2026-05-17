@@ -1,0 +1,147 @@
+/* ========================================== */
+/* INSTRUCTIONS PANEL STYLES */
+/* ========================================== */
+/* Extracted from shared-panels.css - Instructions panel only */
+
+.instructions-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none !important; /* Force hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 1) 0%, rgba(15, 20, 25, 1) 100%);
+  border: min(0.3vw, 0.4vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(2.5vh, 3vw);
+  width: 90vw;
+  height: min(90vh, 90vw);
+  max-height: min(90vh, 90vw);
+  box-sizing: border-box;
+  overflow-y: auto;
+  box-shadow: 0 0 min(5vh, 6vw) rgba(77, 162, 255, 0.5);
+  z-index: 999999;
+  flex-direction: column;
+  transition: opacity 0.3s ease-out;
+}
+
+.instructions-panel.instructions-panel-visible {
+  display: flex !important;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.instructions-panel.instructions-panel-hidden {
+  display: none !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.instructions-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4DA2FF, transparent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Instructions content - match pattern of .store, .tournament, .leaderboard */
+.instructions-panel .instructions-content {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  flex: 1;
+  position: relative;
+}
+
+.instructions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: min(3vh, 3.5vw);
+  padding-bottom: min(1.5vh, 2vw);
+  border-bottom: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}
+
+.instructions-header h2 {
+  color: #4DA2FF;
+  font-size: min(4vw, 4.5vh);
+  margin: 0;
+  text-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.5);
+}
+
+.instructions-section {
+  margin-bottom: min(2.5vh, 3vw);
+}
+
+.instructions-section h3 {
+  color: #4DA2FF;
+  font-size: min(2.5vw, 3vh);
+  margin-bottom: min(1.5vh, 2vw);
+  padding-bottom: min(0.8vh, 1vw);
+  border-bottom: min(0.1vh, 0.15vw) solid rgba(77, 162, 255, 0.2);
+}
+
+.instructions-section p {
+  color: #ccc;
+  line-height: 1.6;
+  margin-bottom: min(1vh, 1.2vw);
+  font-size: min(1.8vw, 2.3vh);
+}
+
+.instructions-section ul {
+  color: #ccc;
+  line-height: 1.6;
+  padding-left: min(2vh, 2.5vw);
+  font-size: min(1.8vw, 2.3vh);
+}
+
+.instructions-section li {
+  margin-bottom: min(0.8vh, 1vw);
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: min(1.2vh, 1.5vw);
+  padding: min(1vh, 1.2vw);
+  background: rgba(77, 162, 255, 0.05);
+  border-radius: min(0.8vh, 1vw);
+  border: min(0.1vh, 0.15vw) solid rgba(77, 162, 255, 0.1);
+}
+
+.control-icon {
+  font-size: min(2vw, 2.5vh);
+  margin-right: min(1.5vh, 2vw);
+  min-width: min(3vh, 3.5vw);
+}
+
+.control-text {
+  color: #ccc;
+  font-weight: 500;
+  font-size: min(1.8vw, 2.3vh);
+}
+
+.instructions-buttons {
+  display: flex;
+  justify-content: center;
+  margin-top: min(3vh, 3.5vw);
+  padding-top: min(2vh, 2.5vw);
+  border-top: min(0.2vw, 0.3vh) solid rgba(77, 162, 255, 0.3);
+}

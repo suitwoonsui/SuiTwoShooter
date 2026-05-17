@@ -1,0 +1,155 @@
+/* ==========================================
+   LOADING MODAL STYLES
+   ========================================== */
+
+/* Loading Modal Base */
+.loading-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001; /* Higher than badge modals (10000) */
+  backdrop-filter: blur(5px);
+  transition: opacity 0.3s ease;
+}
+
+.loading-modal-hidden {
+  display: none;
+}
+
+.loading-modal-visible {
+  display: flex;
+}
+
+/* Loading Modal Content */
+.loading-modal-content {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: min(0.2vw, 0.3vh) solid #4DA2FF;
+  border-radius: min(2vh, 2.5vw);
+  padding: min(4vh, 5vw);
+  width: 90vw;
+  box-shadow: 0 min(1.2vh, 1.5vw) min(5vh, 6vw) rgba(0, 0, 0, 0.5);
+  position: relative;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Loading Spinner Container */
+.loading-spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: min(2vh, 2.5vw);
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  width: min(6vh, 7vw);
+  height: min(6vh, 7vw);
+  border: min(0.5vh, 0.6vw) solid rgba(77, 162, 255, 0.3);
+  border-top: min(0.5vh, 0.6vw) solid #4DA2FF;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Loading Message */
+.loading-modal-message {
+  color: #ffffff;
+  font-size: min(2.2vw, 2.8vh);
+  font-weight: 500;
+  margin: 0;
+  text-shadow: 0 0 min(1.2vh, 1.5vw) rgba(77, 162, 255, 0.5);
+}
+
+/* Multi-step checklist (e.g. store loading) */
+.loading-modal-steps {
+  margin-top: min(2.5vh, 3vw);
+  text-align: left;
+  max-width: min(92vw, 28rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.loading-modal-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.loading-modal-step {
+  display: flex;
+  align-items: flex-start;
+  gap: min(1.2vh, 1.4vw);
+  font-size: min(1.65vw, 2vh);
+  line-height: 1.35;
+  margin-bottom: min(0.9vh, 1.1vw);
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 0.2s ease;
+}
+
+.loading-modal-step-marker {
+  flex-shrink: 0;
+  width: 1.25em;
+  text-align: center;
+  font-size: 0.95em;
+}
+
+.loading-modal-step-label {
+  flex: 1;
+}
+
+.loading-modal-step--pending .loading-modal-step-marker {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.loading-modal-step--active {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.loading-modal-step--active .loading-modal-step-marker {
+  color: #4DA2FF;
+}
+
+.loading-modal-step--done {
+  color: rgba(180, 220, 255, 0.85);
+}
+
+.loading-modal-step--done .loading-modal-step-marker {
+  color: #39ff14;
+}
+
+/* Pulse animation for border glow effect */
+.loading-modal-content::before {
+  content: '';
+  position: absolute;
+  top: min(-0.3vh, -0.4vw);
+  left: min(-0.3vh, -0.4vw);
+  right: min(-0.3vh, -0.4vw);
+  bottom: min(-0.3vh, -0.4vw);
+  background: linear-gradient(45deg, #4DA2FF, #00D4FF, #4DA2FF);
+  border-radius: min(2vh, 2.5vw);
+  z-index: -1;
+  opacity: 0.5;
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+

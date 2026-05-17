@@ -1,0 +1,12 @@
+[package]
+name = "suitwo_game"
+version = "1.0.0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
+platform = { local = "../../../../platform/contracts/platform" }
+
+[addresses]
+suitwo_game = "0x0"
+# Platform package ID - must match deployed platform package (platform/contracts/platform)
+platform = "0xe88f376136404809795e1e6744066757fe75d691817a89e54ef6249c648488d0"

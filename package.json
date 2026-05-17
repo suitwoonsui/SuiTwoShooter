@@ -1,0 +1,14 @@
+{
+  "name": "suitwo-shooter-game",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "echo \"No root build step (deploy frontend and backend separately).\"",
+    "vercel-build": "npm run build",
+    "generate:asset-sfx-manifest": "node scripts/generate-asset-sfx-manifest.cjs"
+  }
+}
+

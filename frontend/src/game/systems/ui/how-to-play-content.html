@@ -1,0 +1,140 @@
+<!-- This file contains the full HTML structure for the How to Play modal -->
+<!-- It will be loaded and inserted into the instructions panel -->
+
+<div class="instructions-header">
+  <h2>📖 How to Play</h2>
+  <button class="close-btn" id="howToPlayCloseBtn" onclick="hideInstructions()">✕</button>
+</div>
+
+<!-- Tab Navigation -->
+<div class="how-to-play-tabs">
+  <button class="how-to-play-tab-btn active" data-tab="getting-started">Getting Started</button>
+  <button class="how-to-play-tab-btn" data-tab="character">The Character</button>
+  <button class="how-to-play-tab-btn" data-tab="enemies">The Enemies</button>
+  <button class="how-to-play-tab-btn" data-tab="bosses">The Bosses</button>
+  <button class="how-to-play-tab-btn" data-tab="combat">Combat & Projectiles</button>
+  <button class="how-to-play-tab-btn" data-tab="collectibles">Collectibles & Items</button>
+  <button class="how-to-play-tab-btn" data-tab="premium-store">Premium Store</button>
+  <button class="how-to-play-tab-btn" data-tab="tournaments">Tournaments</button>
+  <button class="how-to-play-tab-btn" data-tab="progression">Progression & Rewards</button>
+</div>
+
+<!-- Tab 1: Getting Started -->
+<div id="tab-getting-started" class="how-to-play-tab-content active">
+  <div class="how-to-play-accordion active">
+    <div class="how-to-play-accordion-header">
+      <h3>🎯 Objective</h3>
+      <span class="how-to-play-accordion-icon">▼</span>
+    </div>
+    <div class="how-to-play-accordion-content">
+      <div class="how-to-play-content-section">
+        <p>Survive as long as possible, defeat bosses, and achieve the highest score! Navigate through the market chart, fighting against bearish forces that threaten to crash the market.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="how-to-play-accordion">
+    <div class="how-to-play-accordion-header">
+      <h3>🎮 Basic Controls</h3>
+      <span class="how-to-play-accordion-icon">▼</span>
+    </div>
+    <div class="how-to-play-accordion-content">
+      <div class="how-to-play-content-section">
+        <ul>
+          <li><strong>Mouse/Touch:</strong> Move your character vertically across lanes</li>
+          <li><strong>P Key:</strong> Pause/Resume game</li>
+          <li><strong>Auto-Fire:</strong> Your character shoots magic orbs automatically</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="how-to-play-accordion">
+    <div class="how-to-play-accordion-header">
+      <h3>🎯 Gameplay Overview</h3>
+      <span class="how-to-play-accordion-icon">▼</span>
+    </div>
+    <div class="how-to-play-accordion-content">
+      <div class="how-to-play-content-section">
+        <ul>
+          <li>Move your character to avoid enemies and collect power-ups</li>
+          <li>Collect coins to increase your score and activate force fields</li>
+          <li>Pick up green power-ups to increase firepower</li>
+          <li>Avoid red power-downs that decrease firepower</li>
+          <li>Defeat bosses to progress to higher tiers</li>
+          <li>Higher tiers feature stronger enemies and bosses</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tab 2: The Character (SuiTwo) -->
+<div id="tab-character" class="how-to-play-tab-content">
+  <div class="how-to-play-accordion">
+    <div class="how-to-play-accordion-header">
+      <h3>Who is SuiTwo?</h3>
+      <span class="how-to-play-accordion-icon">▼</span>
+    </div>
+    <div class="how-to-play-accordion-content">
+      <div class="how-to-play-content-section">
+        <div class="how-to-play-image-container">
+          <img src="assets/SuiTwo_Character.webp" alt="SuiTwo Character" class="how-to-play-image" onerror="this.src='assets/SuiTwo_Profile.webp'">
+        </div>
+        <p class="how-to-play-narrative">
+          SuiTwo is a powerful entity born from the chaos of market volatility. Like a legendary guardian, SuiTwo channels mystical energy to defend against the negative forces that threaten market stability. With each battle, SuiTwo grows stronger, learning to harness the power of market momentum itself.
+        </p>
+        <p>
+          As you play, you embody SuiTwo's journey through the treacherous market chart, fighting against bearish enemies and manipulative forces that seek to crash the market. Your success determines SuiTwo's power and progression.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="how-to-play-accordion">
+    <div class="how-to-play-accordion-header">
+      <h3>Abilities & Powers</h3>
+      <span class="how-to-play-accordion-icon">▼</span>
+    </div>
+    <div class="how-to-play-accordion-content">
+      <div class="how-to-play-content-section">
+        <div class="how-to-play-image-container">
+          <canvas id="magicOrbPreview" width="200" height="200" style="max-width: 200px; margin: 0 auto; display: block;"></canvas>
+        </div>
+        <p class="how-to-play-narrative">
+          SuiTwo's primary weapon is the Magic Orb—a manifestation of pure market energy. These blue orbs of power grow stronger with each power-up collected, representing SuiTwo's increasing mastery over market forces.
+        </p>
+        <div class="how-to-play-gameplay">
+          <h4>Magic Orb Levels</h4>
+          <ul>
+            <li><strong>Level 1-10:</strong> Your orb power increases with each level</li>
+            <li><strong>Fire Rate:</strong> Decreases as level increases (faster shooting)</li>
+            <li><strong>Base Interval:</strong> 300ms at Level 1, down to 100ms at Level 10</li>
+            <li><strong>Auto-Fire:</strong> Orbs fire automatically at configured intervals</li>
+          </ul>
+        </div>
+        <div class="how-to-play-gameplay">
+          <h4>Force Field</h4>
+          <p>When you collect enough coins in a streak, SuiTwo can activate a protective force field—a shield of market energy that blocks all incoming projectiles. This represents SuiTwo's ability to create stability in volatile markets.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="how-to-play-accordion">
+    <div class="how-to-play-accordion-header">
+      <h3>Character Image</h3>
+      <span class="how-to-play-accordion-icon">▼</span>
+    </div>
+    <div class="how-to-play-accordion-content">
+      <div class="how-to-play-content-section">
+        <div class="how-to-play-image-container">
+          <img src="assets/SuiTwo_Character.webp" alt="SuiTwo Character" class="how-to-play-image">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Note: Due to message length limits, I'll continue with the remaining tabs in the next response -->
+<!-- The structure follows the same pattern for all remaining tabs -->

@@ -1,0 +1,46 @@
+diff --git a/node_modules/@mysten/sui/dist/cjs/jsonRpc/json-rpc-resolver.js b/node_modules/@mysten/sui/dist/cjs/jsonRpc/json-rpc-resolver.js
+index 33d3493..156e4cf 100644
+--- a/node_modules/@mysten/sui/dist/cjs/jsonRpc/json-rpc-resolver.js
++++ b/node_modules/@mysten/sui/dist/cjs/jsonRpc/json-rpc-resolver.js
+@@ -159,15 +159,10 @@ async function resolveObjectReferences(transactionData, client) {
+         initialSharedVersion: input.UnresolvedObject.initialSharedVersion || object?.initialSharedVersion,
+         mutable: input.UnresolvedObject.mutable || isUsedAsMutable(transactionData, index)
+       });
+-    } else if (isUsedAsReceiving(transactionData, index)) {
+-      updated = import_Inputs.Inputs.ReceivingRef(
+-        {
+-          objectId: id,
+-          digest: input.UnresolvedObject.digest ?? object?.digest,
+-          version: input.UnresolvedObject.version ?? object?.version
+-        }
+-      );
+     }
++    // Aqueduct: do not emit ObjectArg::Receiving for unresolved inputs. ReceivingRef requires the
++    // fullnode "coin reservation backward compatibility" feature and breaks executeTransactionBlock
++    // on many public RPCs. Our PTBs (e.g. terminal paid checkout) pass Coin<T> by value, not Receiving<T>.
+     transactionData.inputs[transactionData.inputs.indexOf(input)] = updated ?? import_Inputs.Inputs.ObjectRef({
+       objectId: id,
+       digest: input.UnresolvedObject.digest ?? object?.digest,
+diff --git a/node_modules/@mysten/sui/dist/esm/jsonRpc/json-rpc-resolver.js b/node_modules/@mysten/sui/dist/esm/jsonRpc/json-rpc-resolver.js
+index ef4f80e..0e3e898 100644
+--- a/node_modules/@mysten/sui/dist/esm/jsonRpc/json-rpc-resolver.js
++++ b/node_modules/@mysten/sui/dist/esm/jsonRpc/json-rpc-resolver.js
+@@ -140,15 +140,10 @@ async function resolveObjectReferences(transactionData, client) {
+         initialSharedVersion: input.UnresolvedObject.initialSharedVersion || object?.initialSharedVersion,
+         mutable: input.UnresolvedObject.mutable || isUsedAsMutable(transactionData, index)
+       });
+-    } else if (isUsedAsReceiving(transactionData, index)) {
+-      updated = Inputs.ReceivingRef(
+-        {
+-          objectId: id,
+-          digest: input.UnresolvedObject.digest ?? object?.digest,
+-          version: input.UnresolvedObject.version ?? object?.version
+-        }
+-      );
+     }
++    // Aqueduct: do not emit ObjectArg::Receiving for unresolved inputs. ReceivingRef requires the
++    // fullnode "coin reservation backward compatibility" feature and breaks executeTransactionBlock
++    // on many public RPCs. Our PTBs (e.g. terminal paid checkout) pass Coin<T> by value, not Receiving<T>.
+     transactionData.inputs[transactionData.inputs.indexOf(input)] = updated ?? Inputs.ObjectRef({
+       objectId: id,
+       digest: input.UnresolvedObject.digest ?? object?.digest,

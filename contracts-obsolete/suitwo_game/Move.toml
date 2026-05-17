@@ -1,0 +1,11 @@
+[package]
+name = "suitwo_game"
+version = "1.0.0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "d75fae3aa7fa3545b5803980a1e0c965b8bbf48e" }
+# Platform: shooter-game connects via platform backend/API; no on-chain platform dependency (deprecated).
+
+[addresses]
+# Published package ID (fresh deploy 2026-02-05). Required for upgrades.
+suitwo_game = "0x22c0b3305db0680ed31e0dcf888ce925d75d6ace57e99f7b89f3a2be2bea0432"
