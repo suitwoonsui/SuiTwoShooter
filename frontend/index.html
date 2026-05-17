@@ -9,9 +9,8 @@
   <!-- For production, uncomment and set your backend URL: -->
   <!-- <meta name="backend-url" content="https://your-backend.vercel.app/api" /> -->
   
-  <!-- Wallet Module URL - Auto-detects local file in development -->
-  <!-- For production, uncomment and set your wallet module URL: -->
-  <meta name="wallet-module-url" content="https://aqueduct-platform.vercel.app/wallet-api.umd.cjs" />
+  <!-- Wallet module: resolved from game backend GET /api/config (uses PLATFORM_BACKEND_URL + /wallet-api.umd.cjs on platform). -->
+  <!-- Optional debug override only: <meta name="wallet-module-url" content="https://.../wallet-api.umd.cjs" /> -->
   <script>
     (function initializeAppViewportUnit() {
       const getVV = () => ({

@@ -72,13 +72,10 @@ const getConfig = () => {
         // Default production backend URL
         config.backendUrl = 'https://sui-two-shooter-backend-sui-integra.vercel.app/api';
       }
-      
-      if (!config.walletModuleUrl) {
-        // Default production wallet module URL: served directly from the Aqueduct Platform deployment.
-        // If you deploy your own wallet-module host, set the meta tag:
-        // <meta name="wallet-module-url" content="https://.../wallet-api.umd.cjs" />
-        config.walletModuleUrl = 'https://aqueduct-platform.vercel.app/wallet-api.umd.cjs';
-      }
+
+      // Wallet bundle URL is NOT derived from the game API base. It comes from Aqueduct Platform
+      // (PLATFORM_BACKEND_URL on the game backend) via GET /api/config → platform estuary/connect.
+      // Optional override: <meta name="wallet-module-url" content="..." /> for debugging only.
     }
   } else {
     // Fallback for non-browser environments (e.g. SSR); align with game backend default.
@@ -88,6 +85,28 @@ const getConfig = () => {
   
   return config;
 };
+
+/** Game backend GET /api/config (proxies platform estuary/connect → walletModuleUrl). */
+function hydrateWalletModuleUrlFromGameBackend(gameApiBase) {
+  if (!gameApiBase || typeof fetch === 'undefined') return;
+  try {
+    const u = new URL(String(gameApiBase), window.location.origin);
+    const path = u.pathname.replace(/\/+$/, '');
+    const configPath = path.endsWith('/api') ? `${path}/config` : '/api/config';
+    const configUrl = `${u.origin}${configPath}?source=base-config`;
+    fetch(configUrl, { method: 'GET', cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json && json.success === true && typeof json.walletModuleUrl === 'string' && json.walletModuleUrl.length > 0) {
+          window.GAME_CONFIG.WALLET_MODULE_URL = json.walletModuleUrl;
+          console.log('🔧 [BASE CONFIG] Wallet module URL from game /api/config:', json.walletModuleUrl);
+        }
+      })
+      .catch(() => {});
+  } catch (_e) {
+    // ignore
+  }
+}
 
 // Initialize global config immediately when script loads
 (function() {
@@ -100,6 +119,13 @@ const getConfig = () => {
   // Kept for older callers; must be the game API base — only WALLET_MODULE_URL may point at the platform host.
   window.GAME_CONFIG.BASE_BACKEND_URL = config.gameBackendUrl || config.backendUrl;
   window.GAME_CONFIG.WALLET_MODULE_URL = config.walletModuleUrl;
+
+  const isLocalhost =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+  if (!isLocalhost && config.backendUrl && !config.walletModuleUrl) {
+    hydrateWalletModuleUrlFromGameBackend(config.backendUrl);
+  }
   
   // Helper function to get the correct backend URL for a given endpoint
   window.GAME_CONFIG.getBackendUrl = function(_endpoint) {

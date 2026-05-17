@@ -527,7 +527,7 @@ function loadScripts(scripts, type = 'scripts') {
             const resp = await fetch(configUrl, { method: 'GET' });
             if (resp.ok) {
               const json = await resp.json();
-              if (json && typeof json.walletModuleUrl === 'string' && json.walletModuleUrl.length > 0) {
+              if (json?.success === true && typeof json.walletModuleUrl === 'string' && json.walletModuleUrl.length > 0) {
                 return json.walletModuleUrl;
               }
             }
