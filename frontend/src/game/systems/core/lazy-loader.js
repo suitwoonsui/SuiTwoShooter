@@ -510,39 +510,46 @@ function loadScripts(scripts, type = 'scripts') {
         const configured = window.GAME_CONFIG?.WALLET_MODULE_URL;
 
         const apiBase = window.GAME_CONFIG?.API_BASE_URL;
-        const isProdHost =
-          typeof window !== 'undefined' &&
-          window.location &&
-          (window.location.hostname.includes('vercel.app') || window.location.protocol === 'https:');
+        const hostname = typeof window !== 'undefined' && window.location ? window.location.hostname : '';
+        const isLocalhost =
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname === '0.0.0.0' ||
+          hostname.startsWith('192.168.') ||
+          hostname.startsWith('10.');
 
-        // Preferred in production: ask the game backend for the platform-provided walletModuleUrl.
-        // This makes the wallet bundle location driven by backend/platform config (env vars, ecosystems),
-        // rather than being baked into static HTML.
-        if (isProdHost && apiBase) {
+        // Production: game backend resolves wallet URL from PLATFORM_BACKEND_URL (never localhost).
+        if (!isLocalhost && apiBase) {
           try {
             const u = new URL(String(apiBase), window.location.origin);
             const path = u.pathname.replace(/\/+$/, '');
             const configPath = path.endsWith('/api') ? `${path}/config` : '/api/config';
             const configUrl = `${u.origin}${configPath}?source=wallet-loader`;
-            const resp = await fetch(configUrl, { method: 'GET' });
+            const resp = await fetch(configUrl, { method: 'GET', cache: 'no-store' });
             if (resp.ok) {
               const json = await resp.json();
               if (json?.success === true && typeof json.walletModuleUrl === 'string' && json.walletModuleUrl.length > 0) {
                 return json.walletModuleUrl;
               }
             }
-          } catch (_e) {
-            // ignore and fall back
+            console.error('❌ [WALLET] Game /api/config did not return walletModuleUrl', {
+              status: resp.status,
+              apiBase,
+            });
+          } catch (e) {
+            console.error('❌ [WALLET] Failed to fetch game /api/config', e);
           }
         }
 
-        // Fallback/override: static config (meta tag / base-config).
-        if (configured && !String(configured).includes('your-base-backend.vercel.app')) {
+        if (configured && !String(configured).includes('your-base-backend.vercel.app') && !String(configured).includes('localhost')) {
           return configured;
         }
 
-        // Local dev fallback (platform wallet bundle on 3000).
-        return 'http://localhost:3000/wallet-api.umd.cjs';
+        if (isLocalhost) {
+          return 'http://localhost:3000/wallet-api.umd.cjs';
+        }
+
+        throw new Error('Wallet module URL unavailable. Set PLATFORM_BACKEND_URL on the game backend and redeploy.');
       };
 
       const withWalletCacheBust = (baseUrl) => {
@@ -591,18 +598,22 @@ function loadScripts(scripts, type = 'scripts') {
 
       // Best-effort: retry once if load fails or WalletAPI didn't materialize.
       (async () => {
-        const baseUrl = await resolveWalletBaseUrl();
-        const walletModuleUrl = withWalletCacheBust(baseUrl);
-        console.log('📦 Loading wallet module from:', walletModuleUrl, { baseUrl });
+        try {
+          const baseUrl = await resolveWalletBaseUrl();
+          const walletModuleUrl = withWalletCacheBust(baseUrl);
+          console.log('📦 Loading wallet module from:', walletModuleUrl, { baseUrl });
 
-        const r1 = await loadWalletBundleOnce(walletModuleUrl, 1);
-        if (typeof window.WalletAPI !== 'undefined') return;
-        if (!r1.ok || typeof window.WalletAPI === 'undefined') {
-          console.warn('⚠️ Wallet bundle retrying (WalletAPI still missing)', {
-            hasWalletAPI: typeof window.WalletAPI !== 'undefined',
-          });
-          const retryUrl = withWalletCacheBust(baseUrl);
-          await loadWalletBundleOnce(retryUrl, 2);
+          const r1 = await loadWalletBundleOnce(walletModuleUrl, 1);
+          if (typeof window.WalletAPI !== 'undefined') return;
+          if (!r1.ok || typeof window.WalletAPI === 'undefined') {
+            console.warn('⚠️ Wallet bundle retrying (WalletAPI still missing)', {
+              hasWalletAPI: typeof window.WalletAPI !== 'undefined',
+            });
+            const retryUrl = withWalletCacheBust(baseUrl);
+            await loadWalletBundleOnce(retryUrl, 2);
+          }
+        } catch (walletErr) {
+          console.error('❌ [WALLET] Could not resolve wallet module URL', walletErr);
         }
       })();
     }

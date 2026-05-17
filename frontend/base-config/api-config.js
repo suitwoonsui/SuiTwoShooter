@@ -98,8 +98,10 @@ function hydrateWalletModuleUrlFromGameBackend(gameApiBase) {
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (json && json.success === true && typeof json.walletModuleUrl === 'string' && json.walletModuleUrl.length > 0) {
-          window.GAME_CONFIG.WALLET_MODULE_URL = json.walletModuleUrl;
-          console.log('🔧 [BASE CONFIG] Wallet module URL from game /api/config:', json.walletModuleUrl);
+          if (!json.walletModuleUrl.includes('localhost')) {
+            window.GAME_CONFIG.WALLET_MODULE_URL = json.walletModuleUrl;
+            console.log('🔧 [BASE CONFIG] Wallet module URL from game /api/config:', json.walletModuleUrl);
+          }
         }
       })
       .catch(() => {});

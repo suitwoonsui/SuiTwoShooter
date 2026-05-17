@@ -38,16 +38,14 @@ function normalizePlatformBackendBaseUrl(url: string): string {
 
 /**
  * Get the platform backend base URL from env only (no hardcoded production URL).
- * PLATFORM_BACKEND_URL, PLATFORM_APP_CONFIG_URL, NEXT_PUBLIC_PLATFORM_BACKEND_URL.
+ * PLATFORM_BACKEND_URL, NEXT_PUBLIC_PLATFORM_BACKEND_URL.
  * (Do not use API_BASE_URL here — on the game backend that often points at the game API, not Aqueduct Platform.)
  * Local dev defaults to http://localhost:3000 when unset. Production on Vercel must set env vars.
  */
 export function getPlatformBackendUrl(): string {
   const fromEnv =
     (typeof process !== 'undefined' &&
-      (process.env.PLATFORM_BACKEND_URL ||
-        process.env.PLATFORM_APP_CONFIG_URL ||
-        process.env.NEXT_PUBLIC_PLATFORM_BACKEND_URL)) ||
+      (process.env.PLATFORM_BACKEND_URL || process.env.NEXT_PUBLIC_PLATFORM_BACKEND_URL)) ||
     (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_PLATFORM_BACKEND_URL);
 
   if (fromEnv) {

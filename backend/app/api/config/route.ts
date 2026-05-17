@@ -10,19 +10,13 @@ import { platformConfigClient, getEcosystemIdFromRequest } from '@/lib/services/
 
 // Note: withApiHandler automatically handles OPTIONS/CORS, so we don't need a separate OPTIONS export
 
-type GameFrontendConfigResponse =
-  | {
-      success: true;
-      network?: string;
-      rpcUrl?: string;
-      walletModuleUrl?: string;
-      storageKey: 'game-admin-wallet';
-    }
-  | {
-      success: false;
-      error: string;
-      storageKey: 'game-admin-wallet';
-    };
+type GameFrontendConfigResponse = {
+  success: true;
+  network?: string;
+  rpcUrl?: string;
+  walletModuleUrl?: string;
+  storageKey: 'game-admin-wallet';
+};
 
 type CachedEntry = { at: number; data: GameFrontendConfigResponse };
 
@@ -71,85 +65,39 @@ export const GET = withApiHandler(
     const p = (async (): Promise<GameFrontendConfigResponse> => {
       console.info('[GAME_BACKEND_PROXY] Forwarding config request to platform API', {
         route: '/api/config',
-        target: '/api/config',
+        target: '/api/estuary/connect',
         source: source || '(missing)',
         ecosystemId: ecosystemId || '(default-from-env)',
         cache: 'miss',
         forceRefresh,
       });
-      // Config is now handled by platform; proxy and override storageKey for game frontend; inform platform of ecosystem
       const result = await platformConfigClient.getConfig({ ecosystemId });
-      if (!result.success) {
-        const err = result.error || 'Platform estuary/connect failed';
-        console.warn('[GAME_BACKEND_PROXY] Platform config unavailable', {
-          route: '/api/config',
-          error: err,
-        });
-        return {
-          success: false,
-          error: err,
-          storageKey: 'game-admin-wallet',
-        };
+      if (!result.success && result.error) {
+        throw new Error(result.error);
       }
       console.info('[GAME_BACKEND_PROXY] Platform config response received', {
         route: '/api/config',
         success: true,
         network: result.network,
+        walletModuleUrl: result.walletModuleUrl,
       });
       const data: GameFrontendConfigResponse = {
         success: true,
         network: result.network,
         rpcUrl: result.rpcUrl,
         walletModuleUrl: result.walletModuleUrl,
-        // Keep game-admin-wallet so game frontend doesn't overwrite platform admin wallet connection
         storageKey: 'game-admin-wallet',
       };
       configCacheByEcosystemId.set(cacheKey, { at: Date.now(), data });
       return data;
-    })()
-      .finally(() => {
-        configInFlightByEcosystemId.delete(cacheKey);
-      });
+    })().finally(() => {
+      configInFlightByEcosystemId.delete(cacheKey);
+    });
 
     configInFlightByEcosystemId.set(cacheKey, p);
     return p;
-
-    /* ---- COMMENTED OUT: config now handled by platform (use GET /api/platform/config or this proxy) ----
-    // Read environment variables directly instead of calling getConfig()
-    // This avoids validation errors for missing optional variables
-    // We only need basic network info for the frontend
-    let network: 'testnet' | 'mainnet' | 'devnet' = 'testnet';
-    if (process.env.SUI_TESTNET_NETWORK) {
-      network = 'testnet';
-    } else if (process.env.SUI_MAINNET_NETWORK) {
-      network = 'mainnet';
-    } else if (process.env.SUI_NETWORK) {
-      network = process.env.SUI_NETWORK as 'testnet' | 'mainnet' | 'devnet';
-    }
-    const rpcUrl = process.env.SUI_RPC_URL || (
-      network === 'testnet'
-        ? 'https://fullnode.testnet.sui.io:443'
-        : network === 'mainnet'
-        ? 'https://fullnode.mainnet.sui.io:443'
-        : 'https://fullnode.devnet.sui.io:443'
-    );
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-    const walletModuleUrl = process.env.WALLET_MODULE_URL || (
-      isProduction
-        ? 'https://your-base-backend.vercel.app/wallet-api.umd.cjs'
-        : 'http://localhost:3000/wallet-api.umd.cjs'
-    );
-    return {
-      success: true,
-      network,
-      rpcUrl,
-      walletModuleUrl,
-      storageKey: 'game-admin-wallet',
-    };
-    ---- end commented out ---- */
   },
   {
-    logRequest: false, // Config endpoint doesn't need request logging
+    logRequest: false,
   }
 );
-
