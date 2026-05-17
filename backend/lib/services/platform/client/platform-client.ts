@@ -32,19 +32,26 @@ export function encodeDefinitionValue(jsonString: string): string {
   return gzipSync(Buffer.from(jsonString, 'utf8')).toString('base64');
 }
 
+function normalizePlatformBackendBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, '');
+}
+
 /**
- * Get the platform backend base URL.
- * Uses PLATFORM_BACKEND_URL / NEXT_PUBLIC_PLATFORM_BACKEND_URL only; no hardcoded production URL.
- * When the game is served from localhost, defaults to http://localhost:3000 so local dev works.
- * For production (e.g. Vercel), set PLATFORM_BACKEND_URL in that environment's variables.
+ * Get the platform backend base URL from env only (no hardcoded production URL).
+ * PLATFORM_BACKEND_URL, PLATFORM_APP_CONFIG_URL, API_BASE_URL, NEXT_PUBLIC_PLATFORM_BACKEND_URL.
+ * Local dev defaults to http://localhost:3000 when unset. Production on Vercel must set env vars.
  */
 export function getPlatformBackendUrl(): string {
-  const explicitUrl =
-    (typeof process !== 'undefined' && (process.env.PLATFORM_BACKEND_URL || process.env.NEXT_PUBLIC_PLATFORM_BACKEND_URL)) ||
+  const fromEnv =
+    (typeof process !== 'undefined' &&
+      (process.env.PLATFORM_BACKEND_URL ||
+        process.env.PLATFORM_APP_CONFIG_URL ||
+        process.env.NEXT_PUBLIC_PLATFORM_BACKEND_URL ||
+        process.env.API_BASE_URL)) ||
     (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_PLATFORM_BACKEND_URL);
 
-  if (explicitUrl) {
-    return explicitUrl;
+  if (fromEnv) {
+    return normalizePlatformBackendBaseUrl(fromEnv);
   }
 
   // Client-side on localhost: default to local platform backend
@@ -60,7 +67,6 @@ export function getPlatformBackendUrl(): string {
     return 'http://localhost:3000';
   }
 
-  // Production without env: no hardcoded URL; caller must set PLATFORM_BACKEND_URL in deployment.
   return '';
 }
 

@@ -257,9 +257,11 @@ function beginMenuBootstrapPrefetch(gameApiBase, forceRefresh) {
         (readiness.store === true && readiness.tournaments === true)
       );
       if (!bootstrapData?.success || !ready) {
-        const reason = bootstrapData?.success
-          ? 'Blocking bootstrap dependencies are not ready yet'
-          : 'Menu bootstrap failed';
+        const sliceErrors = bootstrapData?.readiness?.errors;
+        const detail = [sliceErrors?.store, sliceErrors?.tournaments].filter(Boolean).join('; ');
+        const reason = !bootstrapData?.success
+          ? 'Menu bootstrap failed'
+          : detail || 'Blocking bootstrap dependencies are not ready yet';
         window.__menuBootstrapState = {
           status: 'error',
           at: now,
