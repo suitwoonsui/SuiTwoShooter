@@ -10,13 +10,19 @@ import { platformConfigClient, getEcosystemIdFromRequest } from '@/lib/services/
 
 // Note: withApiHandler automatically handles OPTIONS/CORS, so we don't need a separate OPTIONS export
 
-type GameFrontendConfigResponse = {
-  success: true;
-  network?: string;
-  rpcUrl?: string;
-  walletModuleUrl?: string;
-  storageKey: 'game-admin-wallet';
-};
+type GameFrontendConfigResponse =
+  | {
+      success: true;
+      network?: string;
+      rpcUrl?: string;
+      walletModuleUrl?: string;
+      storageKey: 'game-admin-wallet';
+    }
+  | {
+      success: false;
+      error: string;
+      storageKey: 'game-admin-wallet';
+    };
 
 type CachedEntry = { at: number; data: GameFrontendConfigResponse };
 
@@ -73,8 +79,17 @@ export const GET = withApiHandler(
       });
       // Config is now handled by platform; proxy and override storageKey for game frontend; inform platform of ecosystem
       const result = await platformConfigClient.getConfig({ ecosystemId });
-      if (!result.success && result.error) {
-        throw new Error(result.error);
+      if (!result.success) {
+        const err = result.error || 'Platform estuary/connect failed';
+        console.warn('[GAME_BACKEND_PROXY] Platform config unavailable', {
+          route: '/api/config',
+          error: err,
+        });
+        return {
+          success: false,
+          error: err,
+          storageKey: 'game-admin-wallet',
+        };
       }
       console.info('[GAME_BACKEND_PROXY] Platform config response received', {
         route: '/api/config',

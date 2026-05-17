@@ -15,7 +15,7 @@ import {
 
 let bootstrapInFlight: Promise<Record<string, unknown>> | null = null;
 
-async function loadBootstrapSlice<T>(
+async function loadBootstrapSlice<T extends Record<string, unknown>>(
   label: string,
   loader: () => Promise<T>,
   fallback: T
@@ -24,8 +24,11 @@ async function loadBootstrapSlice<T>(
     return await loader();
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    PlatformLogger.error(`[BOOTSTRAP] ${label} load failed`, { message });
-    return fallback;
+    PlatformLogger.error(`[BOOTSTRAP] ${label} load failed`, {
+      message,
+      platformBackendUrl: getPlatformBackendUrl() || '(unset)',
+    });
+    return { ...fallback, error: message };
   }
 }
 

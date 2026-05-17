@@ -521,8 +521,10 @@ function loadScripts(scripts, type = 'scripts') {
         if (isProdHost && apiBase) {
           try {
             const u = new URL(String(apiBase), window.location.origin);
-            const configUrl = new URL('./config', u.toString()); // /api/config
-            const resp = await fetch(configUrl.toString(), { method: 'GET' });
+            const path = u.pathname.replace(/\/+$/, '');
+            const configPath = path.endsWith('/api') ? `${path}/config` : '/api/config';
+            const configUrl = `${u.origin}${configPath}?source=wallet-loader`;
+            const resp = await fetch(configUrl, { method: 'GET' });
             if (resp.ok) {
               const json = await resp.json();
               if (json && typeof json.walletModuleUrl === 'string' && json.walletModuleUrl.length > 0) {
