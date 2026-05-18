@@ -1,7 +1,7 @@
 // ==========================================
 // Inventory Merge Recipe Definition (Admin)
 // Source of truth: Aquifer definition storage (compressed base64 JSON).
-// This does NOT make merges executable by itself; publish/sync to Reservoir separately.
+// Also syncs the recipe to Reservoir (register_merge_recipe) so player merges can execute.
 // ==========================================
 
 import { NextRequest } from 'next/server';
@@ -144,16 +144,21 @@ export const POST = withApiHandler(async (request: NextRequest) => {
     throw new PlatformError(PlatformErrorCode.TRANSACTION_BUILD_FAILED, msg);
   }
 
-  const transactionBytesBase64 = build.transactions[0];
-  const txBytes = Buffer.from(transactionBytesBase64, 'base64');
-  const signed = await adminWallet.getKeypair().signTransaction(txBytes);
-  const signature = typeof signed === 'object' && signed !== null && 'signature' in signed ? (signed as { signature: string }).signature : String(signed);
-
-  const exec = await platformTxClient.executeSigned({ transactionBytesBase64, signature }, platformOptions);
-  if (!exec.success) {
-    throw new PlatformError(PlatformErrorCode.TRANSACTION_FAILED, exec.error || 'Execution failed');
+  const digests: string[] = [];
+  for (const transactionBytesBase64 of build.transactions) {
+    const txBytes = Buffer.from(transactionBytesBase64, 'base64');
+    const signed = await adminWallet.getKeypair().signTransaction(txBytes);
+    const signature =
+      typeof signed === 'object' && signed !== null && 'signature' in signed
+        ? (signed as { signature: string }).signature
+        : String(signed);
+    const exec = await platformTxClient.executeSigned({ transactionBytesBase64, signature }, platformOptions);
+    if (!exec.success) {
+      throw new PlatformError(PlatformErrorCode.TRANSACTION_FAILED, exec.error || 'Execution failed');
+    }
+    if (exec.digest) digests.push(exec.digest);
   }
 
-  return { success: true, digest: exec.digest, key, recipeId };
+  return { success: true, digest: digests[0], digests, key, recipeId };
 });
 

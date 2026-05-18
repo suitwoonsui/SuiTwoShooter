@@ -508,9 +508,10 @@ function updateConsumptionUI() {
     
     buttons.forEach(button => {
       const level = parseInt(button.getAttribute('data-level')) || 1;
-      const isSelected = gameItemSelection[itemId] === level ||
-                        (itemId === 'destroy_all' && gameItemSelection[itemId] === true && level === 1) ||
-                        (itemId === 'boss_kill_shot' && gameItemSelection[itemId] === true && level === 1);
+      const isNonLeveled = itemId === 'destroy_all' || itemId === 'boss_kill_shot';
+      const isSelected = isNonLeveled
+        ? gameItemSelection[itemId] === true
+        : gameItemSelection[itemId] === level;
       
       if (isSelected) {
         button.classList.add('selected');

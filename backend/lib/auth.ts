@@ -6,6 +6,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConfig } from '@/config/config';
 import { getCorsHeaders } from './cors';
+import { getPlatformApiKeyForCall } from '@/lib/services/platform/client/platform-client';
+
+const SERVER_KEY_HINT =
+  'Set ECOSYSTEM_<id>_APP_<app>_API_KEY (preferred), ECOSYSTEM_<id>_API_KEY, or legacy API_KEY / ADMIN_API_KEY in backend/.env';
+
+/**
+ * Keys the game backend may use for outbound platform calls and optional inbound admin auth.
+ */
+function getConfiguredAdminApiKeys(): string[] {
+  const keys = new Set<string>();
+  try {
+    const legacy = getConfig().security.apiKey;
+    if (legacy) keys.add(legacy);
+  } catch {
+    /* config not ready */
+  }
+  const appKey = getPlatformApiKeyForCall({ apiKeyScope: 'app' });
+  if (appKey) keys.add(appKey);
+  const ecoKey = getPlatformApiKeyForCall({ apiKeyScope: 'ecosystem' });
+  if (ecoKey) keys.add(ecoKey);
+  return [...keys];
+}
+
+/** True when the server can call the platform (app/ecosystem key or legacy API_KEY). */
+export function isGameAdminServerConfigured(): boolean {
+  return getConfiguredAdminApiKeys().length > 0;
+}
+
+/** Throws when no platform/legacy API key is configured (admin proxy routes). */
+export function assertGameAdminServerConfigured(): void {
+  if (!isGameAdminServerConfigured()) {
+    throw new Error(`Platform API key not configured on server. ${SERVER_KEY_HINT}`);
+  }
+}
 
 /**
  * Authentication utilities for admin endpoints
@@ -16,29 +50,20 @@ import { getCorsHeaders } from './cors';
  * Supports both 'Authorization: Bearer <key>' and 'X-API-Key: <key>' headers
  */
 export function verifyApiKey(request: NextRequest): boolean {
-  const config = getConfig();
-  const apiKey = config.security.apiKey;
-
-  // If no API key is configured, deny access (security by default)
-  if (!apiKey || apiKey === '') {
-    console.warn('⚠️ [AUTH] API_KEY not configured in environment variables');
+  const accepted = getConfiguredAdminApiKeys();
+  if (accepted.length === 0) {
+    console.warn('⚠️ [AUTH] No admin/platform API key configured in environment');
     return false;
   }
 
-  // Check Authorization header (Bearer token format)
   const authHeader = request.headers.get('authorization');
   if (authHeader) {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (token === apiKey) {
-      return true;
-    }
+    if (accepted.includes(token)) return true;
   }
 
-  // Check X-API-Key header (alternative format)
   const apiKeyHeader = request.headers.get('x-api-key');
-  if (apiKeyHeader && apiKeyHeader === apiKey) {
-    return true;
-  }
+  if (apiKeyHeader && accepted.includes(apiKeyHeader)) return true;
 
   return false;
 }

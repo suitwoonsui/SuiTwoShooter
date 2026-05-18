@@ -6,6 +6,11 @@ import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger'
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
 import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
 import { PlatformValidators } from '@/lib/services/platform/validators/platform-validators';
+import {
+  type AdminInventoryItemInput,
+  normalizeAdminInventoryItemForPlatform,
+  validateAdminInventoryItem,
+} from '@/lib/services/inventory/admin-inventory-item';
 
 /**
  * POST /api/store/admin/add-items
@@ -19,7 +24,7 @@ import { PlatformValidators } from '@/lib/services/platform/validators/platform-
  * Request body:
  * {
  *   playerAddress: string,
- *   items: Array<{ itemId: string, level: number, quantity: number }>
+ *   items: Array<{ itemId: string, quantity: number, level?: number }> — level only for leveled SKUs
  * }
  */
 export async function OPTIONS(request: NextRequest) {
@@ -41,7 +46,7 @@ export const POST = withApiHandler(
 
     const body = await getRequestBody<{ 
       playerAddress: string; 
-      items: Array<{ itemId: string; level: number; quantity: number }>;
+      items: AdminInventoryItemInput[];
       ecosystemId?: string;
     }>(request);
     const { playerAddress, items } = body;
@@ -61,25 +66,20 @@ export const POST = withApiHandler(
       throw new Error('Invalid items. Must be a non-empty array.');
     }
 
-    // Validate each item
     for (const item of items) {
-      if (!item.itemId || !item.level || !item.quantity) {
-        throw new Error('Each item must have itemId, level, and quantity.');
-      }
-      if (item.quantity <= 0) {
-        throw new Error('Quantity must be greater than 0.');
-      }
+      validateAdminInventoryItem(item);
     }
+    const platformItems = items.map(normalizeAdminInventoryItemForPlatform);
 
     PlatformLogger.info('Received request to add items', {
       adminId,
       playerAddress,
-      items,
+      items: platformItems,
     });
 
     // Call platform inventory API (inventory separated from store; per-ecosystem)
     const result = await platformInventoryClient.adminAddItems(
-      { playerAddress, items },
+      { playerAddress, items: platformItems },
       { ecosystemId: ecosystemId || undefined }
     );
 

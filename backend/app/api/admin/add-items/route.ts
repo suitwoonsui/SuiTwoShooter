@@ -1,18 +1,23 @@
 ﻿import { NextRequest } from 'next/server';
 import { buildBatchViaChannel, platformTxClient, getCorridorAdminCapabilityObjectIdFromEnv, buildPlatformCallOptions } from '@/lib/services/platform/client/platform-client';
 import { handleCorsPreflight } from '@/lib/cors';
-import { getConfig } from '@/config/config';
+import { assertGameAdminServerConfigured } from '@/lib/auth';
 import { getAdminWalletService } from '@/lib/services/wallet/admin/admin-wallet-service';
 import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
 import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
 import { PlatformValidators } from '@/lib/services/platform/validators/platform-validators';
+import {
+  type AdminInventoryItemInput,
+  normalizeAdminInventoryItemForPlatform,
+  validateAdminInventoryItem,
+} from '@/lib/services/inventory/admin-inventory-item';
 
 /**
  * POST /api/admin/add-items
  * 
  * Server-side proxy for admin add items
- * Automatically uses API_KEY from environment (no need to send it from browser)
+ * Uses platform API key from environment server-side (browser does not send a key)
  * This allows a web UI to work without exposing the API key
  */
 export async function OPTIONS(request: NextRequest) {
@@ -21,15 +26,11 @@ export async function OPTIONS(request: NextRequest) {
 
 export const POST = withApiHandler(
   async (request: NextRequest) => {
-    // Verify API key is configured (server-side check)
-    const config = getConfig();
-    if (!config.security.apiKey || config.security.apiKey === '') {
-      throw new Error('API_KEY not configured on server. Please set API_KEY in backend/.env.local');
-    }
+    assertGameAdminServerConfigured();
 
     const body = await getRequestBody<{ 
       playerAddress: string; 
-      items: Array<{ itemId: string; level: number; quantity: number }>; 
+      items: AdminInventoryItemInput[];
       adminWalletAddress: string;
       ecosystemId?: string;
     }>(request);
@@ -67,19 +68,14 @@ export const POST = withApiHandler(
       throw new Error('Invalid items. Must be a non-empty array.');
     }
 
-    // Validate each item
     for (const item of items) {
-      if (!item.itemId || !item.level || !item.quantity) {
-        throw new Error('Each item must have itemId, level, and quantity.');
-      }
-      if (item.quantity <= 0) {
-        throw new Error('Quantity must be greater than 0.');
-      }
+      validateAdminInventoryItem(item);
     }
+    const platformItems = items.map(normalizeAdminInventoryItemForPlatform);
 
     PlatformLogger.info('Server-side request to add items', {
       playerAddress,
-      items,
+      items: platformItems,
     });
 
     const platformOptions = buildPlatformCallOptions(request, body);
@@ -96,7 +92,7 @@ export const POST = withApiHandler(
           operationId: 'inventory-add-items',
           params: {
             playerAddress,
-            items,
+            items: platformItems,
             senderAddress: adminWallet.getAddress(),
             corridorAdminCapId,
           },

@@ -10,9 +10,10 @@ import { bcs } from '@mysten/bcs';
 import { AdminStyles } from '../types';
 import { getApiUrl } from '../utils/get-api-url';
 import { deriveItemOrderFromOfferOrder, sortItemsByStockroomOrder } from '../utils/stockroom-item-order';
+import { isLeveledProvisionItem } from '@/lib/services/inventory/admin-inventory-item';
 
 type ItemChoice = { id: string; name: string; levels: number[] };
-type KeyRow = { itemId: string; level: number; qty: number };
+type KeyRow = { itemId: string; level?: number; qty: number };
 
 type SavedRecipe = {
   key: string;
@@ -22,14 +23,20 @@ type SavedRecipe = {
   rawBase64: string;
 };
 
-function toBalanceKey(itemId: string, level: number): string {
-  return level > 0 ? `${itemId}_${level}` : itemId;
+function toBalanceKey(itemId: string, level?: number): string {
+  return level != null && level > 0 ? `${itemId}_${level}` : itemId;
 }
 
-function parseBalanceKey(k: string): { itemId: string; level: number } {
-  const m = /^(.+)_([0-9]+)$/.exec(String(k || ''));
-  if (m) return { itemId: m[1], level: Number(m[2]) || 0 };
-  return { itemId: String(k || ''), level: 0 };
+function parseBalanceKey(k: string): { itemId: string; level?: number } {
+  const raw = String(k || '');
+  const m = /^(.+)_([0-9]+)$/.exec(raw);
+  if (m) {
+    const itemId = m[1];
+    const level = Number(m[2]);
+    if (!isLeveledProvisionItem(itemId)) return { itemId: raw };
+    return { itemId, level };
+  }
+  return { itemId: raw };
 }
 
 function canonicalRecipeIdFromRows(inRows: KeyRow[], outRows: KeyRow[]): string {
@@ -68,6 +75,18 @@ const MergeRecipeBcs = bcs.struct('MergeRecipe', {
   inputs: bcs.vector(BalanceQtyBcs),
   outputs: bcs.vector(BalanceQtyBcs),
 });
+
+const MERGE_RECIPE_KEY_PREFIX = 'reservoir_merge_recipe:';
+
+function base64ToBytes(b64: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(b64, 'base64'));
+  }
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
 function setDragCardImage(e: React.DragEvent, args: { title: string; subtitle: string }) {
   try {
@@ -247,6 +266,24 @@ export function MergeRecipeBuilder(props: {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isAdminWalletConnected) {
+      setSavedRecipes([]);
+      setSavedLoadedOnce(false);
+      setSavedError(null);
+      return;
+    }
+    void loadSavedRecipes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdminWalletConnected, adminAddress]);
+
+  useEffect(() => {
+    if (leftTab === 'saved' && isAdminWalletConnected && !savedLoadedOnce && !savedLoading) {
+      void loadSavedRecipes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leftTab, isAdminWalletConnected]);
+
   const loadSavedRecipes = async () => {
     if (!isAdminWalletConnected) return;
     setSavedLoading(true);
@@ -255,35 +292,58 @@ export function MergeRecipeBuilder(props: {
       const res = await fetch(getApiUrl('api/aquifer/definitions'), {
         method: 'GET',
         headers: { 'Content-Type': 'application/json', ...(adminAddress ? { 'X-Admin-Wallet': adminAddress } : {}) },
+        cache: 'no-store',
       });
       const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `Failed to load Aquifer definitions (HTTP ${res.status})`);
+      }
       const defs = (data?.definitions ?? []) as Array<{ key?: string; value?: string }>;
-      const prefix = 'reservoir_merge_recipe:';
       const filtered = defs
-        .filter((d) => typeof d.key === 'string' && d.key.startsWith(prefix) && typeof d.value === 'string' && d.value.length > 0)
+        .filter(
+          (d) =>
+            typeof d.key === 'string' &&
+            d.key.startsWith(MERGE_RECIPE_KEY_PREFIX) &&
+            typeof d.value === 'string' &&
+            d.value.length > 0
+        )
         .map((d) => ({ key: d.key as string, value: d.value as string }));
 
       const decoded: SavedRecipe[] = [];
+      let parseFailures = 0;
       for (const d of filtered) {
         try {
-          const bytes = Buffer.from(d.value, 'base64');
+          const bytes = base64ToBytes(d.value);
           const parsed = MergeRecipeBcs.parse(bytes) as unknown as {
             inputs: Array<{ balance_key: number[]; qty: bigint | string }>;
             outputs: Array<{ balance_key: number[]; qty: bigint | string }>;
           };
-          const inputsParsed = parsed.inputs.map((i) => ({ key: new TextDecoder().decode(new Uint8Array(i.balance_key)), qty: Number(i.qty) }));
-          const outputsParsed = parsed.outputs.map((o) => ({ key: new TextDecoder().decode(new Uint8Array(o.balance_key)), qty: Number(o.qty) }));
-          const recipeId = d.key.slice(prefix.length);
+          const inputsParsed = parsed.inputs.map((i) => ({
+            key: new TextDecoder().decode(new Uint8Array(i.balance_key)),
+            qty: Number(i.qty),
+          }));
+          const outputsParsed = parsed.outputs.map((o) => ({
+            key: new TextDecoder().decode(new Uint8Array(o.balance_key)),
+            qty: Number(o.qty),
+          }));
+          const recipeId = d.key.slice(MERGE_RECIPE_KEY_PREFIX.length);
           decoded.push({ key: d.key, recipeId, inputs: inputsParsed, outputs: outputsParsed, rawBase64: d.value });
         } catch {
-          /* skip */
+          parseFailures += 1;
         }
       }
       decoded.sort((a, b) => a.recipeId.localeCompare(b.recipeId));
       setSavedRecipes(decoded);
       setSavedLoadedOnce(true);
+      if (parseFailures > 0 && decoded.length === 0) {
+        setSavedError(`${parseFailures} recipe definition(s) could not be decoded (BCS format mismatch).`);
+      } else if (parseFailures > 0) {
+        setSavedError(`Loaded ${decoded.length} recipe(s); skipped ${parseFailures} with invalid format.`);
+      }
     } catch (e) {
       setSavedError(e instanceof Error ? e.message : 'Failed to load Aquifer definitions');
+      setSavedRecipes([]);
+      setSavedLoadedOnce(true);
     } finally {
       setSavedLoading(false);
     }
@@ -378,6 +438,8 @@ export function MergeRecipeBuilder(props: {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.success) {
         setResult({ success: true, digest: data.digest });
+        await loadSavedRecipes();
+        setLeftTab('saved');
       } else {
         setResult({ success: false, error: data?.error || 'Failed to save recipe definition' });
       }
@@ -659,7 +721,10 @@ export function MergeRecipeBuilder(props: {
             </button>
             <button
               type="button"
-              onClick={() => setLeftTab('saved')}
+              onClick={() => {
+                setLeftTab('saved');
+                if (isAdminWalletConnected && !savedLoading) void loadSavedRecipes();
+              }}
               style={{
                 padding: '0.6rem 0.9rem',
                 backgroundColor: leftTab === 'saved' ? styles.buttonPrimary : styles.bgSecondary,
@@ -828,9 +893,14 @@ export function MergeRecipeBuilder(props: {
               </div>
 
               {savedError && <div style={{ marginTop: '0.75rem', color: styles.textError }}>{savedError}</div>}
-              {!savedError && savedRecipes.length === 0 && (
+              {savedLoading && (
                 <div style={{ marginTop: '0.75rem', color: styles.textSecondary, fontSize: '0.9rem' }}>
-                  No saved recipes found yet. (Looking for keys with prefix <code>reservoir_merge_recipe:</code>)
+                  Loading saved recipes from Aquifer…
+                </div>
+              )}
+              {!savedLoading && savedLoadedOnce && !savedError && savedRecipes.length === 0 && (
+                <div style={{ marginTop: '0.75rem', color: styles.textSecondary, fontSize: '0.9rem' }}>
+                  No saved recipes found yet. (Looking for keys with prefix <code>{MERGE_RECIPE_KEY_PREFIX}</code>)
                 </div>
               )}
 

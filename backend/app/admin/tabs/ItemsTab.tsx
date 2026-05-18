@@ -12,6 +12,12 @@ import { useWalletDiscovery } from '../hooks/useWalletDiscovery';
 import { WalletDiscoveryUI } from '../components/WalletDiscoveryUI';
 import { WalletList } from '../components/WalletList';
 import { CopyableAddress } from '../components/CopyableAddress';
+import {
+  inventoryRowKey,
+  parseInventoryRowKey,
+  serializeAdminInventoryItem,
+  type AdminInventoryItemInput,
+} from '@/lib/services/inventory/admin-inventory-item';
 import { MergeRecipeBuilder } from '../components/MergeRecipeBuilder';
 import { StockroomTab } from './StockroomTab';
 import { StoreItem, CATALOG_ITEM_ORDER } from '@/lib/services/store/catalog/item-catalog';
@@ -24,11 +30,7 @@ interface ItemsTabProps {
   styles: AdminStyles;
 }
 
-interface Item {
-  itemId: string;
-  level: number;
-  quantity: number;
-}
+interface Item extends AdminInventoryItemInput {}
 
 interface UserInventory {
   address: string;
@@ -42,6 +44,11 @@ type ItemType = {
   name: string;
   levels: number[];
 };
+
+function levelsForCategory(categoryType: ItemType): (number | undefined)[] {
+  if (categoryType.levels.length === 0) return [undefined];
+  return [1, 2, 3].filter((l) => categoryType.levels.includes(l));
+}
 
 const itemTypes: ItemType[] = [
   { id: 'extra_lives', name: 'Extra Lives', levels: [1, 2, 3] },
@@ -114,7 +121,8 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
   interface PendingChange {
     address: string;
     itemId: string;
-    level: number;
+    /** Omitted for non-leveled items (destroy_all, boss_kill_shot). */
+    level?: number;
     currentQuantity: number;
     targetQuantity: number;
   }
@@ -348,11 +356,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
         },
         body: JSON.stringify({
           playerAddress: address,
-          items: items.map(item => ({
-            itemId: item.itemId,
-            level: item.level,
-            quantity: item.quantity,
-          })),
+          items: items.map((item) => serializeAdminInventoryItem(item)),
           adminWalletAddress: connectedAddress,
         }),
       });
@@ -501,11 +505,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
           },
           body: JSON.stringify({
             playerAddress: address,
-            items: bulkItems.map(item => ({
-              itemId: item.itemId,
-              level: item.level,
-              quantity: item.quantity,
-            })),
+            items: bulkItems.map((item) => serializeAdminInventoryItem(item)),
             adminWalletAddress: connectedAddress,
           }),
         });
@@ -536,24 +536,23 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
   };
 
   // Format inventory for display
-  const formatInventory = (inventory: Record<string, number>): Array<{ itemId: string; level: number; quantity: number }> => {
-    const formatted: Array<{ itemId: string; level: number; quantity: number }> = [];
-    
+  const formatInventory = (inventory: Record<string, number>): AdminInventoryItemInput[] => {
+    const formatted: AdminInventoryItemInput[] = [];
+
     for (const [key, quantity] of Object.entries(inventory)) {
       if (quantity > 0) {
-        const m = /^(.+)_([0-9]+)$/.exec(key);
-        if (m) {
-          formatted.push({ itemId: m[1], level: parseInt(m[2], 10), quantity });
-        } else {
-          // Non-leveled key (e.g. destroy_all, boss_kill_shot)
-          formatted.push({ itemId: key, level: 0, quantity });
-        }
+        const parsed = parseInventoryRowKey(key);
+        formatted.push({
+          itemId: parsed.itemId,
+          quantity,
+          ...(parsed.level != null ? { level: parsed.level } : {}),
+        });
       }
     }
-    
+
     return formatted.sort((a, b) => {
       if (a.itemId !== b.itemId) return a.itemId.localeCompare(b.itemId);
-      return a.level - b.level;
+      return (a.level ?? 0) - (b.level ?? 0);
     });
   };
 
@@ -575,11 +574,16 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
   }
 
   // Pending changes management - global across all wallets
-  const updatePendingChange = (address: string, itemId: string, level: number, targetQuantity: number) => {
+  const updatePendingChange = (
+    address: string,
+    itemId: string,
+    level: number | undefined,
+    targetQuantity: number,
+  ) => {
     const walletData = walletInventories[address];
     if (!walletData) return;
 
-    const key = level > 0 ? `${itemId}_${level}` : itemId;
+    const key = inventoryRowKey(itemId, level);
     const currentQuantity = (walletData.inventory && typeof walletData.inventory === 'object')
       ? (walletData.inventory[key] || 0)
       : 0;
@@ -613,7 +617,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
     });
   };
 
-  const removeOneFromPendingChange = (address: string, itemId: string, level: number) => {
+  const removeOneFromPendingChange = (address: string, itemId: string, level?: number) => {
     setPendingChanges(prev => {
       const existingIndex = prev.findIndex(
         change => change.address === address && change.itemId === itemId && change.level === level
@@ -677,17 +681,21 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
         for (const change of walletChanges) {
           const difference = change.targetQuantity - change.currentQuantity;
           if (difference > 0) {
-            itemsToAdd.push({
-              itemId: change.itemId,
-              level: change.level,
-              quantity: difference,
-            });
+            itemsToAdd.push(
+              serializeAdminInventoryItem({
+                itemId: change.itemId,
+                quantity: difference,
+                ...(change.level != null ? { level: change.level } : {}),
+              }),
+            );
           } else if (difference < 0) {
-            itemsToRemove.push({
-              itemId: change.itemId,
-              level: change.level,
-              quantity: Math.abs(difference),
-            });
+            itemsToRemove.push(
+              serializeAdminInventoryItem({
+                itemId: change.itemId,
+                quantity: Math.abs(difference),
+                ...(change.level != null ? { level: change.level } : {}),
+              }),
+            );
           }
         }
 
@@ -782,7 +790,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
     }
   };
 
-  const getPendingChange = (address: string, itemId: string, level: number): PendingChange | null => {
+  const getPendingChange = (address: string, itemId: string, level?: number): PendingChange | null => {
     return pendingChanges.find(c => c.address === address && c.itemId === itemId && c.level === level) || null;
   };
 
@@ -2246,10 +2254,9 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                               gridTemplateColumns: 'repeat(4, 1fr)', 
                               gap: '0.75rem' 
                             }}>
-                              {/* Leveled items: render levels 1..3. Non-leveled items: render a single base card (level=0). */}
-                              {(categoryType.levels.length > 0 ? [1, 2, 3] : [0]).map((level) => {
-                                // Check if this level exists for this category
-                                if (level > 0 && !categoryType.levels.includes(level)) return null;
+                              {/* Leveled: L1–L3 cards. Non-leveled: one card with no level field. */}
+                              {levelsForCategory(categoryType).map((level) => {
+                                if (level != null && !categoryType.levels.includes(level)) return null;
                                 
                                 // Check for pending changes
                                 const pendingChange = getPendingChange(address, categoryId, level);
@@ -2260,7 +2267,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                                 
                                 return (
                                   <div
-                                    key={`${categoryId}_${level}`}
+                                    key={`${categoryId}_${level ?? 'base'}`}
                                     className={`admin-card-compact inventory-item-card ${hasChange ? (difference > 0 ? 'admin-card-positive has-change-positive' : 'admin-card-negative has-change-negative') : ''}`}
                                     style={{
                                       backgroundColor: !hasChange ? styles.bgTertiary : undefined,
@@ -2268,7 +2275,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                                     }}
                                   >
                                     <div className="admin-content inventory-item-content">
-                                      {level > 0 && (
+                                      {level != null && (
                                         <div className="admin-level-badge">
                                           <span className="admin-level-text">
                                             L{level}
@@ -2352,8 +2359,11 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                               {/* Add Item Card - 4th Column (matching wallets with inventory) */}
                               <CategoryAddItemCard
                                 onAddOne={() => {
-                                  const level = categoryType?.levels[0] ?? 0;
-                                  const key = level > 0 ? `${categoryId}_${level}` : categoryId;
+                                  const level =
+                                    categoryType && categoryType.levels.length > 0
+                                      ? categoryType.levels[0]
+                                      : undefined;
+                                  const key = inventoryRowKey(categoryId, level);
                                   const currentQty = walletInventories[address]?.inventory?.[key] ?? 0;
                                   const target = getPendingChange(address, categoryId, level)?.targetQuantity ?? currentQty;
                                   updatePendingChange(address, categoryId, level, target + 1);
@@ -2430,8 +2440,8 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                               gridTemplateColumns: 'repeat(4, 1fr)', 
                               gap: '0.75rem' 
                             }}>
-                              {(categoryType.levels.length > 0 ? [1, 2, 3] : [0]).map((level) => {
-                                if (level > 0 && !categoryType.levels.includes(level)) return null;
+                              {levelsForCategory(categoryType).map((level) => {
+                                if (level != null && !categoryType.levels.includes(level)) return null;
                                 
                                 const pendingChange = getPendingChange(address, categoryId, level);
                                 const currentQuantity = 0;
@@ -2441,7 +2451,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                                 
                                 return (
                                   <div
-                                    key={`${categoryId}_${level}`}
+                                    key={`${categoryId}_${level ?? 'base'}`}
                                     className={`admin-card-compact inventory-item-card ${hasChange ? (difference > 0 ? 'admin-card-positive has-change-positive' : 'admin-card-negative has-change-negative') : ''}`}
                                     style={{
                                       backgroundColor: !hasChange ? styles.bgTertiary : undefined,
@@ -2449,7 +2459,7 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                                     }}
                                   >
                                     <div className="admin-content inventory-item-content">
-                                      {level > 0 && (
+                                      {level != null && (
                                         <div className="admin-level-badge">
                                           <span className="admin-level-text">L{level}</span>
                                         </div>
@@ -2514,8 +2524,11 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                               })}
                               <CategoryAddItemCard
                                 onAddOne={() => {
-                                  const level = categoryType?.levels[0] ?? 0;
-                                  const key = level > 0 ? `${categoryId}_${level}` : categoryId;
+                                  const level =
+                                    categoryType && categoryType.levels.length > 0
+                                      ? categoryType.levels[0]
+                                      : undefined;
+                                  const key = inventoryRowKey(categoryId, level);
                                   const currentQty = walletInventories[address]?.inventory?.[key] ?? 0;
                                   const target = getPendingChange(address, categoryId, level)?.targetQuantity ?? currentQty;
                                   updatePendingChange(address, categoryId, level, target + 1);
@@ -2595,21 +2608,22 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                                           <h5 style={{ margin: 0, color: styles.text, fontSize: '0.95rem', fontWeight: 'bold' }}>{categoryType.name}</h5>
                                         </div>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
-                                          {(categoryType.levels.length > 0 ? [1, 2, 3] : [0]).map((level) => {
-                                            if (level > 0 && !categoryType.levels.includes(level)) return null;
+                                          {levelsForCategory(categoryType).map((level) => {
+                                            if (level != null && !categoryType.levels.includes(level)) return null;
                                             const pendingChange = getPendingChange(address, categoryId, level);
-                                            const currentQuantity = walletData.inventory?.[level > 0 ? `${categoryId}_${level}` : categoryId] ?? 0;
+                                            const currentQuantity =
+                                              walletData.inventory?.[inventoryRowKey(categoryId, level)] ?? 0;
                                             const targetQuantity = pendingChange ? pendingChange.targetQuantity : currentQuantity;
                                             const difference = targetQuantity - currentQuantity;
                                             const hasChange = difference !== 0;
                                             return (
                                               <div
-                                                key={`${categoryId}_${level}`}
+                                                key={`${categoryId}_${level ?? 'base'}`}
                                                 className={`admin-card-compact inventory-item-card ${hasChange ? (difference > 0 ? 'admin-card-positive has-change-positive' : 'admin-card-negative has-change-negative') : ''}`}
                                                 style={{ backgroundColor: !hasChange ? styles.bgTertiary : undefined, borderColor: !hasChange ? styles.border : undefined }}
                                               >
                                                 <div className="admin-content inventory-item-content">
-                                                  {level > 0 && <div className="admin-level-badge"><span className="admin-level-text">L{level}</span></div>}
+                                                  {level != null && <div className="admin-level-badge"><span className="admin-level-text">L{level}</span></div>}
                                                   <div className="inventory-quantity-section">
                                                     <div className="admin-content-row inventory-quantity-row">
                                                       <span className="admin-label-small">Cur:</span>
@@ -2639,8 +2653,12 @@ export function ItemsTab({ isAdminWalletConnected, connectedAddress, adminAddres
                                           })}
                                           <CategoryAddItemCard
                                             onAddOne={() => {
-                                              const level = categoryType?.levels[0] ?? 0;
-                                              const currentQty = walletData.inventory?.[level > 0 ? `${categoryId}_${level}` : categoryId] ?? 0;
+                                              const level =
+                                                categoryType && categoryType.levels.length > 0
+                                                  ? categoryType.levels[0]
+                                                  : undefined;
+                                              const currentQty =
+                                                walletData.inventory?.[inventoryRowKey(categoryId, level)] ?? 0;
                                               const target = getPendingChange(address, categoryId, level)?.targetQuantity ?? currentQty;
                                               updatePendingChange(address, categoryId, level, target + 1);
                                             }}

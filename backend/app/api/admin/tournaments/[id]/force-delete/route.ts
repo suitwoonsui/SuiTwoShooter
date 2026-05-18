@@ -9,7 +9,7 @@ import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler } from '@/lib/api/api-handler';
 import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
-import { getConfig } from '@/config/config';
+import { assertGameAdminServerConfigured } from '@/lib/auth';
 import { getAdminWalletService } from '@/lib/services/wallet/admin/admin-wallet-service';
 import {
   buildBatchViaChannel,
@@ -24,10 +24,7 @@ export async function OPTIONS(request: NextRequest) {
 
 export const POST = withApiHandler(
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    const config = getConfig();
-    if (!config.security.apiKey || config.security.apiKey === '') {
-      throw new Error('API_KEY not configured on server.');
-    }
+    assertGameAdminServerConfigured();
 
     const { id } = await params;
     const tournamentId = parseInt(id, 10);

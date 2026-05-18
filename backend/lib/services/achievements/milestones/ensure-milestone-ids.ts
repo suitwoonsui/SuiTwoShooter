@@ -9,7 +9,7 @@ export type MilestoneRowLike = {
   milestoneId?: number;
   threshold: number;
   credits: number;
-  items?: Array<{ itemId: string; level: number; quantity: number }>;
+  items?: Array<{ itemId: string; level?: number; quantity: number }>;
   level?: number;
 };
 

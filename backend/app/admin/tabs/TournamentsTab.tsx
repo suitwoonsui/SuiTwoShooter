@@ -12,6 +12,11 @@ import { ContractSelectionUI } from '../components/ContractSelectionUI';
 import { CopyableAddress } from '../components/CopyableAddress';
 import { TournamentCreationFeeEditor } from '../components/TournamentCreationFeeEditor';
 import { toDynamicProvisionKey } from '@/lib/services/store/catalog/item-id';
+import {
+  isLeveledProvisionItem,
+  serializeAdminInventoryItem,
+  type AdminInventoryItemInput,
+} from '@/lib/services/inventory/admin-inventory-item';
 
 const PROVISION_ITEM_OPTIONS = [
   { id: 'extra_lives', label: '❤️ Extra Lives' },
@@ -25,8 +30,8 @@ const PROVISION_ITEM_OPTIONS = [
 
 /** Ensure config has poolDistribution and other required fields (avoids .reduce on undefined) */
 function normalizeDefaultRewardConfig(
-  c: { rewardDepth?: number; poolDepth?: number; poolDistribution?: number[]; poolSource?: number; itemRewards?: Record<number, Array<{ itemId: string; level: number; quantity: number }>> } | null
-): { rewardDepth: number; poolDepth: number; poolDistribution: number[]; poolSource: number; itemRewards: Record<number, Array<{ itemId: string; level: number; quantity: number }>> } {
+  c: { rewardDepth?: number; poolDepth?: number; poolDistribution?: number[]; poolSource?: number; itemRewards?: Record<number, AdminInventoryItemInput[]> } | null
+): { rewardDepth: number; poolDepth: number; poolDistribution: number[]; poolSource: number; itemRewards: Record<number, AdminInventoryItemInput[]> } {
   if (!c) {
     return {
       rewardDepth: 10,
@@ -3634,8 +3639,8 @@ function DefaultRewardsConfigEditor({
     { id: 'extra_lives', name: 'Extra Lives', levels: [1, 2, 3] },
     { id: 'slow_time', name: 'Slow Time', levels: [1, 2, 3] },
     { id: 'coin_tractor_beam', name: 'Coin Tractor Beam', levels: [1, 2, 3] },
-    { id: 'destroy_all', name: 'Destroy All Enemies', levels: [1] },
-    { id: 'boss_kill_shot', name: 'Boss Kill Shot', levels: [1] },
+    { id: 'destroy_all', name: 'Destroy All Enemies', levels: [] },
+    { id: 'boss_kill_shot', name: 'Boss Kill Shot', levels: [] },
   ];
 
   const getAvailableItem = (itemId: string) => {
@@ -3874,9 +3879,17 @@ function DefaultRewardsConfigEditor({
                     <select
                       value={toDynamicProvisionKey(item.itemId)}
                       onChange={(e) => {
+                        const newItemId = e.target.value;
                         const newItemRewards = { ...currentConfig.itemRewards };
                         newItemRewards[rank] = [...(newItemRewards[rank] || [])];
-                        newItemRewards[rank][itemIdx] = { ...item, itemId: e.target.value };
+                        const draft = {
+                          ...item,
+                          itemId: newItemId,
+                          level: isLeveledProvisionItem(newItemId) || newItemId === 'random'
+                            ? (item.level ?? 1)
+                            : undefined,
+                        };
+                        newItemRewards[rank][itemIdx] = serializeAdminInventoryItem(draft);
                         onConfigChange({ ...currentConfig, itemRewards: newItemRewards });
                       }}
                       style={{
@@ -3894,27 +3907,32 @@ function DefaultRewardsConfigEditor({
                         </option>
                       ))}
                     </select>
-                    <select
-                      value={item.level}
-                      onChange={(e) => {
-                        const newItemRewards = { ...currentConfig.itemRewards };
-                        newItemRewards[rank] = [...(newItemRewards[rank] || [])];
-                        newItemRewards[rank][itemIdx] = { ...item, level: parseInt(e.target.value) };
-                        onConfigChange({ ...currentConfig, itemRewards: newItemRewards });
-                      }}
-                      style={{
-                        width: '100px',
-                        padding: '0.5rem',
-                        backgroundColor: styles.bgSecondary,
-                        color: styles.text,
-                        border: `1px solid ${styles.border}`,
-                        borderRadius: '4px',
-                      }}
-                    >
-                      {(getAvailableItem(item.itemId)?.levels ?? []).map((level) => (
-                        <option key={level} value={level}>Level {level}</option>
-                      ))}
-                    </select>
+                    {(getAvailableItem(item.itemId)?.levels?.length ?? 0) > 0 && (
+                      <select
+                        value={item.level ?? 1}
+                        onChange={(e) => {
+                          const newItemRewards = { ...currentConfig.itemRewards };
+                          newItemRewards[rank] = [...(newItemRewards[rank] || [])];
+                          newItemRewards[rank][itemIdx] = {
+                            ...item,
+                            level: parseInt(e.target.value, 10) || 1,
+                          };
+                          onConfigChange({ ...currentConfig, itemRewards: newItemRewards });
+                        }}
+                        style={{
+                          width: '100px',
+                          padding: '0.5rem',
+                          backgroundColor: styles.bgSecondary,
+                          color: styles.text,
+                          border: `1px solid ${styles.border}`,
+                          borderRadius: '4px',
+                        }}
+                      >
+                        {(getAvailableItem(item.itemId)?.levels ?? []).map((level) => (
+                          <option key={level} value={level}>Level {level}</option>
+                        ))}
+                      </select>
+                    )}
                     <input
                       type="number"
                       min="1"

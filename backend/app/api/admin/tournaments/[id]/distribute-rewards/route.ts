@@ -5,7 +5,7 @@
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { getConfig } from '@/config/config';
+import { assertGameAdminServerConfigured } from '@/lib/auth';
 import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { getTournamentService } from '@/lib/services/tournament/core/tournament-service';
 import { getAdminWalletService } from '@/lib/services/wallet/admin/admin-wallet-service';
@@ -25,10 +25,7 @@ const distributionLocks = new Map<number, Promise<any>>();
 
 export const POST = withApiHandler(
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
-    const config = getConfig();
-    if (!config.security.apiKey || config.security.apiKey === '') {
-      throw new Error('API_KEY not configured on server.');
-    }
+    assertGameAdminServerConfigured();
 
     // Await params (Next.js 15 requirement)
     const { id } = await params;

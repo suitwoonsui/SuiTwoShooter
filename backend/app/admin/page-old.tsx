@@ -507,8 +507,8 @@ export default function AdminPage() {
     { id: 'force_field', name: 'Force Field', levels: [1, 2, 3] },
     { id: 'orb_level', name: 'Orb Level', levels: [1, 2, 3] },
     { id: 'slow_time', name: 'Slow Time', levels: [1, 2, 3] },
-    { id: 'destroy_all', name: 'Destroy All Enemies', levels: [1] },
-    { id: 'boss_kill_shot', name: 'Boss Kill Shot', levels: [1] },
+    { id: 'destroy_all', name: 'Destroy All Enemies', levels: [] },
+    { id: 'boss_kill_shot', name: 'Boss Kill Shot', levels: [] },
     { id: 'coin_tractor_beam', name: 'Coin Tractor Beam', levels: [1, 2, 3] },
   ];
 

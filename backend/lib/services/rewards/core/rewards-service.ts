@@ -13,12 +13,14 @@ import { getConfig } from '@/config/config';
 import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { priceConverter } from '@/lib/services/payments/converter/price-converter';
 import { signAndSubmitRewardTransactions } from '@/lib/services/rewards/executor/rewards-platform-executor';
+import {
+  type AdminInventoryItemInput,
+  isLeveledProvisionItem,
+  rewardItemForProvision,
+  serializeAdminInventoryItem,
+} from '@/lib/services/inventory/admin-inventory-item';
 
-export interface RewardItem {
-  itemId: string;
-  level: number;
-  quantity: number;
-}
+export type RewardItem = AdminInventoryItemInput;
 
 export interface TournamentRewardDistribution {
   rank: number;
@@ -269,20 +271,21 @@ export class RewardsService {
 
     // Convert to RewardItem format, resolving "random" to actual items
     for (const item of rankItems) {
-      if (item.itemId && item.level && item.quantity) {
-        // Resolve "random" to an actual random Level 1 item
-        if (item.itemId === 'random') {
-          // Get random items for each quantity requested
-          for (let i = 0; i < item.quantity; i++) {
-            items.push(...this.getRandomLevel1Item());
-          }
-        } else {
-          items.push({
-            itemId: item.itemId,
-            level: item.level,
-            quantity: item.quantity,
-          });
+      if (!item?.itemId || !item?.quantity) continue;
+      const needsLevel = item.itemId === 'random' || isLeveledProvisionItem(item.itemId);
+      if (needsLevel && (item.level == null || item.level < 1)) continue;
+      if (!needsLevel && item.level != null) continue;
+
+      if (item.itemId === 'random') {
+        for (let i = 0; i < item.quantity; i++) {
+          items.push(...this.getRandomLevel1Item());
         }
+      } else {
+        items.push(serializeAdminInventoryItem({
+          itemId: item.itemId,
+          quantity: item.quantity,
+          ...(item.level != null ? { level: item.level } : {}),
+        }));
       }
     }
 
@@ -303,16 +306,16 @@ export class RewardsService {
     // Top 3 get special items
     if (rank === 1) {
       // 1st Place: Destroy All + Boss Kill Shot + 1 random Level 1 item
-      items.push({ itemId: 'destroy_all', level: 1, quantity: 1 });
-      items.push({ itemId: 'boss_kill_shot', level: 1, quantity: 1 });
+      items.push(rewardItemForProvision('destroy_all', 1));
+      items.push(rewardItemForProvision('boss_kill_shot', 1));
       items.push(...this.getRandomLevel1Item());
     } else if (rank === 2) {
       // 2nd Place: Boss Kill Shot + 1 random Level 1 item
-      items.push({ itemId: 'boss_kill_shot', level: 1, quantity: 1 });
+      items.push(rewardItemForProvision('boss_kill_shot', 1));
       items.push(...this.getRandomLevel1Item());
     } else if (rank === 3) {
       // 3rd Place: Destroy All + 1 random Level 1 item
-      items.push({ itemId: 'destroy_all', level: 1, quantity: 1 });
+      items.push(rewardItemForProvision('destroy_all', 1));
       items.push(...this.getRandomLevel1Item());
     } else {
       // 4th-10th Place: 1 random Level 1 item

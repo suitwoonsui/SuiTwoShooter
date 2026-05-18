@@ -3,12 +3,14 @@
 // Used by backend (Initialize, normalize) and admin UI (form defaults).
 // ==========================================
 
+import type { AdminInventoryItemInput } from '@/lib/services/inventory/admin-inventory-item';
+
 export type DefaultRewardConfig = {
   rewardDepth: number;
   poolDepth: number;
   poolDistribution: number[];
   poolSource: number;
-  itemRewards: Record<number, Array<{ itemId: string; level: number; quantity: number }>>;
+  itemRewards: Record<number, AdminInventoryItemInput[]>;
 };
 
 /**
@@ -22,16 +24,16 @@ export const DEFAULT_REWARD_CONFIG: DefaultRewardConfig = {
   poolSource: 0,
   itemRewards: {
     1: [
-      { itemId: 'destroy_all', level: 1, quantity: 1 },
-      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
+      { itemId: 'destroy_all', quantity: 1 },
+      { itemId: 'boss_kill_shot', quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     2: [
-      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
+      { itemId: 'boss_kill_shot', quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     3: [
-      { itemId: 'destroy_all', level: 1, quantity: 1 },
+      { itemId: 'destroy_all', quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     4: [{ itemId: 'random', level: 1, quantity: 1 }],

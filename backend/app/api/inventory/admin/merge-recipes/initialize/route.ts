@@ -1,7 +1,7 @@
 // ==========================================
 // Inventory Merge Recipes Initialization (Admin)
 // Registers Reservoir merge recipes (3→1 and optional hyper 9→1) for leveled store items.
-// On-chain: `reservoir::register_merge_recipe` (requires CorridorAdminCap).
+// Recipes are stored in Aquifer (source of truth) and synced to Reservoir via register_merge_recipe for player merges.
 // ==========================================
 
 import { NextRequest } from 'next/server';
@@ -149,6 +149,7 @@ export const POST = withApiHandler(async (request: NextRequest) => {
     }).toBytes();
     const value = Buffer.from(valueBytes).toString('base64');
 
+    const senderAddress = adminWallet.getAddress();
     const build = await buildBatchViaChannel(
       {
         operations: [
@@ -158,7 +159,7 @@ export const POST = withApiHandler(async (request: NextRequest) => {
               key,
               value,
               corridorAdminCapabilityObjectId: corridorAdminCapId,
-              senderAddress: adminWallet.getAddress(),
+              senderAddress,
               gasBudgetMist,
             },
           },
@@ -173,18 +174,30 @@ export const POST = withApiHandler(async (request: NextRequest) => {
       continue;
     }
 
-    const transactionBase64 = build.transactions[0];
-    const txBytes = Buffer.from(transactionBase64, 'base64');
-    const signed = await adminWallet.getKeypair().signTransaction(txBytes);
-    const signature = typeof signed === 'object' && signed !== null && 'signature' in signed ? (signed as { signature: string }).signature : String(signed);
-
-    const exec = await platformTxClient.executeSigned({ transactionBytesBase64: transactionBase64, signature }, platformOptions);
-    if (!exec.success) {
-      results.push({ recipeId: r.recipeId, itemId: r.itemId, success: false, error: exec.error || 'Execution failed' });
+    let lastDigest: string | undefined;
+    let recipeError: string | undefined;
+    for (const transactionBase64 of build.transactions) {
+      const txBytes = Buffer.from(transactionBase64, 'base64');
+      const signed = await adminWallet.getKeypair().signTransaction(txBytes);
+      const signature =
+        typeof signed === 'object' && signed !== null && 'signature' in signed
+          ? (signed as { signature: string }).signature
+          : String(signed);
+      const exec = await platformTxClient.executeSigned({ transactionBytesBase64: transactionBase64, signature }, platformOptions);
+      if (!exec.success) {
+        recipeError = exec.error || 'Transaction execution failed';
+        break;
+      }
+      if (exec.digest) {
+        lastDigest = exec.digest;
+        digests.push(exec.digest);
+      }
+    }
+    if (recipeError) {
+      results.push({ recipeId: r.recipeId, itemId: r.itemId, success: false, error: recipeError });
       continue;
     }
-    if (exec.digest) digests.push(exec.digest);
-    results.push({ recipeId: r.recipeId, itemId: r.itemId, digest: exec.digest, success: true });
+    results.push({ recipeId: r.recipeId, itemId: r.itemId, digest: lastDigest, success: true });
   }
 
   const ok = results.filter((x) => x.success).length;
@@ -192,7 +205,10 @@ export const POST = withApiHandler(async (request: NextRequest) => {
 
   return {
     success: failed === 0,
-    message: failed === 0 ? `Saved ${ok} merge recipes to Aquifer.` : `Saved ${ok} merge recipes to Aquifer; ${failed} failed.`,
+    message:
+      failed === 0
+        ? `Saved ${ok} merge recipes to Aquifer and synced them to Reservoir.`
+        : `Saved ${ok} merge recipes; ${failed} failed (Aquifer and/or Reservoir sync).`,
     digests,
     results,
   };

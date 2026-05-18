@@ -7,13 +7,18 @@
 import { NextRequest } from 'next/server';
 import { buildBatchViaChannel, platformTxClient, buildPlatformCallOptions, getCorridorCapabilityObjectIdFromEnv } from '@/lib/services/platform/client/platform-client';
 import { handleCorsPreflight } from '@/lib/cors';
-import { getConfig } from '@/config/config';
+import { assertGameAdminServerConfigured } from '@/lib/auth';
 import { getAdminWalletService } from '@/lib/services/wallet/admin/admin-wallet-service';
 import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
 import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
 import { PlatformValidators } from '@/lib/services/platform/validators/platform-validators';
 import { toDynamicProvisionKey } from '@/lib/services/store/catalog/item-id';
+import {
+  type AdminInventoryItemInput,
+  normalizeAdminInventoryItemForPlatform,
+  validateAdminInventoryItem,
+} from '@/lib/services/inventory/admin-inventory-item';
 
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPreflight(request);
@@ -25,14 +30,11 @@ export async function OPTIONS(request: NextRequest) {
  */
 export const POST = withApiHandler(
   async (request: NextRequest) => {
-    const config = getConfig();
-    if (!config.security.apiKey || config.security.apiKey === '') {
-      throw new Error('API_KEY not configured on server. Please set API_KEY in backend/.env.local');
-    }
+    assertGameAdminServerConfigured();
 
     const body = await getRequestBody<{
       playerAddress: string;
-      items: Array<{ itemId: string; level: number; quantity: number }>;
+      items: AdminInventoryItemInput[];
       adminWalletAddress: string;
       ecosystemId?: string;
     }>(request);
@@ -70,22 +72,19 @@ export const POST = withApiHandler(
 
     const mappedItems: Array<{ itemKey: string; level: number; quantity: number }> = [];
     for (const item of items) {
-      if (!item.itemId || item.level == null || item.quantity == null) {
+      try {
+        validateAdminInventoryItem(item);
+      } catch (e) {
         throw new PlatformError(
-          PlatformErrorCode.INVALID_ADDRESS,
-          'Each item must have itemId, level, and quantity.'
+          PlatformErrorCode.INVALID_INPUT,
+          e instanceof Error ? e.message : 'Invalid item'
         );
       }
-      if (item.quantity <= 0) {
-        throw new PlatformError(
-          PlatformErrorCode.INVALID_ADDRESS,
-          'Quantity must be greater than 0.'
-        );
-      }
+      const normalized = normalizeAdminInventoryItemForPlatform(item);
       mappedItems.push({
-        itemKey: toDynamicProvisionKey(item.itemId),
-        level: item.level,
-        quantity: item.quantity,
+        itemKey: toDynamicProvisionKey(normalized.itemId),
+        level: normalized.level,
+        quantity: normalized.quantity,
       });
     }
 

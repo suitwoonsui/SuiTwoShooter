@@ -7,6 +7,7 @@ import { fetchStockroomOffersMap, getStockroomUsdPriceForLevel } from '@/lib/ser
 import { getBadgeService } from '@/lib/services/badge/core/badge-service';
 import { getDiscounts } from '@/lib/services/badge/utilities/badge-utilities';
 import { getGameConfigService } from '@/lib/services/config/game-config/game-config-service';
+import type { AdminInventoryItemInput } from '@/lib/services/inventory/admin-inventory-item';
 
 /**
  * Tournament reward configuration (TypeScript interface)
@@ -26,11 +27,8 @@ export interface TournamentRewardConfig {
 /**
  * Item reward entry
  */
-export interface ItemReward {
-  itemId: string;      // Item type: 'orb_level', 'force_field', 'extra_lives', 'slow_time', 'coin_tractor_beam', 'destroy_all', 'boss_kill_shot'
-  level: number;        // Item level (1, 2, or 3)
-  quantity: number;     // Number of items
-}
+/** @see AdminInventoryItemInput — `level` only for leveled SKUs and `random` placeholder. */
+export type ItemReward = AdminInventoryItemInput;
 
 /**
  * Reward cost calculation result
@@ -171,20 +169,22 @@ export class RewardCostCalculator {
     for (const [rank, items] of itemRewardsMap.entries()) {
       
       for (const item of items) {
-        const itemPrice = getStockroomUsdPriceForLevel(offers, item.itemId, item.level);
+        const isSpecial = SPECIAL_ITEMS.includes(item.itemId);
+        const levelForPrice = isSpecial ? 1 : (item.level ?? 1);
+        const itemPrice = getStockroomUsdPriceForLevel(offers, item.itemId, levelForPrice);
         if (itemPrice == null) {
-          console.warn(`Missing Stockroom price for ${item.itemId} level ${item.level}`);
+          console.warn(`Missing Stockroom price for ${item.itemId} level ${levelForPrice}`);
           continue;
         }
 
         const quantity = item.quantity || 1;
 
         // Check if special item (apply badge discount only, no base discount)
-        if (SPECIAL_ITEMS.includes(item.itemId)) {
+        if (isSpecial) {
           specialItemCost += itemPrice * quantity * badgeDiscountFactor;
         }
         // Check if level 2+ (apply badge discount only to price difference)
-        else if (item.level > 1) {
+        else if (item.level != null && item.level > 1) {
           const level1Price = getStockroomUsdPriceForLevel(offers, item.itemId, 1) ?? avgLevel1;
           const priceDifference = itemPrice - level1Price;
           level2PlusCost += priceDifference * quantity * badgeDiscountFactor;

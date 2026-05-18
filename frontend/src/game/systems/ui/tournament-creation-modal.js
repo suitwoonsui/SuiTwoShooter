@@ -49,8 +49,8 @@ const AVAILABLE_ITEMS = [
   { id: 'extra_lives', name: 'Extra Lives', levels: [1, 2, 3] },
   { id: 'slow_time', name: 'Slow Time', levels: [1, 2, 3] },
   { id: 'coin_tractor_beam', name: 'Coin Tractor Beam', levels: [1, 2, 3] },
-  { id: 'destroy_all', name: 'Destroy All Enemies', levels: [1], special: true },
-  { id: 'boss_kill_shot', name: 'Boss Kill Shot', levels: [1], special: true },
+  { id: 'destroy_all', name: 'Destroy All Enemies', levels: [], special: true },
+  { id: 'boss_kill_shot', name: 'Boss Kill Shot', levels: [], special: true },
 ];
 
 // Wizard state
@@ -534,16 +534,16 @@ async function getDefaultRewardConfigForDisplay() {
   // "random" is resolved at distribution time, not at display time
   const itemRewards = {
     1: [
-      { itemId: 'destroy_all', level: 1, quantity: 1 },
-      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
+      { itemId: 'destroy_all', quantity: 1 },
+      { itemId: 'boss_kill_shot', quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     2: [
-      { itemId: 'boss_kill_shot', level: 1, quantity: 1 },
+      { itemId: 'boss_kill_shot', quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     3: [
-      { itemId: 'destroy_all', level: 1, quantity: 1 },
+      { itemId: 'destroy_all', quantity: 1 },
       { itemId: 'random', level: 1, quantity: 1 },
     ],
     4: [{ itemId: 'random', level: 1, quantity: 1 }],

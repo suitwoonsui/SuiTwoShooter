@@ -6,7 +6,7 @@
 import { NextRequest } from 'next/server';
 import { handleCorsPreflight } from '@/lib/cors';
 import { withApiHandler, getRequestBody } from '@/lib/api/api-handler';
-import { getConfig } from '@/config/config';
+import { assertGameAdminServerConfigured } from '@/lib/auth';
 import { getAdminWalletService } from '@/lib/services/wallet/admin/admin-wallet-service';
 import { PlatformLogger } from '@/lib/services/platform/logging/platform-logger';
 import { PlatformError, PlatformErrorCode } from '@/lib/services/platform/errors/platform-errors';
@@ -19,10 +19,7 @@ export async function OPTIONS(request: NextRequest) {
 
 export const POST = withApiHandler(
   async (request: NextRequest) => {
-    const config = getConfig();
-    if (!config.security.apiKey || config.security.apiKey === '') {
-      throw new Error('API_KEY not configured on server. Please set API_KEY in backend/.env.local');
-    }
+    assertGameAdminServerConfigured();
 
     const body = await getRequestBody<{
       playerAddress: string;
