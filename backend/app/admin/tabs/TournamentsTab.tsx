@@ -17,6 +17,7 @@ import {
   serializeAdminInventoryItem,
   type AdminInventoryItemInput,
 } from '@/lib/services/inventory/admin-inventory-item';
+import type { DefaultRewardConfig } from '@/lib/services/tournament/rewards-config/default-rewards-constants';
 
 const PROVISION_ITEM_OPTIONS = [
   { id: 'extra_lives', label: '❤️ Extra Lives' },
@@ -31,7 +32,7 @@ const PROVISION_ITEM_OPTIONS = [
 /** Ensure config has poolDistribution and other required fields (avoids .reduce on undefined) */
 function normalizeDefaultRewardConfig(
   c: { rewardDepth?: number; poolDepth?: number; poolDistribution?: number[]; poolSource?: number; itemRewards?: Record<number, AdminInventoryItemInput[]> } | null
-): { rewardDepth: number; poolDepth: number; poolDistribution: number[]; poolSource: number; itemRewards: Record<number, AdminInventoryItemInput[]> } {
+): DefaultRewardConfig {
   if (!c) {
     return {
       rewardDepth: 10,
@@ -82,13 +83,7 @@ export function TournamentsTab({ isAdminWalletConnected, connectedAddress, admin
   const [activeSection, setActiveSection] = useState<'create' | 'tickets' | 'rewards' | 'manage' | 'defaultRewards'>('create');
   
   // Default rewards configuration state
-  const [defaultRewardConfig, setDefaultRewardConfig] = useState<{
-    rewardDepth: number;
-    poolDepth: number;
-    poolDistribution: number[];
-    poolSource: number;
-    itemRewards: Record<number, Array<{ itemId: string; level: number; quantity: number }>>;
-  } | null>(null);
+  const [defaultRewardConfig, setDefaultRewardConfig] = useState<DefaultRewardConfig | null>(null);
   const [loadingDefaultRewards, setLoadingDefaultRewards] = useState(false);
   const [initDefaultRewardsLoading, setInitDefaultRewardsLoading] = useState(false);
   const [initDefaultRewardsResult, setInitDefaultRewardsResult] = useState<{
@@ -3619,14 +3614,8 @@ function DefaultRewardsConfigEditor({
   onConfigChange,
   styles,
 }: {
-  config: {
-    rewardDepth: number;
-    poolDepth: number;
-    poolDistribution: number[];
-    poolSource: number;
-    itemRewards: Record<number, Array<{ itemId: string; level: number; quantity: number }>>;
-  } | null;
-  onConfigChange: (config: any) => void;
+  config: DefaultRewardConfig | null;
+  onConfigChange: (config: DefaultRewardConfig) => void;
   styles: AdminStyles;
 }) {
   // Normalize so poolDistribution and other fields are always defined (avoids .reduce on undefined)

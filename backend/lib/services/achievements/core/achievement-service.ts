@@ -34,13 +34,17 @@ import {
   invalidateMilestoneDefinitionsPublicCache,
 } from '@/lib/cache/public-nonuser-data-cache';
 import type { NormalizedMilestoneDefinitions } from '@/lib/services/achievements/milestones/milestone-definitions-public-load';
+import {
+  normalizeAdminInventoryItemForPlatform,
+  type AdminInventoryItemInput,
+} from '@/lib/services/inventory/admin-inventory-item';
 
 // Milestone definitions from MONETIZATION_STRATEGY.md
 export interface MilestoneDefinition {
   milestoneId?: number; // Stable unique identifier (never changes)
   threshold: number;
   credits: number;
-  items: Array<{ itemId: string; level: number; quantity: number }>;
+  items: AdminInventoryItemInput[];
   level?: number; // Optional: actual on-chain level number
 }
 
@@ -74,7 +78,7 @@ export interface EligibleAchievement {
   milestoneId?: number; // Stable unique identifier
   threshold: number;
   credits: number;
-  items: Array<{ itemId: string; level: number; quantity: number }>;
+  items: AdminInventoryItemInput[];
 }
 
 export class AchievementService {
@@ -537,7 +541,7 @@ export class AchievementService {
     playerAddress: string,
     milestones: EligibleAchievement[],
     totalCredits: number,
-    allItems: Array<{ itemId: string; level: number; quantity: number }>,
+    allItems: AdminInventoryItemInput[],
     hasRewards: boolean
   ): Promise<{
     success: boolean;
@@ -587,7 +591,7 @@ export class AchievementService {
             {
               recipientAddress: playerAddress,
               credits: totalCredits > 0 ? totalCredits : undefined,
-              items: allItems.length ? allItems : undefined,
+              items: allItems.length ? allItems.map(normalizeAdminInventoryItemForPlatform) : undefined,
             },
           ],
           adminWalletAddress: admin,
@@ -971,7 +975,7 @@ export class AchievementService {
         playerAddress,
         lastActorAddress: adminAddr,
         credits: milestone.credits,
-        items: milestone.items ?? [],
+        items: (milestone.items ?? []).map(normalizeAdminInventoryItemForPlatform),
         linkageDigest: payoutDigest,
       });
       const wakeRes = await this.submitWakeStatsBatch(playerAddress, completeWake);
@@ -1116,7 +1120,7 @@ export class AchievementService {
       }
 
       let totalCredits = 0;
-      const allItems: Array<{ itemId: string; level: number; quantity: number }> = [];
+      const allItems: AdminInventoryItemInput[] = [];
       for (const milestone of toClaim) {
         totalCredits += milestone.credits;
         if (milestone.items) {
@@ -1181,7 +1185,7 @@ export class AchievementService {
             playerAddress,
             lastActorAddress: adminAddr,
             credits: m.credits,
-            items: m.items ?? [],
+            items: (m.items ?? []).map(normalizeAdminInventoryItemForPlatform),
             linkageDigest: payoutDigest,
           })
         );

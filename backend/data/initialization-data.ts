@@ -5,6 +5,7 @@
 // All initialization scripts should import from here instead of hardcoding data
 
 import { DEFAULT_PROVISIONS_SEED } from '../lib/services/store/catalog/provisions';
+import type { AdminInventoryItemInput } from '../lib/services/inventory/admin-inventory-item';
 
 /** Re-export: on-chain catalog bootstrap template (Admin initialize). Not the runtime catalog. */
 export { DEFAULT_PROVISIONS_SEED };
@@ -88,7 +89,7 @@ export interface MilestoneDefinition {
   milestoneId?: number; // Stable unique ID (stored on chain; used for claim/unclaim)
   threshold: number;
   credits: number;
-  items: Array<{ itemId: string; level: number; quantity: number }>;
+  items: AdminInventoryItemInput[];
 }
 
 // Source data. May optionally include explicit milestoneId values (recommended for long-term stability).

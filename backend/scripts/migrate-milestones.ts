@@ -16,6 +16,7 @@ import { fromHEX } from '@mysten/sui/utils';
 import { Transaction } from '@mysten/sui/transactions';
 import { bech32 } from 'bech32';
 import { MILESTONE_DEFINITIONS } from '../data/initialization-data';
+import { normalizeAdminInventoryItemForPlatform } from '../lib/services/inventory/admin-inventory-item';
 
 const CATEGORY_CODES: Record<string, number> = {
   gamesPlayed: 1,
@@ -118,15 +119,16 @@ async function main() {
       const itemQuantities: bigint[] = [];
       let valid = true;
       for (const item of def.items) {
-        const u8 = ITEM_ID_TO_U8[item.itemId];
+        const norm = normalizeAdminInventoryItemForPlatform(item);
+        const u8 = ITEM_ID_TO_U8[norm.itemId];
         if (u8 === undefined) {
-          console.warn(`Invalid itemId: ${item.itemId} in ${categoryName} level ${level}`);
+          console.warn(`Invalid itemId: ${norm.itemId} in ${categoryName} level ${level}`);
           valid = false;
           break;
         }
         itemIds.push(u8);
-        itemLevels.push(item.level);
-        itemQuantities.push(BigInt(item.quantity));
+        itemLevels.push(norm.level);
+        itemQuantities.push(BigInt(norm.quantity));
       }
       if (!valid) continue;
       categories.push(categoryCode);
