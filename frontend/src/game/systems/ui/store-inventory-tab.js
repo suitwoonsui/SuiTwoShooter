@@ -844,40 +844,47 @@ const StoreInventoryTab = {
 
           const executeResult = await window.walletAPIInstance.signAndExecuteTransaction(result.transaction);
 
-          // Wallet providers may return a digest without effects.status; treat that as "submitted" and
-          // confirm via backend before showing success + refreshing inventory.
-          const digest = executeResult?.digest;
-          const isWalletSuccess = executeResult?.success === true;
-          const status = executeResult?.status;
-          const finalStatus = executeResult?.finalStatus;
-          const canConfirm = typeof digest === 'string' && digest.trim().length > 0;
+          if (!executeResult?.success && !executeResult?.digest) {
+            throw new Error(executeResult?.error || 'Transaction signing failed');
+          }
 
-          let confirmed = false;
-          let exists = false;
-          let chainStatus = null;
+          const digest = executeResult?.digest;
+          if (typeof digest !== 'string' || !digest.trim()) {
+            throw new Error(executeResult?.error || 'Transaction submitted without a digest');
+          }
+
+          // Only on-chain success counts — same pattern as store purchase (poll /api/tx/status).
+          const txStatusBase = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
+          const network =
+            (typeof window.GAME_CONFIG !== 'undefined' && window.GAME_CONFIG.SUI_NETWORK) ||
+            (typeof window.GAME_CONFIG !== 'undefined' && window.GAME_CONFIG.suiNetwork) ||
+            'testnet';
+
+          let chainStatus = executeResult?.status === 'success' || executeResult?.finalStatus === 'success' ? 'success' : null;
           let chainError = null;
-          if (!isWalletSuccess && canConfirm) {
+          let attempts = 0;
+          const maxAttempts = 40;
+
+          while (chainStatus !== 'success' && chainStatus !== 'failure' && attempts < maxAttempts) {
+            await new Promise((r) => setTimeout(r, 500));
+            attempts++;
             try {
-              const API_BASE_URL = window.GameApi ? window.GameApi.getBaseUrl() : (window.GAME_CONFIG?.GAME_BACKEND_URL || window.GAME_CONFIG?.API_BASE_URL || 'http://localhost:3001/api');
-              const txRes = await fetch(`${API_BASE_URL}/tx/status/${encodeURIComponent(digest)}?network=testnet`, { cache: 'no-store' });
+              const txRes = await fetch(
+                `${txStatusBase}/tx/status/${encodeURIComponent(digest)}?network=${encodeURIComponent(network)}`,
+                { cache: 'no-store' }
+              );
+              if (!txRes.ok) continue;
               const txData = await txRes.json().catch(() => null);
-              exists = Boolean(txData?.exists);
-              confirmed = Boolean(txData?.confirmed);
-              chainStatus = txData?.status ?? null;
-              chainError = txData?.error ?? null;
+              if (txData?.status === 'success' || txData?.status === 'failure') {
+                chainStatus = txData.status;
+                chainError = txData?.error ?? null;
+              }
             } catch (_) {
-              // best-effort; fall through to failure
+              /* retry */
             }
           }
 
-          const isConfirmedSuccess =
-            isWalletSuccess ||
-            status === 'success' ||
-            finalStatus === 'success' ||
-            chainStatus === 'success' ||
-            confirmed;
-
-          if (isConfirmedSuccess) {
+          if (chainStatus === 'success') {
             alert(`✅ ${mergeType} successful! You now have 1x ${itemType} Level ${targetLevel}.`);
             
             // Keep inventory caches consistent (PlayerInventoryCache + store/item-selection).
@@ -901,10 +908,9 @@ const StoreInventoryTab = {
             }
           } else {
             const msg =
-              executeResult?.error ||
-              (canConfirm && chainStatus === 'failure' ? `Transaction failed: ${chainError || digest}` : null) ||
-              (canConfirm && (exists || confirmed) ? `Transaction not confirmed yet (digest: ${digest})` : null) ||
-              'Transaction execution failed';
+              chainStatus === 'failure'
+                ? `Merge failed on-chain: ${chainError || digest}`
+                : `Merge not confirmed in time (digest: ${digest}). Check your wallet or explorer before retrying.`;
             throw new Error(msg);
           }
         } catch (error) {
